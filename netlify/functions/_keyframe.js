@@ -145,6 +145,10 @@ async function createKeyframe(supabase, { series, episode, shot, characters, log
   // Memoria visual automática: si el lugar de esta toma no tiene imagen fija todavía, se crea
   // primero (una sola vez por lugar) para que todas las tomas de ese lugar compartan el set.
   const seriesId = series.id || episode.series_id;
+  // Primero se revisan las fotos de cara (sin gastar nada): antes se creaba la imagen del
+  // lugar y DESPUÉS fallaba por falta de foto.
+  const sinFoto = (shot.characters || []).filter((name) => { const r = (characters || []).find((x) => x.name === name); return !r || !r.reference_image_url; });
+  if (sinFoto.length) throw new Error(`Falta la foto de cara de: ${sinFoto.join(', ')}. Genérala en el Elenco antes de crear el cuadro.`);
   const locs = (series.visual_memory && series.visual_memory.locations) || {};
   const hasLocDef = !!(series.story_bible && series.story_bible.locations && series.story_bible.locations[shot.location]);
   if (shot.location && hasLocDef && !(locs[shot.location] && locs[shot.location].url)) {

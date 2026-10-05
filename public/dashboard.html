@@ -1377,6 +1377,7 @@
         const episodeId = btn.dataset.ep;
         const ep = await freshEpisodeOrBlock(episodeId);
         if (!ep) return;
+        if (blockIfMissingPhotos(ep)) return;
         const missing = (ep.shots || []).filter(sh => !frameFor(ep, sh.n) && !clipFor(ep, sh.n)).length;
         const newLocs = missingLocationsFor(ep);
         if (!await askConfirm('Generar ' + missing + ' cuadros iniciales del EP ' + ep.episode_number + ' (sin video).\n\n' +
@@ -1434,9 +1435,28 @@
         return false;
       }
 
+      // Personajes de las tomas indicadas que todavía no tienen foto de cara (sin foto no hay cuadro).
+      function missingPhotos(ep, shotNumbers) {
+        const chars = (lastLoadedData && lastLoadedData.characters) || [];
+        const names = new Set();
+        (ep.shots || []).filter(sh => !shotNumbers || shotNumbers.includes(sh.n)).forEach(sh => (sh.characters || []).forEach(n => {
+          const c = chars.find(x => x.name === n);
+          if (!c || !c.reference_image_url) names.add(n);
+        }));
+        return [...names];
+      }
+      function blockIfMissingPhotos(ep, shotNumbers) {
+        const miss = missingPhotos(ep, shotNumbers);
+        if (!miss.length) return false;
+        alert('📷 Faltan las fotos de cara de:\n\n' + miss.map(n => '• ' + n).join('\n') + '\n\nSin la foto no se puede crear el cuadro inicial. Ve al Elenco y dale "Generar fotos que faltan" (~$' + (miss.length * IMAGE_PRICE_USD).toFixed(2) + '). No se mandó nada ni se cobró nada.');
+        return true;
+      }
+
       async function generateKeyframe(episodeId, n) {
         const ep = await freshEpisodeOrBlock(episodeId);
         if (!ep) return;
+        if (blockIfMissingPhotos(ep, [n])) return;
+        const startedAt = Date.now();
         const prev = ep && frameFor(ep, n);
         const prevUpdated = prev ? prev.updated_at : null;
         const box = document.querySelector('[data-shot="' + episodeId + '-' + n + '"]');
@@ -1452,12 +1472,16 @@
           alert('No se pudo generar el cuadro: ' + err.message);
           return loadDashboard();
         }
+        let failed = null;
         const ok = await pollUntil(d => {
           const cur = (d.episodes || []).find(x => x.id === episodeId);
           const f = cur && frameFor(cur, n);
+          const ke = cur && cur.validator_report && cur.validator_report.last_keyframe_error;
+          if (ke && ke.shot === n && new Date(ke.at).getTime() >= startedAt - 3000) { failed = ke.error; return true; }
           return f && f.updated_at !== prevUpdated;
         }, 4 * 60 * 1000);
         await loadDashboard();
+        if (failed) return alert('❌ No se pudo crear el cuadro de la TOMA ' + String(n).padStart(2, '0') + ':\n\n' + failed);
         if (!ok) alert('El cuadro no apareció después de 4 minutos. Revisa la terminal de netlify dev.');
       }
 
@@ -2010,6 +2034,7 @@
       window.produceEpisode = async function(episodeId) {
         const ep = await freshEpisodeOrBlock(episodeId);
         if (!ep) return;
+        if (usesKeyframes(lastLoadedData.series) && blockIfMissingPhotos(ep)) return;
         const doneClips = (ep.assets || []).filter(a => a.kind === 'video_clip').length;
         const missingClips = ((ep.shots || []).length || 0) - doneClips;
         const q = videoProvider === 'google' ? veoQuotaInfo(lastLoadedData, seriesModels(lastLoadedData.series).shot) : null;
