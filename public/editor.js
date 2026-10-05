@@ -35,7 +35,7 @@
           <video id="edVideo" class="absolute inset-0 w-full h-full object-cover" playsinline preload="auto"></video>
           <div id="edCard" class="hidden absolute inset-0 bg-black flex flex-col items-center justify-center text-center px-6"></div>
           <div id="edTop" class="hidden absolute left-0 right-0 text-center px-4" style="font-family:Montserrat,sans-serif;font-weight:800;color:#FFE100;text-shadow:0 0 3px #000,0 0 3px #000,0 0 3px #000"></div>
-          <div id="edSub" class="hidden absolute left-0 right-0 text-center px-5 leading-tight" style="font-family:Montserrat,sans-serif;font-weight:800;color:#fff;text-shadow:0 0 3px #000,0 0 3px #000,0 0 3px #000,0 0 3px #000"></div>
+          <div id="edSub" class="hidden absolute left-0 right-0 text-center px-5 leading-tight z-10 select-none" style="font-family:Montserrat,sans-serif;font-weight:800;color:#fff;text-shadow:0 0 3px #000,0 0 3px #000,0 0 3px #000,0 0 3px #000"></div>
           <div id="edLabel" class="absolute top-1 left-1 text-[10px] font-mono bg-black/60 text-white rounded px-1.5"></div>
         </div>
         <audio id="edMusic" loop preload="auto"></audio>
@@ -44,6 +44,15 @@
           <div class="flex-1 h-1.5 bg-slate-800 rounded"><div id="edProg" class="h-1.5 bg-cyber-cyan rounded" style="width:0%"></div></div>
           <span id="edTime" class="text-[10px] font-mono text-slate-400">0:00</span>
         </div>
+        <div id="edScrubBox" class="w-full bg-black/40 border border-cyber-border rounded-lg p-2 text-[11px] font-mono text-slate-300">
+          <div class="flex items-center justify-between mb-1"><span id="edScrubLabel" class="text-white font-bold">Elige una toma</span><span id="edScrubTime">0.0s / 8.0s</span></div>
+          <input type="range" id="edScrub" min="0" max="8" step="0.04" value="0" class="w-full">
+          <div class="flex gap-2 mt-1">
+            <button onclick="vyEditor.cutHere('start')" class="flex-1 px-2 py-1 rounded border border-cyber-gold/50 text-cyber-gold hover:bg-cyber-gold/10" title="Lo de antes de este punto se quita"><i class="fa-solid fa-scissors mr-1"></i>Empieza aquí</button>
+            <button onclick="vyEditor.cutHere('end')" class="flex-1 px-2 py-1 rounded border border-cyber-gold/50 text-cyber-gold hover:bg-cyber-gold/10" title="Lo de después de este punto se quita">Termina aquí <i class="fa-solid fa-scissors ml-1"></i></button>
+          </div>
+          <p class="text-[10px] text-slate-500 mt-1">Mueve la barra para buscar el cuadro exacto y corta. Las zonas grises se quitan.</p>
+        </div>
         <p id="edTotal" class="text-xs font-mono"></p>
       </div>
       <div class="min-w-0 flex flex-col gap-3">
@@ -51,8 +60,9 @@
           <div class="bg-black/30 border border-cyber-border rounded-lg p-3 space-y-2">
             <p class="text-cyber-cyan font-bold">SUBTÍTULOS</p>
             <label class="flex items-center gap-2"><input type="checkbox" id="edSubOn"> Quemar subtítulos con el diálogo</label>
-            <label class="flex items-center gap-2">Tamaño <input type="range" id="edSubSize" min="32" max="64" step="2" class="flex-1"><span id="edSubSizeV"></span></label>
-            <label class="flex items-center gap-2">Posición <select id="edSubPos" class="bg-black border border-cyber-border rounded px-1"><option value="bottom">Abajo (arriba de la interfaz de TikTok)</option><option value="middle">Centro</option></select></label>
+            <label class="flex items-center gap-2">Tamaño <input type="range" id="edSubSize" min="22" max="64" step="1" class="flex-1"><span id="edSubSizeV" class="w-8 text-right"></span></label>
+            <label class="flex items-center gap-2">Altura <input type="range" id="edSubPos" min="20" max="1150" step="5" class="flex-1"><span id="edSubPosV" class="w-12 text-right"></span></label>
+            <p class="text-[10px] text-slate-500">También puedes <b>arrastrar el subtítulo</b> en la vista previa. La franja roja es donde TikTok/Reels tapan con sus botones y textos.</p>
           </div>
           <div class="bg-black/30 border border-cyber-border rounded-lg p-3 space-y-2">
             <p class="text-cyber-cyan font-bold">AUDIO</p>
@@ -93,8 +103,9 @@
     $('edMusicFile').addEventListener('change', (e) => uploadMusic(e.target.files[0]));
     const bind = (id, fn, ev) => $(id).addEventListener(ev || 'input', () => { fn($(id)); markDirty(); });
     bind('edSubOn', (el) => { st.plan.subtitles.enabled = el.checked; }, 'change');
-    bind('edSubSize', (el) => { st.plan.subtitles.size = Number(el.value); $('edSubSizeV').textContent = el.value; });
-    bind('edSubPos', (el) => { st.plan.subtitles.position = el.value; }, 'change');
+    bind('edSubSize', (el) => { st.plan.subtitles.size = Number(el.value); $('edSubSizeV').textContent = el.value; previewSub(); });
+    bind('edSubPos', (el) => { st.plan.subtitles.margin_v = Number(el.value); $('edSubPosV').textContent = posLabel(); previewSub(); });
+    initDrag();
     bind('edNorm', (el) => { st.plan.audio.normalize = el.checked; }, 'change');
     bind('edMusicVol', (el) => { st.plan.audio.music_volume = Number(el.value); $('edMusicVolV').textContent = Math.round(el.value * 100) + '%'; $('edMusic').volume = Number(el.value); });
     bind('edTitleOn', (el) => { st.plan.title_card.enabled = el.checked; }, 'change');
@@ -105,6 +116,7 @@
     bind('edEndText', (el) => { st.plan.end_card.text = el.value; });
     bind('edEndSub', (el) => { st.plan.end_card.subtext = el.value; });
     bind('edEndSecs', (el) => { st.plan.end_card.seconds = Number(el.value) || 2; });
+    $('edScrub').addEventListener('input', (e) => { if (st.scrubShot != null) showFrame(st.scrubShot, Number(e.target.value)); });
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('edModal').classList.contains('hidden')) close(); });
   }
 
@@ -148,11 +160,11 @@
         </div>
         <div class="flex-1 min-w-0 grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-1 text-[11px] font-mono text-slate-300">
           <div class="sm:col-span-2 flex items-center justify-between gap-2">
-            <span class="text-white font-bold">TOMA ${String(c.shot).padStart(2, '0')} <span class="text-slate-500 font-normal">· ${esc((shotOf(c.shot).characters || []).map((n) => n.split(' ')[0]).join(' + '))} · ${clipDur(c).toFixed(1)}s</span></span>
+            <span class="text-white font-bold">TOMA ${String(c.shot).padStart(2, '0')} <span class="text-slate-500 font-normal">· ${esc((shotOf(c.shot).characters || []).map((n) => n.split(' ')[0]).join(' + '))} · <span id="edDur${i}">${clipDur(c).toFixed(1)}s</span></span></span>
             <label class="flex items-center gap-1"><input type="checkbox" ${c.include === false ? '' : 'checked'} onchange="vyEditor.set(${i},'include',this.checked)"> Incluir</label>
           </div>
-          <label class="flex items-center gap-2">Cortar inicio <input type="range" min="0" max="3" step="0.1" value="${c.trim_start || 0}" oninput="vyEditor.set(${i},'trim_start',this.value);this.nextElementSibling.textContent=Number(this.value).toFixed(1)+'s'" class="flex-1"><span class="w-9 text-right">${(Number(c.trim_start) || 0).toFixed(1)}s</span></label>
-          <label class="flex items-center gap-2">Cortar final <input type="range" min="0" max="3" step="0.1" value="${c.trim_end || 0}" oninput="vyEditor.set(${i},'trim_end',this.value);this.nextElementSibling.textContent=Number(this.value).toFixed(1)+'s'" class="flex-1"><span class="w-9 text-right">${(Number(c.trim_end) || 0).toFixed(1)}s</span></label>
+          <label class="flex items-center gap-2">Cortar inicio <input type="range" min="0" max="6" step="0.1" value="${c.trim_start || 0}" oninput="vyEditor.set(${i},'trim_start',this.value);vyEditor.seekShot(${c.shot},Number(this.value));this.nextElementSibling.textContent=Number(this.value).toFixed(1)+'s'" class="flex-1"><span class="w-9 text-right">${(Number(c.trim_start) || 0).toFixed(1)}s</span></label>
+          <label class="flex items-center gap-2">Cortar final <input type="range" min="0" max="6" step="0.1" value="${c.trim_end || 0}" oninput="vyEditor.set(${i},'trim_end',this.value);vyEditor.seekShot(${c.shot},8-Number(this.value)-0.05);this.nextElementSibling.textContent=Number(this.value).toFixed(1)+'s'" class="flex-1"><span class="w-9 text-right">${(Number(c.trim_end) || 0).toFixed(1)}s</span></label>
           <label class="flex items-center gap-2">Volumen <input type="range" min="0" max="2" step="0.05" value="${c.volume == null ? 1 : c.volume}" oninput="vyEditor.set(${i},'volume',this.value);this.nextElementSibling.textContent=Math.round(this.value*100)+'%'" class="flex-1"><span class="w-9 text-right">${Math.round((c.volume == null ? 1 : c.volume) * 100)}%</span></label>
           <label class="flex items-center gap-2">Texto arriba <input maxlength="60" value="${esc(c.overlay || '')}" placeholder="(opcional) ej. 3 DÍAS DESPUÉS" oninput="vyEditor.set(${i},'overlay',this.value)" class="flex-1 bg-black border border-cyber-border rounded px-1"></label>
           <label class="sm:col-span-2 flex items-center gap-2">Subtítulo <input maxlength="200" value="${esc(c.subtitle || '')}" placeholder="${esc(def || '(sin diálogo)')}" oninput="vyEditor.set(${i},'subtitle',this.value)" class="flex-1 bg-black border border-cyber-border rounded px-1"></label>
@@ -165,8 +177,9 @@
   function fillGlobals() {
     const p = st.plan;
     $('edSubOn').checked = p.subtitles.enabled !== false;
-    $('edSubSize').value = p.subtitles.size || 46; $('edSubSizeV').textContent = $('edSubSize').value;
-    $('edSubPos').value = p.subtitles.position || 'bottom';
+    if (p.subtitles.margin_v == null) p.subtitles.margin_v = p.subtitles.position === 'middle' ? 560 : 300;
+    $('edSubSize').value = p.subtitles.size || 38; $('edSubSizeV').textContent = $('edSubSize').value;
+    $('edSubPos').value = p.subtitles.margin_v; $('edSubPosV').textContent = posLabel();
     $('edNorm').checked = p.audio.normalize !== false;
     $('edMusicVol').value = p.audio.music_volume == null ? 0.12 : p.audio.music_volume; $('edMusicVolV').textContent = Math.round($('edMusicVol').value * 100) + '%';
     $('edMusicName').textContent = p.audio.music_url ? (p.audio.music_name || 'música cargada') : 'sin música';
@@ -176,13 +189,78 @@
     $('edEndOn').checked = !!p.end_card.enabled; $('edEndText').value = p.end_card.text || ''; $('edEndSub').value = p.end_card.subtext || ''; $('edEndSecs').value = p.end_card.seconds || 2;
   }
 
+  // ---- Subtítulo: tamaño y altura (con arrastre en la vista previa) ----
+  function posLabel() { return Math.round((Number(st.plan.subtitles.margin_v) || 0) / 1280 * 100) + '%'; }
+  function styleSub() {
+    const sub = $('edSub');
+    sub.style.fontSize = ((Number(st.plan.subtitles.size) || 38) * K) + 'px';
+    sub.style.bottom = ((Number(st.plan.subtitles.margin_v) || 180) * K) + 'px';
+  }
+  // Muestra el subtítulo de la toma actual (aunque esté en pausa) para acomodarlo.
+  function previewSub() {
+    styleSub();
+    const item = st.seq[st.idx];
+    const text = item && item.type === 'clip' ? item.subtitle : '';
+    const sub = $('edSub');
+    if (!st.playing) { sub.textContent = text || 'Así se verá el subtítulo'; sub.classList.toggle('hidden', !st.plan.subtitles.enabled); }
+  }
+  function initDrag() {
+    const sub = $('edSub'); const phone = $('edPhone');
+    sub.style.cursor = 'ns-resize'; sub.style.pointerEvents = 'auto'; sub.title = 'Arrastra para subir o bajar el subtítulo';
+    // Zona que tapa la interfaz de TikTok/Reels (aprox. el 15% de abajo).
+    phone.insertAdjacentHTML('beforeend', '<div id="edSafe" class="hidden absolute left-0 right-0 bottom-0 pointer-events-none" style="height:' + (190 * K) + 'px;background:repeating-linear-gradient(45deg,rgba(255,0,80,.18) 0 6px,transparent 6px 12px);border-top:1px dashed rgba(255,0,80,.6)"></div>');
+    sub.addEventListener('pointerdown', (e) => {
+      e.preventDefault(); sub.setPointerCapture(e.pointerId); st.dragging = true; $('edSafe').classList.remove('hidden');
+      const rect = phone.getBoundingClientRect();
+      const move = (ev) => {
+        const fromBottom = rect.bottom - ev.clientY - sub.offsetHeight / 2;
+        st.plan.subtitles.margin_v = Math.round(Math.min(1150, Math.max(20, fromBottom / K)) / 5) * 5;
+        $('edSubPos').value = st.plan.subtitles.margin_v; $('edSubPosV').textContent = posLabel(); styleSub();
+      };
+      const up = () => { st.dragging = false; $('edSafe').classList.add('hidden'); sub.removeEventListener('pointermove', move); sub.removeEventListener('pointerup', up); markDirty(); };
+      sub.addEventListener('pointermove', move); sub.addEventListener('pointerup', up);
+    });
+  }
+
+  // ---- Barra para buscar dentro de una toma y cortar ----
+  st.scrubShot = null;
+  function clipLen() { const v = $('edVideo'); return v.duration && isFinite(v.duration) ? v.duration : 8; }
+  function paintScrub() {
+    const shot = st.scrubShot;
+    const box = $('edScrubBox');
+    if (shot == null) { box.style.opacity = 0.5; return; }
+    box.style.opacity = 1;
+    const c = st.plan.clips.find((x) => x.shot === shot) || {};
+    const len = clipLen();
+    const a = ((Number(c.trim_start) || 0) / len) * 100;
+    const b = (1 - (Number(c.trim_end) || 0) / len) * 100;
+    const r = $('edScrub');
+    r.max = len.toFixed(2);
+    r.style.background = `linear-gradient(90deg,#334155 0%,#334155 ${a}%,#06b6d4 ${a}%,#06b6d4 ${b}%,#334155 ${b}%,#334155 100%)`;
+    r.style.height = '6px'; r.style.borderRadius = '4px'; r.style.appearance = 'auto';
+    $('edScrubLabel').textContent = 'TOMA ' + String(shot).padStart(2, '0') + ' · queda ' + Math.max(1, len - (Number(c.trim_start) || 0) - (Number(c.trim_end) || 0)).toFixed(1) + 's';
+  }
+  function showFrame(shot, t) {
+    stop();
+    st.seq = buildSeq();
+    const a = clipAsset(shot);
+    if (!a) return;
+    st.scrubShot = shot;
+    paintScrub();
+    const i = st.seq.findIndex((x) => x.shot === shot);
+    if (i >= 0) st.idx = i;
+    const v = $('edVideo');
+    $('edCard').classList.add('hidden'); v.classList.remove('invisible');
+    $('edLabel').textContent = 'TOMA ' + String(shot).padStart(2, '0');
+    const seek = () => { v.currentTime = Math.max(0, Math.min(clipLen() - 0.04, t)); $('edScrub').value = v.currentTime; $('edScrubTime').textContent = v.currentTime.toFixed(1) + 's / ' + clipLen().toFixed(1) + 's'; paintScrub(); const item = st.seq[st.idx]; if (item && item.shot === shot) showOverlay(item, v.currentTime); };
+    if (v.getAttribute('src') !== a.storage_path) { v.setAttribute('src', a.storage_path); v.addEventListener('loadedmetadata', seek, { once: true }); v.load(); } else seek();
+  }
+
   // ---- Vista previa ----
   function showOverlay(item, tInClip) {
     const sub = $('edSub'); const top = $('edTop');
-    const size = Number(st.plan.subtitles.size) || 46;
-    sub.style.fontSize = (size * K) + 'px';
-    sub.style.bottom = ((st.plan.subtitles.position === 'middle' ? 560 : 300) * K) + 'px';
-    const showSub = item.subtitle && tInClip >= SUB_WINDOW[0] && tInClip <= SUB_WINDOW[1];
+    styleSub();
+    const showSub = (item.subtitle && tInClip >= SUB_WINDOW[0] && tInClip <= SUB_WINDOW[1]) || (st.dragging && item.subtitle);
     sub.classList.toggle('hidden', !showSub);
     if (showSub) sub.textContent = item.subtitle;
     top.style.fontSize = (44 * K) + 'px'; top.style.top = (170 * K) + 'px';
@@ -194,6 +272,8 @@
     if (!item || item.type !== 'clip') return;
     const v = $('edVideo');
     showOverlay(item, v.currentTime);
+    if (st.scrubShot !== item.shot) { st.scrubShot = item.shot; paintScrub(); }
+    $('edScrub').value = v.currentTime; $('edScrubTime').textContent = v.currentTime.toFixed(1) + 's / ' + clipLen().toFixed(1) + 's';
     if (v.currentTime >= item.end - 0.03) next();
     updateProgress(v.currentTime - item.start);
   }
@@ -273,6 +353,9 @@
     document.body.style.overflow = 'hidden';
     st.idx = 0; st.seq = buildSeq(); stop();
     if (st.seq[0]) { st.playing = false; playItem(0); }
+    const firstClip = st.seq.findIndex((x) => x.type === 'clip');
+    if (firstClip >= 0) { st.idx = firstClip; playItem(firstClip); }
+    previewSub();
   }
   async function close() {
     if (st.dirty && !(await window.askConfirm('Tienes cambios sin guardar en el editor. ¿Cerrar de todas formas?'))) return;
@@ -348,13 +431,29 @@
     playFrom: (shot) => { st.seq = buildSeq(); const i = st.seq.findIndex((x) => x.shot === shot); if (i >= 0) start(i); },
     set: (i, key, val) => {
       const c = st.plan.clips[i];
-      if (key === 'trim_start' || key === 'trim_end') c[key] = Math.min(3, Math.max(0, Number(val) || 0));
+      if (key === 'trim_start' || key === 'trim_end') {
+        // Cada toma debe quedar con al menos 1 s.
+        const other = key === 'trim_start' ? Number(c.trim_end) || 0 : Number(c.trim_start) || 0;
+        c[key] = Math.min(7 - other, Math.max(0, Number(val) || 0));
+      }
       else if (key === 'volume') c[key] = Math.min(2, Math.max(0, Number(val) || 0));
       else c[key] = val;
       markDirty();
+      const durEl = $('edDur' + i); if (durEl) durEl.textContent = clipDur(c).toFixed(1) + 's';
+      if (st.scrubShot === c.shot) paintScrub();
       if (key === 'include') renderClips();
     },
     move: (i, d) => { const a = st.plan.clips; const j = i + d; if (j < 0 || j >= a.length) return; [a[i], a[j]] = [a[j], a[i]]; markDirty(); renderClips(); },
+    seekShot: (shot, t) => showFrame(shot, t),
+    cutHere: (which) => {
+      if (st.scrubShot == null) return alert('Primero elige una toma: dale clic a su miniatura o mueve sus barras de corte.');
+      const i = st.plan.clips.findIndex((x) => x.shot === st.scrubShot);
+      const t = $('edVideo').currentTime || 0;
+      const len = clipLen();
+      if (which === 'start') window.vyEditor.set(i, 'trim_start', Math.round(t * 10) / 10);
+      else window.vyEditor.set(i, 'trim_end', Math.round((len - t) * 10) / 10);
+      renderClips(); paintScrub();
+    },
     removeMusic: () => { st.plan.audio.music_url = null; st.plan.audio.music_name = ''; fillGlobals(); markDirty(); }
   };
 })();

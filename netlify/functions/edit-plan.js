@@ -24,7 +24,7 @@ function sanitize(plan) {
       subtitle: c.subtitle == null || c.subtitle === '' ? null : txt(c.subtitle, 200),
       overlay: txt(c.overlay, 60)
     })),
-    subtitles: { enabled: !(p.subtitles && p.subtitles.enabled === false), size: num(p.subtitles && p.subtitles.size, 30, 70, 46), position: p.subtitles && p.subtitles.position === 'middle' ? 'middle' : 'bottom' },
+    subtitles: { enabled: !(p.subtitles && p.subtitles.enabled === false), size: num(p.subtitles && p.subtitles.size, 22, 70, 38), margin_v: num(p.subtitles && p.subtitles.margin_v, 20, 1150, 180) },
     audio: {
       normalize: !(p.audio && p.audio.normalize === false),
       music_url: p.audio && typeof p.audio.music_url === 'string' && /^https:\/\//.test(p.audio.music_url) ? p.audio.music_url : null,

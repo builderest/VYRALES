@@ -127,7 +127,7 @@ function defaultPlan(episode) {
   return {
     version: 1,
     clips: shots.map((s) => ({ shot: s.n, include: true, trim_start: 0, trim_end: 0, volume: 1, subtitle: null, overlay: '' })),
-    subtitles: { enabled: true, size: 46, position: 'bottom' },
+    subtitles: { enabled: true, size: 38, margin_v: 180 },
     audio: { normalize: true, music_url: null, music_volume: 0.12 },
     title_card: { enabled: false, text: '', subtext: '', seconds: 2 },
     end_card: { enabled: false, text: '', subtext: '', seconds: 2 }
@@ -181,7 +181,9 @@ async function renderEpisode({ episode, series, log = console.log, fetchFile = d
     fs.copyFileSync(findFont(), path.join(cwd, 'fonts', FONT_FILE));
     const parts = [];
     let total = 0;
-    const style = { subSize: Number(plan.subtitles.size) || 46, subMarginV: plan.subtitles.position === 'middle' ? 560 : 300 };
+    // margin_v = distancia (en px de 1280) desde el borde de abajo hasta la base del subtítulo.
+    const mv = plan.subtitles.margin_v != null ? Number(plan.subtitles.margin_v) : (plan.subtitles.position === 'middle' ? 560 : 300);
+    const style = { subSize: Number(plan.subtitles.size) || 38, subMarginV: Math.round(Math.min(1150, Math.max(20, mv))) };
 
     if (plan.title_card.enabled && (plan.title_card.text || plan.title_card.subtext)) {
       log('tarjeta de título...');
