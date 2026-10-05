@@ -1234,7 +1234,8 @@
           ? 'Foto de ' + (chr ? chr.name : 'personaje')
           : o.kind === 'location'
           ? 'Lugar: ' + o.locationKey
-          : 'EP ' + (ep ? ep.episode_number : '?') + ' · Toma ' + o.n + (o.kind === 'keyframe' ? ' · cuadro inicial' : ' · video');
+          : 'EP ' + (ep ? ep.episode_number : '?') + ' · TOMA ' + String(o.n).padStart(2, '0') + (o.kind === 'keyframe' ? ' · cuadro inicial' : ' · video') +
+            (function() { const sh = ep && (ep.shots || []).find(x => x.n === o.n); return sh ? ' — ' + (sh.characters || []).map(n => n.split(' ')[0]).join(' + ') + ' en ' + sh.location : ''; })();
         const price = o.kind === 'video' ? (o.cost ? Number(o.cost) : null) : IMAGE_PRICE_USD;
         document.getElementById('pmTitle').textContent = title;
         document.getElementById('pmSubtitle').textContent = o.kind === 'video'
@@ -1243,7 +1244,7 @@
           : (o.kind === 'keyframe' ? 'Prompt del cuadro inicial (Gemini). Se le adjuntan las fotos de cara y la imagen fija del lugar.' : 'Prompt de la imagen fija del lugar (Gemini).');
         const gen = document.getElementById('pmGenerate');
         gen.classList.toggle('hidden', o.mode === 'save');
-        gen.innerHTML = '<i class="fa-solid fa-bolt mr-1"></i>Guardar y generar' + (price ? ' (~$' + price.toFixed(2) + ')' : '');
+        gen.innerHTML = '<i class="fa-solid fa-bolt mr-1"></i>Guardar y generar' + ((o.kind === 'keyframe' || o.kind === 'video') ? ' TOMA ' + String(o.n).padStart(2, '0') : '') + (price ? ' (~$' + price.toFixed(2) + ')' : '');
         document.getElementById('pmText').value = 'Cargando...';
         pmError('');
         pm = o;
@@ -1678,7 +1679,7 @@
                       '<div class="flex flex-wrap items-center gap-2 mt-1.5">' +
                         (sh.prompt_override ? '<span class="text-[10px] font-mono px-1.5 py-0.5 rounded border border-cyber-violet/40 text-cyber-violet"><i class="fa-solid fa-pen mr-1"></i>prompt editado</span>' : '') +
                         (effectivePrompt
-                          ? '<details class="w-full"><summary class="cursor-pointer text-[10px] font-mono text-cyber-violet hover:underline list-none inline-block"><i class="fa-solid fa-terminal mr-1"></i>Ver prompt de Veo</summary>' +
+                          ? '<details class="w-full"><summary class="cursor-pointer text-[10px] font-mono text-cyber-violet hover:underline list-none inline-block"><i class="fa-solid fa-terminal mr-1"></i>Ver prompt de Veo · <span class="text-white font-bold">TOMA ' + String(sh.n).padStart(2, '0') + '</span></summary>' +
                               '<div class="mt-1 bg-slate-950 border border-slate-800 rounded p-2">' +
                                 '<div class="flex justify-end gap-3">' +
                                   '<button onclick="openPromptEditor(this)" data-kind="video" data-ep="' + e.id + '" data-n="' + sh.n + '" data-mode="save" class="text-[10px] font-mono text-cyber-cyan hover:underline"><i class="fa-solid fa-pen mr-1"></i>Editar</button>' +
@@ -1693,14 +1694,14 @@
                                 ? '<button type="button" onclick="openMedia(this)" data-src="' + esc(frame.storage_path) + '" data-kind="image" data-title="EP ' + e.episode_number + ' · Toma ' + sh.n + ' · cuadro inicial" class="relative" title="Ver cuadro inicial"><img src="' + esc(frame.storage_path) + '" class="h-16 w-9 object-cover rounded border border-cyber-border hover:border-cyber-cyan"></button>'
                                 : '') +
                               (canGenerateShots && !clip
-                                ? '<button onclick="openPromptEditor(this)" data-kind="keyframe" data-ep="' + e.id + '" data-n="' + sh.n + '" data-mode="generate" class="text-[10px] font-mono px-2 py-0.5 rounded border border-cyber-violet/40 text-cyber-violet bg-cyber-violet/10 hover:bg-cyber-violet/20"><i class="fa-solid fa-image mr-1"></i>' + (frame ? 'Regenerar cuadro' : '1 · Generar cuadro') + ' (~$' + (IMAGE_PRICE_USD * (locMissing ? 2 : 1)).toFixed(2) + (locMissing ? ', incluye lugar' : '') + ')</button>'
+                                ? '<button onclick="openPromptEditor(this)" data-kind="keyframe" data-ep="' + e.id + '" data-n="' + sh.n + '" data-mode="generate" class="text-[10px] font-mono px-2 py-0.5 rounded border border-cyber-violet/40 text-cyber-violet bg-cyber-violet/10 hover:bg-cyber-violet/20"><i class="fa-solid fa-image mr-1"></i>' + (frame ? 'Regenerar cuadro' : '1 · Generar cuadro') + ' · TOMA ' + String(sh.n).padStart(2, '0') + ' (~$' + (IMAGE_PRICE_USD * (locMissing ? 2 : 1)).toFixed(2) + (locMissing ? ', incluye lugar' : '') + ')</button>'
                                 : '') +
                             '</div>'
                           : '') +
                         (clip
                           ? '<button type="button" onclick="openMedia(this)" data-src="' + esc(clip.storage_path) + '" data-kind="video" data-title="EP ' + e.episode_number + ' · Toma ' + sh.n + '" class="text-[10px] font-mono text-cyber-emerald hover:underline"><i class="fa-solid fa-circle-play mr-1"></i>Ver toma generada (' + (clip.approved ? 'aprobada' : 'pendiente de revisión') + ')</button>'
                           : (canGenerateShots
-                              ? '<button onclick="openPromptEditor(this)" data-kind="video" data-ep="' + e.id + '" data-n="' + sh.n + '" data-mode="generate" data-cost="' + shotCost + '" class="text-[10px] font-mono px-2 py-0.5 rounded border border-cyber-gold/40 text-cyber-gold bg-cyber-gold/10 hover:bg-cyber-gold/20"><i class="fa-solid fa-flask mr-1"></i>' + (kf ? (frame ? '2 · Animar toma' : 'Cuadro + animar toma') : 'Generar solo esta toma') + ' (~$' + shotCost + ')</button>'
+                              ? '<button onclick="openPromptEditor(this)" data-kind="video" data-ep="' + e.id + '" data-n="' + sh.n + '" data-mode="generate" data-cost="' + shotCost + '" class="text-[10px] font-mono px-2 py-0.5 rounded border border-cyber-gold/40 text-cyber-gold bg-cyber-gold/10 hover:bg-cyber-gold/20"><i class="fa-solid fa-flask mr-1"></i>' + (kf ? (frame ? '2 · Animar TOMA ' + String(sh.n).padStart(2, '0') : 'Cuadro + animar TOMA ' + String(sh.n).padStart(2, '0')) : 'Generar solo la TOMA ' + String(sh.n).padStart(2, '0')) + ' (~$' + shotCost + ')</button>'
                               : '')) +
                       '</div>' +
                     '</div>'
