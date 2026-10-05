@@ -45,6 +45,21 @@ exports.handler = async (event) => {
       .eq('series_id', series.id)
       .order('sort_order', { ascending: true });
 
+    // Gasto REAL (tabla generation_log): de esta serie y del mes en curso (todas las series).
+    const monthStart = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1)).toISOString();
+    const [{ data: seriesSpend }, { data: monthSpend }] = await Promise.all([
+      supabase.from('generation_log').select('kind, cost_usd').eq('series_id', series.id),
+      supabase.from('generation_log').select('cost_usd').gte('created_at', monthStart)
+    ]);
+    const spend = { series_total: 0, month_total: 0, by_kind: {}, generations: 0 };
+    (seriesSpend || []).forEach((r) => {
+      const c = Number(r.cost_usd) || 0;
+      spend.series_total += c;
+      spend.by_kind[r.kind] = (spend.by_kind[r.kind] || 0) + c;
+      spend.generations++;
+    });
+    (monthSpend || []).forEach((r) => (spend.month_total += Number(r.cost_usd) || 0));
+
     // Solo el conteo (head: true no trae filas, es barato) — para el panel de stats
     // reales del dashboard (nada de números de maqueta).
     const { count: channelsCount } = await supabase
@@ -59,7 +74,8 @@ exports.handler = async (event) => {
         all_series: allSeries || [],
         episodes,
         characters: characters || [],
-        channels_count: channelsCount || 0
+        channels_count: channelsCount || 0,
+        spend
       })
     };
   } catch (err) {

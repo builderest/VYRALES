@@ -20,6 +20,7 @@ const { BUCKET, uploadClip, storagePathFromPublicUrl } = require('./_storage');
 const { generateVeoClip, loadReferenceImages } = require('./_veo');
 const { effectiveShotPrompt, referenceUrlsForShot } = require('./_series');
 const { createKeyframe, loadExistingKeyframe } = require('./_keyframe');
+const { logSpend } = require('./_spend');
 
 const LOG = '[regen-shot]';
 
@@ -87,6 +88,7 @@ exports.handler = async (event) => {
     if (referenceImages.length) modelKey = rules.shot_model === 'veo_standard' ? 'veo_standard' : 'veo_fast';
     console.log(LOG, 'generando con Veo (' + modelKey + ')... esto tarda un rato.');
     const { videoBuffer, costUsd, model } = await generateVeoClip({ modelKey, prompt, referenceImages, startImage });
+    await logSpend(supabase, { seriesId: episode.series_id, episodeId: episode.id, shotNumber: asset.shot_number, kind: 'video', model: modelKey, costUsd, note: 'regenerada' });
     console.log(LOG, 'Veo terminó, subiendo a Supabase Storage...');
 
     // Nombre con versión: si se reusara shot-NN.mp4, la caché del navegador/CDN podría

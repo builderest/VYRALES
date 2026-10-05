@@ -6,6 +6,7 @@ const { getSupabaseClient } = require('./_supabase');
 const { generateImage } = require('./_image');
 const { buildLocationPrompt } = require('./_keyframe');
 const { ensureMediaBucket, uploadFile, removeByPublicUrl } = require('./_storage');
+const { logSpend } = require('./_spend');
 
 const LOG = '[location-image]';
 
@@ -23,6 +24,7 @@ exports.handler = async (event) => {
 
     console.log(LOG, 'generando lugar', key, '...');
     const img = await generateImage({ prompt });
+    await logSpend(supabase, { seriesId: series.id, kind: 'location', model: img.model, costUsd: img.costUsd, note: key });
     await ensureMediaBucket(supabase);
     const ext = img.mimeType.includes('jpeg') ? 'jpg' : 'png';
     const url = await uploadFile(supabase, { path: `${series.slug}/locations/${key}-v${Date.now()}.${ext}`, buffer: img.buffer, contentType: img.mimeType });

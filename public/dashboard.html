@@ -179,7 +179,7 @@
             <div class="glass-panel rounded-xl p-4 border-l-4 border-l-cyber-cyan relative overflow-hidden">
                 <div class="flex justify-between items-start mb-2">
                     <div>
-                        <p class="text-xs font-mono text-slate-400 uppercase tracking-wider">Gasto Real (Veo)</p>
+                        <p class="text-xs font-mono text-slate-400 uppercase tracking-wider">Gasto real del mes</p>
                         <h3 id="budgetSpentLabel" class="text-2xl font-display font-bold text-white mt-1">$0.00 <span class="text-xs text-slate-400 font-normal">/ $150.00</span></h3>
                     </div>
                     <div class="w-8 h-8 rounded-lg bg-cyber-cyan/10 border border-cyber-cyan/30 flex items-center justify-center text-cyber-cyan">
@@ -190,7 +190,7 @@
                     <div id="budgetBar" class="bg-gradient-to-r from-cyber-cyan to-cyber-violet h-full rounded-full" style="width: 0%"></div>
                 </div>
                 <div class="flex justify-between text-[11px] font-mono text-slate-400">
-                    <span id="budgetAvgLabel">~ $0.00 / Episodio</span>
+                    <span id="budgetAvgLabel">—</span>
                     <span id="budgetPctLabel" class="text-cyber-cyan font-bold">0% Usado</span>
                 </div>
             </div>
@@ -246,13 +246,13 @@
                 <div class="flex justify-between items-start mb-2">
                     <div>
                         <p class="text-xs font-mono text-slate-400 uppercase tracking-wider">Modo Veo API</p>
-                        <h3 id="veoModeTitle" class="text-lg font-display font-bold text-cyber-emerald mt-1">HÍBRIDO LITE/FAST</h3>
+                        <h3 id="veoModeTitle" class="text-lg font-display font-bold text-cyber-emerald mt-1">—</h3>
                     </div>
                     <div class="w-8 h-8 rounded-lg bg-cyber-emerald/10 border border-cyber-emerald/30 flex items-center justify-center text-cyber-emerald">
                         <i class="fa-solid fa-wand-magic-sparkles"></i>
                     </div>
                 </div>
-                <p id="veoModeDesc" class="text-xs text-slate-400 mt-1">7 tomas Lite (~$0.04/s) + 1 Fast Clip (~$0.16/s) en el Cliffhanger final. Precios calibrados contra gasto real.</p>
+                <p id="veoModeDesc" class="text-xs text-slate-400 mt-1">Cargando…</p>
             </div>
         </section>
 
@@ -746,16 +746,17 @@
             .map(a => Object.assign({}, a, { episode_number: e.episode_number }))
         );
 
-        const totalSpent = allClips.reduce((sum, a) => sum + (Number(a.cost_usd) || 0), 0);
-        const episodesWithAssets = episodes.filter(e => (e.assets || []).length > 0);
-        const avgCostPerEpisode = episodesWithAssets.length ? totalSpent / episodesWithAssets.length : 0;
+        // Gasto REAL: sale del registro de gastos (cada video/imagen cobrado, aunque se haya
+        // regenerado después). El presupuesto es mensual y para todas las series juntas.
+        const spend = data.spend || { month_total: 0, series_total: 0 };
+        const totalSpent = Number(spend.month_total) || 0;
         const pctUsed = Math.min(100, (totalSpent / BUDGET_TARGET_USD) * 100);
 
         document.getElementById('budgetSpentLabel').innerHTML =
           '$' + totalSpent.toFixed(2) + ' <span class="text-xs text-slate-400 font-normal">/ $' + BUDGET_TARGET_USD.toFixed(2) + '</span>';
         document.getElementById('budgetBar').style.width = pctUsed.toFixed(1) + '%';
-        document.getElementById('budgetAvgLabel').textContent = '~ $' + avgCostPerEpisode.toFixed(2) + ' / Episodio';
-        document.getElementById('budgetPctLabel').textContent = pctUsed.toFixed(1) + '% Usado';
+        document.getElementById('budgetAvgLabel').textContent = 'Esta serie: $' + (Number(spend.series_total) || 0).toFixed(2) + ' (' + (spend.generations || 0) + ' cobros)';
+        document.getElementById('budgetPctLabel').textContent = pctUsed.toFixed(1) + '% usado';
 
         const badge = document.getElementById('budgetBadge');
         if (totalSpent === 0) {
@@ -1523,14 +1524,15 @@
         const t = document.getElementById('veoModeTitle');
         const d = document.getElementById('veoModeDesc');
         if (!t || !d) return;
-        const perShot = (k) => '$' + (m.secs * VEO_PRICE_PER_SEC[k]).toFixed(2);
-        if (m.shot === m.cliff) {
-          t.textContent = 'TODO ' + VEO_LABEL[m.shot].toUpperCase();
-          d.textContent = 'Las 8 tomas en Veo ' + VEO_LABEL[m.shot] + ' (' + perShot(m.shot) + ' c/u, ~$' + (8 * m.secs * VEO_PRICE_PER_SEC[m.shot]).toFixed(2) + ' por episodio). Precios calibrados contra gasto real.';
-        } else {
-          t.textContent = 'HÍBRIDO ' + VEO_LABEL[m.shot].toUpperCase() + '/' + VEO_LABEL[m.cliff].toUpperCase();
-          d.textContent = '7 tomas ' + VEO_LABEL[m.shot] + ' (' + perShot(m.shot) + ' c/u) + 1 ' + VEO_LABEL[m.cliff] + ' (' + perShot(m.cliff) + ') en el cliffhanger. Precios calibrados contra gasto real.';
-        }
+        const r = (series && series.story_bible && series.story_bible.rules) || {};
+        const n = r.shots_per_episode || 8;
+        const kf = usesKeyframes(series);
+        const video = (k) => m.secs * VEO_PRICE_PER_SEC[k];
+        const perEp = (n - 1) * video(m.shot) + video(m.cliff) + (kf ? n * IMAGE_PRICE_USD : 0);
+        t.textContent = (m.shot === m.cliff ? 'TODO ' + VEO_LABEL[m.shot].toUpperCase() : VEO_LABEL[m.shot].toUpperCase() + ' + ' + VEO_LABEL[m.cliff].toUpperCase()) + (kf ? ' + CUADRO INICIAL' : '');
+        d.textContent = n + ' tomas × ($' + video(m.shot).toFixed(2) + ' video' + (kf ? ' + $' + IMAGE_PRICE_USD.toFixed(2) + ' cuadro' : '') + ')' +
+          (m.shot !== m.cliff ? ' (gancho en ' + VEO_LABEL[m.cliff] + ': $' + video(m.cliff).toFixed(2) + ')' : '') +
+          ' = ~$' + perEp.toFixed(2) + ' por episodio completo.' + (r.reference_images ? ' Fotos enviadas directo a Veo.' : '');
       }
 
       function renderArc(data) {
@@ -1706,8 +1708,10 @@
           row('Personajes por toma', 'máx. ' + (r.max_characters_per_shot || 2)) +
           row('Diálogo por toma', '1 hablante · máx. ' + (r.max_dialogue_words_per_shot || 15) + ' palabras') +
           row('Modelo de video', model('shot_model') + (r.cliffhanger_model && r.cliffhanger_model !== r.shot_model ? ' (+ ' + model('cliffhanger_model') + ' en el gancho)' : '')) +
-          row('Fotos de referencia a Veo', r.reference_images ? 'Sí' : 'No', !!r.reference_images) +
-          row('Memoria visual (cuadro inicial)', r.keyframes ? 'Sí' : 'No', !!r.keyframes) +
+          row('Fotos de cara', r.reference_images
+              ? 'Sí · enviadas directo a Veo'
+              : (r.keyframes ? 'Sí · en el cuadro inicial de cada toma' : 'No se usan'), !!(r.reference_images || r.keyframes)) +
+          row('Imágenes de lugares', r.keyframes ? 'Sí · en el cuadro inicial' : 'No se usan', !!r.keyframes) +
           '<p class="text-[10px] text-slate-500 leading-snug pt-1">Estas reglas vienen de la novela creada con PROMPT; el validador las hace cumplir al crearla.</p>';
       }
 

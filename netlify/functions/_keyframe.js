@@ -6,6 +6,7 @@
 const { loadReferenceImages } = require('./_veo');
 const { MAX_CHARACTER_REFS, generateImage } = require('./_image');
 const { ensureMediaBucket, uploadFile, removeByPublicUrl } = require('./_storage');
+const { logSpend } = require('./_spend');
 
 function locationOf(sb, key) {
   const loc = sb.locations && sb.locations[key];
@@ -99,6 +100,7 @@ async function createKeyframe(supabase, { series, episode, shot, characters, log
   const prompt = effectiveKeyframePrompt(shot, characters, series.story_bible, hasLocationRef);
   log('generando cuadro inicial de la toma', shot.n, 'con', refs.length, 'imagen(es) de referencia...');
   const img = await generateImage({ prompt, references: refs });
+  await logSpend(supabase, { seriesId: series.id || episode.series_id, episodeId: episode.id, shotNumber: shot.n, kind: 'keyframe', model: img.model, costUsd: img.costUsd });
 
   await ensureMediaBucket(supabase);
   const ext = img.mimeType.includes('jpeg') ? 'jpg' : 'png';

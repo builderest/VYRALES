@@ -20,6 +20,7 @@ const { generateVeoClip, loadReferenceImages } = require('./_veo');
 const { mergeEpisodeVideo } = require('./_merge');
 const { effectiveShotPrompt, referenceUrlsForShot } = require('./_series');
 const { createKeyframe, loadExistingKeyframe } = require('./_keyframe');
+const { logSpend } = require('./_spend');
 
 // Estilo por defecto SOLO para series viejas sin story_bible.visual_style (dragon_silicio).
 // Las novelas nuevas definen su estilo en story_bible.visual_style (ej. animación 3D).
@@ -263,6 +264,7 @@ exports.handler = async (event) => {
           console.log(LOG, `toma ${scene.number}/${total}: ${existingFrame ? 'usando el cuadro inicial ya guardado' : 'cuadro inicial creado'}.`);
         }
         const { videoBuffer, costUsd, model } = await generateVeoClip({ modelKey, prompt, referenceImages, startImage });
+        await logSpend(supabase, { seriesId: series.id, episodeId: episode.id, shotNumber: scene.number, kind: 'video', model: modelKey, costUsd });
         console.log(LOG, `toma ${scene.number}/${total}: Veo terminó, subiendo a Supabase Storage...`);
 
         const storagePath = `${series.slug}/ep${episode.episode_number}/shot-${String(scene.number).padStart(2, '0')}.mp4`;
