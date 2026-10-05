@@ -143,6 +143,14 @@
               <label class="flex items-center gap-2"><input type="checkbox" id="edNorm"> Volumen parejo en todo el episodio (-14 LUFS)</label>
               <label class="flex items-center gap-2"><input type="checkbox" id="edDuck"> Bajar la música cuando habla el narrador (estilo documental)</label>
               <div class="flex items-center gap-2"><button onclick="document.getElementById('edMusicFile').click()" class="${btn} border-cyber-border hover:text-white"><i class="fa-solid fa-music mr-1"></i>Subir música</button><input type="file" id="edMusicFile" accept="audio/*" class="hidden"><span id="edMusicName" class="truncate text-slate-400"></span><button id="edMusicDel" onclick="vyEditor.removeMusic()" class="hidden text-cyber-pink" title="Quitar música"><i class="fa-solid fa-trash"></i></button></div>
+              <div class="border border-cyber-border rounded-lg p-2 space-y-1.5">
+                <p class="text-[10px] text-slate-500">MÚSICA CON IA (Lyria 3.5 · ~$0.08 por pista de 2–3 min · instrumental, sin voces)</p>
+                <textarea id="edMusicPrompt" rows="3" class="w-full bg-black/40 border border-cyber-border rounded p-1.5 text-[11px] text-slate-200" placeholder="Describe la música (en inglés funciona mejor)"></textarea>
+                <button id="edMusicGenBtn" onclick="vyEditor.genMusic()" class="${btn} border-cyber-violet/50 text-cyber-violet hover:bg-cyber-violet/10"><i class="fa-solid fa-wand-magic-sparkles mr-1"></i>Generar música (~$0.08)</button>
+                <span id="edMusicGenSt" class="text-[10px] text-slate-400"></span>
+                <p class="text-[10px] text-slate-500 pt-1">BIBLIOTECA DE LA SERIE (se reusa en cualquier episodio)</p>
+                <div id="edMusicLib" class="space-y-1"></div>
+              </div>
               <label class="flex items-center gap-2">Volumen música <input type="range" id="edMusicVol" min="0" max="0.5" step="0.01" class="flex-1"><span id="edMusicVolV"></span></label>
             </div>
             <div data-pane="cards" class="ed-pane hidden grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -428,6 +436,8 @@
     $('edMusicVol').value = p.audio.music_volume == null ? 0.12 : p.audio.music_volume; $('edMusicVolV').textContent = Math.round($('edMusicVol').value * 100) + '%';
     $('edMusicName').textContent = p.audio.music_url ? (p.audio.music_name || 'música cargada') : 'sin música';
     $('edMusicDel').classList.toggle('hidden', !p.audio.music_url);
+    renderMusicLib();
+    if (!$('edMusicPrompt').value) $('edMusicPrompt').value = MUSIC_PROMPT_DEFAULT;
     if (($('edMusic').getAttribute('src') || '') !== (p.audio.music_url || '')) $('edMusic').setAttribute('src', p.audio.music_url || '');
     $('edTitleOn').checked = !!p.title_card.enabled; $('edTitleText').value = p.title_card.text || ''; $('edTitleSub').value = p.title_card.subtext || ''; $('edTitleSecs').value = p.title_card.seconds || 2;
     $('edEndOn').checked = !!p.end_card.enabled; $('edEndText').value = p.end_card.text || ''; $('edEndSub').value = p.end_card.subtext || ''; $('edEndSecs').value = p.end_card.seconds || 2;
@@ -871,6 +881,45 @@
       b.disabled = false; b.innerHTML = '<i class="fa-solid fa-film mr-1"></i>Guardar y renderizar video final ($0)';
     }
   }
+  // ---------- Música con IA (Lyria) + biblioteca por serie ----------
+  const MUSIC_PROMPT_DEFAULT = 'A 3-minute cinematic natural-history documentary underscore: deep warm cello and low strings, soft taiko-style drums pulsing slowly, airy ethnic flute, gentle piano motifs, a sense of ancient mystery, wonder and discovery, tension that rises gradually and resolves softly at the end. 70 BPM.';
+  const musicTracks = () => { const d = ctx().data; return (d && d.series && d.series.story_bible && d.series.story_bible.music_tracks) || []; };
+  function renderMusicLib() {
+    const box = $('edMusicLib'); if (!box) return;
+    const list = musicTracks();
+    box.innerHTML = list.length ? list.map((t, i) =>
+      `<div class="flex items-center gap-2 text-[11px]">
+        <button onclick="vyEditor.previewTrack(${i})" class="text-slate-400 hover:text-white" title="Escuchar"><i class="fa-solid fa-play"></i></button>
+        <span class="flex-1 truncate ${st.plan && st.plan.audio.music_url === t.url ? 'text-cyber-emerald' : 'text-slate-300'}">${esc(t.name || 'Música')}</span>
+        ${st.plan && st.plan.audio.music_url === t.url ? '<span class="text-cyber-emerald">en uso</span>' : `<button onclick="vyEditor.useTrack(${i})" class="text-cyber-cyan hover:underline">Usar</button>`}
+      </div>`).join('') : '<p class="text-[11px] text-slate-500">Todavía no hay música generada.</p>';
+  }
+  async function genMusic() {
+    const prompt = $('edMusicPrompt').value.trim();
+    if (prompt.length < 15) return alert('Describe la música un poco más.');
+    if (!(await (window.askConfirm ? window.askConfirm('Generar una pista de música con Lyria 3.5 (instrumental, 2–3 min).\n\nCosto: ~$0.08. Tarda ~30–60 s. ¿Continuar?') : Promise.resolve(confirm('Generar música (~$0.08)?'))))) return;
+    const b = $('edMusicGenBtn'); b.disabled = true; $('edMusicGenSt').textContent = 'Generando música... (~30–60 s)';
+    const before = (musicTracks()[0] || {}).url;
+    try {
+      const res = await fetch('/.netlify/functions/music-generate-background', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ series: ctx().series, prompt }) });
+      if (!res.ok && res.status !== 202) throw new Error('HTTP ' + res.status);
+      const t0 = Date.now();
+      for (;;) {
+        await new Promise((r) => setTimeout(r, 6000));
+        await ctx().reload();
+        const run = ((ctx().data || {}).series || {}).story_bible && ctx().data.series.story_bible.music_last_run;
+        const first = musicTracks()[0];
+        if (first && first.url !== before) { useTrackObj(first); $('edMusicGenSt').textContent = '✅ Lista y puesta en el episodio. Dale Guardar.'; break; }
+        if (run && run.status === 'error' && new Date(run.at).getTime() > t0 - 5000) throw new Error(run.error || 'error');
+        if (Date.now() - t0 > 4 * 60000) throw new Error('tardó demasiado; revisa la terminal');
+      }
+    } catch (err) {
+      $('edMusicGenSt').textContent = '';
+      alert('No se pudo generar la música: ' + err.message);
+    } finally { b.disabled = false; renderMusicLib(); }
+  }
+  function useTrackObj(t) { st.plan.audio.music_url = t.url; st.plan.audio.music_name = t.name || 'Música IA'; if (st.plan.audio.music_volume == null || st.plan.audio.music_volume < 0.15) st.plan.audio.music_volume = 0.2; fillGlobals(); markDirty(); }
+
   async function uploadMusic(file) {
     if (!file) return;
     if (file.size > 15 * 1024 * 1024) return alert('La música pesa más de 15 MB. Usa un MP3 más ligero.');
@@ -950,6 +999,9 @@
       document.querySelectorAll('#edModal .ed-pane').forEach((el) => el.classList.toggle('hidden', el.dataset.pane !== name));
       document.querySelectorAll('#edModal .ed-tab').forEach((el) => { const on = el.dataset.tab === name; el.className = 'ed-tab px-3 py-1 rounded-t border-b-2 text-xs font-mono ' + (on ? 'border-cyber-cyan text-cyber-cyan' : 'border-transparent text-slate-400 hover:text-white'); });
     },
+    genMusic,
+    useTrack: (i) => { const t = musicTracks()[i]; if (t) useTrackObj(t); },
+    previewTrack: (i) => { const t = musicTracks()[i]; if (!t) return; const a = window.__trackPrev || (window.__trackPrev = new Audio()); if (a.src === t.url && !a.paused) { a.pause(); return; } a.src = t.url; a.play().catch(() => {}); },
     removeMusic: () => { st.plan.audio.music_url = null; st.plan.audio.music_name = ''; fillGlobals(); markDirty(); }
   };
 })();
