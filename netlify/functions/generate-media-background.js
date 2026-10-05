@@ -277,7 +277,7 @@ exports.handler = async (event) => {
       }
       if (Date.now() - startedAt > TIME_BUDGET_MS) {
         console.warn(LOG, 'cerca del límite de 15 min de Netlify — me vuelvo a llamar para seguir con las tomas que faltan...');
-        await fetch(selfUrl(event, Object.assign({ series: seriesSlug, episode_id: episode.id, continue: '1', provider }, modelOverride ? { model: modelOverride } : {})), { method: 'POST' });
+        await fetch(selfUrl(event, Object.assign({ series: seriesSlug, episode_id: episode.id, continue: '1', provider }, modelOverride ? { model: modelOverride } : {})), { method: 'POST', headers: process.env.DASHBOARD_KEY ? { 'x-vyrales-key': process.env.DASHBOARD_KEY } : {} });
         return { statusCode: 202, body: JSON.stringify({ episode_id: episode.id, continued: true, shots_ok_this_run: results.filter((r) => r.status === 'fulfilled').length }) };
       }
       const isCliffhanger = scene.number === total;

@@ -137,6 +137,7 @@
                     <div class="flex items-center gap-2">
                         <h1 class="font-display font-bold text-xl tracking-wider text-white">VYRALES</h1>
                         <span class="text-xs font-mono bg-cyber-violet/30 text-cyber-cyan border border-cyber-cyan/30 px-2 py-0.5 rounded-full font-semibold">v3.1 ORCHESTRATOR</span>
+                        <a href="/.netlify/functions/login?logout=1" class="text-[10px] font-mono text-slate-500 hover:text-cyber-pink ml-1" title="Cerrar sesión"><i class="fa-solid fa-right-from-bracket mr-1"></i>Salir</a>
                     </div>
                     <p class="text-xs text-slate-400 font-mono">Arquitectura de Automatización de Microdramas con IA</p>
                 </div>
@@ -834,10 +835,12 @@
         return k;
       }
       async function keyedFetch(url, body) {
-        for (let attempt = 0; attempt < 2; attempt++) {
-          const k = await dashKey(attempt > 0);
-          if (!k) throw new Error('Sin llave del dashboard.');
-          const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-vyrales-key': k }, body: JSON.stringify(body) });
+        // Con sesión iniciada (cookie del login) no hace falta la llave; solo se pide si el servidor dice 401.
+        for (let attempt = 0; attempt < 3; attempt++) {
+          let k = null;
+          try { k = localStorage.getItem('vyrales_key'); } catch (_) {}
+          if (attempt > 0) { k = await dashKey(true); if (!k) throw new Error('Sin llave del dashboard.'); }
+          const res = await fetch(url, { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, k ? { 'x-vyrales-key': k } : {}), body: JSON.stringify(body) });
           if (res.status !== 401) return res;
           const j = await res.json().catch(() => ({}));
           if (/Falta DASHBOARD_KEY/.test(j.error || '')) throw new Error(j.error);
@@ -845,10 +848,8 @@
         }
         throw new Error('Llave del dashboard incorrecta.');
       }
-      window.connectSocial = async function(platform) {
-        const k = await dashKey();
-        if (!k) return;
-        window.open('/.netlify/functions/oauth-' + platform + '-start?k=' + encodeURIComponent(k), '_blank');
+      window.connectSocial = function(platform) {
+        window.open('/.netlify/functions/oauth-' + platform + '-start', '_blank'); // la sesión (cookie) autoriza
       };
       window.socialPublish = async function(epId, platform) {
         const ep = (lastLoadedData.episodes || []).find(x => x.id === epId);

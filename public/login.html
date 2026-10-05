@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex">
+<title>VYRALES · Entrar</title>
+<style>
+  body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#0b0f19;color:#e2e8f0;font-family:system-ui,sans-serif}
+  form{background:#111827;border:1px solid #1f2937;border-radius:14px;padding:28px;width:min(340px,90vw)}
+  h1{margin:0 0 4px;font-size:22px;background:linear-gradient(90deg,#22d3ee,#e879f9);-webkit-background-clip:text;color:transparent}
+  p{margin:0 0 18px;color:#94a3b8;font-size:13px}
+  input{width:100%;box-sizing:border-box;padding:11px;border-radius:8px;border:1px solid #334155;background:#0b0f19;color:#fff;font-size:15px}
+  button{margin-top:14px;width:100%;padding:11px;border:0;border-radius:8px;background:#06b6d4;color:#001018;font-weight:700;font-size:15px;cursor:pointer}
+  .err{color:#f472b6;font-size:13px;margin-top:10px;display:none}
+</style></head>
+<body>
+<form method="post" action="/.netlify/functions/login">
+  <h1>VYRALES</h1><p>Panel privado. Escribe tu contraseña.</p>
+  <input type="password" name="password" placeholder="Contraseña" autocomplete="current-password" autofocus required>
+  <input type="hidden" name="next" id="next">
+  <button type="submit">Entrar</button>
+  <div class="err" id="err">Contraseña incorrecta.</div>
+</form>
+<script>
+  var q = new URLSearchParams(location.search);
+  document.getElementById('next').value = q.get('next') || '/';
+  if (q.get('error')) document.getElementById('err').style.display = 'block';
+</script>
+</body></html>

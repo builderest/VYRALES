@@ -22,3 +22,5 @@
   from = "/"
   to = "/dashboard.html"
   status = 200
+
+# Candado: todo el sitio y las funciones piden sesión — netlify/edge-functions/auth.js (path "/*" en su config).

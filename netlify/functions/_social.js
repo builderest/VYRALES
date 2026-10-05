@@ -9,7 +9,7 @@
 // INSTAGRAM_APP_SECRET. Los tokens se guardan en la tabla social_accounts (migración 006).
 const crypto = require('crypto');
 
-const BASE_URL = () => (process.env.PUBLIC_BASE_URL || 'https://vyrales.netlify.app').replace(/\/$/, '');
+const BASE_URL = () => (process.env.PUBLIC_BASE_URL || 'https://vyrales.app').replace(/\/$/, '');
 const REDIRECT = (platform) => `${BASE_URL()}/.netlify/functions/oauth-${platform}-callback`;
 const IG_GRAPH = 'https://graph.instagram.com/v23.0';
 
