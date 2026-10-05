@@ -417,4 +417,4 @@ async function renderEpisode({ episode, series, log = console.log, fetchFile = d
   }
 }
 
-module.exports = { renderEpisode, resolvePlan, defaultPlan, dialogueOf };
+module.exports = { renderEpisode, resolvePlan, defaultPlan, dialogueOf, findFont, FONT_FILE, FONT_NAME };

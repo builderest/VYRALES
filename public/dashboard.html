@@ -734,6 +734,87 @@
         } catch (err) { alert('No se pudo detener: ' + err.message); }
         loadDashboard();
       };
+      // ---------- PUBLICAR (TikTok + Instagram Reels) ----------
+      // Fase 1: paquete listo para subir a mano (textos, portada, aviso de IA, checklist). Publicar
+      // directo por API exige que TikTok/Meta aprueben la app; hasta entonces sale privado/borrador.
+      function publishPanelHtml(e) {
+        const final = (e.assets || []).find(a => a.kind === 'final_render');
+        if (!final) return '';
+        const vr = e.validator_report || {};
+        const pk = vr.publish_package || null;
+        const pub = vr.published || {};
+        const running = pk && pk.status === 'running' && Date.now() - new Date(pk.at).getTime() < 3 * 60000;
+        const copyBtn = (label, text) => '<button onclick="copyTag(this, event)" data-tag="' + esc(text || '') + '" class="text-[10px] font-mono px-2 py-0.5 rounded border border-cyber-cyan/40 text-cyber-cyan hover:bg-cyber-cyan/10"><i class="fa-regular fa-copy mr-1"></i>' + label + '</button>';
+        const box = (title, text) => '<div class="bg-slate-950 border border-slate-800 rounded p-2"><div class="flex justify-between items-center mb-1"><span class="text-[10px] font-mono text-slate-400">' + title + '</span>' + copyBtn('Copiar', text) + '</div><p class="text-[11px] text-slate-200 whitespace-pre-wrap">' + esc(text || '') + '</p></div>';
+        const platform = (key, label, steps) => {
+          const done = pub[key];
+          return '<div class="border ' + (done ? 'border-cyber-emerald/50' : 'border-cyber-border') + ' rounded-lg p-2 space-y-1">' +
+            '<p class="text-[11px] font-mono font-bold ' + (done ? 'text-cyber-emerald' : 'text-white') + '">' + label + (done ? ' · PUBLICADO ' + (done.url ? '<a href="' + esc(done.url) + '" target="_blank" class="underline">ver</a>' : '') : '') + '</p>' +
+            '<ol class="list-decimal ml-4 text-[11px] text-slate-300 space-y-0.5">' + steps.map(x => '<li>' + x + '</li>').join('') + '</ol>' +
+            (done
+              ? '<button onclick="markPublished(\'' + e.id + '\', \'' + key + '\', true)" class="text-[10px] font-mono text-slate-500 hover:text-white underline">Desmarcar</button>'
+              : '<button onclick="markPublished(\'' + e.id + '\', \'' + key + '\')" class="text-[10px] font-mono px-2 py-0.5 rounded border border-cyber-emerald/40 text-cyber-emerald hover:bg-cyber-emerald/10"><i class="fa-solid fa-check mr-1"></i>Ya lo publiqué</button>') +
+          '</div>';
+        };
+        const dl = (url, name) => url + (url.includes('?') ? '&' : '?') + 'download=' + encodeURIComponent(name);
+        const vname = 'EP' + e.episode_number + '_' + (e.title || 'episodio').replace(/[^\w]+/g, '_').slice(0, 40) + '.mp4';
+        return '<details class="mt-2 border border-cyber-pink/40 rounded-lg"' + (pk ? ' open' : '') + '><summary class="cursor-pointer list-none p-2 text-xs font-mono text-cyber-pink"><i class="fa-solid fa-bullhorn mr-1"></i>PUBLICAR · TikTok + Instagram Reels' +
+            (pub.tiktok || pub.instagram ? ' · <span class="text-cyber-emerald">' + ['tiktok', 'instagram'].filter(k => pub[k]).join(' + ') + ' ✓</span>' : '') + '</summary>' +
+          '<div class="p-2 pt-0 space-y-2">' +
+            '<div class="flex flex-wrap gap-2 items-center">' +
+              '<a href="' + esc(dl(final.storage_path, vname)) + '" class="text-[11px] font-mono px-2 py-1 rounded border border-cyber-gold/50 text-cyber-gold hover:bg-cyber-gold/10"><i class="fa-solid fa-download mr-1"></i>Descargar video final</a>' +
+              (running
+                ? '<span class="text-[11px] font-mono text-cyber-pink"><i class="fa-solid fa-spinner fa-spin mr-1"></i>Preparando textos y portada...</span>'
+                : '<button onclick="makePublishPackage(\'' + e.id + '\')" class="text-[11px] font-mono px-2 py-1 rounded border border-cyber-pink/50 text-cyber-pink hover:bg-cyber-pink/10"><i class="fa-solid fa-wand-magic-sparkles mr-1"></i>' + (pk && pk.status === 'done' ? 'Rehacer textos y portada' : 'Preparar textos y portada') + ' (~$0.001)</button>') +
+            '</div>' +
+            (pk && pk.status === 'error' ? '<p class="text-[11px] text-cyber-pink">Error: ' + esc(pk.error || '') + '</p>' : '') +
+            (pk && pk.status === 'done'
+              ? '<div class="grid grid-cols-1 sm:grid-cols-[110px_1fr] gap-2">' +
+                  (pk.cover_url ? '<div><img src="' + esc(pk.cover_url) + '" class="w-[110px] rounded border border-cyber-border"><a href="' + esc(dl(pk.cover_url, 'portada_EP' + e.episode_number + '.jpg')) + '" class="block text-[10px] font-mono text-cyber-gold mt-1"><i class="fa-solid fa-download mr-1"></i>Portada</a></div>' : '<div></div>') +
+                  '<div class="space-y-2">' + box('DESCRIPCIÓN TIKTOK', pk.tiktok) + box('DESCRIPCIÓN INSTAGRAM', pk.instagram) + box('COMENTARIO PARA FIJAR (en las dos)', pk.pinned_comment) + '</div>' +
+                '</div>' +
+                '<div class="grid grid-cols-1 sm:grid-cols-2 gap-2">' +
+                  platform('tiktok', 'TIKTOK', [
+                    'Descarga el video y súbelo desde la app (botón +).',
+                    'Pega la <b>descripción TikTok</b>.',
+                    'Portada: elige el primer cuadro y escribe el texto: <b>' + esc(pk.cover_text || '') + '</b>.',
+                    '<b>Obligatorio:</b> Más opciones → activa <b>“Contenido generado por IA”</b>.',
+                    'Publica y fija el comentario. Responde los primeros comentarios en la primera hora.'
+                  ]) +
+                  platform('instagram', 'INSTAGRAM REELS', [
+                    'Sube el video como <b>Reel</b> (cuenta Business o Creador).',
+                    'Portada: “Editar portada” → <b>Agregar desde galería</b> → la portada descargada.',
+                    'Pega la <b>descripción Instagram</b>.',
+                    '<b>Obligatorio:</b> Configuración avanzada → activa <b>la etiqueta de IA</b>.',
+                    'Comparte también en tu historia y fija el comentario.'
+                  ]) +
+                '</div>' +
+                '<p class="text-[10px] text-slate-500">Publica los episodios en orden y con un ritmo fijo (por ejemplo, uno por día a la misma hora). Después mira la retención en las estadísticas: el % que sigue a los 3 s y al final.</p>'
+              : '') +
+          '</div></details>';
+      }
+      window.makePublishPackage = async function(epId) {
+        try {
+          const res = await fetch('/.netlify/functions/publish-package-background', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ episode_id: epId }) });
+          if (!res.ok && res.status !== 202) throw new Error('HTTP ' + res.status);
+        } catch (err) { return alert('No se pudo preparar: ' + err.message); }
+        setTimeout(loadDashboard, 1500);
+        const poll = (n) => setTimeout(async () => { await loadDashboard(); const ep = (lastLoadedData.episodes || []).find(x => x.id === epId); const pk = ep && (ep.validator_report || {}).publish_package; if (n > 0 && pk && pk.status === 'running') poll(n - 1); }, 5000);
+        poll(12);
+      };
+      window.markPublished = async function(epId, platform, unmark) {
+        let url = '';
+        if (!unmark) {
+          url = await askText('Pega el enlace del video publicado en ' + (platform === 'tiktok' ? 'TikTok' : 'Instagram') + ' (opcional):', '');
+          if (url === null) return;
+        }
+        try {
+          const res = await fetch('/.netlify/functions/publish-mark', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ episode_id: epId, platform, url, unmark: !!unmark }) });
+          const j = await res.json();
+          if (!res.ok) throw new Error(j.error || res.status);
+        } catch (err) { return alert('No se pudo guardar: ' + err.message); }
+        loadDashboard();
+      };
       window.genNarration = async function(btn) {
         const epId = btn.getAttribute('data-ep');
         const n = btn.getAttribute('data-n');
@@ -1951,6 +2032,7 @@
                   ((e.assets || []).some(a => a.kind === 'video_clip') && e.status !== 'generando_media'
                     ? '<button onclick="vyEditor.open(\'' + e.id + '\')" class="px-3 py-1.5 rounded-lg bg-cyber-gold/10 border border-cyber-gold/40 text-cyber-gold text-xs font-mono hover:bg-cyber-gold/20"><i class="fa-solid fa-scissors mr-1"></i>Editar episodio</button>'
                     : '') + '</div>' +
+                publishPanelHtml(e) +
               '</div>' +
             '</details>'
           );
