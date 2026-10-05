@@ -790,6 +790,8 @@
           '<div class="p-2 pt-0 space-y-2">' +
             '<div class="flex flex-wrap gap-2 items-center">' +
               '<a href="' + esc(dl(final.storage_path, vname)) + '" class="text-[11px] font-mono px-2 py-1 rounded border border-cyber-gold/50 text-cyber-gold hover:bg-cyber-gold/10"><i class="fa-solid fa-download mr-1"></i>Descargar video final</a>' +
+              (pk && pk.status === 'done' ? '<a href="/copiar.html?series=' + encodeURIComponent(DEFAULT_SERIES) + '&ep=' + e.episode_number + '" target="_blank" class="text-[11px] font-mono px-2 py-1 rounded border border-cyber-cyan/50 text-cyber-cyan hover:bg-cyber-cyan/10"><i class="fa-solid fa-mobile-screen mr-1"></i>Abrir en el celular</a>' +
+                '<button onclick="copyTag(this, event)" data-tag="' + esc(location.origin + '/copiar.html?series=' + encodeURIComponent(DEFAULT_SERIES) + '&ep=' + e.episode_number) + '" class="text-[11px] font-mono px-2 py-1 rounded border border-slate-600 text-slate-300 hover:bg-slate-800"><i class="fa-solid fa-link mr-1"></i>Copiar enlace</button>' : '') +
               (running
                 ? '<span class="text-[11px] font-mono text-cyber-pink"><i class="fa-solid fa-spinner fa-spin mr-1"></i>Preparando textos y portada...</span>'
                 : '<button onclick="makePublishPackage(\'' + e.id + '\')" class="text-[11px] font-mono px-2 py-1 rounded border border-cyber-pink/50 text-cyber-pink hover:bg-cyber-pink/10"><i class="fa-solid fa-wand-magic-sparkles mr-1"></i>' + (pk && pk.status === 'done' ? 'Rehacer textos y portada' : 'Preparar textos y portada') + ' (~$0.001)</button>') +

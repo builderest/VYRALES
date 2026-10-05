@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>VYRALES · Copiar para publicar</title>
+<style>
+  :root { --bg:#05070d; --card:#0b1020; --line:#1e2a44; --txt:#e6ebf5; --mut:#8a96ad; --cyan:#22d3ee; --pink:#ff2d7a; --gold:#fbbf24; --ok:#34d399; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--txt); font:16px/1.45 -apple-system,system-ui,Segoe UI,Roboto,sans-serif; padding:16px 16px 48px; max-width:640px; margin-inline:auto; }
+  h1 { font-size:18px; margin:0 0 4px; color:var(--pink); }
+  .mut { color:var(--mut); font-size:13px; }
+  select { width:100%; margin:12px 0; padding:12px; border-radius:10px; background:var(--card); color:var(--txt); border:1px solid var(--line); font-size:16px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px; margin:14px 0; }
+  .card h2 { font-size:13px; letter-spacing:.06em; color:var(--mut); margin:0 0 8px; font-weight:600; }
+  .txt { white-space:pre-wrap; word-break:break-word; font-size:15px; margin:0 0 12px; user-select:all; -webkit-user-select:all; }
+  button, a.btn { display:block; width:100%; text-align:center; padding:14px; border-radius:12px; border:0; font-size:17px; font-weight:700; cursor:pointer; text-decoration:none; }
+  .copy { background:var(--cyan); color:#001018; }
+  .copy.ok { background:var(--ok); }
+  a.btn { background:transparent; color:var(--gold); border:1px solid var(--gold); margin-top:8px; }
+  .row { display:flex; gap:12px; align-items:flex-start; }
+  .row img { width:110px; border-radius:10px; border:1px solid var(--line); }
+  ol { padding-left:20px; margin:0; } li { margin:6px 0; }
+  .warn { color:var(--gold); font-weight:700; }
+</style>
+</head>
+<body>
+  <h1>📱 Copiar para publicar</h1>
+  <div class="mut" id="sub">Cargando…</div>
+  <select id="ep" hidden></select>
+  <div id="out"></div>
+<script>
+const qs = new URLSearchParams(location.search);
+const SERIES = qs.get('series') || 'cuando_no_eramos_los_unicos_humanos';
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
+const dl = (url, name) => url + (url.includes('?') ? '&' : '?') + 'download=' + encodeURIComponent(name);
+let EPS = [];
+
+async function copy(btn, text) {
+  try { await navigator.clipboard.writeText(text); }
+  catch (_) { // respaldo para navegadores viejos
+    const t = document.createElement('textarea'); t.value = text; t.style.position = 'fixed'; t.style.opacity = '0';
+    document.body.appendChild(t); t.focus(); t.select(); document.execCommand('copy'); t.remove();
+  }
+  const old = btn.textContent; btn.textContent = '✓ Copiado'; btn.classList.add('ok');
+  setTimeout(() => { btn.textContent = old; btn.classList.remove('ok'); }, 1800);
+}
+
+function block(title, text) {
+  if (!text) return '';
+  const id = 'b' + Math.random().toString(36).slice(2);
+  window[id] = text;
+  return '<div class="card"><h2>' + title + '</h2><p class="txt">' + esc(text) + '</p><button class="copy" onclick="copy(this, window.' + id + ')">Copiar</button></div>';
+}
+
+function render() {
+  const e = EPS.find(x => String(x.episode_number) === document.getElementById('ep').value);
+  if (!e) return;
+  const pk = e.validator_report.publish_package;
+  const final = (e.assets || []).find(a => a.kind === 'final_render');
+  const vname = 'EP' + e.episode_number + '.mp4';
+  document.getElementById('out').innerHTML =
+    '<div class="card"><div class="row">' + (pk.cover_url ? '<img src="' + esc(pk.cover_url) + '" alt="portada">' : '') +
+      '<div style="flex:1"><b>EP ' + e.episode_number + '</b><div class="mut">' + esc(e.title || '') + '</div>' +
+      (final ? '<a class="btn" href="' + esc(dl(final.storage_path, vname)) + '">⬇ Video</a>' : '') +
+      (pk.cover_url ? '<a class="btn" href="' + esc(dl(pk.cover_url, 'portada_EP' + e.episode_number + '.jpg')) + '">⬇ Portada</a>' : '') +
+    '</div></div></div>' +
+    block('DESCRIPCIÓN TIKTOK', pk.tiktok) +
+    block('DESCRIPCIÓN INSTAGRAM', pk.instagram) +
+    block('COMENTARIO PARA FIJAR (en las dos)', pk.pinned_comment) +
+    block('TEXTO DE PORTADA', pk.cover_text) +
+    '<div class="card"><h2>ANTES DE PUBLICAR</h2><ol>' +
+      '<li>TikTok: abre el borrador (Bandeja de entrada → notificación) o sube el video con +.</li>' +
+      '<li>Pega la descripción y elige la portada.</li>' +
+      '<li class="warn">TikTok: Más opciones → activa “Contenido generado por IA”.</li>' +
+      '<li class="warn">Instagram: Configuración avanzada → activa la etiqueta de IA.</li>' +
+      '<li>Publica y fija el comentario.</li>' +
+    '</ol></div>';
+}
+
+(async () => {
+  try {
+    const r = await fetch('/.netlify/functions/get-episodes?series=' + encodeURIComponent(SERIES), { credentials: 'same-origin' });
+    if (r.status === 401 || r.redirected) { location.href = '/login.html?next=' + encodeURIComponent(location.pathname + location.search); return; }
+    const d = await r.json();
+    EPS = (d.episodes || []).filter(e => e.validator_report && e.validator_report.publish_package && e.validator_report.publish_package.status === 'done')
+      .sort((a, b) => a.episode_number - b.episode_number);
+    document.getElementById('sub').textContent = (d.series && d.series.title) || SERIES;
+    if (!EPS.length) { document.getElementById('out').innerHTML = '<div class="card">Ningún episodio tiene textos todavía. En el dashboard pulsa «Preparar textos y portada».</div>'; return; }
+    const sel = document.getElementById('ep');
+    sel.innerHTML = EPS.map(e => '<option value="' + e.episode_number + '">EP ' + e.episode_number + ' · ' + esc(e.title || '') + '</option>').join('');
+    const want = qs.get('ep'); sel.value = want && EPS.some(e => String(e.episode_number) === want) ? want : String(EPS[EPS.length - 1].episode_number);
+    sel.hidden = EPS.length < 2; sel.onchange = render; render();
+  } catch (err) { document.getElementById('out').innerHTML = '<div class="card">Error: ' + esc(err.message) + '</div>'; }
+})();
+</script>
+</body>
+</html>
