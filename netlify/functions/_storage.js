@@ -23,4 +23,16 @@ async function uploadClip(supabase, { path: storagePath, buffer }) {
   return data.publicUrl;
 }
 
-module.exports = { BUCKET, ensureMediaBucket, uploadClip };
+// Subida genérica (imágenes de referencia de personajes, etc.). Devuelve la URL pública.
+async function uploadFile(supabase, { path: storagePath, buffer, contentType }) {
+  const { error } = await supabase.storage.from(BUCKET).upload(storagePath, buffer, {
+    contentType,
+    upsert: true
+  });
+  if (error) throw error;
+
+  const { data } = supabase.storage.from(BUCKET).getPublicUrl(storagePath);
+  return data.publicUrl;
+}
+
+module.exports = { BUCKET, ensureMediaBucket, uploadClip, uploadFile };
