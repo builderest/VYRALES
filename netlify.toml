@@ -5,7 +5,8 @@
 [functions]
   node_bundler = "esbuild"
 
-# Scheduled function: dispara el pipeline todos los días a las 8am (hora UTC).
-# Ajusta el cron si quieres otra hora — recuerda que Netlify programa en UTC.
-[functions."daily-trigger"]
-  schedule = "0 13 * * *"
+# daily-trigger YA NO corre programado: la produccion la dispara Franklin a mano (de noche)
+# y los guiones de cada novela se escriben completos de una vez (arco entero) e importan
+# con import-series. Si algun dia se quiere volver a automatizar, reponer aqui:
+# [functions."daily-trigger"]
+#   schedule = "0 13 * * *"
