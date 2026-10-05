@@ -365,6 +365,12 @@
 
             </div>
 
+            <!-- Tomas del episodio en revisión: desplegable (cerrado si ya están todas aprobadas) -->
+            <details id="shotCardsDetails" class="mb-6 rounded-xl border border-cyber-border bg-cyber-darker/30 hidden">
+                <summary id="shotCardsSummary" class="cursor-pointer list-none px-4 py-3 text-sm font-mono text-cyber-cyan hover:text-white select-none"></summary>
+                <div id="shotCardsInner" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 p-4 pt-0"></div>
+            </details>
+
             <!-- Vertical 9:16 Shot Breakdown & Scene Cards Grid -->
             <div id="shotCardsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 
@@ -2708,16 +2714,25 @@
           renderFinalRenderPanel(inReview);
           document.querySelectorAll('.demo-shot-card').forEach(el => el.remove());
 
+          const shotBox = document.getElementById('shotCardsDetails');
           if (inReview && inReview.assets && inReview.assets.length) {
             const sorted = inReview.assets.filter(a => a.kind === 'video_clip').sort((a, b) => (a.shot_number || 0) - (b.shot_number || 0));
-            const addCard = document.getElementById('addChapterCard');
+            const inner = document.getElementById('shotCardsInner');
             sorted.forEach((asset, i) => {
-              addCard.insertAdjacentHTML('beforebegin', renderShotCard(asset, i, sorted.length));
+              inner.insertAdjacentHTML('beforeend', renderShotCard(asset, i, sorted.length));
             });
+            const pending = sorted.filter(a => !a.approved).length;
+            shotBox.classList.toggle('hidden', !sorted.length);
+            document.getElementById('shotCardsSummary').innerHTML = '<i class="fa-solid fa-film mr-2"></i>TOMAS DEL EP ' + inReview.episode_number + ' · ' + (sorted.length - pending) + '/' + sorted.length + ' aprobadas' +
+              (pending ? ' · <span class="text-cyber-gold">' + pending + ' por revisar</span>' : ' · <span class="text-cyber-emerald">todas aprobadas ✓</span>') + ' <span class="text-slate-500">(clic para ' + 'ver / ocultar)</span>';
+            // Abierto solo si falta revisar; si el usuario lo abrió/cerró a mano, se respeta.
+            if (window.__shotBoxUser == null && shotBox.open !== (pending > 0)) { shotBox.__expect = pending > 0; shotBox.open = pending > 0; }
+            if (!shotBox.__wired) { shotBox.__wired = true; shotBox.addEventListener('toggle', () => { if (shotBox.__expect === shotBox.open) { shotBox.__expect = undefined; return; } window.__shotBoxUser = shotBox.open; }); }
             banner.innerHTML = inReview.status === 'generando_media'
               ? '<i class="fa-solid fa-spinner fa-spin mr-1"></i>Generando EP ' + inReview.episode_number + ' de "' + esc(data.series.title) + '": ' + sorted.length + ' de ' + ((inReview.shots || []).length || '?') + ' tomas listas. Puedes ir revisando las que ya salieron.'
               : 'Revisando EP ' + inReview.episode_number + ' de "' + esc(data.series.title) + '".';
           } else {
+            shotBox.classList.add('hidden');
             banner.textContent = 'Todavía no hay tomas generadas en esta serie.';
           }
           lastLoadedData = data;
