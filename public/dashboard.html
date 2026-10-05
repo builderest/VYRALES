@@ -886,6 +886,15 @@
         const u = new URL(location.href); u.searchParams.delete('connected'); history.replaceState(null, '', u.pathname + u.search);
         setTimeout(() => window.openSocialModal && window.openSocialModal(), 800);
       })();
+      // Lleva al panel PUBLICAR del episodio (lo abre y hace scroll).
+      window.goPublish = function(epId) {
+        const card = document.querySelector('details[data-ep-id="' + epId + '"]');
+        if (!card) return;
+        card.open = true;
+        const pub = [...card.querySelectorAll('details')].find(d => /PUBLICAR/.test((d.querySelector(':scope > summary') || {}).textContent || ''));
+        if (pub) { pub.open = true; pub.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+        else card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      };
       window.disconnectSocial = async function(platform) {
         if (!await askConfirm('¿Desconectar ' + (platform === 'tiktok' ? 'TikTok' : 'Instagram') + ' de VYRALES?\n\nNo borra nada de tu cuenta; solo deja de poder publicar desde aquí hasta que la vuelvas a conectar.')) return;
         try {
@@ -1216,6 +1225,7 @@
                 '<p class="text-cyber-emerald font-bold"><i class="fa-solid fa-check-circle mr-1"></i>Video final del episodio #' + episode.episode_number + ' listo (' + clips.length + ' tomas unidas).</p>' +
                 '<button type="button" onclick="openMedia(this)" data-src="' + esc(finalRender.storage_path) + '" data-kind="video" data-title="EP ' + episode.episode_number + ' · Video final" class="text-cyber-cyan hover:underline"><i class="fa-solid fa-circle-play mr-1"></i>Ver / descargar</button>' +
                 ' · <button onclick="vyEditor.open(\'' + episode.id + '\')" class="text-cyber-gold hover:underline"><i class="fa-solid fa-scissors mr-1"></i>Editar episodio</button>' +
+                ' · <button onclick="goPublish(\'' + episode.id + '\')" class="text-cyber-pink hover:underline font-bold"><i class="fa-solid fa-bullhorn mr-1"></i>Publicar</button>' +
                 ' · <button onclick="mergeEpisode(\'' + episode.id + '\')" class="text-slate-400 hover:text-cyber-cyan underline">Unir sin editar</button>' +
               '</div>' +
             '</div>';
