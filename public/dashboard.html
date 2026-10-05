@@ -137,6 +137,7 @@
                     <div class="flex items-center gap-2">
                         <h1 class="font-display font-bold text-xl tracking-wider text-white">VYRALES</h1>
                         <span class="text-xs font-mono bg-cyber-violet/30 text-cyber-cyan border border-cyber-cyan/30 px-2 py-0.5 rounded-full font-semibold">v3.1 ORCHESTRATOR</span>
+                        <button type="button" onclick="openSocialModal()" class="text-[10px] font-mono px-2 py-0.5 rounded-full border border-cyber-pink/50 text-cyber-pink hover:bg-cyber-pink/10 ml-1" title="Conectar TikTok / Instagram"><i class="fa-solid fa-share-nodes mr-1"></i>Redes</button>
                         <a href="/.netlify/functions/login?logout=1" class="text-[10px] font-mono text-slate-500 hover:text-cyber-pink ml-1" title="Cerrar sesión"><i class="fa-solid fa-right-from-bracket mr-1"></i>Salir</a>
                     </div>
                     <p class="text-xs text-slate-400 font-mono">Arquitectura de Automatización de Microdramas con IA</p>
@@ -848,6 +849,44 @@
         }
         throw new Error('Llave del dashboard incorrecta.');
       }
+      // ---------- Ventana "Redes": conectar / desconectar cuentas (arriba, junto a VYRALES) ----------
+      window.openSocialModal = async function() {
+        let m = document.getElementById('socialModal');
+        if (!m) {
+          m = document.createElement('div');
+          m.id = 'socialModal';
+          m.className = 'fixed inset-0 z-[90] bg-black/70 flex items-center justify-center p-4';
+          m.addEventListener('click', (e) => { if (e.target === m) m.remove(); });
+          document.body.appendChild(m);
+        }
+        m.innerHTML = '<div class="bg-cyber-darker border border-cyber-border rounded-xl p-5 w-full max-w-md text-sm"><p class="text-slate-400 font-mono text-xs"><i class="fa-solid fa-spinner fa-spin mr-1"></i>Revisando cuentas...</p></div>';
+        let soc = null;
+        try { soc = await (await fetch('/.netlify/functions/social-status')).json(); window.__social = soc; } catch (_) {}
+        const row = (key, label, icon) => {
+          const acc = soc && (soc.accounts || {})[key];
+          const hasKeys = soc && (soc.keys || {})[key];
+          let right;
+          if (!soc) right = '<span class="text-cyber-pink text-xs">No se pudo revisar</span>';
+          else if (soc.table_missing) right = '<span class="text-cyber-gold text-xs">Falta la tabla (migración 006)</span>';
+          else if (!hasKeys) right = '<span class="text-slate-500 text-xs">Faltan las llaves de la app (.env / Netlify)</span>';
+          else if (acc) right = '<span class="text-cyber-emerald text-xs mr-2">● ' + esc(acc.name || 'conectada') + '</span><button onclick="disconnectSocial(\'' + key + '\')" class="text-[11px] font-mono px-2 py-1 rounded border border-slate-600 text-slate-400 hover:text-white">Desconectar</button>';
+          else right = '<button onclick="connectSocial(\'' + key + '\')" class="text-[11px] font-mono px-3 py-1.5 rounded border border-cyber-violet/60 text-cyber-violet bg-cyber-violet/10 hover:bg-cyber-violet/20"><i class="fa-solid fa-link mr-1"></i>Conectar ' + label + '</button>';
+          return '<div class="flex items-center justify-between gap-3 py-3 border-b border-slate-800"><span class="text-white font-semibold"><i class="' + icon + ' mr-2"></i>' + label + '</span><span class="flex items-center">' + right + '</span></div>';
+        };
+        m.innerHTML = '<div class="bg-cyber-darker border border-cyber-border rounded-xl p-5 w-full max-w-md">' +
+          '<div class="flex justify-between items-center mb-1"><h3 class="text-white font-display font-bold">Redes conectadas</h3><button onclick="document.getElementById(\'socialModal\').remove()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button></div>' +
+          '<p class="text-[11px] text-slate-500 mb-2">Conecta tu cuenta una vez; después publicas desde el panel PUBLICAR de cada episodio.</p>' +
+          row('tiktok', 'TikTok', 'fa-brands fa-tiktok') + row('instagram', 'Instagram', 'fa-brands fa-instagram') +
+          '<p class="text-[10px] text-slate-500 mt-3">Al conectar se abre una pestaña nueva; cuando diga “conectado”, ciérrala y dale <button onclick="openSocialModal()" class="underline text-cyber-cyan">actualizar</button>.</p></div>';
+      };
+      window.disconnectSocial = async function(platform) {
+        if (!await askConfirm('¿Desconectar ' + (platform === 'tiktok' ? 'TikTok' : 'Instagram') + ' de VYRALES?\n\nNo borra nada de tu cuenta; solo deja de poder publicar desde aquí hasta que la vuelvas a conectar.')) return;
+        try {
+          const res = await keyedFetch('/.netlify/functions/social-disconnect', { platform });
+          if (!res.ok) throw new Error((await res.json()).error || res.status);
+        } catch (err) { return alert('No se pudo desconectar: ' + err.message); }
+        openSocialModal(); loadDashboard();
+      };
       window.connectSocial = function(platform) {
         window.open('/.netlify/functions/oauth-' + platform + '-start', '_blank'); // la sesión (cookie) autoriza
       };
