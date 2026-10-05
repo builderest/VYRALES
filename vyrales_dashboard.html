@@ -1,0 +1,982 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VYRALES // AI Automation Control Center</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Google Fonts: Space Grotesk & Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Chart.js for Telemetry Analytics -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        cyber: {
+                            bg: '#05070f',
+                            card: '#0a0f1d',
+                            border: '#1b253e',
+                            cyan: '#00f0ff',
+                            violet: '#7000ff',
+                            pink: '#ff007f',
+                            emerald: '#00ff88',
+                            gold: '#ffb700',
+                            darker: '#020307'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                        display: ['Space Grotesk', 'sans-serif']
+                    },
+                    boxShadow: {
+                        'neon-cyan': '0 0 15px rgba(0, 240, 255, 0.35)',
+                        'neon-violet': '0 0 15px rgba(112, 0, 255, 0.35)',
+                        'neon-pink': '0 0 15px rgba(255, 0, 127, 0.35)',
+                        'neon-emerald': '0 0 15px rgba(0, 255, 136, 0.35)',
+                        'glass': '0 8px 32px 0 rgba(0, 0, 0, 0.5)'
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* Custom Cyberpunk Scrollbar & Glassmorphic Utilities */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #05070f;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #1b253e;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #00f0ff;
+        }
+
+        .glass-panel {
+            background: rgba(10, 15, 29, 0.75);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(0, 240, 255, 0.12);
+        }
+
+        .glass-panel-glow {
+            background: rgba(10, 15, 29, 0.85);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(112, 0, 255, 0.25);
+            box-shadow: inset 0 0 20px rgba(112, 0, 255, 0.08);
+        }
+
+        .cyber-grid-bg {
+            background-image: linear-gradient(to right, rgba(0, 240, 255, 0.03) 1px, transparent 1px),
+                              linear-gradient(to bottom, rgba(0, 240, 255, 0.03) 1px, transparent 1px);
+            background-size: 30px 30px;
+        }
+
+        .animated-pulse-border {
+            position: relative;
+        }
+        .animated-pulse-border::after {
+            content: '';
+            position: absolute;
+            inset: -1px;
+            border-radius: inherit;
+            padding: 1px;
+            background: linear-gradient(90deg, #00f0ff, #7000ff, #ff007f, #00f0ff);
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+            background-size: 300% 100%;
+            animation: borderGradient 4s linear infinite;
+        }
+
+        @keyframes borderGradient {
+            0% { background-position: 0% 0%; }
+            100% { background-position: 300% 0%; }
+        }
+
+        .scanline {
+            background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0, 240, 255, 0.05) 50%, rgba(0, 240, 255, 0.05));
+            background-size: 100% 4px;
+        }
+    </style>
+</head>
+
+<body class="bg-cyber-bg text-slate-200 font-sans min-h-screen cyber-grid-bg antialiased selection:bg-cyber-cyan selection:text-black">
+
+    <!-- TOP HEADER / COMMAND BAR -->
+    <header class="sticky top-0 z-50 glass-panel border-b border-cyber-border/80 px-4 lg:px-8 py-3">
+        <div class="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
+            
+            <!-- Logo & Brand Title -->
+            <div class="flex items-center space-x-3">
+                <div class="relative flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-cyber-cyan via-cyber-violet to-cyber-pink p-[1px] shadow-neon-cyan">
+                    <div class="w-full h-full bg-cyber-darker rounded-[11px] flex items-center justify-center">
+                        <i class="fa-solid fa-clapperboard text-cyber-cyan text-lg animate-pulse"></i>
+                    </div>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h1 class="font-display font-bold text-xl tracking-wider text-white">VYRALES</h1>
+                        <span class="text-xs font-mono bg-cyber-violet/30 text-cyber-cyan border border-cyber-cyan/30 px-2 py-0.5 rounded-full font-semibold">v3.1 ORCHESTRATOR</span>
+                    </div>
+                    <p class="text-xs text-slate-400 font-mono">Arquitectura de Automatización de Microdramas con IA</p>
+                </div>
+            </div>
+
+            <!-- Active Series Selector -->
+            <div class="flex items-center space-x-3 bg-cyber-darker/80 border border-cyber-border px-3 py-1.5 rounded-lg">
+                <i class="fa-solid fa-tv text-cyber-pink text-xs"></i>
+                <span class="text-xs text-slate-400 font-mono hidden sm:inline">SERIE ACTIVA:</span>
+                <select id="seriesSelector" onchange="switchSeries(this.value)" class="bg-transparent text-sm font-semibold text-cyber-cyan focus:outline-none cursor-pointer">
+                    <option value="dragon" class="bg-cyber-card text-white">El Dragón de Silicio (Sci-Fi)</option>
+                    <option value="herencia" class="bg-cyber-card text-white">La Herencia de Cristal (Drama)</option>
+                    <option value="tokio" class="bg-cyber-card text-white">Sombras en Tokio (Cyberpunk Thriller)</option>
+                </select>
+            </div>
+
+            <!-- Infrastructure Status Pills -->
+            <div class="hidden xl:flex items-center space-x-3 font-mono text-xs">
+                <div class="flex items-center space-x-1.5 px-2.5 py-1 rounded-md bg-emerald-950/40 border border-emerald-500/30 text-emerald-400">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                    <span>NETLIFY: ONLINE</span>
+                </div>
+                <div class="flex items-center space-x-1.5 px-2.5 py-1 rounded-md bg-cyber-violet/20 border border-cyber-violet/40 text-cyber-violet">
+                    <i class="fa-solid fa-database text-[10px]"></i>
+                    <span>SUPABASE: READY</span>
+                </div>
+                <div class="flex items-center space-x-1.5 px-2.5 py-1 rounded-md bg-cyber-cyan/10 border border-cyber-cyan/30 text-cyber-cyan">
+                    <i class="fa-solid fa-brain text-[10px]"></i>
+                    <span>CLAUDE MAX: ACTIVE</span>
+                </div>
+            </div>
+
+            <!-- Quick Trigger Run Button -->
+            <button onclick="triggerPipelineRun()" class="relative group overflow-hidden px-4 py-2 rounded-lg bg-gradient-to-r from-cyber-cyan via-cyber-violet to-cyber-pink p-[1px] shadow-neon-pink hover:scale-105 transition-all">
+                <div class="bg-cyber-darker group-hover:bg-opacity-80 transition-all px-3 py-1.5 rounded-[7px] flex items-center space-x-2">
+                    <i class="fa-solid fa-bolt text-cyber-gold animate-bounce"></i>
+                    <span class="font-display font-semibold text-xs text-white tracking-wider">EJECUTAR PIPELINE</span>
+                </div>
+            </button>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 lg:px-8 py-6 space-y-6">
+
+        <!-- SYSTEM METRICS & BUDGET STATUS PANEL -->
+        <section class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            
+            <!-- Budget Widget -->
+            <div class="glass-panel rounded-xl p-4 border-l-4 border-l-cyber-cyan relative overflow-hidden">
+                <div class="flex justify-between items-start mb-2">
+                    <div>
+                        <p class="text-xs font-mono text-slate-400 uppercase tracking-wider">Presupuesto Mensual</p>
+                        <h3 class="text-2xl font-display font-bold text-white mt-1">$112.50 <span class="text-xs text-slate-400 font-normal">/ $150.00</span></h3>
+                    </div>
+                    <div class="w-8 h-8 rounded-lg bg-cyber-cyan/10 border border-cyber-cyan/30 flex items-center justify-center text-cyber-cyan">
+                        <i class="fa-solid fa-wallet"></i>
+                    </div>
+                </div>
+                <div class="w-full bg-slate-800 rounded-full h-2 overflow-hidden mb-2">
+                    <div class="bg-gradient-to-r from-cyber-cyan to-cyber-violet h-full rounded-full" style="width: 75%"></div>
+                </div>
+                <div class="flex justify-between text-[11px] font-mono text-slate-400">
+                    <span>~ $2.30 / Episodio (Lite)</span>
+                    <span class="text-cyber-cyan font-bold">75% Usado</span>
+                </div>
+            </div>
+
+            <!-- Episode Production Yield -->
+            <div class="glass-panel rounded-xl p-4 border-l-4 border-l-cyber-violet">
+                <div class="flex justify-between items-start mb-2">
+                    <div>
+                        <p class="text-xs font-mono text-slate-400 uppercase tracking-wider">Episodios este mes</p>
+                        <h3 class="text-2xl font-display font-bold text-white mt-1">28 / 30 <span class="text-xs text-emerald-400 font-normal"><i class="fa-solid fa-arrow-up"></i> 93%</span></h3>
+                    </div>
+                    <div class="w-8 h-8 rounded-lg bg-cyber-violet/10 border border-cyber-violet/30 flex items-center justify-center text-cyber-violet">
+                        <i class="fa-solid fa-film"></i>
+                    </div>
+                </div>
+                <div class="grid grid-cols-3 gap-1 mt-3 text-center text-[10px] font-mono">
+                    <div class="bg-slate-900/60 p-1 rounded border border-slate-800">
+                        <span class="block text-slate-400">Listos</span>
+                        <span class="text-cyber-emerald font-bold text-xs">22</span>
+                    </div>
+                    <div class="bg-slate-900/60 p-1 rounded border border-slate-800">
+                        <span class="block text-slate-400">Revisión</span>
+                        <span class="text-cyber-gold font-bold text-xs">4</span>
+                    </div>
+                    <div class="bg-slate-900/60 p-1 rounded border border-slate-800">
+                        <span class="block text-slate-400">Cola</span>
+                        <span class="text-cyber-cyan font-bold text-xs">2</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Claude Validator & Cliffhanger Score -->
+            <div class="glass-panel rounded-xl p-4 border-l-4 border-l-cyber-pink">
+                <div class="flex justify-between items-start mb-2">
+                    <div>
+                        <p class="text-xs font-mono text-slate-400 uppercase tracking-wider">Tasa de Aprobación Guion</p>
+                        <h3 class="text-2xl font-display font-bold text-white mt-1">88.4%</h3>
+                    </div>
+                    <div class="w-8 h-8 rounded-lg bg-cyber-pink/10 border border-cyber-pink/30 flex items-center justify-center text-cyber-pink">
+                        <i class="fa-solid fa-shield-halved"></i>
+                    </div>
+                </div>
+                <p class="text-xs text-slate-300 mt-2 font-mono">
+                    <i class="fa-solid fa-check text-cyber-emerald mr-1"></i> Story Bible Pass Rate
+                </p>
+                <div class="mt-2 text-[11px] text-slate-400 font-mono">
+                    Reintentos automáticos: <span class="text-cyber-pink font-bold">1.2 prom.</span>
+                </div>
+            </div>
+
+            <!-- Veo API Multi-Model Config -->
+            <div class="glass-panel rounded-xl p-4 border-l-4 border-l-cyber-emerald">
+                <div class="flex justify-between items-start mb-2">
+                    <div>
+                        <p class="text-xs font-mono text-slate-400 uppercase tracking-wider">Modo Veo API</p>
+                        <h3 class="text-lg font-display font-bold text-cyber-emerald mt-1">HÍBRIDO LITE/FAST</h3>
+                    </div>
+                    <div class="w-8 h-8 rounded-lg bg-cyber-emerald/10 border border-cyber-emerald/30 flex items-center justify-center text-cyber-emerald">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i>
+                    </div>
+                </div>
+                <p class="text-xs text-slate-400 mt-1">7 tomas Lite ($0.04/s) + 1 Fast Clip ($0.15/s) en el Cliffhanger final.</p>
+                <span class="inline-block mt-2 text-[10px] font-mono bg-cyber-emerald/20 text-cyber-emerald border border-cyber-emerald/40 px-2 py-0.5 rounded">OPTIMIZADO DÍA DÍA</span>
+            </div>
+        </section>
+
+        <!-- PIPELINE WORKFLOW VISUALIZER (INTERACTIVE NODES) -->
+        <section class="glass-panel rounded-2xl p-6 relative">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                <div>
+                    <div class="flex items-center space-x-2">
+                        <span class="w-3 h-3 rounded-full bg-cyber-cyan animate-pulse"></span>
+                        <h2 class="font-display font-bold text-lg text-white">ORQUESTACIÓN DEL PIPELINE // FLUJO AUTOMATIZADO</h2>
+                    </div>
+                    <p class="text-xs text-slate-400 font-mono mt-0.5">Haz clic en cualquier nodo para inspeccionar el payload de la API, prompts o logs de ejecución.</p>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <span class="text-xs font-mono text-slate-400">Latencia en cola: <strong class="text-cyber-cyan">320ms</strong></span>
+                    <button onclick="resetNodeStatus()" class="px-3 py-1 rounded bg-slate-800 hover:bg-slate-700 text-xs font-mono text-slate-300 transition-all border border-slate-700">
+                        <i class="fa-solid fa-rotate-right mr-1"></i> Reiniciar Vista
+                    </button>
+                </div>
+            </div>
+
+            <!-- Pipeline Node Map Grid -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 relative">
+                
+                <!-- Node 1: Claude Max Scripting -->
+                <div id="node-1" onclick="openNodeDetails('node1')" class="cursor-pointer glass-panel p-4 rounded-xl border border-cyber-cyan/40 hover:border-cyber-cyan transition-all hover:shadow-neon-cyan relative group">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-cyber-cyan/20 text-cyber-cyan font-bold">PASO 01</span>
+                        <i class="fa-solid fa-pen-nib text-cyber-cyan"></i>
+                    </div>
+                    <h4 class="font-display font-semibold text-sm text-white">Claude Max</h4>
+                    <p class="text-[11px] text-slate-400 font-mono mt-1">Guion del Episodio</p>
+                    <div class="mt-3 flex items-center justify-between text-[10px] font-mono text-slate-400">
+                        <span>Estado:</span>
+                        <span class="text-emerald-400 font-bold flex items-center gap-1"><i class="fa-solid fa-circle text-[6px]"></i> COMPLETADO</span>
+                    </div>
+                </div>
+
+                <!-- Node 2: Story Bible & Validator -->
+                <div id="node-2" onclick="openNodeDetails('node2')" class="cursor-pointer glass-panel p-4 rounded-xl border border-cyber-pink/40 hover:border-cyber-pink transition-all hover:shadow-neon-pink relative group">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-cyber-pink/20 text-cyber-pink font-bold">PASO 02</span>
+                        <i class="fa-solid fa-shield-virus text-cyber-pink"></i>
+                    </div>
+                    <h4 class="font-display font-semibold text-sm text-white">Validador Biblia</h4>
+                    <p class="text-[11px] text-slate-400 font-mono mt-1">Revisor + Cliffhanger</p>
+                    <div class="mt-3 flex items-center justify-between text-[10px] font-mono text-slate-400">
+                        <span>Estado:</span>
+                        <span class="text-emerald-400 font-bold flex items-center gap-1"><i class="fa-solid fa-circle text-[6px]"></i> APROBADO</span>
+                    </div>
+                </div>
+
+                <!-- Node 3: Supabase Asset Sync -->
+                <div id="node-3" onclick="openNodeDetails('node3')" class="cursor-pointer glass-panel p-4 rounded-xl border border-cyber-violet/40 hover:border-cyber-violet transition-all hover:shadow-neon-violet relative group">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-cyber-violet/20 text-cyber-violet font-bold">PASO 03</span>
+                        <i class="fa-solid fa-database text-cyber-violet"></i>
+                    </div>
+                    <h4 class="font-display font-semibold text-sm text-white">Supabase Store</h4>
+                    <p class="text-[11px] text-slate-400 font-mono mt-1">Ref Visual + Metadatos</p>
+                    <div class="mt-3 flex items-center justify-between text-[10px] font-mono text-slate-400">
+                        <span>Estado:</span>
+                        <span class="text-emerald-400 font-bold flex items-center gap-1"><i class="fa-solid fa-circle text-[6px]"></i> SINCRONIZADO</span>
+                    </div>
+                </div>
+
+                <!-- Node 4: Veo API Video Gen Queue -->
+                <div id="node-4" onclick="openNodeDetails('node4')" class="cursor-pointer glass-panel p-4 rounded-xl border border-cyber-gold/40 hover:border-cyber-gold transition-all hover:shadow-neon-cyan relative group">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-cyber-gold/20 text-cyber-gold font-bold">PASO 04</span>
+                        <i class="fa-solid fa-video text-cyber-gold animate-pulse"></i>
+                    </div>
+                    <h4 class="font-display font-semibold text-sm text-white">Cola Veo 3.1</h4>
+                    <p class="text-[11px] text-slate-400 font-mono mt-1">8 Clips x 8s (64s total)</p>
+                    <div class="mt-3 flex items-center justify-between text-[10px] font-mono text-slate-400">
+                        <span>Estado:</span>
+                        <span class="text-cyber-gold font-bold flex items-center gap-1"><i class="fa-solid fa-spinner animate-spin text-[10px]"></i> GENERANDO</span>
+                    </div>
+                </div>
+
+                <!-- Node 5: Human Review Panel -->
+                <div id="node-5" onclick="openNodeDetails('node5')" class="cursor-pointer glass-panel p-4 rounded-xl border border-slate-700 hover:border-cyber-cyan transition-all relative group">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-bold">PASO 05</span>
+                        <i class="fa-solid fa-user-check text-slate-300"></i>
+                    </div>
+                    <h4 class="font-display font-semibold text-sm text-white">Filtro Humano</h4>
+                    <p class="text-[11px] text-slate-400 font-mono mt-1">Control Calidad (1-2 min)</p>
+                    <div class="mt-3 flex items-center justify-between text-[10px] font-mono text-slate-400">
+                        <span>Estado:</span>
+                        <span class="text-slate-400 font-bold">ESPERANDO</span>
+                    </div>
+                </div>
+
+                <!-- Node 6: Multi-Channel Publishing -->
+                <div id="node-6" onclick="openNodeDetails('node6')" class="cursor-pointer glass-panel p-4 rounded-xl border border-slate-700 hover:border-cyber-emerald transition-all relative group">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-bold">PASO 06</span>
+                        <i class="fa-solid fa-share-nodes text-slate-300"></i>
+                    </div>
+                    <h4 class="font-display font-semibold text-sm text-white">Publicación</h4>
+                    <p class="text-[11px] text-slate-400 font-mono mt-1">TikTok / YT / Reels</p>
+                    <div class="mt-3 flex items-center justify-between text-[10px] font-mono text-slate-400">
+                        <span>Estado:</span>
+                        <span class="text-slate-400 font-bold">PENDIENTE</span>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Simulated Terminal Output Bar -->
+            <div class="mt-4 bg-cyber-darker border border-cyber-border rounded-xl p-3 font-mono text-xs text-slate-300 flex items-center justify-between overflow-x-auto">
+                <div class="flex items-center space-x-3 min-w-max">
+                    <span class="text-cyber-cyan font-bold"><i class="fa-solid fa-terminal mr-1"></i> LIVE LOG:</span>
+                    <span id="terminalLiveLog" class="text-slate-300">[14:22:08] Netlify function initiated. Script validated against Story Bible rule #14 (Cliffhanger mandatory). Veo queue assigned 8 clips.</span>
+                </div>
+                <button onclick="toggleLogConsole()" class="text-[10px] text-cyber-cyan hover:underline ml-4 min-w-max">Ver consola completa &rarr;</button>
+            </div>
+        </section>
+
+        <!-- STORY BIBLE & CHARACTER CONSISTENCY CENTRAL -->
+        <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            <!-- Story Bible & Rules Engine -->
+            <div class="glass-panel rounded-2xl p-6 lg:col-span-1 space-y-4">
+                <div class="flex items-center justify-between border-b border-cyber-border pb-3">
+                    <div class="flex items-center space-x-2">
+                        <i class="fa-solid fa-book-bookmark text-cyber-pink"></i>
+                        <h3 class="font-display font-bold text-white text-base">STORY BIBLE & REGLAS</h3>
+                    </div>
+                    <span class="text-[10px] font-mono bg-cyber-pink/20 text-cyber-pink border border-cyber-pink/40 px-2 py-0.5 rounded">SUPABASE JSON</span>
+                </div>
+
+                <!-- Rules Toggles -->
+                <div class="space-y-3 font-mono text-xs">
+                    <div class="flex items-center justify-between p-2.5 rounded-lg bg-cyber-darker/60 border border-cyber-border">
+                        <div>
+                            <p class="text-white font-semibold">Gancho / Cliffhanger Obligatorio</p>
+                            <p class="text-[10px] text-slate-400">Rechazar si el guion resuelve el capítulo</p>
+                        </div>
+                        <input type="checkbox" checked class="accent-cyber-pink h-4 w-4 rounded cursor-pointer">
+                    </div>
+
+                    <div class="flex items-center justify-between p-2.5 rounded-lg bg-cyber-darker/60 border border-cyber-border">
+                        <div>
+                            <p class="text-white font-semibold">Verificación de Personalidad</p>
+                            <p class="text-[10px] text-slate-400">Comparar tono con arquetipo fijo</p>
+                        </div>
+                        <input type="checkbox" checked class="accent-cyber-pink h-4 w-4 rounded cursor-pointer">
+                    </div>
+
+                    <div class="flex items-center justify-between p-2.5 rounded-lg bg-cyber-darker/60 border border-cyber-border">
+                        <div>
+                            <p class="text-white font-semibold">Consistencia Visual de Personajes</p>
+                            <p class="text-[10px] text-slate-400">Inyectar tags fijos de Nano Banana Pro</p>
+                        </div>
+                        <input type="checkbox" checked class="accent-cyber-cyan h-4 w-4 rounded cursor-pointer">
+                    </div>
+                </div>
+
+                <!-- Episode Continuity Memory Log -->
+                <div class="mt-4 pt-3 border-t border-cyber-border">
+                    <h4 class="text-xs font-mono font-bold text-slate-300 mb-2 flex items-center justify-between">
+                        <span>MEMORIA DE CONTINUIDAD</span>
+                        <span class="text-[10px] text-cyber-cyan">Episodio 14 &rarr; 15</span>
+                    </h4>
+                    <div class="bg-cyber-darker p-3 rounded-lg border border-cyber-border/80 text-[11px] font-mono text-slate-400 space-y-1.5">
+                        <p><strong class="text-cyber-cyan">Último Cliffhanger:</strong> "Elena descubre el chip con la ubicación de la IA central oculta en su prótesis."</p>
+                        <p><strong class="text-cyber-pink">Estado Pendiente:</strong> "Kenji irrumpe en el laboratorio armado. Tensión máxima."</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Fixed Character Reference Profiles (Visual Consistency Vault) -->
+            <div class="glass-panel rounded-2xl p-6 lg:col-span-2">
+                <div class="flex items-center justify-between border-b border-cyber-border pb-3 mb-4">
+                    <div class="flex items-center space-x-2">
+                        <i class="fa-solid fa-users-viewfinder text-cyber-cyan"></i>
+                        <h3 class="font-display font-bold text-white text-base">REFERENCIAS VISUALES FIJAS DE PERSONAJES</h3>
+                    </div>
+                    <span class="text-xs font-mono text-slate-400">Nano Banana Pro Generated References</span>
+                </div>
+
+                <div id="characterCardsContainer" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <!-- Character 1 Card -->
+                    <div class="bg-cyber-darker p-4 rounded-xl border border-cyber-border hover:border-cyber-cyan transition-all flex space-x-4">
+                        <div class="relative w-24 h-32 rounded-lg overflow-hidden flex-shrink-0 border border-cyber-cyan/30">
+                            <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80" alt="Elena Vance" class="w-full h-full object-cover">
+                            <span class="absolute bottom-1 left-1 right-1 text-[9px] font-mono bg-black/80 text-cyber-cyan text-center py-0.5 rounded">REF_FIXED_01</span>
+                        </div>
+                        <div class="space-y-1 text-xs">
+                            <div class="flex items-center justify-between">
+                                <h4 class="font-display font-bold text-white text-sm">Elena Vance</h4>
+                                <span class="text-[10px] font-mono text-cyber-cyan bg-cyber-cyan/10 px-1.5 py-0.5 rounded">PROTAGONISTA</span>
+                            </div>
+                            <p class="text-[11px] text-slate-400">Ingeniera cibernética rebelde. Pelo corto plateado, chaqueta de cuero con neón violeta, prótesis ocular derecha.</p>
+                            <div class="pt-2 text-[10px] font-mono text-slate-400">
+                                <strong class="text-slate-300">Prompt Tag Fijo:</strong>
+                                <p class="text-cyber-cyan/90 bg-slate-900 p-1.5 rounded mt-0.5 border border-slate-800">
+                                    "25yo cybernetic engineer female, short silver hair, glowing violet ocular lens, cyberpunk street jacket"
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Character 2 Card -->
+                    <div class="bg-cyber-darker p-4 rounded-xl border border-cyber-border hover:border-cyber-violet transition-all flex space-x-4">
+                        <div class="relative w-24 h-32 rounded-lg overflow-hidden flex-shrink-0 border border-cyber-violet/30">
+                            <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80" alt="Kenji Sato" class="w-full h-full object-cover">
+                            <span class="absolute bottom-1 left-1 right-1 text-[9px] font-mono bg-black/80 text-cyber-violet text-center py-0.5 rounded">REF_FIXED_02</span>
+                        </div>
+                        <div class="space-y-1 text-xs">
+                            <div class="flex items-center justify-between">
+                                <h4 class="font-display font-bold text-white text-sm">Kenji Sato</h4>
+                                <span class="text-[10px] font-mono text-cyber-pink bg-cyber-pink/10 px-1.5 py-0.5 rounded">ANTAGONISTA</span>
+                            </div>
+                            <p class="text-[11px] text-slate-400">Agente corporativo de SilicoCorp. Traje táctico de corte limpio, cicatriz diagonal en barbilla, mirada implacable.</p>
+                            <div class="pt-2 text-[10px] font-mono text-slate-400">
+                                <strong class="text-slate-300">Prompt Tag Fijo:</strong>
+                                <p class="text-cyber-violet/90 bg-slate-900 p-1.5 rounded mt-0.5 border border-slate-800">
+                                    "35yo Japanese male operative, sharp black tech suit, clean jawline with subtle scar, intense gaze"
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- EPISODE PRODUCTION QUEUE & REVIEW PANEL -->
+        <section class="glass-panel rounded-2xl p-6">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 border-b border-cyber-border pb-4">
+                <div>
+                    <h3 class="font-display font-bold text-lg text-white flex items-center gap-2">
+                        <i class="fa-solid fa-sliders text-cyber-gold"></i>
+                        <span>PANEL DE REVISIÓN HUMANA Y COLA DE PRODUCCIÓN</span>
+                    </h3>
+                    <p class="text-xs text-slate-400 font-mono">Filtro humano rápido de 1-2 minutos para evitar "looks IA" o inconsistencias antes de publicar.</p>
+                </div>
+
+                <div class="flex items-center space-x-2">
+                    <button class="px-3 py-1.5 rounded-lg bg-cyber-cyan/10 border border-cyber-cyan/30 text-cyber-cyan text-xs font-mono hover:bg-cyber-cyan/20">
+                        <i class="fa-solid fa-filter mr-1"></i> Filtrar: Pendientes (2)
+                    </button>
+                    <button class="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 text-xs font-mono hover:bg-slate-700">
+                        Historial Publicados
+                    </button>
+                </div>
+            </div>
+
+            <!-- Vertical 9:16 Shot Breakdown & Scene Cards Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                
+                <!-- Scene Shot Card 1 -->
+                <div class="bg-cyber-darker rounded-xl border border-cyber-border overflow-hidden group hover:border-cyber-cyan transition-all flex flex-col justify-between">
+                    <div>
+                        <!-- Simulated 9:16 Vertical Shot Frame -->
+                        <div class="relative aspect-[9/16] bg-slate-950 overflow-hidden">
+                            <img src="https://images.unsplash.com/photo-1515260268569-9271009adfdb?auto=format&fit=crop&w=600&q=80" alt="Shot 1" class="w-full h-full object-cover group-hover:scale-105 transition-all duration-500">
+                            <div class="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/60"></div>
+                            
+                            <!-- Badges Top -->
+                            <div class="absolute top-3 left-3 right-3 flex justify-between items-center text-[10px] font-mono">
+                                <span class="bg-black/80 text-cyber-cyan border border-cyber-cyan/30 px-2 py-0.5 rounded">TOMA 01 / 08</span>
+                                <span class="bg-cyber-emerald/90 text-black font-bold px-2 py-0.5 rounded">VEO LITE ($0.24)</span>
+                            </div>
+
+                            <!-- Shot Audio/Prompt Preview Overlay -->
+                            <div class="absolute bottom-3 left-3 right-3 text-xs text-white">
+                                <p class="font-display font-semibold text-cyber-cyan">Gancho Inicial - Entrada</p>
+                                <p class="text-[11px] text-slate-300 line-clamp-2 mt-0.5">Elena entra corriendo al callejón oscuro bajo la lluvia torrencial de neón.</p>
+                            </div>
+                        </div>
+
+                        <!-- Card Detail Metrics -->
+                        <div class="p-3 text-[11px] font-mono space-y-1.5 border-t border-cyber-border">
+                            <div class="flex justify-between text-slate-400">
+                                <span>Duración: <strong>8 seg</strong></span>
+                                <span>Calidad: <strong class="text-cyber-emerald">OK (98%)</strong></span>
+                            </div>
+                            <div class="text-[10px] text-slate-400 truncate">
+                                Modelo: <span class="text-white">google/veo-3.1-lite</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Action Controls -->
+                    <div class="p-3 bg-slate-900/80 border-t border-cyber-border flex items-center justify-between gap-2">
+                        <button onclick="approveShot(1)" class="flex-1 py-1.5 rounded bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/40 text-xs font-mono font-semibold transition-all">
+                            <i class="fa-solid fa-check mr-1"></i> Aprobar
+                        </button>
+                        <button onclick="regenShot(1)" class="px-2.5 py-1.5 rounded bg-cyber-pink/20 hover:bg-cyber-pink/30 text-cyber-pink border border-cyber-pink/40 text-xs font-mono transition-all" title="Regenerar Toma Punctual ($0.20)">
+                            <i class="fa-solid fa-rotate"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Scene Shot Card 2 -->
+                <div class="bg-cyber-darker rounded-xl border border-cyber-border overflow-hidden group hover:border-cyber-cyan transition-all flex flex-col justify-between">
+                    <div>
+                        <div class="relative aspect-[9/16] bg-slate-950 overflow-hidden">
+                            <img src="https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=600&q=80" alt="Shot 2" class="w-full h-full object-cover group-hover:scale-105 transition-all duration-500">
+                            <div class="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/60"></div>
+                            
+                            <div class="absolute top-3 left-3 right-3 flex justify-between items-center text-[10px] font-mono">
+                                <span class="bg-black/80 text-cyber-cyan border border-cyber-cyan/30 px-2 py-0.5 rounded">TOMA 02 / 08</span>
+                                <span class="bg-cyber-emerald/90 text-black font-bold px-2 py-0.5 rounded">VEO LITE ($0.24)</span>
+                            </div>
+
+                            <div class="absolute bottom-3 left-3 right-3 text-xs text-white">
+                                <p class="font-display font-semibold text-cyber-cyan">Plano Detalle - Lente Ocular</p>
+                                <p class="text-[11px] text-slate-300 line-clamp-2 mt-0.5">El ojo cibernético de Elena brilla revelando el código encriptado.</p>
+                            </div>
+                        </div>
+
+                        <div class="p-3 text-[11px] font-mono space-y-1.5 border-t border-cyber-border">
+                            <div class="flex justify-between text-slate-400">
+                                <span>Duración: <strong>8 seg</strong></span>
+                                <span>Calidad: <strong class="text-cyber-emerald">OK (95%)</strong></span>
+                            </div>
+                            <div class="text-[10px] text-slate-400 truncate">
+                                Modelo: <span class="text-white">google/veo-3.1-lite</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="p-3 bg-slate-900/80 border-t border-cyber-border flex items-center justify-between gap-2">
+                        <button onclick="approveShot(2)" class="flex-1 py-1.5 rounded bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/40 text-xs font-mono font-semibold transition-all">
+                            <i class="fa-solid fa-check mr-1"></i> Aprobar
+                        </button>
+                        <button onclick="regenShot(2)" class="px-2.5 py-1.5 rounded bg-cyber-pink/20 hover:bg-cyber-pink/30 text-cyber-pink border border-cyber-pink/40 text-xs font-mono transition-all" title="Regenerar Toma Punctual ($0.20)">
+                            <i class="fa-solid fa-rotate"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Scene Shot Card 3 (Cliffhanger Scene - Fast Mode) -->
+                <div class="bg-cyber-darker rounded-xl border-2 border-cyber-pink/60 overflow-hidden group hover:border-cyber-pink transition-all flex flex-col justify-between shadow-neon-pink">
+                    <div>
+                        <div class="relative aspect-[9/16] bg-slate-950 overflow-hidden">
+                            <img src="https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=600&q=80" alt="Shot 8" class="w-full h-full object-cover group-hover:scale-105 transition-all duration-500">
+                            <div class="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/60"></div>
+                            
+                            <div class="absolute top-3 left-3 right-3 flex justify-between items-center text-[10px] font-mono">
+                                <span class="bg-cyber-pink text-white font-bold px-2 py-0.5 rounded animate-pulse">CLIFFHANGER #08</span>
+                                <span class="bg-cyber-pink/90 text-white font-bold px-2 py-0.5 rounded">VEO FAST ($1.20)</span>
+                            </div>
+
+                            <div class="absolute bottom-3 left-3 right-3 text-xs text-white">
+                                <p class="font-display font-semibold text-cyber-pink">Toma Final Clímax</p>
+                                <p class="text-[11px] text-slate-300 line-clamp-2 mt-0.5">Kenji apunta su arma. Fundido a negro repentino con disparo ensordecedor.</p>
+                            </div>
+                        </div>
+
+                        <div class="p-3 text-[11px] font-mono space-y-1.5 border-t border-cyber-border">
+                            <div class="flex justify-between text-slate-400">
+                                <span>Duración: <strong>8 seg</strong></span>
+                                <span>Calidad: <strong class="text-cyber-pink">MÁXIMA (99%)</strong></span>
+                            </div>
+                            <div class="text-[10px] text-slate-400 truncate">
+                                Modelo: <span class="text-cyber-pink font-semibold">google/veo-3.1-fast</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="p-3 bg-slate-900/80 border-t border-cyber-border flex items-center justify-between gap-2">
+                        <button onclick="approveShot(3)" class="flex-1 py-1.5 rounded bg-cyber-pink/20 hover:bg-cyber-pink/40 text-cyber-pink border border-cyber-pink/50 text-xs font-mono font-bold transition-all">
+                            <i class="fa-solid fa-paper-plane mr-1"></i> Publicar Capítulo
+                        </button>
+                        <button onclick="regenShot(3)" class="px-2.5 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-mono transition-all">
+                            <i class="fa-solid fa-rotate"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Scene Shot Card 4 (Add / Pending Generator Slot) -->
+                <div class="bg-cyber-darker/40 rounded-xl border border-dashed border-cyber-border flex flex-col items-center justify-center p-6 text-center hover:border-cyber-cyan transition-all">
+                    <div class="w-12 h-12 rounded-full bg-cyber-cyan/10 border border-cyber-cyan/30 flex items-center justify-center text-cyber-cyan mb-3">
+                        <i class="fa-solid fa-plus text-lg"></i>
+                    </div>
+                    <h4 class="font-display font-bold text-white text-sm">Nuevo Capítulo en Cola</h4>
+                    <p class="text-xs text-slate-400 font-mono mt-1">Capítulo #16 listo para renderizado en batch.</p>
+                    <button onclick="triggerPipelineRun()" class="mt-4 px-4 py-2 rounded-lg bg-cyber-cyan/20 text-cyber-cyan border border-cyber-cyan/40 text-xs font-mono hover:bg-cyber-cyan/30 transition-all">
+                        Iniciar Render Episodio #16
+                    </button>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- API & INFRASTRUCTURE TELEMETRY ANALYTICS -->
+        <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            <!-- Real-time Cost & Usage Chart -->
+            <div class="glass-panel rounded-2xl p-6 lg:col-span-2">
+                <div class="flex items-center justify-between border-b border-cyber-border pb-3 mb-4">
+                    <div>
+                        <h3 class="font-display font-bold text-white text-base">TELEMETRÍA DE COSTOS Y CONSUMO DE API</h3>
+                        <p class="text-xs text-slate-400 font-mono">Consumo diario acumulado en Google AI Studio / Vertex AI</p>
+                    </div>
+                    <span class="text-xs font-mono text-cyber-emerald bg-cyber-emerald/10 border border-cyber-emerald/30 px-2 py-1 rounded">DENTRO DE PRESUPUESTO ($150 MAX)</span>
+                </div>
+                
+                <div class="h-64">
+                    <canvas id="costChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Supabase Storage Breakdown & Database Metadatos -->
+            <div class="glass-panel rounded-2xl p-6 lg:col-span-1 space-y-4">
+                <div class="flex items-center justify-between border-b border-cyber-border pb-3">
+                    <h3 class="font-display font-bold text-white text-base">SUPABASE STORAGE & DB</h3>
+                    <i class="fa-solid fa-server text-cyber-violet"></i>
+                </div>
+
+                <div class="space-y-3 font-mono text-xs">
+                    <div>
+                        <div class="flex justify-between text-slate-300 mb-1">
+                            <span>Storage Usado (Clips + Render):</span>
+                            <span class="text-cyber-violet font-bold">14.2 GB / 50 GB</span>
+                        </div>
+                        <div class="w-full bg-slate-800 rounded-full h-1.5">
+                            <div class="bg-cyber-violet h-full rounded-full" style="width: 28.4%"></div>
+                        </div>
+                    </div>
+
+                    <div class="p-3 bg-cyber-darker rounded-lg border border-cyber-border space-y-2">
+                        <div class="flex justify-between">
+                            <span class="text-slate-400">Canales Registrados:</span>
+                            <span class="text-white font-bold">3 (TikTok, YT Shorts, IG)</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-slate-400">Filas en `episodes`:</span>
+                            <span class="text-white font-bold">142 registros</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-slate-400">Tamaño Story Bible (JSON):</span>
+                            <span class="text-white font-bold">48 KB</span>
+                        </div>
+                    </div>
+
+                    <div class="p-3 bg-slate-900/80 rounded-lg border border-cyber-cyan/20">
+                        <p class="text-[11px] text-cyber-cyan font-semibold flex items-center gap-1">
+                            <i class="fa-solid fa-circle-info"></i> Alerta de Presupuesto Configurada
+                        </p>
+                        <p class="text-[10px] text-slate-400 mt-1">
+                            Billing Budget activado en $150.00 en Google Cloud Console para pausar Netlify functions automáticamente al alcanzar el límite.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- INTERACTIVE NODE INSPECTOR MODAL -->
+    <div id="nodeModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="glass-panel-glow max-w-2xl w-full rounded-2xl p-6 relative border border-cyber-cyan/50 space-y-4">
+            <button onclick="closeNodeModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white text-lg">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+
+            <div class="flex items-center space-x-3 border-b border-cyber-border pb-3">
+                <div id="modalIcon" class="w-10 h-10 rounded-lg bg-cyber-cyan/20 flex items-center justify-center text-cyber-cyan text-lg">
+                    <i class="fa-solid fa-code"></i>
+                </div>
+                <div>
+                    <h3 id="modalTitle" class="font-display font-bold text-white text-lg">Detalles del Nodo</h3>
+                    <p id="modalSubtitle" class="text-xs font-mono text-slate-400">Payload de la API y registros de orquestación</p>
+                </div>
+            </div>
+
+            <div class="space-y-3 font-mono text-xs">
+                <div>
+                    <span class="text-slate-400 block mb-1">Payload / JSON Request:</span>
+                    <pre id="modalJson" class="bg-cyber-darker p-3 rounded-xl border border-cyber-border text-cyber-cyan overflow-x-auto text-[11px] max-h-48">
+                    </pre>
+                </div>
+
+                <div>
+                    <span class="text-slate-400 block mb-1">Logs de Ejecución Recientes:</span>
+                    <div id="modalLogs" class="bg-slate-950 p-3 rounded-xl border border-slate-800 text-slate-300 space-y-1 text-[11px] font-mono">
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex justify-end pt-2">
+                <button onclick="closeNodeModal()" class="px-4 py-2 rounded-lg bg-cyber-cyan text-black font-display font-semibold text-xs hover:bg-cyber-cyan/80 transition-all">
+                    Cerrar Inspector
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- FOOTER -->
+    <footer class="border-t border-cyber-border/60 py-6 mt-12 glass-panel text-center font-mono text-xs text-slate-500">
+        <p>VYRALES Micro-drama Architecture &copy; 2026 &middot; Powered by Veo 3.1, Claude Max & Supabase Orchestration</p>
+    </footer>
+
+    <script>
+        // Data Store for Nodes
+        const nodeData = {
+            node1: {
+                title: "Paso 01: Claude Max Scripting",
+                subtitle: "Generación de Guion con Story Bible completa en Prompt Context",
+                icon: "fa-pen-nib",
+                json: `{
+  "model": "claude-3-7-sonnet-20250219",
+  "task": "generate_microdrama_script",
+  "series_id": "dragon_silicio",
+  "episode_num": 15,
+  "system_prompt": "Recibes el Story Bible adjunto. Mantén arquetipos intactos. Gancho obligatorio final."
+}`,
+                logs: [
+                    "[14:22:01] Prompt encolado via Claude Task.",
+                    "[14:22:05] Guion generado con éxito (340 palabras, 8 escenas)."
+                ]
+            },
+            node2: {
+                title: "Paso 02: Validador de Biblia & Cliffhanger",
+                subtitle: "Lógica de Reviso de Continuidad y Regla de Tensión Final",
+                icon: "fa-shield-virus",
+                json: `{
+  "validator_status": "PASSED",
+  "checks": {
+    "cliffhanger_unresolved": true,
+    "personality_drift": false,
+    "continuity_match": "100%"
+  },
+  "retries_count": 0
+}`,
+                logs: [
+                    "[14:22:06] Validador analiza la escena #8...",
+                    "[14:22:07] APROBADO: El capítulo termina con disparo sin resolver."
+                ]
+            },
+            node3: {
+                title: "Paso 03: Supabase Storage & Character Vault",
+                subtitle: "Sincronización de Referencias Visuales para Veo 3.1",
+                icon: "fa-database",
+                json: `{
+  "supabase_bucket": "series/dragon_silicio/episodes/15/",
+  "character_refs": [
+    "elena_vance_ref.png",
+    "kenji_sato_ref.png"
+  ],
+  "status": "ASSETS_READY"
+}`,
+                logs: [
+                    "[14:22:07] URLs firmadas de Supabase Storage generadas.",
+                    "[14:22:08] Metadatos guardados en la tabla 'episodes'."
+                ]
+            },
+            node4: {
+                title: "Paso 04: Cola de Renderizado Veo 3.1",
+                subtitle: "Generación de Bloques de Video de 8 Segundos",
+                icon: "fa-video",
+                json: `{
+  "clips_total": 8,
+  "mode_breakdown": {
+    "lite_clips": 7,
+    "fast_clips": 1
+  },
+  "estimated_cost": "$2.88"
+}`,
+                logs: [
+                    "[14:22:09] Enviando batch request a Google AI Studio API...",
+                    "[14:22:15] Clips 1 a 7 (Lite) generados. Generando Clip 8 (Fast)..."
+                ]
+            },
+            node5: {
+                title: "Paso 05: Panel de Revisión Humana",
+                subtitle: "Control de Calidad de Artefactos Visuales y Rostros",
+                icon: "fa-user-check",
+                json: `{
+  "human_review_required": true,
+  "flagged_issues": 0,
+  "recommended_action": "APPROVE_AND_PUBLISH"
+}`,
+                logs: [
+                    "[14:22:20] Episodio listo en el panel de revisión.",
+                    "[14:22:22] En espera de aprobación por Franklin Meran."
+                ]
+            },
+            node6: {
+                title: "Paso 06: Publicación Multicanal",
+                subtitle: "Disparo Automático a TikTok, YouTube Shorts e Instagram Reels",
+                icon: "fa-share-nodes",
+                json: `{
+  "targets": ["tiktok_main", "yt_shorts_es", "ig_reels"],
+  "schedule": "IMMEDIATE",
+  "rendered_file": "series/dragon/ep15_final.mp4"
+}`,
+                logs: [
+                    "[14:22:30] Webhook listo para ejecución tras aprobación."
+                ]
+            }
+        };
+
+        // Open Inspector Modal
+        function openNodeDetails(nodeKey) {
+            const data = nodeData[nodeKey];
+            if (!data) return;
+
+            document.getElementById('modalTitle').innerText = data.title;
+            document.getElementById('modalSubtitle').innerText = data.subtitle;
+            document.getElementById('modalJson').innerText = data.json;
+            
+            const logsContainer = document.getElementById('modalLogs');
+            logsContainer.innerHTML = data.logs.map(log => `<p>${log}</p>`).join('');
+
+            document.getElementById('nodeModal').classList.remove('hidden');
+        }
+
+        function closeNodeModal() {
+            document.getElementById('nodeModal').classList.add('hidden');
+        }
+
+        // Trigger Pipeline Simulation Run
+        function triggerPipelineRun() {
+            const liveLog = document.getElementById('terminalLiveLog');
+            liveLog.innerHTML = `<span class="text-cyber-gold"><i class="fa-solid fa-spinner animate-spin"></i> Iniciando ejecución de prueba del pipeline para Episodio #16...</span>`;
+            
+            setTimeout(() => {
+                liveLog.innerHTML = `<span class="text-cyber-pink">[14:23:01] Claude Max: Guion para Episodio #16 redactado con gancho de alta tensión.</span>`;
+            }, 1500);
+
+            setTimeout(() => {
+                liveLog.innerHTML = `<span class="text-cyber-violet">[14:23:03] Validador Biblia: OK. Sincronizando tags visuales en Supabase Storage.</span>`;
+            }, 3000);
+
+            setTimeout(() => {
+                liveLog.innerHTML = `<span class="text-cyber-emerald">[14:23:05] Veo 3.1 API: 8 clips encolados (7 Lite + 1 Fast). Listo para revisión humana!</span>`;
+            }, 4500);
+        }
+
+        // Human Action Quick Actions
+        function approveShot(shotNum) {
+            alert(`Toma #${shotNum} aprobada. Marcada como lista para el montaje final.`);
+        }
+
+        function regenShot(shotNum) {
+            alert(`Regenerando Toma #${shotNum} en modo Veo Lite ($0.20)... Se mantendrá la referencia de personaje.`);
+        }
+
+        function switchSeries(seriesKey) {
+            const container = document.getElementById('characterCardsContainer');
+            if (seriesKey === 'herencia') {
+                container.innerHTML = `
+                    <div class="bg-cyber-darker p-4 rounded-xl border border-cyber-border hover:border-cyber-cyan transition-all flex space-x-4">
+                        <div class="relative w-24 h-32 rounded-lg overflow-hidden flex-shrink-0 border border-cyber-cyan/30">
+                            <img src="https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=400&q=80" alt="Sofía" class="w-full h-full object-cover">
+                        </div>
+                        <div class="space-y-1 text-xs">
+                            <h4 class="font-display font-bold text-white text-sm">Sofía de la Vega</h4>
+                            <p class="text-[11px] text-slate-400">Heredera traicionada. Vestido elegante oscuro, collar de diamantes, expresión desafiante.</p>
+                        </div>
+                    </div>
+                `;
+            } else {
+                location.reload();
+            }
+        }
+
+        window.onload = function() {
+            const ctx = document.getElementById('costChart').getContext('2d');
+            
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: ['1 Oct', '2 Oct', '3 Oct', '4 Oct', '5 Oct', '6 Oct', '7 Oct'],
+                    datasets: [
+                        {
+                            label: 'Costo Veo Lite ($)',
+                            data: [2.5, 3.2, 2.8, 3.5, 3.0, 2.9, 3.1],
+                            borderColor: '#00ff88',
+                            backgroundColor: 'rgba(0, 255, 136, 0.1)',
+                            fill: true,
+                            tension: 0.4
+                        },
+                        {
+                            label: 'Costo Veo Fast ($)',
+                            data: [1.2, 1.5, 1.2, 2.0, 1.4, 1.3, 1.5],
+                            borderColor: '#ff007f',
+                            backgroundColor: 'rgba(255, 0, 127, 0.1)',
+                            fill: true,
+                            tension: 0.4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: '#94a3b8',
+                                font: { family: 'JetBrains Mono', size: 11 }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { color: 'rgba(255,255,255,0.05)' },
+                            ticks: { color: '#94a3b8', font: { family: 'JetBrains Mono' } }
+                        },
+                        y: {
+                            grid: { color: 'rgba(255,255,255,0.05)' },
+                            ticks: { color: '#94a3b8', font: { family: 'JetBrains Mono' } }
+                        }
+                    }
+                }
+            });
+        };
+    </script>
+</body>
+</html>

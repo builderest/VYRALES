@@ -1,0 +1,11 @@
+[build]
+  publish = "public"
+  functions = "netlify/functions"
+
+[functions]
+  node_bundler = "esbuild"
+
+# Scheduled function: dispara el pipeline todos los días a las 8am (hora UTC).
+# Ajusta el cron si quieres otra hora — recuerda que Netlify programa en UTC.
+[functions."daily-trigger"]
+  schedule = "0 13 * * *"
