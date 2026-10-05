@@ -60,6 +60,21 @@ exports.handler = async (event) => {
     });
     (monthSpend || []).forEach((r) => (spend.month_total += Number(r.cost_usd) || 0));
 
+    // Cuota diaria de Veo (Google la reinicia a medianoche hora del Pacífico): videos hechos
+    // HOY por modelo, en todas las series. Lite en Nivel 1 = 10 por día.
+    const now = new Date();
+    const parts = Object.fromEntries(new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/Los_Angeles', year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23'
+    }).formatToParts(now).map((p) => [p.type, p.value]));
+    const ptAsUtc = Date.UTC(+parts.year, +parts.month - 1, +parts.day, +parts.hour, +parts.minute, +parts.second);
+    const offsetMs = ptAsUtc - Math.floor(now.getTime() / 1000) * 1000;
+    const dayStartUtc = new Date(Date.UTC(+parts.year, +parts.month - 1, +parts.day) - offsetMs);
+    const { data: todayVideos } = await supabase
+      .from('generation_log').select('model').eq('kind', 'video').gte('created_at', dayStartUtc.toISOString());
+    spend.veo_today = { by_model: {}, day_start: dayStartUtc.toISOString(), limits: { veo_lite: 10 } };
+    (todayVideos || []).forEach((r) => { spend.veo_today.by_model[r.model] = (spend.veo_today.by_model[r.model] || 0) + 1; });
+
     // Solo el conteo (head: true no trae filas, es barato) — para el panel de stats
     // reales del dashboard (nada de números de maqueta).
     const { count: channelsCount } = await supabase

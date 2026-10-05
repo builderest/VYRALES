@@ -248,6 +248,7 @@ exports.handler = async (event) => {
     console.log(LOG, 'modelos:', shotModel, '(tomas) /', cliffhangerModel, '(cliffhanger)');
 
     const results = [];
+    let quotaStop = null;
     for (const scene of scenes) {
       if (Date.now() - startedAt > TIME_BUDGET_MS) {
         console.warn(LOG, 'cerca del límite de 15 min de Netlify — me vuelvo a llamar para seguir con las tomas que faltan...');
@@ -294,8 +295,14 @@ exports.handler = async (event) => {
         console.log(LOG, `toma ${scene.number}/${total}: OK ✅ (asset ${asset.id})`);
         results.push({ status: 'fulfilled', value: { shot: scene.number, model, costUsd, assetId: asset.id } });
       } catch (shotErr) {
-        console.error(LOG, `toma ${scene.number}/${total}: FALLÓ ❌`, shotErr);
+        console.error(LOG, `toma ${scene.number}/${total}: FALLÓ ❌`, shotErr.code === 'VEO_QUOTA' ? shotErr.message : shotErr);
         results.push({ status: 'rejected', reason: shotErr });
+        if (shotErr.code === 'VEO_QUOTA') {
+          // Sin cuota no tiene sentido seguir: las demás tomas fallarían igual.
+          quotaStop = { at: new Date().toISOString(), shot: scene.number, message: shotErr.message };
+          console.warn(LOG, 'cuota de Veo agotada: me detengo aquí. Las tomas que faltan se generan con "Producir" más tarde.');
+          break;
+        }
       }
     }
 
@@ -306,9 +313,16 @@ exports.handler = async (event) => {
     // anteriores + las de esta). Si falta alguna (fallo o toma de prueba suelta), vuelve a
     // "guion_generado" y el botón Producir solo genera las que faltan.
     const allDone = doneShots.size + succeeded.length >= total;
+    // Resultado de la corrida guardado en el episodio para que el dashboard lo muestre.
+    const lastRun = {
+      at: new Date().toISOString(),
+      created: succeeded.length,
+      failed: failures.filter((f) => !(f.reason && f.reason.code === 'VEO_QUOTA')).map((f) => String((f.reason && f.reason.message) || f.reason).slice(0, 300)),
+      quota_stop: quotaStop
+    };
     await supabase
       .from('episodes')
-      .update({ status: allDone ? 'en_revision' : 'guion_generado' })
+      .update({ status: allDone ? 'en_revision' : 'guion_generado', validator_report: Object.assign({}, episode.validator_report || {}, { last_video_run: lastRun }) })
       .eq('id', episode.id);
 
     console.log(

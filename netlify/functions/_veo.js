@@ -40,23 +40,44 @@ function getGenAIClient() {
   return new GoogleGenAI({ apiKey });
 }
 
-// Reintenta con backoff exponencial solo en 429 (cuota excedida) — común en cuentas de
-// facturación recién activadas, que arrancan con cuotas bajas de solicitudes simultáneas.
-async function callWithRetry(fn, { retries = 4, baseDelayMs = 20000 } = {}) {
-  let lastErr;
-  for (let attempt = 0; attempt <= retries; attempt++) {
+// Cuotas reales de Veo (Google AI Studio, Nivel 1, visto el 2026-10-05): Veo 3 Lite =
+// 2 solicitudes por MINUTO y 10 por DÍA (se reinicia a medianoche, hora del Pacífico).
+// - Ritmo: nunca más de 2 por minuto → mínimo 31 s entre el inicio de dos videos.
+// - 429: se espera 65 s (se vacía la ventana del minuto) y se reintenta UNA vez. Si vuelve
+//   a dar 429 es la cuota DIARIA: se lanza un error con code = 'VEO_QUOTA' y la producción
+//   se detiene (antes reintentaba 4 veces con esperas de hasta 160 s en CADA toma).
+const MIN_GAP_MS = 31000;
+let lastVeoCallAt = 0;
+async function paceVeo() {
+  const wait = lastVeoCallAt + MIN_GAP_MS - Date.now();
+  if (wait > 0) {
+    console.log('[veo] respetando el límite de 2 por minuto: espero', Math.ceil(wait / 1000) + 's');
+    await new Promise((r) => setTimeout(r, wait));
+  }
+  lastVeoCallAt = Date.now();
+}
+function isQuotaError(err) {
+  return !!err && (err.status === 429 || /RESOURCE_EXHAUSTED|\b429\b/.test(err.message || ''));
+}
+async function callWithRetry(fn) {
+  await paceVeo();
+  try {
+    return await fn();
+  } catch (err) {
+    if (!isQuotaError(err)) throw err;
+    console.warn('[veo] 429 (cuota) — espero 65s y reintento una sola vez...');
+    await new Promise((r) => setTimeout(r, 65000));
+    await paceVeo();
     try {
       return await fn();
-    } catch (err) {
-      lastErr = err;
-      const is429 = err.status === 429 || /RESOURCE_EXHAUSTED|429/.test(err.message || '');
-      if (!is429 || attempt === retries) throw err;
-      const delay = baseDelayMs * Math.pow(2, attempt);
-      console.warn('[veo] 429 (cuota excedida) — reintentando en', Math.round(delay / 1000) + 's', '(intento', attempt + 1, 'de', retries + ')');
-      await new Promise((resolve) => setTimeout(resolve, delay));
+    } catch (err2) {
+      if (!isQuotaError(err2)) throw err2;
+      const e = new Error('Se acabó la cuota de Veo de Google (límite de videos por día de tu nivel). Vuelve a intentar después de la medianoche, hora del Pacífico.');
+      e.code = 'VEO_QUOTA';
+      e.status = 429;
+      throw e;
     }
   }
-  throw lastErr;
 }
 
 // Modelos que aceptan imágenes de referencia ("Ingredients to video"). Veo 3.1 Lite NO.

@@ -1850,7 +1850,11 @@
           desc.textContent = done + ' de ' + total + ' tomas listas · se actualiza sola cada 20 s';
         } else if (next) {
           title.textContent = 'Siguiente: EP ' + next.episode_number + ' — ' + (next.title || '');
-          desc.textContent = ((next.shots || []).length || 0) + ' tomas · ~$' + estimateEpisodeCost(next).toFixed(2) + ' en Veo';
+          const doneN = (next.assets || []).filter(a => a.kind === 'video_clip').length;
+          const q = veoQuotaInfo(data, seriesModels(data.series).shot);
+          desc.innerHTML = esc(((next.shots || []).length || 0) + ' tomas' + (doneN ? ' (' + doneN + ' ya hechas)' : '') + ' · ~$' + estimateEpisodeCost(next).toFixed(2) + ' en Veo') +
+            (q ? '<br><span class="' + (q.left ? 'text-slate-400' : 'text-cyber-pink') + '">Cuota Veo hoy: ' + q.used + '/' + q.limit + (q.left ? '' : ' · se reinicia ' + esc(q.resetLabel)) + '</span>' : '') +
+            (quotaStopOf(next) ? '<br><span class="text-cyber-gold">⏸ Se detuvo por cuota de Google en la toma ' + quotaStopOf(next).quota_stop.shot + '</span>' : '');
           btn.textContent = 'Producir EP ' + next.episode_number;
           btn.classList.remove('hidden');
         } else {
@@ -1916,6 +1920,21 @@
 
       // Producción manual de un episodio (cuesta dinero real en Veo). Solo se ofrece para
       // el siguiente episodio en "guion_generado", en orden.
+      // Cuota diaria de Veo (Google, Nivel 1): Lite = 10 videos por día, se reinicia a medianoche
+      // hora del Pacífico. El servidor manda cuántos van hoy (spend.veo_today).
+      function veoQuotaInfo(data, modelKey) {
+        const t = (data && data.spend && data.spend.veo_today) || null;
+        if (!t || !t.limits || !t.limits[modelKey]) return null;
+        const used = (t.by_model && t.by_model[modelKey]) || 0;
+        const limit = t.limits[modelKey];
+        const reset = new Date(new Date(t.day_start).getTime() + 24 * 3600 * 1000);
+        return { used, limit, left: Math.max(0, limit - used), resetLabel: reset.toLocaleString('es-MX', { weekday: 'short', hour: 'numeric', minute: '2-digit' }) };
+      }
+      function quotaStopOf(ep) {
+        const r = ep && ep.validator_report && ep.validator_report.last_video_run;
+        return r && r.quota_stop && (Date.now() - new Date(r.at).getTime() < 36 * 3600 * 1000) ? r : null;
+      }
+
       // Antes de gastar: se relee el estado REAL del servidor (la página puede estar vieja).
       // Si el episodio ya se está generando, se avisa y no se manda nada.
       async function freshEpisodeOrBlock(episodeId) {
@@ -1943,9 +1962,16 @@
         const ep = await freshEpisodeOrBlock(episodeId);
         if (!ep) return;
         const doneClips = (ep.assets || []).filter(a => a.kind === 'video_clip').length;
+        const missingClips = ((ep.shots || []).length || 0) - doneClips;
+        const q = veoQuotaInfo(lastLoadedData, seriesModels(lastLoadedData.series).shot);
+        if (q && q.left === 0) {
+          return alert('⛔ Hoy ya usaste los ' + q.limit + ' videos por día que Google permite en tu nivel (Veo Lite).\n\nNo se mandó nada ni se cobró nada. La cuota se reinicia: ' + q.resetLabel + ' (tu hora).');
+        }
+        const quotaNote = q ? 'Cuota de Google hoy: ' + q.used + ' de ' + q.limit + ' videos usados.' +
+          (missingClips > q.left ? ' ⚠️ Faltan ' + missingClips + ' tomas pero hoy solo quedan ' + q.left + ': se harán ' + q.left + ' y la producción se detiene sola; el resto con "Producir" después de ' + q.resetLabel + '.' : '') + '\n\n' : '';
         const cost = estimateEpisodeCost(ep);
         if (!await askConfirm('Producir EP ' + ep.episode_number + ' "' + (ep.title || '') + '" con Veo.\n\n' +
-          (doneClips ? 'Ya hay ' + doneClips + ' toma(s) hechas: NO se repiten. Se generan solo las ' + (((ep.shots || []).length || 0) - doneClips) + ' que faltan.\n\n' : '') +
+          (doneClips ? 'Ya hay ' + doneClips + ' toma(s) hechas: NO se repiten. Se generan solo las ' + missingClips + ' que faltan.\n\n' : '') + quotaNote +
           'Costo estimado: ~$' + cost.toFixed(2) + ' USD (' + costBreakdownLabel(ep) + '). Es un cargo REAL en Google Cloud.\nTarda entre 10 y 30 minutos. ¿Continuar?')) return;
         const banner = document.getElementById('dataStatusBanner');
         try {
@@ -1980,6 +2006,8 @@
             }
             if (cur.status === 'guion_generado' && Date.now() - start > 90000) {
               await loadDashboard();
+              const qs = quotaStopOf(cur);
+              if (qs) return alert('⏸ Producción detenida en la toma ' + qs.quota_stop.shot + ': se acabó la cuota diaria de Veo de Google.\n\nVan ' + clips + '/' + total + ' tomas. Las que fallaron por cuota NO se cobran. Dale "Producir" otra vez después de medianoche (hora del Pacífico): solo genera las que faltan.');
               return alert('La producción terminó con ' + clips + '/' + total + ' tomas. Algunas fallaron — vuelve a apretar "Producir": solo genera las que faltan.');
             }
           } catch (_) {}
