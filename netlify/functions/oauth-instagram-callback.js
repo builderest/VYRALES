@@ -9,7 +9,9 @@ const page = (ok, msg) => ({ statusCode: ok ? 200 : 400, headers: { 'Content-Typ
 exports.handler = async (event) => {
   const q = event.queryStringParameters || {};
   if (q.error) return page(false, 'Autorización cancelada: ' + String(q.error_description || q.error).replace(/[<>]/g, ''));
-  if (!checkState('instagram', q.state)) return page(false, 'El enlace expiró o no es válido. Vuelve a darle "Conectar" desde el dashboard.');
+  let valid = false;
+  try { valid = checkState('instagram', q.state); } catch (err) { return page(false, String(err.message).replace(/[<>]/g, '')); }
+  if (!valid) return page(false, 'El enlace expiró o no es válido. Vuelve a darle "Conectar" desde el dashboard.');
   try {
     const name = await instagramConnect(getSupabaseClient(), q.code);
     return page(true, 'instagram conectado: ' + String(name || '').replace(/[<>]/g, ''));
