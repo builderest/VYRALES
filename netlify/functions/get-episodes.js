@@ -14,9 +14,15 @@ exports.handler = async (event) => {
       .single();
 
     if (seriesError || !series) {
+      // DEBUG TEMPORAL: exponemos el detalle real del error para diagnosticar
+      // la conexión a Supabase en producción. Quitar este 'debug' una vez
+      // confirmado que todo funciona.
       return {
         statusCode: 404,
-        body: JSON.stringify({ error: 'Serie no encontrada' })
+        body: JSON.stringify({
+          error: 'Serie no encontrada',
+          debug: seriesError ? { message: seriesError.message, code: seriesError.code, details: seriesError.details, hint: seriesError.hint } : null
+        })
       };
     }
 
