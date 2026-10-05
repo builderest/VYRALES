@@ -823,6 +823,43 @@
         return (s || '').toString().replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
       }
 
+      // ---------- Narración de voz fija encima de CUALQUIER reproductor de toma ----------
+      // Un <video data-narr="url" data-narr-secs="s" data-mute="0|1"> suena con la voz del narrador
+      // sincronizada, igual que en el render (empieza a 0.3 s; hasta 1.2x si no cabe en 8 s).
+      function narrAttrsFor(asset) {
+        if (!asset || !lastLoadedData) return '';
+        const ep = (lastLoadedData.episodes || []).find(e => e.id === asset.episode_id || (e.assets || []).some(a => a.id === asset.id));
+        const sh = ep && (ep.shots || []).find(x => x.n === asset.shot_number);
+        const ns = sh && narrationState(lastLoadedData.series, sh);
+        const n = ns && ns.n && ns.n.url ? ns.n : null;
+        if (!n) return '';
+        return ' data-narr="' + esc(n.url) + '" data-narr-secs="' + (n.seconds || 6) + '" data-mute="' + (/Voice-over narration/i.test(asset.prompt || '') ? '1' : '0') + '"';
+      }
+      function attachNarration(v) {
+        if (v.__narr) return v.__narr;
+        const a = new Audio(v.getAttribute('data-narr'));
+        a.preload = 'auto';
+        const secs = Number(v.getAttribute('data-narr-secs')) || 6;
+        a.playbackRate = Math.min(1.2, Math.max(1, secs / 7.55));
+        if (v.getAttribute('data-mute') === '1') v.muted = true;
+        let on = false;
+        const sync = () => {
+          const t = v.currentTime - 0.3;
+          if (v.paused || v.ended || t < 0 || t > secs / a.playbackRate) { if (on) { a.pause(); on = false; } return; }
+          if (!on) { try { a.currentTime = t * a.playbackRate; } catch (_) {} a.play().catch(() => {}); on = true; }
+        };
+        v.addEventListener('timeupdate', sync);
+        ['pause', 'seeking', 'ended', 'emptied'].forEach(ev => v.addEventListener(ev, () => { a.pause(); on = false; }));
+        v.__narr = a;
+        return a;
+      }
+      document.addEventListener('play', (ev) => {
+        const v = ev.target;
+        if (v && v.tagName === 'VIDEO' && v.getAttribute('data-narr')) attachNarration(v);
+        // Que no suenen dos tomas a la vez.
+        document.querySelectorAll('video').forEach(o => { if (o !== v && !o.paused) o.pause(); });
+      }, true);
+
       function renderShotCard(asset, index, total) {
         const isCliff = index === total - 1;
         const modelLabel = asset.model === 'veo_fast' ? 'VEO FAST' : asset.model === 'veo_lite' ? 'VEO LITE' : String(asset.model || '').toUpperCase();
@@ -834,7 +871,7 @@
           '<div class="demo-shot-card bg-cyber-darker rounded-xl border ' + (isCliff ? 'border-2 border-cyber-pink/60 shadow-neon-pink' : 'border-cyber-border') + ' overflow-hidden group hover:border-cyber-cyan transition-all flex flex-col justify-between relative" data-asset-id="' + asset.id + '" data-updated-at="' + esc(asset.updated_at || '') + '">' +
             '<div>' +
               '<div class="relative aspect-[9/16] bg-slate-950 overflow-hidden flex items-center justify-center text-slate-600 text-xs font-mono text-center p-4">' +
-                (asset.storage_path ? ('<video src="' + esc(asset.storage_path) + '" controls preload="metadata" playsinline class="w-full h-full object-cover absolute inset-0 bg-black"></video>') : 'Sin preview aún') +
+                (asset.storage_path ? ('<video src="' + esc(asset.storage_path) + '" controls preload="metadata" playsinline class="w-full h-full object-cover absolute inset-0 bg-black"' + narrAttrsFor(asset) + '></video>') : 'Sin preview aún') +
                 '<div class="absolute top-3 left-3 right-3 flex justify-between items-center text-[10px] font-mono">' +
                   '<span class="bg-black/80 text-cyber-cyan border border-cyber-cyan/30 px-2 py-0.5 rounded">TOMA ' + String(index + 1).padStart(2, '0') + ' / ' + total + '</span>' +
                   '<span class="bg-cyber-emerald/90 text-black font-bold px-2 py-0.5 rounded">' + modelLabel + ' (' + cost + ')</span>' +
@@ -848,7 +885,7 @@
             '</div>' +
             '<div class="p-3 bg-slate-900/80 border-t border-cyber-border flex items-center justify-between gap-2">' +
               approveBtn +
-              (asset.storage_path ? '<button onclick="openMedia(this)" data-src="' + esc(asset.storage_path) + '" data-kind="video" data-title="Toma ' + String(index + 1).padStart(2, '0') + '" class="px-2.5 py-1.5 rounded bg-cyber-cyan/10 hover:bg-cyber-cyan/20 text-cyber-cyan border border-cyber-cyan/30 text-xs font-mono transition-all" title="Ver en grande / descargar"><i class="fa-solid fa-expand"></i></button>' : '') +
+              (asset.storage_path ? '<button onclick="openMedia(this)" data-src="' + esc(asset.storage_path) + '" data-kind="video"' + narrAttrsFor(asset) + ' data-title="Toma ' + String(index + 1).padStart(2, '0') + '" class="px-2.5 py-1.5 rounded bg-cyber-cyan/10 hover:bg-cyber-cyan/20 text-cyber-cyan border border-cyber-cyan/30 text-xs font-mono transition-all" title="Ver en grande / descargar"><i class="fa-solid fa-expand"></i></button>' : '') +
               '<button onclick="regenShot(\'' + asset.id + '\')" class="px-2.5 py-1.5 rounded bg-cyber-pink/20 hover:bg-cyber-pink/30 text-cyber-pink border border-cyber-pink/40 text-xs font-mono transition-all" title="Regenerar toma"><i class="fa-solid fa-rotate"></i></button>' +
             '</div>' +
           '</div>'
@@ -1243,29 +1280,8 @@
         const body = document.getElementById('mediaBody');
         body.innerHTML = kind === 'image'
           ? '<img src="' + esc(src) + '" alt="' + esc(title) + '" class="max-h-[85vh] w-auto object-contain">'
-          : '<video src="' + esc(src) + '" controls autoplay playsinline class="max-h-[85vh] w-full bg-black"></video>';
-        // Toma con narrador de voz fija: la voz suena encima del video, igual que en el render
-        // (empieza a 0.3 s, se acelera hasta 1.2x si no cabe; la voz vieja de Veo se silencia).
-        const narrUrl = kind === 'video' && el.getAttribute('data-narr');
-        if (narrUrl) {
-          const v = body.querySelector('video');
-          const a = new Audio(narrUrl);
-          a.preload = 'auto';
-          const secs = Number(el.getAttribute('data-narr-secs')) || 6;
-          a.playbackRate = Math.min(1.2, Math.max(1, secs / 7.55));
-          if (el.getAttribute('data-mute') === '1') v.muted = true;
-          let on = false;
-          const sync = () => {
-            const t = v.currentTime - 0.3;
-            if (v.paused || t < 0 || t > secs / a.playbackRate) { if (on) { a.pause(); on = false; } return; }
-            if (!on) { try { a.currentTime = t * a.playbackRate; } catch (_) {} a.play().catch(() => {}); on = true; }
-          };
-          v.addEventListener('timeupdate', sync);
-          v.addEventListener('play', sync);
-          v.addEventListener('pause', () => { a.pause(); on = false; });
-          v.addEventListener('seeking', () => { a.pause(); on = false; });
-          currentMedia.narr = a;
-        }
+          : '<video src="' + esc(src) + '" controls autoplay playsinline class="max-h-[85vh] w-full bg-black"' +
+            (el.getAttribute('data-narr') ? ' data-narr="' + esc(el.getAttribute('data-narr')) + '" data-narr-secs="' + esc(el.getAttribute('data-narr-secs') || '') + '" data-mute="' + esc(el.getAttribute('data-mute') || '0') + '"' : '') + '></video>';
         document.getElementById('mediaModal').classList.remove('hidden');
         document.body.style.overflow = 'hidden';
       };
@@ -1275,7 +1291,6 @@
         if (modal.classList.contains('hidden')) return;
         const v = modal.querySelector('video');
         if (v) { v.pause(); v.removeAttribute('src'); v.load(); }
-        if (currentMedia && currentMedia.narr) { currentMedia.narr.pause(); currentMedia.narr.removeAttribute('src'); }
         document.getElementById('mediaBody').innerHTML = '';
         modal.classList.add('hidden');
         document.body.style.overflow = '';
