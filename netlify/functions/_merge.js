@@ -157,6 +157,13 @@ async function mergeWithNarration(supabase, { episode, series, log }) {
   // 2) Render con el plan del editor (o el plan por defecto): voz, ducking, subtítulos, -14 LUFS.
   const { data: fresh, error } = await supabase.from('episodes').select('*, assets(*)').eq('id', episode.id).single();
   if (error || !fresh) throw error || new Error('No se pudo releer el episodio.');
+  // Sin música elegida en el editor → la última pista de la biblioteca de la serie (si hay).
+  const plan = fresh.edit_plan || {};
+  const lib = (series.story_bible && series.story_bible.music_tracks) || [];
+  if (!(plan.audio && plan.audio.music_url) && lib[0] && lib[0].url) {
+    fresh.edit_plan = Object.assign({}, plan, { audio: Object.assign({ normalize: true, duck: true, music_volume: 0.2 }, plan.audio || {}, { music_url: lib[0].url, music_name: lib[0].name }) });
+    log('música de la biblioteca de la serie:', lib[0].name);
+  }
   const { renderEpisode } = require('./_render');
   const result = await renderEpisode({ episode: fresh, series, log });
   try {
