@@ -2724,10 +2724,8 @@
             const pending = sorted.filter(a => !a.approved).length;
             shotBox.classList.toggle('hidden', !sorted.length);
             document.getElementById('shotCardsSummary').innerHTML = '<i class="fa-solid fa-film mr-2"></i>TOMAS DEL EP ' + inReview.episode_number + ' · ' + (sorted.length - pending) + '/' + sorted.length + ' aprobadas' +
-              (pending ? ' · <span class="text-cyber-gold">' + pending + ' por revisar</span>' : ' · <span class="text-cyber-emerald">todas aprobadas ✓</span>') + ' <span class="text-slate-500">(clic para ' + 'ver / ocultar)</span>';
-            // Abierto solo si falta revisar; si el usuario lo abrió/cerró a mano, se respeta.
-            if (window.__shotBoxUser == null && shotBox.open !== (pending > 0)) { shotBox.__expect = pending > 0; shotBox.open = pending > 0; }
-            if (!shotBox.__wired) { shotBox.__wired = true; shotBox.addEventListener('toggle', () => { if (shotBox.__expect === shotBox.open) { shotBox.__expect = undefined; return; } window.__shotBoxUser = shotBox.open; }); }
+              (pending ? ' · <span class="text-cyber-gold">' + pending + ' por revisar</span>' : ' · <span class="text-cyber-emerald">todas aprobadas ✓</span>') + ' <span class="text-slate-500">▾ ver / ocultar</span>';
+            // Desplegable normal: empieza cerrado y se abre/cierra con un clic (el refresco no lo toca).
             banner.innerHTML = inReview.status === 'generando_media'
               ? '<i class="fa-solid fa-spinner fa-spin mr-1"></i>Generando EP ' + inReview.episode_number + ' de "' + esc(data.series.title) + '": ' + sorted.length + ' de ' + ((inReview.shots || []).length || '?') + ' tomas listas. Puedes ir revisando las que ya salieron.'
               : 'Revisando EP ' + inReview.episode_number + ' de "' + esc(data.series.title) + '".';
