@@ -206,11 +206,16 @@ function buildImagePrompt(character, storyBible) {
   const sb = storyBible || {};
   const style = (sb.visual_style || 'High-end 3D animated feature film style').split(',')[0].trim();
   const tag = String(character.fixed_prompt_tag || '').trim().replace(/\.$/, '');
+  // El estilo va al inicio Y al final, y se niega lo fotorrealista explícitamente: en la
+  // primera prueba (2026-10-05) Gemini devolvió 4 de 5 retratos como fotos realistas.
   return (
-    `${style} character face reference. ${tag}. ` +
-    'Close-up head and shoulders, facing the camera, neutral relaxed expression, ' +
+    `${style} character face reference: a stylized 3D animated character render, NOT photorealistic, NOT a photo of a real person. ` +
+    `${tag}. ` +
+    'Smooth stylized 3D skin, slightly large expressive animated eyes, ' +
+    'close-up head and shoulders, facing the camera, neutral relaxed expression, ' +
     'wearing a plain simple light-gray crew-neck top, soft even studio lighting, ' +
-    'plain light-gray background, vertical 9:16. No text, no logos, no jewelry.'
+    'plain light-gray background, vertical 9:16. Same art style as a 3D animated movie, not live action. ' +
+    'No text, no logos, no jewelry.'
   );
 }
 
