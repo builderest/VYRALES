@@ -877,7 +877,7 @@
           '<div class="flex justify-between items-center mb-1"><h3 class="text-white font-display font-bold">Redes conectadas</h3><button onclick="document.getElementById(\'socialModal\').remove()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button></div>' +
           '<p class="text-[11px] text-slate-500 mb-2">Conecta tu cuenta una vez; después publicas desde el panel PUBLICAR de cada episodio.</p>' +
           row('tiktok', 'TikTok', 'fa-brands fa-tiktok') + row('instagram', 'Instagram', 'fa-brands fa-instagram') +
-          '<p class="text-[10px] text-slate-500 mt-3">Al conectar se abre una pestaña nueva; cuando diga “conectado”, ciérrala y dale <button onclick="openSocialModal()" class="underline text-cyber-cyan">actualizar</button>.</p></div>';
+          '<p class="text-[10px] text-slate-500 mt-3">Al conectar vas a la página de la red; cuando diga “conectado”, vuelves al panel con el botón. Si no lo ves aquí, dale <button onclick="openSocialModal()" class="underline text-cyber-cyan">actualizar</button>.</p></div>';
       };
       window.disconnectSocial = async function(platform) {
         if (!await askConfirm('¿Desconectar ' + (platform === 'tiktok' ? 'TikTok' : 'Instagram') + ' de VYRALES?\n\nNo borra nada de tu cuenta; solo deja de poder publicar desde aquí hasta que la vuelvas a conectar.')) return;
@@ -888,7 +888,9 @@
         openSocialModal(); loadDashboard();
       };
       window.connectSocial = function(platform) {
-        window.open('/.netlify/functions/oauth-' + platform + '-start', '_blank'); // la sesión (cookie) autoriza
+        // En la MISMA pestaña (una pestaña nueva la bloqueaba el navegador como pop-up). TikTok /
+        // Instagram vuelven a vyrales.app y esa página tiene el botón para regresar al panel.
+        location.href = '/.netlify/functions/oauth-' + platform + '-start'; // la sesión (cookie) autoriza
       };
       window.socialPublish = async function(epId, platform) {
         const ep = (lastLoadedData.episodes || []).find(x => x.id === epId);
