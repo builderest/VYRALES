@@ -90,6 +90,9 @@ exports.handler = async (event) => {
   // el episodio completo. La toma queda guardada como parte del episodio (si se aprueba, ya
   // no se vuelve a generar cuando se produzca el resto).
   const onlyShot = Number(body.shot || qs.shot) || null;
+  // frames_only: genera SOLO los cuadros iniciales que falten (sin Veo), para revisarlos
+  // todos antes de gastar en video. ~$0.067 por cuadro.
+  const framesOnly = body.frames_only === true || qs.frames_only === '1';
 
   let markedGenerating = null; // id del episodio que ESTA corrida marcó como generando_media
   console.log(LOG, 'arrancó. series=', seriesSlug, 'episode_id=', episodeId || '(ninguno, toma el siguiente en guion_generado)', isContinuation ? '(continuación)' : '');
@@ -198,6 +201,29 @@ exports.handler = async (event) => {
 
     await ensureMediaBucket(supabase);
     console.log(LOG, 'bucket "media" listo.');
+
+    if (framesOnly) {
+      if (!useKeyframes) throw new Error('Esta serie no usa memoria visual (rules.keyframes = false).');
+      await supabase.from('episodes').update({ status: 'generando_media' }).eq('id', episode.id);
+      markedGenerating = episode.id;
+      let made = 0;
+      const failed = [];
+      for (const scene of scenes) {
+        if (Date.now() - startedAt > TIME_BUDGET_MS) break;
+        if (await loadExistingKeyframe(supabase, episode.id, scene.number)) continue;
+        try {
+          await createKeyframe(supabase, { series, episode, shot: scene.shot, characters, log: (...a) => console.log(LOG, ...a) });
+          made++;
+        } catch (err) {
+          console.error(LOG, `cuadro de la toma ${scene.number} FALLÓ:`, err.message);
+          failed.push(scene.number);
+        }
+      }
+      await supabase.from('episodes').update({ status: 'guion_generado' }).eq('id', episode.id);
+      markedGenerating = null;
+      console.log(LOG, 'cuadros listos:', made, failed.length ? '— fallaron: ' + failed.join(', ') : '');
+      return { statusCode: 200, body: JSON.stringify({ frames_created: made, frames_failed: failed }) };
+    }
 
     await supabase.from('episodes').update({ status: 'generando_media' }).eq('id', episode.id);
     markedGenerating = episode.id;

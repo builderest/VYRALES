@@ -1280,6 +1280,33 @@
         if (o.kind === 'location') return generateLocationImage(o.locationKey, text);
       };
 
+      // Genera SOLO los cuadros iniciales que faltan del episodio (sin video) para revisarlos.
+      window.generateAllFrames = async function(btn) {
+        const episodeId = btn.dataset.ep;
+        const ep = lastLoadedData && (lastLoadedData.episodes || []).find(x => x.id === episodeId);
+        if (!ep) return;
+        const missing = (ep.shots || []).filter(sh => !frameFor(ep, sh.n) && !clipFor(ep, sh.n)).length;
+        if (!confirm('Generar ' + missing + ' cuadros iniciales del EP ' + ep.episode_number + ' (sin video).\n\nCosto: ' + missing + ' × $' + IMAGE_PRICE_USD.toFixed(3) + ' = ~$' + (missing * IMAGE_PRICE_USD).toFixed(2) + ' USD.\nDespués revisas cada cuadro y regeneras solo los que salgan mal, antes de gastar en video. ¿Continuar?')) return;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>Generando cuadros...';
+        try {
+          const res = await fetch('/.netlify/functions/generate-media-background', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ series: DEFAULT_SERIES, episode_id: episodeId, frames_only: true })
+          });
+          if (!res.ok && res.status !== 202) throw new Error('HTTP ' + res.status);
+        } catch (err) { alert('No se pudo arrancar: ' + err.message); return loadDashboard(); }
+        const start = Date.now();
+        await pollUntil(d => {
+          const cur = (d.episodes || []).find(x => x.id === episodeId);
+          if (!cur) return false;
+          const left = (cur.shots || []).filter(sh => !frameFor(cur, sh.n) && !clipFor(cur, sh.n)).length;
+          btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>Cuadros: ' + (missing - left) + '/' + missing + '...';
+          return left === 0 || (cur.status === 'guion_generado' && Date.now() - start > 30000);
+        }, 15 * 60 * 1000);
+        await loadDashboard();
+      };
+
       // Regenerar desde el panel de revisión: primero el modal con el prompt actual.
       window.regenShot = function(assetId) {
         const ep = (lastLoadedData && lastLoadedData.episodes || []).find(e => (e.assets || []).some(a => a.id === assetId));
@@ -1573,6 +1600,10 @@
                 })()
               ).join('')
             : '<pre class="text-[11px] text-slate-300 whitespace-pre-wrap">' + esc(e.script || 'Sin guion todavía.') + '</pre>';
+          const missingFrames = usesKeyframes(data.series) ? shots.filter(sh => !frameFor(e, sh.n) && !clipFor(e, sh.n)).length : 0;
+          const framesBtn = (e.status === 'guion_generado' && missingFrames)
+            ? '<button onclick="generateAllFrames(this)" data-ep="' + e.id + '" class="mr-2 mb-1 px-3 py-1.5 rounded-lg bg-cyber-violet/15 border border-cyber-violet/50 text-cyber-violet text-xs font-mono hover:bg-cyber-violet/25"><i class="fa-solid fa-images mr-1"></i>Generar los ' + missingFrames + ' cuadros que faltan (~$' + (missingFrames * IMAGE_PRICE_USD).toFixed(2) + ') para revisarlos</button>'
+            : '';
           const produceBtn = (nextToProduce && nextToProduce.id === e.id)
             ? '<button onclick="produceEpisode(\'' + e.id + '\')" class="px-3 py-1.5 rounded-lg bg-cyber-pink/20 border border-cyber-pink/50 text-cyber-pink text-xs font-mono hover:bg-cyber-pink/30"><i class="fa-solid fa-bolt mr-1"></i>Producir este episodio (~$' + estimateEpisodeCost(e).toFixed(2) + ')</button>'
             : '';
@@ -1590,7 +1621,7 @@
                 (cont.summary ? '<p class="text-[11px] text-slate-400"><strong class="text-slate-300">Resumen:</strong> ' + esc(cont.summary) + '</p>' : '') +
                 shotsHtml +
                 (cont.last_cliffhanger ? '<p class="text-[11px] text-cyber-pink"><strong>Gancho:</strong> ' + esc(cont.last_cliffhanger) + '</p>' : '') +
-                produceBtn +
+                '<div class="flex flex-wrap items-center pt-1">' + framesBtn + produceBtn + '</div>' +
               '</div>' +
             '</details>'
           );

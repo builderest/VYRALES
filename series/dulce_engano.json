@@ -495,7 +495,10 @@
             "speaker": "Mateo",
             "line": "Seis meses casada conmigo. Pago su deuda y cancelo el desalojo."
           },
-          "reaction_en": "He slides the folder toward her and waits in silence"
+          "reaction_en": "He slides the folder toward her and waits in silence",
+          "wardrobe": {
+            "Mateo": "a tailored charcoal-gray three-piece suit dusted with white flour on the chest and shoulders, a crisp white open-collar shirt, and a silver watch"
+          }
         },
         {
           "n": 5,
@@ -511,7 +514,10 @@
             "speaker": "Valentina",
             "line": "¿Casarme con usted? ¿Está loco o solo es rico?"
           },
-          "reaction_en": "Mateo raises an eyebrow, unbothered"
+          "reaction_en": "Mateo raises an eyebrow, unbothered",
+          "wardrobe": {
+            "Mateo": "a tailored charcoal-gray three-piece suit dusted with white flour on the chest and shoulders, a crisp white open-collar shirt, and a silver watch"
+          }
         },
         {
           "n": 6,
@@ -527,7 +533,10 @@
             "speaker": "Mateo",
             "line": "Necesito una esposa en treinta días. Usted necesita su panadería. Es justo."
           },
-          "reaction_en": "Valentina crosses her arms and looks away"
+          "reaction_en": "Valentina crosses her arms and looks away",
+          "wardrobe": {
+            "Mateo": "a tailored charcoal-gray three-piece suit dusted with white flour on the chest and shoulders, a crisp white open-collar shirt, and a silver watch"
+          }
         },
         {
           "n": 7,
@@ -544,7 +553,10 @@
             "line": "No estoy en venta. La puerta está justo detrás de usted."
           },
           "reaction_en": "Mateo places a black business card next to the brass register, nods once and walks out",
-          "sfx": "the door bell chimes"
+          "sfx": "the door bell chimes",
+          "wardrobe": {
+            "Mateo": "a tailored charcoal-gray three-piece suit dusted with white flour on the chest and shoulders, a crisp white open-collar shirt, and a silver watch"
+          }
         },
         {
           "n": 8,
@@ -2028,7 +2040,10 @@
             "speaker": "Fernanda",
             "line": "Perdóname... perdóname."
           },
-          "reaction_en": "Fernanda walks away quickly, wiping a tear, while Valentina laughs at the table, unaware"
+          "reaction_en": "Fernanda walks away quickly, wiping a tear, while Valentina laughs at the table, unaware",
+          "wardrobe": {
+            "Fernanda": "an elegant fitted black turtleneck dress and gold hoop earrings"
+          }
         },
         {
           "n": 8,
@@ -2187,7 +2202,10 @@
             "speaker": "Mateo",
             "line": "Te vi en las cámaras, Fernanda. ¿Por qué lo hiciste?"
           },
-          "reaction_en": "Fernanda can't hold his gaze"
+          "reaction_en": "Fernanda can't hold his gaze",
+          "wardrobe": {
+            "Fernanda": "an elegant fitted black turtleneck dress and gold hoop earrings"
+          }
         },
         {
           "n": 5,
@@ -2203,7 +2221,10 @@
             "speaker": "Fernanda",
             "line": "Regina me obligó. Me tiene amenazada con algo de mi papá."
           },
-          "reaction_en": "She covers her face with her hands"
+          "reaction_en": "She covers her face with her hands",
+          "wardrobe": {
+            "Fernanda": "an elegant fitted black turtleneck dress and gold hoop earrings"
+          }
         },
         {
           "n": 6,
@@ -2219,7 +2240,10 @@
             "speaker": "Fernanda",
             "line": "Y hay algo más, Mateo. Valentina es mi hermana."
           },
-          "reaction_en": "Mateo's expression shifts from anger to astonishment"
+          "reaction_en": "Mateo's expression shifts from anger to astonishment",
+          "wardrobe": {
+            "Fernanda": "an elegant fitted black turtleneck dress and gold hoop earrings"
+          }
         },
         {
           "n": 7,
@@ -2235,7 +2259,10 @@
             "speaker": "Mateo",
             "line": "Mañana se lo dices tú. Antes de que Regina lo use."
           },
-          "reaction_en": "Fernanda nods slowly, terrified"
+          "reaction_en": "Fernanda nods slowly, terrified",
+          "wardrobe": {
+            "Fernanda": "an elegant fitted black turtleneck dress and gold hoop earrings"
+          }
         },
         {
           "n": 8,

@@ -48,7 +48,8 @@ function buildKeyframePrompt(shot, characterRows, storyBible, hasLocationRef) {
     parts.push(
       `${names.length > 1 ? `Character ${i + 1}: ` : ''}${row.fixed_prompt_tag.replace(/\.?$/, '')}` +
       (outfit ? `, wearing ${outfit}` : '') +
-      `. Use the face reference image of ${first} for the exact face, skin tone, eyes and hair.`
+      `. From the face reference image of ${first} take ONLY the identity: exact face shape, skin tone, eye color and hair color; ` +
+      `the hairstyle, clothing and accessories come from this text, never from the plain gray top in the reference photo.`
     );
   });
   if (names.length > 1) {
