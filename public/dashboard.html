@@ -1329,7 +1329,7 @@
       // Genera SOLO los cuadros iniciales que faltan del episodio (sin video) para revisarlos.
       window.generateAllFrames = async function(btn) {
         const episodeId = btn.dataset.ep;
-        const ep = lastLoadedData && (lastLoadedData.episodes || []).find(x => x.id === episodeId);
+        const ep = await freshEpisodeOrBlock(episodeId);
         if (!ep) return;
         const missing = (ep.shots || []).filter(sh => !frameFor(ep, sh.n) && !clipFor(ep, sh.n)).length;
         const newLocs = missingLocationsFor(ep);
@@ -1389,7 +1389,8 @@
       }
 
       async function generateKeyframe(episodeId, n) {
-        const ep = lastLoadedData && (lastLoadedData.episodes || []).find(x => x.id === episodeId);
+        const ep = await freshEpisodeOrBlock(episodeId);
+        if (!ep) return;
         const prev = ep && frameFor(ep, n);
         const prevUpdated = prev ? prev.updated_at : null;
         const box = document.querySelector('[data-shot="' + episodeId + '-' + n + '"]');
@@ -1914,11 +1915,37 @@
 
       // Producción manual de un episodio (cuesta dinero real en Veo). Solo se ofrece para
       // el siguiente episodio en "guion_generado", en orden.
+      // Antes de gastar: se relee el estado REAL del servidor (la página puede estar vieja).
+      // Si el episodio ya se está generando, se avisa y no se manda nada.
+      async function freshEpisodeOrBlock(episodeId) {
+        try {
+          const r = await fetch('/.netlify/functions/get-episodes?series=' + encodeURIComponent(DEFAULT_SERIES), { cache: 'no-store' });
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          const d = await r.json();
+          const cur = (d.episodes || []).find(e => e.id === episodeId);
+          if (!cur) { alert('No encontré el episodio. Recarga la página.'); return null; }
+          if (cur.status === 'generando_media') {
+            const done = (cur.assets || []).filter(a => a.kind === 'video_clip').length;
+            alert('⏳ El EP ' + cur.episode_number + ' YA se está generando (' + done + ' de ' + ((cur.shots || []).length || '?') + ' tomas listas).\n\nNo hace falta darle otra vez: no se mandó nada ni se cobró nada. La página se actualiza sola.');
+            await loadDashboard();
+            return null;
+          }
+          lastLoadedData = d;
+          return cur;
+        } catch (err) {
+          alert('No pude confirmar el estado del episodio (' + err.message + '). Por seguridad no se generó nada; intenta de nuevo.');
+          return null;
+        }
+      }
+
       window.produceEpisode = async function(episodeId) {
-        const ep = lastLoadedData && (lastLoadedData.episodes || []).find(e => e.id === episodeId);
-        if (!ep) return alert('No encontré el episodio. Recarga la página.');
+        const ep = await freshEpisodeOrBlock(episodeId);
+        if (!ep) return;
+        const doneClips = (ep.assets || []).filter(a => a.kind === 'video_clip').length;
         const cost = estimateEpisodeCost(ep);
-        if (!await askConfirm('Producir EP ' + ep.episode_number + ' "' + (ep.title || '') + '" con Veo.\n\nCosto estimado: ~$' + cost.toFixed(2) + ' USD (' + costBreakdownLabel(ep) + '). Es un cargo REAL en Google Cloud.\nTarda entre 10 y 30 minutos. ¿Continuar?')) return;
+        if (!await askConfirm('Producir EP ' + ep.episode_number + ' "' + (ep.title || '') + '" con Veo.\n\n' +
+          (doneClips ? 'Ya hay ' + doneClips + ' toma(s) hechas: NO se repiten. Se generan solo las ' + (((ep.shots || []).length || 0) - doneClips) + ' que faltan.\n\n' : '') +
+          'Costo estimado: ~$' + cost.toFixed(2) + ' USD (' + costBreakdownLabel(ep) + '). Es un cargo REAL en Google Cloud.\nTarda entre 10 y 30 minutos. ¿Continuar?')) return;
         const banner = document.getElementById('dataStatusBanner');
         try {
           const res = await fetch('/.netlify/functions/generate-media-background', {
@@ -1964,8 +1991,12 @@
       // formato del prompt antes de gastar el episodio completo. Queda guardada como parte
       // del episodio; si sale bien, "Producir" ya no la vuelve a generar.
       window.generateShot = async function(episodeId, shotNumber, cost, skipConfirm) {
-        const ep = lastLoadedData && (lastLoadedData.episodes || []).find(x => x.id === episodeId);
-        if (!ep) return alert('No encontré el episodio. Recarga la página.');
+        const ep = await freshEpisodeOrBlock(episodeId);
+        if (!ep) return;
+        if ((ep.assets || []).some(a => a.kind === 'video_clip' && a.shot_number === shotNumber)) {
+          await loadDashboard();
+          return alert('La TOMA ' + String(shotNumber).padStart(2, '0') + ' ya tiene video. Si quieres otra versión usa "Regenerar" en el panel de revisión. No se generó nada.');
+        }
         if (!skipConfirm && !await askConfirm('Generar SOLO la toma ' + shotNumber + ' del EP ' + ep.episode_number + ' con Veo.\n\nCosto: ~$' + Number(cost).toFixed(2) + ' USD (cargo real en Google Cloud). Tarda de 1 a 6 minutos. ¿Continuar?')) return;
         const box = document.querySelector('[data-shot="' + episodeId + '-' + shotNumber + '"]');
         const btn = box && box.querySelector('button[data-kind="video"][data-mode="generate"]');
