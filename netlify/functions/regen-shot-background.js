@@ -29,7 +29,8 @@ exports.handler = async (event) => {
     return { statusCode: 405, body: 'Method not allowed' };
   }
   try {
-    const { assetId } = JSON.parse(event.body || '{}');
+    const { assetId, provider: reqProvider } = JSON.parse(event.body || '{}');
+    const provider = ['google', 'fal'].includes(reqProvider) ? reqProvider : (process.env.VIDEO_PROVIDER || 'google');
     if (!assetId) {
       console.error(LOG, 'falta assetId en el body');
       return { statusCode: 400, body: JSON.stringify({ error: 'Falta assetId' }) };
@@ -87,8 +88,8 @@ exports.handler = async (event) => {
     let modelKey = ['veo_lite', 'veo_fast', 'veo_standard'].includes(asset.model) ? asset.model : 'veo_lite';
     if (referenceImages.length) modelKey = rules.shot_model === 'veo_standard' ? 'veo_standard' : 'veo_fast';
     console.log(LOG, 'generando con Veo (' + modelKey + ')... esto tarda un rato.');
-    const { videoBuffer, costUsd, model } = await generateVeoClip({ modelKey, prompt, referenceImages, startImage });
-    await logSpend(supabase, { seriesId: episode.series_id, episodeId: episode.id, shotNumber: asset.shot_number, kind: 'video', model: modelKey, costUsd, note: 'regenerada' });
+    const { videoBuffer, costUsd, model } = await generateVeoClip({ modelKey, prompt, referenceImages, startImage, provider, log: (...a) => console.log(LOG, ...a) });
+    await logSpend(supabase, { seriesId: episode.series_id, episodeId: episode.id, shotNumber: asset.shot_number, kind: 'video', model: provider === 'fal' ? 'fal_' + modelKey : modelKey, costUsd, note: provider === 'fal' ? 'regenerada (fal.ai)' : 'regenerada' });
     console.log(LOG, 'Veo terminó, subiendo a Supabase Storage...');
 
     // Nombre con versión: si se reusara shot-NN.mp4, la caché del navegador/CDN podría

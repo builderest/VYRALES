@@ -681,6 +681,11 @@
       // Modelo de Veo elegido en el dashboard SOLO para las próximas producciones de esta
       // sesión (null = el de la serie). Sirve para usar Fast cuando la cuota de Lite se acabó.
       let veoModelChoice = null;
+      // Proveedor del video: 'google' (cuota diaria de 10) o 'fal' (fal.ai, sin cuota diaria).
+      // Se recuerda en este navegador para no tener que elegirlo cada vez.
+      let videoProvider = (function() { try { return localStorage.getItem('vyrales_provider') || 'google'; } catch (_) { return 'google'; } })();
+      window.setVideoProvider = function(p) { videoProvider = p; try { localStorage.setItem('vyrales_provider', p); } catch (_) {} loadDashboard(); };
+      const providerBody = () => (videoProvider === 'fal' ? { provider: 'fal' } : {});
       // Contexto para editor.js (otro archivo): serie actual, datos cargados y recarga.
       window.vyCtx = () => ({ series: DEFAULT_SERIES, data: lastLoadedData, reload: loadDashboard });
       function seriesModels(series) {
@@ -700,10 +705,17 @@
             (on ? 'border-cyber-cyan bg-cyber-cyan/15 text-cyber-cyan' : 'border-cyber-border text-slate-400 hover:text-white') + '">' +
             '<span class="block font-bold">' + label + (key === base ? ' · de la serie' : '') + '</span>' +
             '<span class="block">$' + (secs * VEO_PRICE_PER_SEC[key]).toFixed(2) + '/toma</span>' +
-            (q ? '<span class="block ' + (q.left ? '' : 'text-cyber-pink') + '">hoy ' + q.used + '/' + q.limit + '</span>' : '') +
+            (q && videoProvider === 'google' ? '<span class="block ' + (q.left ? '' : 'text-cyber-pink') + '">hoy ' + q.used + '/' + q.limit + '</span>' : (videoProvider === 'fal' ? '<span class="block">sin límite</span>' : '')) +
           '</button>';
         };
-        return '<div class="w-full mt-3"><p class="text-[10px] font-mono text-slate-500 mb-1">MODELO DE VIDEO PARA PRODUCIR</p>' +
+        const hasFal = !!(data.providers && data.providers.fal);
+        if (!hasFal && videoProvider === 'fal') videoProvider = 'google';
+        const provBtn = (key, label, sub) => '<button type="button" onclick="setVideoProvider(\'' + key + '\')" ' + (key === 'fal' && !hasFal ? 'disabled title="Falta FAL_KEY en el .env"' : '') +
+          ' class="flex-1 px-2 py-1.5 rounded-lg border text-[10px] font-mono leading-tight ' + (videoProvider === key ? 'border-cyber-emerald bg-cyber-emerald/15 text-cyber-emerald' : 'border-cyber-border text-slate-400 hover:text-white') + (key === 'fal' && !hasFal ? ' opacity-40' : '') + '">' +
+          '<span class="block font-bold">' + label + '</span><span class="block">' + sub + '</span></button>';
+        return '<div class="w-full mt-3"><p class="text-[10px] font-mono text-slate-500 mb-1">PROVEEDOR</p>' +
+          '<div class="flex gap-2 mb-2">' + provBtn('google', 'Google directo', 'cuota 10/día por modelo') + provBtn('fal', 'fal.ai', hasFal ? 'sin límite diario' : 'sin FAL_KEY') + '</div>' +
+          '<p class="text-[10px] font-mono text-slate-500 mb-1">MODELO DE VIDEO PARA PRODUCIR</p>' +
           '<div class="flex gap-2">' + opt('veo_lite', 'Veo Lite') + opt('veo_fast', 'Veo Fast') + '</div>' +
           (veoModelChoice && veoModelChoice !== base ? '<p class="text-[10px] text-cyber-gold mt-1">Solo para esta sesión; la serie sigue en ' + esc(base.replace('veo_', 'Veo ')) + '.</p>' : '') +
         '</div>';
@@ -1887,7 +1899,7 @@
         } else if (next) {
           title.textContent = 'Siguiente: EP ' + next.episode_number + ' — ' + (next.title || '');
           const doneN = (next.assets || []).filter(a => a.kind === 'video_clip').length;
-          const q = veoQuotaInfo(data, seriesModels(data.series).shot);
+          const q = videoProvider === 'google' ? veoQuotaInfo(data, seriesModels(data.series).shot) : null;
           desc.innerHTML = esc(((next.shots || []).length || 0) + ' tomas' + (doneN ? ' (' + doneN + ' ya hechas)' : '') + ' · ~$' + estimateEpisodeCost(next).toFixed(2) + ' en Veo') +
             (q ? '<br><span class="' + (q.left ? 'text-slate-400' : 'text-cyber-pink') + '">Cuota Veo hoy: ' + q.used + '/' + q.limit + (q.left ? '' : ' · se reinicia ' + esc(q.resetLabel)) + '</span>' : '') +
             (quotaStopOf(next) ? '<br><span class="text-cyber-gold">⏸ Se detuvo por cuota de Google en la toma ' + quotaStopOf(next).quota_stop.shot + '</span>' : '');
@@ -2000,7 +2012,7 @@
         if (!ep) return;
         const doneClips = (ep.assets || []).filter(a => a.kind === 'video_clip').length;
         const missingClips = ((ep.shots || []).length || 0) - doneClips;
-        const q = veoQuotaInfo(lastLoadedData, seriesModels(lastLoadedData.series).shot);
+        const q = videoProvider === 'google' ? veoQuotaInfo(lastLoadedData, seriesModels(lastLoadedData.series).shot) : null;
         if (q && q.left === 0) {
           return alert('⛔ Hoy ya usaste los ' + q.limit + ' videos por día que Google permite en tu nivel (Veo Lite).\n\nNo se mandó nada ni se cobró nada. La cuota se reinicia: ' + q.resetLabel + ' (tu hora).');
         }
@@ -2009,13 +2021,13 @@
         const cost = estimateEpisodeCost(ep);
         if (!await askConfirm('Producir EP ' + ep.episode_number + ' "' + (ep.title || '') + '" con Veo.\n\n' +
           (doneClips ? 'Ya hay ' + doneClips + ' toma(s) hechas: NO se repiten. Se generan solo las ' + missingClips + ' que faltan.\n\n' : '') + quotaNote +
-          'Modelo: ' + seriesModels(lastLoadedData.series).shot.replace('veo_', 'Veo ').toUpperCase() + (veoModelChoice ? ' (elegido solo para esta producción)' : '') + '.\n' +
+          'Modelo: ' + seriesModels(lastLoadedData.series).shot.replace('veo_', 'Veo ').toUpperCase() + (veoModelChoice ? ' (elegido solo para esta producción)' : '') + ' · Proveedor: ' + (videoProvider === 'fal' ? 'fal.ai (sin límite diario)' : 'Google') + '.\n' +
           'Costo estimado: ~$' + cost.toFixed(2) + ' USD (' + costBreakdownLabel(ep) + '). Es un cargo REAL en Google Cloud.\nTarda entre 10 y 30 minutos. ¿Continuar?')) return;
         const banner = document.getElementById('dataStatusBanner');
         try {
           const res = await fetch('/.netlify/functions/generate-media-background', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(Object.assign({ series: DEFAULT_SERIES, episode_id: episodeId }, veoModelChoice ? { model: veoModelChoice } : {}))
+            body: JSON.stringify(Object.assign({ series: DEFAULT_SERIES, episode_id: episodeId }, veoModelChoice ? { model: veoModelChoice } : {}, providerBody()))
           });
           if (!res.ok && res.status !== 202) throw new Error('HTTP ' + res.status);
         } catch (err) {
@@ -2071,7 +2083,7 @@
         try {
           const res = await fetch('/.netlify/functions/generate-media-background', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(Object.assign({ series: DEFAULT_SERIES, episode_id: episodeId, shot: shotNumber }, veoModelChoice ? { model: veoModelChoice } : {}))
+            body: JSON.stringify(Object.assign({ series: DEFAULT_SERIES, episode_id: episodeId, shot: shotNumber }, veoModelChoice ? { model: veoModelChoice } : {}, providerBody()))
           });
           if (!res.ok && res.status !== 202) throw new Error('HTTP ' + res.status);
         } catch (err) {
@@ -2383,7 +2395,7 @@
         try {
           const res = await fetch('/.netlify/functions/regen-shot-background', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ assetId })
+            body: JSON.stringify(Object.assign({ assetId }, providerBody()))
           });
           if (!res.ok) throw new Error('HTTP ' + res.status);
           const found = await pollUntilAssetChanged(

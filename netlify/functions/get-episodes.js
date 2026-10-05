@@ -90,6 +90,7 @@ exports.handler = async (event) => {
         episodes,
         characters: characters || [],
         channels_count: channelsCount || 0,
+        providers: { google: !!process.env.GOOGLE_AI_API_KEY, fal: !!process.env.FAL_KEY },
         spend
       })
     };

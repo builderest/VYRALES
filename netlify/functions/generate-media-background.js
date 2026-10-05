@@ -98,6 +98,8 @@ exports.handler = async (event) => {
   // Fast cuando la cuota diaria de Lite se acabó. No cambia la configuración de la serie.
   const ALLOWED_MODELS = ['veo_lite', 'veo_fast', 'veo_standard'];
   const modelOverride = ALLOWED_MODELS.includes(body.model || qs.model) ? (body.model || qs.model) : null;
+  // provider: 'google' (API de Gemini, cuota diaria) o 'fal' (fal.ai, sin cuota diaria).
+  const provider = ['google', 'fal'].includes(body.provider || qs.provider) ? (body.provider || qs.provider) : (process.env.VIDEO_PROVIDER || 'google');
 
   let markedGenerating = null; // id del episodio que ESTA corrida marcó como generando_media
   console.log(LOG, 'arrancó. series=', seriesSlug, 'episode_id=', episodeId || '(ninguno, toma el siguiente en guion_generado)', isContinuation ? '(continuación)' : '');
@@ -250,6 +252,7 @@ exports.handler = async (event) => {
     const shotModel = modelOverride || rules.shot_model || 'veo_lite';
     const cliffhangerModel = modelOverride || rules.cliffhanger_model || 'veo_fast';
     if (modelOverride) console.log(LOG, 'modelo forzado para esta corrida:', modelOverride);
+    console.log(LOG, 'proveedor de video:', provider === 'fal' ? 'fal.ai (sin cuota diaria)' : 'Google (API de Gemini)');
     console.log(LOG, 'modelos:', shotModel, '(tomas) /', cliffhangerModel, '(cliffhanger)');
 
     const results = [];
@@ -257,7 +260,7 @@ exports.handler = async (event) => {
     for (const scene of scenes) {
       if (Date.now() - startedAt > TIME_BUDGET_MS) {
         console.warn(LOG, 'cerca del límite de 15 min de Netlify — me vuelvo a llamar para seguir con las tomas que faltan...');
-        await fetch(selfUrl(event, Object.assign({ series: seriesSlug, episode_id: episode.id, continue: '1' }, modelOverride ? { model: modelOverride } : {})), { method: 'POST' });
+        await fetch(selfUrl(event, Object.assign({ series: seriesSlug, episode_id: episode.id, continue: '1', provider }, modelOverride ? { model: modelOverride } : {})), { method: 'POST' });
         return { statusCode: 202, body: JSON.stringify({ episode_id: episode.id, continued: true, shots_ok_this_run: results.filter((r) => r.status === 'fulfilled').length }) };
       }
       const isCliffhanger = scene.number === total;
@@ -274,8 +277,8 @@ exports.handler = async (event) => {
           startImage = frame.startImage;
           console.log(LOG, `toma ${scene.number}/${total}: ${existingFrame ? 'usando el cuadro inicial ya guardado' : 'cuadro inicial creado'}.`);
         }
-        const { videoBuffer, costUsd, model } = await generateVeoClip({ modelKey, prompt, referenceImages, startImage });
-        await logSpend(supabase, { seriesId: series.id, episodeId: episode.id, shotNumber: scene.number, kind: 'video', model: modelKey, costUsd });
+        const { videoBuffer, costUsd, model } = await generateVeoClip({ modelKey, prompt, referenceImages, startImage, provider, log: (...a) => console.log(LOG, ...a) });
+        await logSpend(supabase, { seriesId: series.id, episodeId: episode.id, shotNumber: scene.number, kind: 'video', model: provider === 'fal' ? 'fal_' + modelKey : modelKey, costUsd, note: provider === 'fal' ? 'fal.ai' : undefined });
         console.log(LOG, `toma ${scene.number}/${total}: Veo terminó, subiendo a Supabase Storage...`);
 
         const storagePath = `${series.slug}/ep${episode.episode_number}/shot-${String(scene.number).padStart(2, '0')}.mp4`;
