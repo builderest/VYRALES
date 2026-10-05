@@ -723,6 +723,17 @@
           loadDashboard();
         } catch (err) { alert('No se pudo guardar el narrador: ' + err.message); }
       };
+      window.stopGeneration = async function(episodeId, force) {
+        if (!await askConfirm(force
+          ? 'Liberar el episodio: úsalo SOLO si cerraste el servidor (Ctrl+C) y el episodio quedó marcado como "generando". Si de verdad sigue generando, no lo uses.\n\n¿Liberar?'
+          : 'Detener la generación.\n\nLa toma que se está generando AHORA termina (ya está pagada); las siguientes no se mandan. Lo que falte se genera después con "Producir". ¿Detener?')) return;
+        try {
+          const res = await fetch('/.netlify/functions/stop-generation', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ episode_id: episodeId, force: !!force }) });
+          const j = await res.json();
+          if (!res.ok) throw new Error(j.error || ('HTTP ' + res.status));
+        } catch (err) { alert('No se pudo detener: ' + err.message); }
+        loadDashboard();
+      };
       window.genNarration = async function(btn) {
         const epId = btn.getAttribute('data-ep');
         const n = btn.getAttribute('data-n');
@@ -2039,6 +2050,10 @@
           const done = (generating.assets || []).filter(a => a.kind === 'video_clip').length;
           title.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>Generando EP ' + generating.episode_number;
           desc.textContent = done + ' de ' + total + ' tomas listas · se actualiza sola cada 20 s';
+          const stopAt = (generating.validator_report || {}).stop_requested_at;
+          desc.insertAdjacentHTML('beforeend', '<div class="mt-3">' + (stopAt && Date.now() - new Date(stopAt).getTime() < 15 * 60000
+            ? '<p class="text-[11px] text-cyber-gold">⏹ Detención pedida: termina la toma en curso y se para.</p><button onclick="stopGeneration(\'' + generating.id + '\', true)" class="mt-1 text-[10px] font-mono text-slate-400 hover:text-white underline">¿Cerraste el servidor y quedó trabado? Liberar el episodio</button>'
+            : '<button onclick="stopGeneration(\'' + generating.id + '\')" class="px-3 py-1.5 rounded-lg bg-cyber-pink/15 border border-cyber-pink/60 text-cyber-pink text-xs font-mono hover:bg-cyber-pink/25"><i class="fa-solid fa-stop mr-1"></i>Detener generación</button>') + '</div>');
         } else if (next) {
           title.textContent = 'Siguiente: EP ' + next.episode_number + ' — ' + (next.title || '');
           const doneN = (next.assets || []).filter(a => a.kind === 'video_clip').length;

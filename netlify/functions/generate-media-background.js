@@ -65,6 +65,14 @@ function buildPrompt(sceneText, characters, storyBible) {
 
 const LOG = '[generate-media]';
 
+// Botón "Detener" del dashboard (stop-generation.js): marca validator_report.stop_requested_at.
+// Se revisa ANTES de cada toma/cuadro: la que ya está en curso termina (y se cobra), las demás no.
+async function stopRequested(supabase, episodeId, startedAt) {
+  const { data } = await supabase.from('episodes').select('validator_report').eq('id', episodeId).single();
+  const at = data && data.validator_report && data.validator_report.stop_requested_at;
+  return !!(at && new Date(at).getTime() >= startedAt - 60000);
+}
+
 function selfUrl(event, params) {
   const headers = event.headers || {};
   const host = headers.host || headers.Host;
@@ -215,9 +223,11 @@ exports.handler = async (event) => {
       markedGenerating = episode.id;
       let made = 0;
       const failed = [];
+      let stoppedByUser = false;
       for (const scene of scenes) {
         if (Date.now() - startedAt > TIME_BUDGET_MS) break;
         if (await loadExistingKeyframe(supabase, episode.id, scene.number)) continue;
+        if (await stopRequested(supabase, episode.id, startedAt)) { stoppedByUser = true; console.warn(LOG, 'DETENIDO por el usuario antes del cuadro', scene.number); break; }
         try {
           await createKeyframe(supabase, { series, episode, shot: scene.shot, characters, log: (...a) => console.log(LOG, ...a) });
           made++;
@@ -229,7 +239,7 @@ exports.handler = async (event) => {
       // Resultado de la corrida guardado en el episodio para que el dashboard lo muestre
       // (antes solo quedaba en la terminal de netlify dev).
       const report = Object.assign({}, episode.validator_report || {}, {
-        last_frames_run: { at: new Date().toISOString(), created: made, failed }
+        last_frames_run: { at: new Date().toISOString(), created: made, failed, stopped_by_user: stoppedByUser }
       });
       await supabase.from('episodes').update({ status: 'guion_generado', validator_report: report }).eq('id', episode.id);
       markedGenerating = null;
@@ -258,7 +268,13 @@ exports.handler = async (event) => {
 
     const results = [];
     let quotaStop = null;
+    let stoppedByUser = false;
     for (const scene of scenes) {
+      if (await stopRequested(supabase, episode.id, startedAt)) {
+        stoppedByUser = true;
+        console.warn(LOG, 'DETENIDO por el usuario antes de la toma', scene.number);
+        break;
+      }
       if (Date.now() - startedAt > TIME_BUDGET_MS) {
         console.warn(LOG, 'cerca del límite de 15 min de Netlify — me vuelvo a llamar para seguir con las tomas que faltan...');
         await fetch(selfUrl(event, Object.assign({ series: seriesSlug, episode_id: episode.id, continue: '1', provider }, modelOverride ? { model: modelOverride } : {})), { method: 'POST' });
@@ -327,7 +343,8 @@ exports.handler = async (event) => {
       at: new Date().toISOString(),
       created: succeeded.length,
       failed: failures.filter((f) => !(f.reason && f.reason.code === 'VEO_QUOTA')).map((f) => String((f.reason && f.reason.message) || f.reason).slice(0, 300)),
-      quota_stop: quotaStop
+      quota_stop: quotaStop,
+      stopped_by_user: stoppedByUser
     };
     await supabase
       .from('episodes')
