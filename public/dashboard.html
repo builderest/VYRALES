@@ -142,13 +142,17 @@
                 </div>
             </div>
 
-            <!-- Active Series Selector -->
-            <div class="flex items-center space-x-3 bg-cyber-darker/80 border border-cyber-border px-3 py-1.5 rounded-lg">
-                <i class="fa-solid fa-tv text-cyber-pink text-xs"></i>
-                <span class="text-xs text-slate-400 font-mono hidden sm:inline">SERIE ACTIVA:</span>
-                <select id="seriesSelector" onchange="switchSeries(this.value)" class="bg-transparent text-sm font-semibold text-cyber-cyan focus:outline-none cursor-pointer max-w-[220px]">
-                    <option class="bg-cyber-card text-white">Cargando series...</option>
-                </select>
+            <!-- Active Series Selector (menú propio: el <select> nativo no se puede estilizar) -->
+            <div id="seriesPicker" class="relative">
+                <button id="seriesPickerBtn" type="button" onclick="toggleSeriesMenu(event)" aria-haspopup="listbox" aria-expanded="false"
+                        class="flex items-center gap-2.5 bg-cyber-darker/80 border border-cyber-border hover:border-cyber-cyan/60 px-3 py-2 rounded-lg transition-all">
+                    <i class="fa-solid fa-tv text-cyber-pink text-xs"></i>
+                    <span class="text-[10px] text-slate-400 font-mono hidden sm:inline whitespace-nowrap tracking-wider">SERIE ACTIVA</span>
+                    <span id="seriesPickerLabel" class="text-sm font-semibold text-cyber-cyan whitespace-nowrap max-w-[220px] truncate">Cargando...</span>
+                    <i id="seriesPickerChevron" class="fa-solid fa-chevron-down text-[10px] text-slate-400 transition-transform"></i>
+                </button>
+                <div id="seriesMenu" role="listbox"
+                     class="hidden absolute left-0 mt-2 w-80 bg-cyber-card border border-cyber-border rounded-xl shadow-neon-cyan p-1.5 z-50"></div>
             </div>
 
             <!-- Infrastructure Status Pills -->
@@ -274,9 +278,12 @@
                     </h3>
                     <p id="castSubtitle" class="text-xs text-slate-400 font-mono">Cargando personajes desde Supabase...</p>
                 </div>
-                <div id="importBar" class="flex flex-wrap items-center gap-2"></div>
+                <div class="flex flex-wrap items-center gap-2">
+                    <button id="castToggleAll" onclick="toggleAllCast()" class="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 text-xs font-mono hover:bg-slate-700"><i class="fa-solid fa-up-right-and-down-left-from-center mr-1"></i>Abrir todas</button>
+                    <div id="importBar" class="flex flex-wrap items-center gap-2"></div>
+                </div>
             </div>
-            <div id="castGrid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"></div>
+            <div id="castGrid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start"></div>
         </section>
 
         <!-- PIPELINE WORKFLOW VISUALIZER (INTERACTIVE NODES) -->
@@ -1120,15 +1127,44 @@
       }
 
       function renderSeriesSelector(allSeries, current) {
-        const sel = document.getElementById('seriesSelector');
         const list = allSeries.slice();
-        if (!list.find(x => x.slug === DEFAULT_SERIES)) list.unshift({ slug: DEFAULT_SERIES, title: DEFAULT_SERIES + ' (no importada)' });
-        sel.innerHTML = list.map(x =>
-          '<option value="' + esc(x.slug) + '" class="bg-cyber-card text-white"' + (x.slug === DEFAULT_SERIES ? ' selected' : '') + '>' +
-            esc(x.title) + (x.genre ? ' (' + esc(x.genre) + ')' : '') +
-          '</option>'
-        ).join('');
+        if (!list.find(x => x.slug === DEFAULT_SERIES)) list.unshift({ slug: DEFAULT_SERIES, title: DEFAULT_SERIES, genre: 'no importada' });
+        const active = list.find(x => x.slug === DEFAULT_SERIES);
+        document.getElementById('seriesPickerLabel').textContent = active ? active.title : 'Elegir serie';
+        document.getElementById('seriesMenu').innerHTML =
+          '<p class="px-3 pt-1.5 pb-2 text-[10px] font-mono text-slate-500 tracking-wider">CAMBIAR DE SERIE</p>' +
+          list.map(x => {
+            const isActive = x.slug === DEFAULT_SERIES;
+            return (
+              '<button type="button" role="option" aria-selected="' + isActive + '" onclick="switchSeries(\'' + esc(x.slug) + '\')" ' +
+                'class="w-full text-left flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg transition-all ' +
+                (isActive ? 'bg-cyber-cyan/10 border border-cyber-cyan/30' : 'border border-transparent hover:bg-white/5 hover:border-cyber-border') + '">' +
+                '<span class="min-w-0">' +
+                  '<span class="block text-sm font-semibold truncate ' + (isActive ? 'text-cyber-cyan' : 'text-white') + '">' + esc(x.title) + '</span>' +
+                  '<span class="block text-[10px] font-mono text-slate-500">' + esc(x.slug) + '</span>' +
+                '</span>' +
+                '<span class="flex items-center gap-2 flex-shrink-0">' +
+                  (x.genre ? '<span class="text-[10px] font-mono px-1.5 py-0.5 rounded border border-cyber-pink/30 text-cyber-pink bg-cyber-pink/10">' + esc(x.genre) + '</span>' : '') +
+                  (isActive ? '<i class="fa-solid fa-check text-cyber-cyan text-xs"></i>' : '') +
+                '</span>' +
+              '</button>'
+            );
+          }).join('');
       }
+
+      function setSeriesMenu(open) {
+        document.getElementById('seriesMenu').classList.toggle('hidden', !open);
+        document.getElementById('seriesPickerChevron').classList.toggle('rotate-180', open);
+        document.getElementById('seriesPickerBtn').setAttribute('aria-expanded', String(open));
+      }
+      window.toggleSeriesMenu = function(ev) {
+        ev.stopPropagation();
+        setSeriesMenu(document.getElementById('seriesMenu').classList.contains('hidden'));
+      };
+      document.addEventListener('click', (ev) => {
+        if (!document.getElementById('seriesPicker').contains(ev.target)) setSeriesMenu(false);
+      });
+      document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') setSeriesMenu(false); });
 
       window.switchSeries = function(slug) {
         try { localStorage.setItem('vyrales_series', slug); } catch (_) {}
@@ -1155,8 +1191,10 @@
             : '<span class="font-display font-bold text-2xl text-white">' + esc(initials(c.name)) + '</span>';
           const row = (label, val) => val ? '<p><strong class="text-slate-300">' + label + ':</strong> ' + esc(val) + '</p>' : '';
           return (
-            '<div class="bg-cyber-darker p-4 rounded-xl border border-cyber-border hover:border-cyber-cyan transition-all flex flex-col gap-3">' +
-              '<div class="flex items-start gap-3">' +
+            // Ficha plegable: cerrada solo se ve la cabecera (foto, nombre, rol); al
+            // abrirla se despliega toda la información del personaje.
+            '<details class="cast-card group bg-cyber-darker rounded-xl border border-cyber-border hover:border-cyber-cyan open:border-cyber-cyan/60 transition-all">' +
+              '<summary class="cursor-pointer list-none p-4 flex items-start gap-3 select-none">' +
                 '<div class="w-16 h-20 rounded-lg flex-shrink-0 flex items-center justify-center overflow-hidden bg-gradient-to-br from-cyber-violet/60 to-cyber-pink/40 border border-cyber-border">' + avatar + '</div>' +
                 '<div class="min-w-0 flex-1">' +
                   '<div class="flex items-center justify-between gap-2">' +
@@ -1166,7 +1204,9 @@
                   '<p class="text-[11px] font-mono text-slate-400">' + (pr.age ? pr.age + ' años · ' : '') + esc(pr.archetype || '') + '</p>' +
                   '<p class="text-[10px] font-mono text-cyber-cyan mt-0.5">Aparece en ' + appearances + ' de ' + episodes.length + ' episodios' + (c.reference_image_url ? '' : ' · sin imagen de referencia') + '</p>' +
                 '</div>' +
-              '</div>' +
+                '<i class="fa-solid fa-chevron-down text-slate-500 text-xs mt-1 transition-transform group-open:rotate-180" title="Ver ficha completa"></i>' +
+              '</summary>' +
+              '<div class="px-4 pb-4 flex flex-col gap-3 border-t border-cyber-border/60 pt-3">' +
               '<p class="text-[11px] text-slate-300">' + esc(c.description || '') + '</p>' +
               '<div class="text-[11px] text-slate-400 space-y-1">' +
                 row('Personalidad', pr.personality) + row('Quiere', pr.wants) + row('Miedo', pr.fear) + row('Arco', pr.arc) + row('Vestuario base', pr.default_outfit) +
@@ -1176,10 +1216,20 @@
                   '<button onclick="copyTag(this)" data-tag="' + esc(c.fixed_prompt_tag || '') + '" class="text-cyber-cyan hover:underline"><i class="fa-regular fa-copy mr-1"></i>Copiar</button></div>' +
                 '<p class="text-cyber-cyan/90 bg-slate-900 p-2 rounded mt-1 border border-slate-800">' + esc(c.fixed_prompt_tag || '— sin tag —') + '</p>' +
               '</div>' +
-            '</div>'
+              '</div>' +
+            '</details>'
           );
         }).join('');
       }
+
+      window.toggleAllCast = function() {
+        const cards = [...document.querySelectorAll('#castGrid details.cast-card')];
+        const open = !cards.every(d => d.open);
+        cards.forEach(d => (d.open = open));
+        document.getElementById('castToggleAll').innerHTML = open
+          ? '<i class="fa-solid fa-down-left-and-up-right-to-center mr-1"></i>Cerrar todas'
+          : '<i class="fa-solid fa-up-right-and-down-left-from-center mr-1"></i>Abrir todas';
+      };
 
       window.copyTag = function(btn) {
         const text = btn.getAttribute('data-tag') || '';
