@@ -14,7 +14,16 @@ exports.handler = async (event) => {
       .single();
 
     if (seriesError || !series) {
-      return { statusCode: 404, body: JSON.stringify({ error: 'Serie no encontrada' }) };
+      // DEBUG TEMPORAL: exponemos el detalle real del error para diagnosticar
+      // la conexión a Supabase. Quitar este 'debug' una vez confirmado que
+      // todo funciona.
+      return {
+        statusCode: 404,
+        body: JSON.stringify({
+          error: 'Serie no encontrada',
+          debug: seriesError ? { message: seriesError.message, code: seriesError.code, details: seriesError.details, hint: seriesError.hint } : null
+        })
+      };
     }
 
     const { data: episodes, error: episodesError } = await supabase
