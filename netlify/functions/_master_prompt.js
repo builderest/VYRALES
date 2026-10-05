@@ -96,6 +96,7 @@ Si algo no está escrito en el JSON, la IA lo inventa distinto en cada toma. Esc
 10. Diálogo: al menos 80% de las tomas con diálogo. Conversaciones en plano/contraplano (alternar hablantes entre tomas). Frases naturales, con emoción, nada de explicar la trama.
 11. Cada episodio termina en GANCHO (cliffhanger) sin resolver. El último episodio cierra el arco principal pero deja un gancho para temporada 2.
 12. continuity de cada episodio: summary, last_cliffhanger, pending_state (español). La historia completa debe ser coherente de principio a fin: nadie sabe algo antes de descubrirlo, los objetos y heridas persisten, la ropa coincide con el momento.
+12a. Documentales / narrador en off: el narrador va en story_bible.extras con "voiceover": true (ej. "Narrador": { "who": "an off-screen documentary narrator", "voice": "…", "voiceover": true }). En sus tomas dialogue.speaker = "Narrador" y action_en describe SOLO lo que se ve (nunca "the narrator speaks…"): nadie en cuadro habla ni mueve la boca.
 12b. Objetos: sigue cada objeto de toma en toma (quién tiene la carta, la caja, el teléfono). Un objeto nunca aparece duplicado ni en manos de quien no lo tiene.
 12c. Fotos, retratos, cuadros y pósters: son objetos quietos; nunca les des acción (no "la foto sonríe"). Si alguien le habla a una foto, la foto debe verse en start_en y la mirada del personaje va a la foto.
 12d. Close-up con 2 personajes: start_en dice cuál está enfocado y dónde queda el otro (al borde, desenfocado). Una sola imagen continua, nunca pantalla dividida.

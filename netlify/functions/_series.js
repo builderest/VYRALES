@@ -56,6 +56,12 @@ function extraOf(sb, key) {
   return typeof ex === 'string' ? { who: ex, voice: '' } : ex;
 }
 
+// Narrador en off (documentales): extra con voiceover:true o descrito como fuera de cámara.
+// Nadie en cuadro habla ni mueve la boca con esa voz.
+function isVoiceover(ex) {
+  return !!ex && (ex.voiceover === true || /off-?screen|never visible|voice-?over|narrat|narrador/i.test(`${ex.who || ''}`));
+}
+
 // El JSON trae `dialogue` como objeto {speaker, line} o null (1 hablante por toma). Las
 // novelas viejas lo traían como array. Esto lo normaliza siempre a array de 0–1 elementos.
 function dialogueList(d) {
@@ -317,7 +323,10 @@ function buildShotPrompt(shot, characterRows, storyBible) {
   // 3) Acción con marcas de tiempo: diálogo en 0–6 s, reacción quieta en 6–8 s (corte limpio)
   const extras = sb.extras || {};
   const lines = dialogueList(shot.dialogue);
+  const voiceoverLine = lines.length && isVoiceover(extraOf(sb, lines[0].speaker));
   const speakerPhrase = (d) => {
+    const vo = extraOf(sb, d.speaker);
+    if (isVoiceover(vo)) return `Voice-over narration, heard over the images from ${vo.who}${vo.voice ? `, in ${vo.voice}` : ''}:`;
     const ex = extraOf(sb, d.speaker);
     if (ex) return `${capitalize(ex.who)} says${ex.voice ? ` in ${ex.voice}` : ''}:`;
     const row = (characterRows || []).find((r) => (r.profile && r.profile.key) === d.speaker || r.name === d.speaker || r.name.split(' ')[0] === d.speaker);
@@ -348,7 +357,11 @@ function buildShotPrompt(shot, characterRows, storyBible) {
         ? `The video begins exactly on the provided first frame: ${shot.start_en.trim().replace(/\.?$/, '.')} Everything continues naturally from that exact pose, with the same composition, set, props and outfits; nothing that already happened before this frame is repeated.`
         : 'The video begins exactly on the provided first frame, keeping the same composition, set and outfits, and continues naturally from that pose.');
     }
-    parts.push('Nobody looks into the camera or talks to the camera: every glance and every spoken line is directed at the person or object named in the action, and the eye line stays on that target while speaking.');
+    if (voiceoverLine) {
+      parts.push('The narration is an off-screen voice-over: nobody in the frame speaks, everyone on screen keeps their mouth closed and does not react to the voice, and nobody looks into the camera.');
+    } else {
+      parts.push('Nobody looks into the camera or talks to the camera: every glance and every spoken line is directed at the person or object named in the action, and the eye line stays on that target while speaking.');
+    }
     const setText = `${(loc && loc.visual) || ''} ${shot.start_en || ''} ${shot.action_en || ''} ${shot.reaction_en || ''}`;
     if (/photo|portrait|painting|poster/i.test(setText)) {
       parts.push('Any person shown in a framed photo, portrait, painting or poster is a completely still printed image: their face never moves, blinks, talks or changes expression.');
