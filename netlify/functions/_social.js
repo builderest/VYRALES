@@ -4,7 +4,9 @@
 //              y publica). Docs: developers.tiktok.com/doc/content-posting-api-get-started-upload-content
 //   Meta      — "Facebook Login": una conexión da la Página de Facebook y su Instagram vinculado
 //              (ver sección Meta abajo).
-// Llaves en .env / Netlify: TIKTOK_CLIENT_KEY, TIKTOK_CLIENT_SECRET, META_APP_ID, META_APP_SECRET. Los tokens se guardan en la tabla social_accounts (migración 006).
+//   YouTube   — Data API v3 (Shorts), ver sección YouTube abajo.
+// Llaves en .env / Netlify: TIKTOK_CLIENT_KEY, TIKTOK_CLIENT_SECRET, META_APP_ID, META_APP_SECRET,
+// YOUTUBE_CLIENT_ID, YOUTUBE_CLIENT_SECRET. Los tokens se guardan en la tabla social_accounts (migración 006).
 const crypto = require('crypto');
 
 const BASE_URL = () => (process.env.PUBLIC_BASE_URL || 'https://vyrales.app').replace(/\/$/, '');
@@ -17,7 +19,7 @@ function need(name) {
 }
 
 // state anti-CSRF firmado (sin guardar nada): plataforma + hora + firma HMAC con el secreto.
-const stateSecret = (platform) => platform === 'tiktok' ? need('TIKTOK_CLIENT_SECRET') : metaSecret();
+const stateSecret = (platform) => platform === 'tiktok' ? need('TIKTOK_CLIENT_SECRET') : platform === 'youtube' ? need('YOUTUBE_CLIENT_SECRET') : metaSecret();
 function makeState(platform) {
   const secret = stateSecret(platform);
   const payload = `${platform}.${Date.now()}`;
@@ -214,4 +216,68 @@ async function facebookPublishReel(supabase, { videoUrl, caption, log = console.
   return { videoId, permalink: `https://www.facebook.com/reel/${videoId}`, pending: true };
 }
 
-module.exports = { tiktokAuthUrl, tiktokConnect, tiktokSendDraft, metaAuthUrl, metaConnect, instagramPublishReel, facebookPublishReel, checkState, stateProblem, getAccount, REDIRECT };
+// ---------------- YouTube (Shorts) ----------------
+// YouTube Data API v3, OAuth de Google (scope youtube.upload). Subida "resumable" del MP4 del
+// final. status.containsSyntheticMedia = true marca el video como contenido alterado/sintético
+// (la etiqueta de IA de YouTube) — esto SÍ se puede por API.
+// OJO: mientras el proyecto de Google Cloud no pase la auditoría de YouTube, todo video subido
+// por API queda PRIVADO (regla de Google para proyectos sin verificar). Se cambia a Público en
+// YouTube Studio con un toque. Docs: developers.google.com/youtube/v3/docs/videos/insert
+// Llaves: YOUTUBE_CLIENT_ID, YOUTUBE_CLIENT_SECRET.
+const YT_SCOPES = 'https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly';
+function youtubeAuthUrl() {
+  const q = new URLSearchParams({ client_id: need('YOUTUBE_CLIENT_ID'), redirect_uri: REDIRECT('youtube'), response_type: 'code', scope: YT_SCOPES, access_type: 'offline', prompt: 'consent', include_granted_scopes: 'true', state: makeState('youtube') });
+  return `https://accounts.google.com/o/oauth2/v2/auth?${q}`;
+}
+async function googleToken(params) {
+  const { res, body } = await jsonFetch('https://oauth2.googleapis.com/token', {
+    method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams(Object.assign({ client_id: need('YOUTUBE_CLIENT_ID'), client_secret: need('YOUTUBE_CLIENT_SECRET') }, params))
+  });
+  if (!res.ok || !body.access_token) throw new Error('Google no dio el token: ' + JSON.stringify(body).slice(0, 300));
+  return body;
+}
+async function youtubeConnect(supabase, code) {
+  const t = await googleToken({ code, grant_type: 'authorization_code', redirect_uri: REDIRECT('youtube') });
+  if (!t.refresh_token) throw new Error('Google no dio refresh_token. Quita el acceso de VYRALES en myaccount.google.com/permissions y vuelve a conectar.');
+  const ch = await jsonFetch('https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true', { headers: { Authorization: `Bearer ${t.access_token}` } });
+  const c = ch.body && ch.body.items && ch.body.items[0];
+  if (!c) throw new Error('Esa cuenta de Google no tiene canal de YouTube (o elegiste otra cuenta/marca). Vuelve a conectar y elige el canal de VYRALES.');
+  await saveAccount(supabase, {
+    platform: 'youtube', account_id: c.id, account_name: c.snippet.title, access_token: t.access_token, refresh_token: t.refresh_token,
+    expires_at: new Date(Date.now() + (t.expires_in || 3600) * 1000).toISOString(), scopes: t.scope || YT_SCOPES
+  });
+  return c.snippet.title;
+}
+async function youtubeAccessToken(supabase) {
+  const acc = await getAccount(supabase, 'youtube');
+  if (!acc) throw new Error('YouTube no está conectado. Dale "Conectar YouTube".');
+  if (acc.expires_at && new Date(acc.expires_at).getTime() - Date.now() > 5 * 60000) return acc.access_token;
+  let t;
+  try { t = await googleToken({ grant_type: 'refresh_token', refresh_token: acc.refresh_token }); }
+  catch (err) { throw new Error('El permiso de YouTube venció (' + err.message.slice(0, 120) + '). Si la app de Google está en modo "Testing" caduca a los 7 días: ponla "In production" y vuelve a conectar.'); }
+  await saveAccount(supabase, Object.assign({}, acc, { access_token: t.access_token, expires_at: new Date(Date.now() + (t.expires_in || 3600) * 1000).toISOString() }));
+  return t.access_token;
+}
+// privacy: 'public' | 'unlisted' | 'private'. YouTube puede forzar 'private' (proyecto sin auditar).
+async function youtubeUpload(supabase, { videoBuffer, title, description, tags = [], privacy = 'public', log = console.log }) {
+  const token = await youtubeAccessToken(supabase);
+  const meta = {
+    snippet: { title: String(title || 'VYRALES').slice(0, 100), description: String(description || '').slice(0, 4900), tags: tags.map((t) => String(t).replace(/^#/, '')).slice(0, 15), categoryId: '27', defaultLanguage: 'es', defaultAudioLanguage: 'es' },
+    status: { privacyStatus: privacy, selfDeclaredMadeForKids: false, containsSyntheticMedia: true, embeddable: true }
+  };
+  const init = await fetch('https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json; charset=UTF-8', 'X-Upload-Content-Type': 'video/mp4', 'X-Upload-Content-Length': String(videoBuffer.length) },
+    body: JSON.stringify(meta)
+  });
+  if (!init.ok) throw new Error('YouTube rechazó el inicio de la subida (HTTP ' + init.status + '): ' + (await init.text()).slice(0, 300));
+  const uploadUrl = init.headers.get('location');
+  log('[youtube] subiendo', (videoBuffer.length / 1048576).toFixed(1), 'MB...');
+  const up = await jsonFetch(uploadUrl, { method: 'PUT', headers: { 'Content-Type': 'video/mp4', 'Content-Length': String(videoBuffer.length) }, body: videoBuffer });
+  if (!up.res.ok || !up.body.id) throw new Error('YouTube rechazó el archivo (HTTP ' + up.res.status + '): ' + JSON.stringify(up.body.error || up.body).slice(0, 300));
+  const got = up.body.status || {};
+  return { videoId: up.body.id, url: `https://youtube.com/shorts/${up.body.id}`, privacy: got.privacyStatus || privacy, forcedPrivate: privacy !== 'private' && got.privacyStatus === 'private' };
+}
+
+module.exports = { tiktokAuthUrl, tiktokConnect, tiktokSendDraft, metaAuthUrl, metaConnect, instagramPublishReel, facebookPublishReel, youtubeAuthUrl, youtubeConnect, youtubeUpload, checkState, stateProblem, getAccount, REDIRECT };

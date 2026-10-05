@@ -10,7 +10,7 @@ exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') return json(405, { error: 'Method not allowed' });
   try {
     const { platform } = JSON.parse(event.body || '{}');
-    if (!['tiktok', 'instagram', 'facebook', 'meta'].includes(platform)) return json(400, { error: 'Plataforma no válida.' });
+    if (!['tiktok', 'instagram', 'facebook', 'meta', 'youtube'].includes(platform)) return json(400, { error: 'Plataforma no válida.' });
     const { error } = await getSupabaseClient().from('social_accounts').delete().in('platform', platform === 'meta' ? ['facebook', 'instagram'] : [platform]);
     if (error) throw error;
     return json(200, { ok: true });

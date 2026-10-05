@@ -19,7 +19,7 @@
     <!-- Chart.js for Telemetry Analytics -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-    <script>window.NET = { tiktok: 'TikTok', instagram: 'Instagram', facebook: 'Facebook', meta: 'Facebook + Instagram' };</script>
+    <script>window.NET = { tiktok: 'TikTok', instagram: 'Instagram', facebook: 'Facebook', meta: 'Facebook + Instagram', youtube: 'YouTube' };</script>
     <script>
         tailwind.config = {
             darkMode: 'class',
@@ -138,7 +138,7 @@
                     <div class="flex items-center gap-2">
                         <h1 class="font-display font-bold text-xl tracking-wider text-white">VYRALES</h1>
                         <span class="text-xs font-mono bg-cyber-violet/30 text-cyber-cyan border border-cyber-cyan/30 px-2 py-0.5 rounded-full font-semibold">v3.1 ORCHESTRATOR</span>
-                        <button type="button" onclick="openSocialModal()" class="text-[10px] font-mono px-2 py-0.5 rounded-full border border-cyber-pink/50 text-cyber-pink hover:bg-cyber-pink/10 ml-1" title="Conectar TikTok / Facebook / Instagram"><i class="fa-solid fa-share-nodes mr-1"></i>Redes</button>
+                        <button type="button" onclick="openSocialModal()" class="text-[10px] font-mono px-2 py-0.5 rounded-full border border-cyber-pink/50 text-cyber-pink hover:bg-cyber-pink/10 ml-1" title="Conectar TikTok / Facebook / Instagram / YouTube"><i class="fa-solid fa-share-nodes mr-1"></i>Redes</button>
                         <a href="/.netlify/functions/login?logout=1" class="text-[10px] font-mono text-slate-500 hover:text-cyber-pink ml-1" title="Cerrar sesión"><i class="fa-solid fa-right-from-bracket mr-1"></i>Salir</a>
                     </div>
                     <p class="text-xs text-slate-400 font-mono">Arquitectura de Automatización de Microdramas con IA</p>
@@ -765,16 +765,17 @@
         const runs = vr.social_runs || {};
         const apiRow = (key, label) => {
           const acc = (soc.accounts || {})[key];
-          const connectKey = key === 'tiktok' ? 'tiktok' : 'meta';
+          const connectKey = (key === 'instagram' || key === 'facebook') ? 'meta' : key;
           const run = runs[key];
           const busy = run && run.status === 'running' && Date.now() - new Date(run.at).getTime() < 10 * 60000;
           if (soc.table_missing) return '<p class="text-[10px] text-cyber-gold">Falta crear la tabla de cuentas (migración 006).</p>';
           if (!(soc.keys || {})[key]) return '<p class="text-[10px] text-slate-500">' + label + ': faltan las llaves de la app en el .env / Netlify.</p>';
           if (!acc || acc.old) return '<button onclick="connectSocial(\'' + connectKey + '\')" class="text-[10px] font-mono px-2 py-0.5 rounded border border-cyber-violet/50 text-cyber-violet hover:bg-cyber-violet/10"><i class="fa-solid fa-link mr-1"></i>' + (acc ? 'Reconectar ' : 'Conectar ') + NET[connectKey] + '</button>';
           return '<div class="flex flex-wrap items-center gap-2 text-[10px] font-mono"><span class="text-cyber-emerald">● ' + esc(acc.name || label) + '</span>' +
-            (busy ? '<span class="text-cyber-pink"><i class="fa-solid fa-spinner fa-spin mr-1"></i>' + (key === 'tiktok' ? 'Enviando a TikTok...' : 'Publicando en ' + NET[key] + '... (1-5 min)') + '</span>'
-              : '<button onclick="socialPublish(\'' + e.id + '\', \'' + key + '\')" class="px-2 py-0.5 rounded border border-cyber-pink/50 text-cyber-pink hover:bg-cyber-pink/10"><i class="fa-solid fa-paper-plane mr-1"></i>' + (key === 'tiktok' ? 'Enviar a TikTok (borrador)' : 'Publicar Reel en ' + NET[key] + ' ahora') + '</button>') +
+            (busy ? '<span class="text-cyber-pink"><i class="fa-solid fa-spinner fa-spin mr-1"></i>' + (key === 'tiktok' ? 'Enviando a TikTok...' : (key === 'youtube' ? 'Subiendo a YouTube...' : 'Publicando en ' + NET[key] + '...') + ' (1-5 min)') + '</span>'
+              : '<button onclick="socialPublish(\'' + e.id + '\', \'' + key + '\')" class="px-2 py-0.5 rounded border border-cyber-pink/50 text-cyber-pink hover:bg-cyber-pink/10"><i class="fa-solid fa-paper-plane mr-1"></i>' + (key === 'tiktok' ? 'Enviar a TikTok (borrador)' : key === 'youtube' ? 'Subir Short a YouTube' : 'Publicar Reel en ' + NET[key] + ' ahora') + '</button>') +
             (run && run.status === 'error' ? '<span class="text-cyber-pink">Error: ' + esc(run.error || '') + '</span>' : '') +
+            (run && run.status === 'uploaded_private' ? '<span class="text-cyber-gold">Subido como PRIVADO (YouTube obliga hasta que el proyecto pase la auditoría). <a href="https://studio.youtube.com/video/' + esc(run.video_id || '') + '/edit" target="_blank" class="underline">Abrir en YouTube Studio</a> → Visibilidad → Público.</span>' : '') +
             (run && run.status === 'draft_sent' ? '<span class="text-cyber-gold">Borrador enviado: abre la notificación en TikTok, activa “Contenido generado por IA” y publica.</span>' : '') +
             (run && run.status === 'published' && run.url ? '<a href="' + esc(run.url) + '" target="_blank" class="text-cyber-emerald underline">ver Reel</a>' : '') +
           '</div>';
@@ -793,8 +794,8 @@
         };
         const dl = (url, name) => url + (url.includes('?') ? '&' : '?') + 'download=' + encodeURIComponent(name);
         const vname = 'EP' + e.episode_number + '_' + (e.title || 'episodio').replace(/[^\w]+/g, '_').slice(0, 40) + '.mp4';
-        return '<details class="mt-2 border border-cyber-pink/40 rounded-lg"' + (pk ? ' open' : '') + '><summary class="cursor-pointer list-none p-2 text-xs font-mono text-cyber-pink"><i class="fa-solid fa-bullhorn mr-1"></i>PUBLICAR · TikTok + Instagram + Facebook' +
-            (pub.tiktok || pub.instagram || pub.facebook ? ' · <span class="text-cyber-emerald">' + ['tiktok', 'instagram', 'facebook'].filter(k => pub[k]).join(' + ') + ' ✓</span>' : '') + '</summary>' +
+        return '<details class="mt-2 border border-cyber-pink/40 rounded-lg"' + (pk ? ' open' : '') + '><summary class="cursor-pointer list-none p-2 text-xs font-mono text-cyber-pink"><i class="fa-solid fa-bullhorn mr-1"></i>PUBLICAR · TikTok + Instagram + Facebook + YouTube' +
+            (pub.tiktok || pub.instagram || pub.facebook || pub.youtube ? ' · <span class="text-cyber-emerald">' + ['tiktok', 'instagram', 'facebook', 'youtube'].filter(k => pub[k]).join(' + ') + ' ✓</span>' : '') + '</summary>' +
           '<div class="p-2 pt-0 space-y-2">' +
             '<div class="flex flex-wrap gap-2 items-center">' +
               '<a href="' + esc(dl(final.storage_path, vname)) + '" class="text-[11px] font-mono px-2 py-1 rounded border border-cyber-gold/50 text-cyber-gold hover:bg-cyber-gold/10"><i class="fa-solid fa-download mr-1"></i>Descargar video final</a>' +
@@ -808,7 +809,7 @@
             (pk && pk.status === 'done'
               ? '<div class="grid grid-cols-1 sm:grid-cols-[110px_1fr] gap-2">' +
                   (pk.cover_url ? '<div><img src="' + esc(pk.cover_url) + '" class="w-[110px] rounded border border-cyber-border"><a href="' + esc(dl(pk.cover_url, 'portada_EP' + e.episode_number + '.jpg')) + '" class="block text-[10px] font-mono text-cyber-gold mt-1"><i class="fa-solid fa-download mr-1"></i>Portada</a></div>' : '<div></div>') +
-                  '<div class="space-y-2">' + box('DESCRIPCIÓN TIKTOK', pk.tiktok) + box('DESCRIPCIÓN INSTAGRAM', pk.instagram) + box('COMENTARIO PARA FIJAR (en todas)', pk.pinned_comment) + '</div>' +
+                  '<div class="space-y-2">' + box('DESCRIPCIÓN TIKTOK', pk.tiktok) + box('DESCRIPCIÓN INSTAGRAM / FACEBOOK', pk.instagram) + (pk.youtube_title ? box('TÍTULO YOUTUBE', pk.youtube_title) + box('DESCRIPCIÓN YOUTUBE', pk.youtube) : '') + box('COMENTARIO PARA FIJAR (en todas)', pk.pinned_comment) + '</div>' +
                 '</div>' +
                 '<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2">' +
                   platform('tiktok', 'TIKTOK', [
@@ -831,6 +832,13 @@
                     'Portada: <b>Editar → Miniatura → Subir</b> la portada descargada.',
                     '<b>Obligatorio:</b> activa <b>“AI label / Etiqueta de IA”</b> (botón junto a «Público»).',
                     'Publica y fija el comentario.'
+                  ]) +
+                  platform('youtube', 'YOUTUBE SHORTS', [
+                    'YouTube app → <b>+</b> → <b>Crear un Short</b> → sube el video.',
+                    'Título: <b>' + esc(pk.youtube_title || pk.cover_text || '') + '</b>.',
+                    'Descripción: pega la <b>descripción YouTube</b>' + (pk.youtube_title ? '' : ' (o la de Instagram + #Shorts)') + '.',
+                    '<b>Obligatorio:</b> Más opciones → <b>Contenido alterado → Sí</b> (etiqueta de IA). Por API se marca solo.',
+                    'Público para audiencia: <b>No es para niños</b>. Fija el comentario.'
                   ]) +
                 '</div>' +
                 '<p class="text-[10px] text-slate-500">Publica los episodios en orden y con un ritmo fijo (por ejemplo, uno por día a la misma hora). Después mira la retención en las estadísticas: el % que sigue a los 3 s y al final.</p>'
@@ -903,7 +911,7 @@
         m.innerHTML = '<div class="bg-cyber-darker border border-cyber-border rounded-xl p-5 w-full max-w-md">' +
           '<div class="flex justify-between items-center mb-1"><h3 class="text-white font-display font-bold">Redes conectadas</h3><button onclick="document.getElementById(\'socialModal\').remove()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button></div>' +
           '<p class="text-[11px] text-slate-500 mb-2">Conecta tu cuenta una vez; después publicas desde el panel PUBLICAR de cada episodio.</p>' +
-          row('tiktok', 'TikTok', 'fa-brands fa-tiktok') + row('meta', 'Facebook + Instagram', 'fa-brands fa-meta') +
+          row('tiktok', 'TikTok', 'fa-brands fa-tiktok') + row('meta', 'Facebook + Instagram', 'fa-brands fa-meta') + row('youtube', 'YouTube', 'fa-brands fa-youtube') +
           '<p class="text-[10px] text-slate-500 mt-2">Meta: una sola conexión da tu <b>Página</b> de Facebook y el Instagram profesional vinculado a ella. En la pantalla de permisos marca la Página de VYRALES y su Instagram.</p>' +
           '<p class="text-[10px] text-slate-500 mt-3">Al conectar vas a la página de la red; cuando diga “conectado”, vuelves al panel con el botón. Si no lo ves aquí, dale <button onclick="openSocialModal()" class="underline text-cyber-cyan">actualizar</button>.</p></div>';
       };
@@ -938,7 +946,9 @@
       };
       window.socialPublish = async function(epId, platform) {
         const ep = (lastLoadedData.episodes || []).find(x => x.id === epId);
-        const msg = platform === 'tiktok'
+        const msg = platform === 'youtube'
+          ? 'Subir el EP ' + ep.episode_number + ' a YouTube como Short, con título, descripción y la etiqueta «Contenido alterado (IA)» ya marcada.\n\nMientras tu proyecto de Google no pase la auditoría de YouTube, el video queda PRIVADO y lo pasas a Público en YouTube Studio. ¿Subir?'
+          : platform === 'tiktok'
           ? 'Enviar el EP ' + ep.episode_number + ' a TikTok como BORRADOR.\n\nTe llega una notificación en la app: ahí pegas la descripción, activas “Contenido generado por IA” y publicas. ¿Enviar?'
           : 'PUBLICAR el EP ' + ep.episode_number + ' en ' + NET[platform] + ' como Reel AHORA (público), con la descripción' + (platform === 'instagram' ? ', la portada' : '') + ' y el aviso de IA en el texto.\n\nLa API de Meta NO activa la etiqueta oficial de IA: después ábrelo en la app y actívala si quieres.\nNo se puede deshacer desde aquí (se borra desde la app). ¿Publicar?';
         if (!await askConfirm(msg)) return;
@@ -1265,9 +1275,10 @@
               '<div class="space-y-3">' +
                 '<div class="grid grid-cols-1 lg:grid-cols-2 gap-3">' + block('DESCRIPCIÓN TIKTOK', pk.tiktok) + block('DESCRIPCIÓN INSTAGRAM / FACEBOOK', pk.instagram) + '</div>' +
                 '<div class="grid grid-cols-1 lg:grid-cols-2 gap-3">' + block('COMENTARIO PARA FIJAR (en todas)', pk.pinned_comment) + block('TEXTO DE PORTADA', pk.cover_text) + '</div>' +
+                '<div class="grid grid-cols-1 lg:grid-cols-2 gap-3">' + block('TÍTULO YOUTUBE', pk.youtube_title) + block('DESCRIPCIÓN YOUTUBE', pk.youtube) + '</div>' +
               '</div>' +
             '</div>' +
-            '<p class="text-[11px] font-mono text-cyber-gold">Recuerda: activa la etiqueta de IA en la app (TikTok: Más opciones → “Contenido generado por IA”; Instagram: Configuración avanzada; Facebook: «AI label» junto a «Público»).</p>';
+            '<p class="text-[11px] font-mono text-cyber-gold">Recuerda: activa la etiqueta de IA en la app (TikTok: Más opciones → “Contenido generado por IA”; Instagram: Configuración avanzada; Facebook: «AI label» junto a «Público»; YouTube: «Contenido alterado → Sí»).</p>';
       }
 
       function renderFinalRenderPanel(episode) {
@@ -2274,11 +2285,11 @@
             // Paso 6 real: episodios con video final, cuántos publicados por red y cuentas conectadas.
             const withFinal = eps.filter(e => (e.assets || []).some(a => a.kind === 'final_render'));
             const pubOf = (k) => eps.filter(e => ((e.validator_report || {}).published || {})[k]).length;
-            const tt = pubOf('tiktok'), ig = pubOf('instagram'), fb = pubOf('facebook');
+            const tt = pubOf('tiktok'), ig = pubOf('instagram'), fb = pubOf('facebook'), yt = pubOf('youtube');
             const soc = window.__social || {};
-            const conn = ['tiktok', 'instagram', 'facebook'].filter(k => (soc.accounts || {})[k] && !(soc.accounts || {})[k].old).map(k => NET[k]);
-            const detail = 'TikTok ' + tt + ' · Instagram ' + ig + ' · Facebook ' + fb + ' publicados · ' + (conn.length ? 'conectado: ' + conn.join(' + ') : 'sin cuentas conectadas (a mano)');
-            const state = !withFinal.length ? 'todo' : (tt + ig ? (tt >= withFinal.length && ig >= withFinal.length ? 'ok' : 'work') : 'work');
+            const conn = ['tiktok', 'instagram', 'facebook', 'youtube'].filter(k => (soc.accounts || {})[k] && !(soc.accounts || {})[k].old).map(k => NET[k]);
+            const detail = 'TikTok ' + tt + ' · Instagram ' + ig + ' · Facebook ' + fb + ' · YouTube ' + yt + ' publicados · ' + (conn.length ? 'conectado: ' + conn.join(' + ') : 'sin cuentas conectadas (a mano)');
+            const state = !withFinal.length ? 'todo' : (tt + ig + fb + yt ? (tt >= withFinal.length && ig >= withFinal.length ? 'ok' : 'work') : 'work');
             return step(6, 'fa-share-nodes', 'Publicación', withFinal.length + ' listo' + (withFinal.length === 1 ? '' : 's'), detail, state, 'arcSection');
           })()
         ].join('');

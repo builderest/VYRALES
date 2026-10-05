@@ -96,6 +96,8 @@ function render() {
     '</div></div></div>' +
     block('DESCRIPCIÓN TIKTOK', pk.tiktok) +
     block('DESCRIPCIÓN INSTAGRAM / FACEBOOK', pk.instagram) +
+    block('TÍTULO YOUTUBE', pk.youtube_title) +
+    block('DESCRIPCIÓN YOUTUBE', pk.youtube) +
     block('COMENTARIO PARA FIJAR (en todas)', pk.pinned_comment) +
     block('TEXTO DE PORTADA', pk.cover_text) +
     '<div class="card"><h2>ANTES DE PUBLICAR</h2><ol>' +
@@ -104,6 +106,7 @@ function render() {
       '<li class="warn">TikTok: Más opciones → activa “Contenido generado por IA”.</li>' +
       '<li class="warn">Instagram: Configuración avanzada → activa la etiqueta de IA.</li>' +
       '<li class="warn">Facebook (Página): botón «AI label» junto a «Público» → activado.</li>' +
+      '<li class="warn">YouTube: Más opciones → «Contenido alterado» → Sí.</li>' +
       '<li>Publica y fija el comentario.</li>' +
     '</ol></div>';
 }

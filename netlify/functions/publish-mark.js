@@ -1,4 +1,4 @@
-// POST /.netlify/functions/publish-mark  { episode_id, platform: 'tiktok'|'instagram'|'facebook', url?, unmark? }
+// POST /.netlify/functions/publish-mark  { episode_id, platform: 'tiktok'|'instagram'|'facebook'|'youtube', url?, unmark? }
 // Registra que el episodio se publicó en una red (para llevar la cuenta en el dashboard).
 const { getSupabaseClient } = require('./_supabase');
 const json = (statusCode, body) => ({ statusCode, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -10,9 +10,9 @@ exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') return json(405, { error: 'Method not allowed' });
   try {
     const b = JSON.parse(event.body || '{}');
-    if (!['tiktok', 'instagram', 'facebook'].includes(b.platform)) return json(400, { error: 'Plataforma no válida.' });
+    if (!['tiktok', 'instagram', 'facebook', 'youtube'].includes(b.platform)) return json(400, { error: 'Plataforma no válida.' });
     const url = String(b.url || '').trim();
-    if (url && !/^https:\/\/(www\.)?(tiktok\.com|vm\.tiktok\.com|instagram\.com|facebook\.com|m\.facebook\.com|fb\.watch)\//.test(url)) return json(400, { error: 'El enlace no parece de TikTok, Instagram o Facebook.' });
+    if (url && !/^https:\/\/(www\.)?(tiktok\.com|vm\.tiktok\.com|instagram\.com|facebook\.com|m\.facebook\.com|fb\.watch|youtube\.com|m\.youtube\.com|youtu\.be)\//.test(url)) return json(400, { error: 'El enlace no parece de TikTok, Instagram, Facebook o YouTube.' });
     const supabase = getSupabaseClient();
     const { data: ep, error } = await supabase.from('episodes').select('id, validator_report, published_at').eq('id', b.episode_id || '').single();
     if (error || !ep) return json(404, { error: 'Episodio no encontrado.' });

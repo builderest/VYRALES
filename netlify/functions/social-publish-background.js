@@ -1,10 +1,12 @@
-// POST /.netlify/functions/social-publish-background  { episode_id, platform: 'tiktok'|'instagram'|'facebook' }
+// POST /.netlify/functions/social-publish-background  { episode_id, platform: 'tiktok'|'instagram'|'facebook'|'youtube' }
 //   tiktok    → envía el video final como BORRADOR a la bandeja de TikTok (el usuario termina en la app)
 //   instagram → publica el Reel con la descripción, la portada y el aviso de IA del paquete
 //   facebook  → publica el Reel en tu Página de Facebook (misma descripción que Instagram)
+//   youtube   → sube el Short (título + descripción + etiqueta de IA por API; privado si el proyecto no está auditado)
 // Resultado en episodes.validator_report.social_runs[platform] { status, at, error?, url? }.
 const { getSupabaseClient } = require('./_supabase');
-const { tiktokSendDraft, instagramPublishReel, facebookPublishReel } = require('./_social');
+const { tiktokSendDraft, instagramPublishReel, facebookPublishReel, youtubeUpload } = require('./_social');
+const { youtubeTitle } = require('./_publish');
 
 const LOG = '[social]';
 
@@ -29,7 +31,7 @@ exports.handler = async (event) => {
     await supabase.from('episodes').update(upd).eq('id', epId);
   };
   try {
-    if (!['tiktok', 'instagram', 'facebook'].includes(platform)) throw new Error('Plataforma no válida.');
+    if (!['tiktok', 'instagram', 'facebook', 'youtube'].includes(platform)) throw new Error('Plataforma no válida.');
     const { data: ep, error } = await supabase.from('episodes').select('id, episode_number, validator_report, assets(kind, storage_path)').eq('id', epId || '').single();
     if (error || !ep) throw error || new Error('Episodio no encontrado.');
     const final = (ep.assets || []).find((a) => a.kind === 'final_render' && a.storage_path);
@@ -43,6 +45,15 @@ exports.handler = async (event) => {
       const r = await tiktokSendDraft(supabase, { videoBuffer: Buffer.from(await res.arrayBuffer()), log: (...a) => console.log(LOG, ...a) });
       await save({ status: 'draft_sent', publish_id: r.publishId, tiktok_status: r.status });
       console.log(LOG, 'TikTok: borrador enviado ✅', r.status);
+    } else if (platform === 'youtube') {
+      const res = await fetch(final.storage_path);
+      if (!res.ok) throw new Error('No se pudo bajar el video final (HTTP ' + res.status + ').');
+      const title = pk.youtube_title || youtubeTitle(pk.cover_text, pk.part || ('Parte ' + ep.episode_number));
+      const description = pk.youtube || [pk.instagram, '#Shorts'].join('\n');
+      const r = await youtubeUpload(supabase, { videoBuffer: Buffer.from(await res.arrayBuffer()), title, description, tags: pk.hashtags || [], privacy: body.privacy || 'public', log: (...a) => console.log(LOG, ...a) });
+      if (r.privacy === 'private') await save({ status: 'uploaded_private', url: r.url, video_id: r.videoId, forced: r.forcedPrivate });
+      else await save({ status: 'published', url: r.url, video_id: r.videoId, privacy: r.privacy }, { url: r.url, via: 'api' });
+      console.log(LOG, 'YouTube: subido ✅', r.url, r.privacy);
     } else if (platform === 'facebook') {
       const r = await facebookPublishReel(supabase, { videoUrl: final.storage_path, caption: pk.facebook || pk.instagram, log: (...a) => console.log(LOG, ...a) });
       await save({ status: 'published', url: r.permalink, video_id: r.videoId, pending: !!r.pending }, { url: r.permalink, via: 'api' });

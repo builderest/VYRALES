@@ -38,3 +38,7 @@
   from = "/auth/meta/callback"
   to = "/.netlify/functions/oauth-meta-callback"
   status = 200
+[[redirects]]
+  from = "/auth/youtube/callback"
+  to = "/.netlify/functions/oauth-youtube-callback"
+  status = 200
