@@ -52,8 +52,8 @@
         "ambient": "a silent corridor with a faint air-conditioning hum"
       },
       "mateo_office": {
-        "visual": "Mateo's executive office at night: minimalist dark wood and glass, the city skyline behind a large desk, and a wall of security monitors glowing blue",
-        "ambient": "a quiet office at night with a soft electronic hum from the monitors"
+        "visual": "Mateo's executive office: minimalist dark wood and glass, the city skyline behind a large desk, and a wall of security monitors glowing blue",
+        "ambient": "a quiet office with a soft electronic hum from the monitors"
       },
       "lawyer_office": {
         "visual": "a classic law office with a walnut desk, leather chairs and tall bookshelves",
@@ -422,7 +422,7 @@
           ],
           "camera": "Slow push-in on Mateo's face",
           "scene_es": "En su oficina, Mateo ve la escena en el monitor de seguridad y toma una decisión.",
-          "start_en": "Mateo sits at his glass desk in his office, holding a phone to his ear with one hand, a security monitor on the wall behind him to the right showing a blurry figure being escorted out",
+          "start_en": "Mateo's office in warm afternoon daylight from the windows behind him: Mateo sits at his glass desk, holding a phone to his ear with one hand, a security monitor on the wall behind him to the right showing a blurry figure being escorted out",
           "action_en": "Mateo glances over his shoulder at the security monitor, a slow intrigued smile forming, and speaks into the phone",
           "dialogue": {
             "speaker": "Mateo",
