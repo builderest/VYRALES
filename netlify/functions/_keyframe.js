@@ -59,7 +59,9 @@ function buildKeyframePrompt(shot, characterRows, storyBible, hasLocationRef) {
   if (loc) {
     parts.push(`Setting: ${loc.visual.replace(/\.?$/, '.')}` + (hasLocationRef ? ' ' + SET_REF_SENTENCE : ''));
   }
-  parts.push(`Moment: the instant this action begins, before anyone speaks — ${String(shot.action_en || '').replace(/\.?$/, '.')}`);
+  parts.push(shot.start_en && shot.start_en.trim()
+    ? `Moment (this exact frame, before anyone speaks): ${shot.start_en.trim().replace(/\.?$/, '.')}`
+    : `Moment: the instant this action begins, before anyone speaks — ${String(shot.action_en || '').replace(/\.?$/, '.')}`);
   parts.push('Natural anatomy and natural hands, expressive faces, cinematic composition.');
   // Una sola imagen continua: con "close-up" + 2 personajes Gemini llegó a armar un collage de
   // 3 paneles (EP1 T10), que Veo no puede animar como una sola toma.

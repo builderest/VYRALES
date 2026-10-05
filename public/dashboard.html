@@ -1170,7 +1170,7 @@
       window.deleteSeries = async function() {
         const series = lastLoadedData && lastLoadedData.series;
         if (!series) return;
-        const typed = prompt(
+        const typed = await askText(
           'ELIMINAR "' + series.title + '" PARA SIEMPRE.\n\n' +
           'Se borran todos sus episodios, personajes, fotos, tomas y videos (también los archivos en Supabase). No se puede deshacer.\n\n' +
           'Para confirmar, escribe exactamente: ' + series.slug
@@ -2123,20 +2123,36 @@
 
       // Confirmación propia (modal en la página). El confirm() del navegador puede quedar
       // bloqueado en silencio ("no permitir más diálogos") y entonces el botón "no hace nada".
-      window.askConfirm = function(message) {
+      // opts: { input: true } → devuelve el texto escrito (o null si cancela);
+      //       { notice: true } → solo aviso con botón "Entendido".
+      function openDialog(message, opts) {
+        const o = opts || {};
         return new Promise(resolve => {
           const m = document.getElementById('confirmModal');
+          const input = document.getElementById('cfInput');
+          const cancel = document.getElementById('cfCancel');
+          const okBtn = document.getElementById('cfOk');
           document.getElementById('cfText').textContent = message;
+          input.classList.toggle('hidden', !o.input);
+          input.value = '';
+          cancel.classList.toggle('hidden', !!o.notice);
+          okBtn.textContent = o.notice ? 'Entendido' : (o.input ? 'Confirmar' : 'Sí, continuar');
           const done = v => { m.classList.add('hidden'); document.removeEventListener('keydown', onKey); resolve(v); };
-          const onKey = e => { if (e.key === 'Escape') done(false); };
-          document.getElementById('cfOk').onclick = () => done(true);
-          document.getElementById('cfCancel').onclick = () => done(false);
-          m.onclick = e => { if (e.target === m) done(false); };
+          const ok = () => done(o.input ? input.value : true);
+          const no = () => done(o.input ? null : !!o.notice);
+          const onKey = e => { if (e.key === 'Escape') no(); if (e.key === 'Enter' && o.input) ok(); };
+          okBtn.onclick = ok;
+          cancel.onclick = no;
+          m.onclick = e => { if (e.target === m) no(); };
           document.addEventListener('keydown', onKey);
           m.classList.remove('hidden');
-          document.getElementById('cfOk').focus();
+          (o.input ? input : okBtn).focus();
         });
-      };
+      }
+      window.askConfirm = (message) => openDialog(message);
+      window.askText = (message) => openDialog(message, { input: true });
+      // Los alert() del navegador también se pueden bloquear en silencio: se muestran en el modal.
+      window.alert = (message) => { openDialog(String(message), { notice: true }); };
 
       async function loadDashboard() {
         const banner = document.getElementById('dataStatusBanner');
@@ -2350,6 +2366,7 @@
       <div class="w-full max-w-lg bg-cyber-darker border border-cyber-cyan/50 rounded-xl p-5 shadow-2xl">
         <h4 class="font-display font-bold text-white mb-3"><i class="fa-solid fa-circle-question text-cyber-cyan mr-2"></i>Confirmar</h4>
         <p id="cfText" class="text-sm text-slate-300 whitespace-pre-line"></p>
+        <input id="cfInput" type="text" autocomplete="off" spellcheck="false" class="hidden mt-3 w-full bg-black/40 border border-cyber-border rounded-lg px-3 py-2 text-sm font-mono text-white focus:border-cyber-cyan outline-none">
         <div class="flex justify-end gap-2 mt-5">
           <button id="cfCancel" class="px-4 py-1.5 rounded-lg bg-slate-800 text-slate-300 text-xs font-mono hover:bg-slate-700">Cancelar</button>
           <button id="cfOk" class="px-4 py-1.5 rounded-lg bg-cyber-cyan/20 border border-cyber-cyan/60 text-cyber-cyan text-xs font-mono hover:bg-cyber-cyan/30">Sí, continuar</button>

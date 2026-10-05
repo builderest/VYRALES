@@ -158,11 +158,18 @@ function validateSeries(data) {
       req(s.camera && s.camera.trim(), `${st}: falta camera (encuadre y movimiento).`);
       req(s.action_en && s.action_en.trim(), `${st}: falta action_en (lo que pasa de 0 a 6 s).`);
       req(s.reaction_en && s.reaction_en.trim(), `${st}: falta reaction_en (reacción quieta de 6 a 8 s, para que el corte sea limpio).`);
+      // start_en = el cuadro inicial exacto (pose, a dónde mira cada uno, qué tiene en las manos).
+      // Lo comparten la imagen y el video: sin él, el video re-actúa cosas que el cuadro ya
+      // mostró (EP1 T1: volvió al horno y le habló a la cámara). Obligatorio desde formato 3.
+      if (rules.keyframes) {
+        if ((data.format_version || 1) >= 3) req(s.start_en && s.start_en.trim(), `${st}: falta start_en (el cuadro inicial exacto: pose, mirada y qué tiene cada uno en las manos).`);
+        else if (!(s.start_en && s.start_en.trim())) warnings.push(`${st}: sin start_en (cuadro inicial); el video puede repetir una acción que el cuadro ya muestra.`);
+      }
 
-      ['camera', 'action_en', 'reaction_en', 'sfx'].forEach((f) => {
+      ['camera', 'start_en', 'action_en', 'reaction_en', 'sfx'].forEach((f) => {
         if (s[f] && /"/.test(s[f])) errors.push(`${st}: ${f} tiene comillas dobles (rompen el prompt).`);
       });
-      const englishText = [s.camera, s.action_en, s.reaction_en, s.sfx].filter(Boolean).join(' ');
+      const englishText = [s.camera, s.start_en, s.action_en, s.reaction_en, s.sfx].filter(Boolean).join(' ');
       RISK_PATTERNS.forEach(([re, why]) => {
         if (re.test(englishText)) warnings.push(`${st}: riesgo visual — ${why}.`);
       });
@@ -230,6 +237,7 @@ function toEpisodeRows(data) {
         characters: s.characters.map((k) => byKey[k].name),
         wardrobe,
         camera: s.camera || '',
+        start_en: s.start_en || '',
         action_en: s.action_en || s.visual_en || '',
         reaction_en: s.reaction_en || '',
         sfx: s.sfx || '',
@@ -335,11 +343,15 @@ function buildShotPrompt(shot, characterRows, storyBible) {
   // Valentina le habló a la cámara en vez de a la foto).
   if (isV2) {
     const keyframes = !!(sb.rules && sb.rules.keyframes);
-    if (keyframes) parts.push('The video begins exactly on the provided first frame, keeping the same composition, set and outfits, and continues naturally from that pose.');
+    if (keyframes) {
+      parts.push(shot.start_en && shot.start_en.trim()
+        ? `The video begins exactly on the provided first frame: ${shot.start_en.trim().replace(/\.?$/, '.')} Everything continues naturally from that exact pose, with the same composition, set, props and outfits; nothing that already happened before this frame is repeated.`
+        : 'The video begins exactly on the provided first frame, keeping the same composition, set and outfits, and continues naturally from that pose.');
+    }
     parts.push('Nobody looks into the camera or talks to the camera: every glance and every spoken line is directed at the person or object named in the action, and the eye line stays on that target while speaking.');
-    const setText = `${(loc && loc.visual) || ''} ${shot.action_en || ''} ${shot.reaction_en || ''}`;
-    if (/photo|portrait|painting|picture|poster|screen|monitor|television|\btv\b/i.test(setText)) {
-      parts.push('Any person shown in a framed photo, portrait, painting, poster or screen is a completely still printed image: their face never moves, blinks, talks or changes expression.');
+    const setText = `${(loc && loc.visual) || ''} ${shot.start_en || ''} ${shot.action_en || ''} ${shot.reaction_en || ''}`;
+    if (/photo|portrait|painting|poster/i.test(setText)) {
+      parts.push('Any person shown in a framed photo, portrait, painting or poster is a completely still printed image: their face never moves, blinks, talks or changes expression.');
     }
   }
 
