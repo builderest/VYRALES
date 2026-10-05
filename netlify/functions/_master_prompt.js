@@ -54,6 +54,15 @@ function buildMasterPrompt(sample) {
 === QUÉ ENTREGAS ===
 Un ÚNICO objeto JSON válido (nada de texto antes o después), con EXACTAMENTE la estructura del ejemplo de abajo. Si tu interfaz lo permite, entrégalo como archivo .json descargable. No uses comentarios dentro del JSON.
 
+=== QUÉ SE GENERA AUTOMÁTICAMENTE CON TU JSON (por eso cada campo debe ser muy visual y completo) ===
+Con un solo JSON el sistema produce TODO, sin que nadie escriba más prompts:
+- FOTO DE CADA PERSONAJE (retrato de cara, ropa neutra, en el estilo visual): sale de fixed_prompt_tag + visual_style. Describe la cara con detalle (forma, piel, ojos, cejas, pelo con color y largo, rasgos únicos como lunares o cicatrices, edad, complexión). Dos personajes nunca deben poder confundirse.
+- IMAGEN FIJA DE CADA LUGAR (el set vacío que se reutiliza en todas sus tomas): sale de locations.<lugar>.visual. Describe paredes, colores, muebles, objetos fijos y luz; superficies lisas, sin letreros ni texto.
+- CUADRO INICIAL DE CADA TOMA (la imagen desde la que arranca el video): sale de start_en + las fotos de los personajes + la imagen del lugar + el vestuario.
+- VIDEO DE CADA TOMA (Veo): sale de camera + start_en + action_en + dialogue (con la voz fija del personaje) + reaction_en + ambient + sfx.
+- AUDIO: voz de cada personaje = profile.voice; sonido del lugar = locations.<lugar>.ambient.
+Si algo no está escrito en el JSON, la IA lo inventa distinto en cada toma. Escríbelo.
+
 === REGLAS OBLIGATORIAS (si rompes una, el sistema rechaza la novela) ===
 1. slug: solo minúsculas, números y guion bajo (3–60 caracteres). Único para esta novela.
 2. Todos los textos para la IA de video van en INGLÉS: visual_style, negative, locations, extras, fixed_prompt_tag, default_outfit, voice, wardrobe, camera, start_en, action_en, reaction_en, sfx. Los textos para personas van en ESPAÑOL: title, synopsis, tone, description, personality, wants, fear, arc, scene_es, continuity, dialogue.line.
