@@ -1281,7 +1281,7 @@
           : o.kind === 'location'
           ? 'Lugar: ' + o.locationKey
           : 'EP ' + (ep ? ep.episode_number : '?') + ' · TOMA ' + String(o.n).padStart(2, '0') + (o.kind === 'keyframe' ? ' · cuadro inicial' : ' · video') +
-            (function() { const sh = ep && (ep.shots || []).find(x => x.n === o.n); return sh ? ' — ' + (sh.characters || []).map(n => n.split(' ')[0]).join(' + ') + ' en ' + sh.location : ''; })();
+            (function() { const sh = ep && (ep.shots || []).find(x => x.n === o.n); return sh ? ' — ' + (sh.characters || []).map(n => { const c = (lastLoadedData.characters || []).find(x => x.name === n); return (c && c.profile && c.profile.key) || n.split(' ')[0]; }).join(' + ') + ' en ' + sh.location : ''; })();
         const price = o.kind === 'video' ? (o.cost ? Number(o.cost) : null) : IMAGE_PRICE_USD;
         document.getElementById('pmTitle').textContent = title;
         document.getElementById('pmSubtitle').textContent = o.kind === 'video'
@@ -1343,10 +1343,15 @@
           const ep = (lastLoadedData.episodes || []).find(x => x.id === o.episodeId);
           const shot = ep && (ep.shots || []).find(sh => sh.n === o.n);
           if (shot) {
-            const inShot = (shot.characters || []).map(n => n.split(' ')[0].toLowerCase());
-            const first = n => n.split(' ')[0];
-            const foreign = (lastLoadedData.characters || []).map(c => first(c.name))
-              .filter(n => !inShot.includes(n.toLowerCase()) && new RegExp('\\b' + n + '\\b', 'i').test(text));
+            // Nombre corto = profile.key (SapiensUno, NeandertalDos…), igual que en los prompts del servidor;
+            // si no hay key, la primera palabra. Antes "Humano sapiens…" exigía la palabra "Humano".
+            const chars = lastLoadedData.characters || [];
+            const first = n => { const c = chars.find(x => x.name === n); return (c && c.profile && c.profile.key) || n.split(' ')[0]; };
+            const inShot = (shot.characters || []).map(n => first(n).toLowerCase());
+            // Lo que va entre comillas es diálogo/narración: ahí se puede nombrar a otro personaje sin que salga en cuadro.
+            const noQuotes = text.replace(/"[^"]*"/g, ' ');
+            const foreign = chars.map(c => first(c.name))
+              .filter(n => !inShot.includes(n.toLowerCase()) && new RegExp('\\b' + n + '\\b', 'i').test(noQuotes));
             const missing = (shot.characters || []).map(first).filter(n => !new RegExp('\\b' + n + '\\b', 'i').test(text));
             if (foreign.length || missing.length) {
               const ok = await askConfirm('⚠️ Este prompt no parece de la Toma ' + o.n + '.\n\n' +
