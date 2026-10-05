@@ -7,6 +7,8 @@
   # ffmpeg-static trae un binario nativo: se copia tal cual (sin empaquetar) para que
   # _merge.js lo encuentre en producción.
   external_node_modules = ["ffmpeg-static"]
+  # Fuente de los subtítulos y tarjetas del editor (_render.js).
+  included_files = ["netlify/functions/assets/fonts/**"]
 
 # daily-trigger YA NO corre programado: la produccion la dispara Franklin a mano (de noche)
 # y los guiones de cada novela se escriben completos de una vez (arco entero) e importan

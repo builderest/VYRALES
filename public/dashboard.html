@@ -681,6 +681,8 @@
       // Modelo de Veo elegido en el dashboard SOLO para las próximas producciones de esta
       // sesión (null = el de la serie). Sirve para usar Fast cuando la cuota de Lite se acabó.
       let veoModelChoice = null;
+      // Contexto para editor.js (otro archivo): serie actual, datos cargados y recarga.
+      window.vyCtx = () => ({ series: DEFAULT_SERIES, data: lastLoadedData, reload: loadDashboard });
       function seriesModels(series) {
         const r = (series && series.story_bible && series.story_bible.rules) || {};
         if (veoModelChoice) return { shot: veoModelChoice, cliff: veoModelChoice, secs: r.shot_seconds || 8, forced: true };
@@ -894,7 +896,8 @@
               '<div class="text-xs font-mono">' +
                 '<p class="text-cyber-emerald font-bold"><i class="fa-solid fa-check-circle mr-1"></i>Video final del episodio #' + episode.episode_number + ' listo (' + clips.length + ' tomas unidas).</p>' +
                 '<button type="button" onclick="openMedia(this)" data-src="' + esc(finalRender.storage_path) + '" data-kind="video" data-title="EP ' + episode.episode_number + ' · Video final" class="text-cyber-cyan hover:underline"><i class="fa-solid fa-circle-play mr-1"></i>Ver / descargar</button>' +
-                ' · <button onclick="mergeEpisode(\'' + episode.id + '\')" class="text-slate-400 hover:text-cyber-cyan underline">Rehacer</button>' +
+                ' · <button onclick="vyEditor.open(\'' + episode.id + '\')" class="text-cyber-gold hover:underline"><i class="fa-solid fa-scissors mr-1"></i>Editar episodio</button>' +
+                ' · <button onclick="mergeEpisode(\'' + episode.id + '\')" class="text-slate-400 hover:text-cyber-cyan underline">Unir sin editar</button>' +
               '</div>' +
             '</div>';
         } else if (clips.length > 0) {
@@ -902,7 +905,8 @@
           panel.innerHTML =
             '<button id="mergeBtn" onclick="mergeEpisode(\'' + episode.id + '\')" class="px-3 py-2 rounded-lg bg-cyber-cyan/10 border border-cyber-cyan/30 text-cyber-cyan text-xs font-mono hover:bg-cyber-cyan/20">' +
               '<i class="fa-solid fa-film mr-1"></i> Unir las ' + clips.length + ' tomas en un solo video final' +
-            '</button>';
+            '</button>' +
+            ' <button onclick="vyEditor.open(\'' + episode.id + '\')" class="px-3 py-2 rounded-lg bg-cyber-gold/10 border border-cyber-gold/40 text-cyber-gold text-xs font-mono hover:bg-cyber-gold/20"><i class="fa-solid fa-scissors mr-1"></i>Abrir editor</button>';
         } else {
           panel.classList.add('hidden');
           panel.innerHTML = '';
@@ -1761,7 +1765,10 @@
                 (cont.summary ? '<p class="text-[11px] text-slate-400"><strong class="text-slate-300">Resumen:</strong> ' + esc(cont.summary) + '</p>' : '') +
                 shotsHtml +
                 (cont.last_cliffhanger ? '<p class="text-[11px] text-cyber-pink"><strong>Gancho:</strong> ' + esc(cont.last_cliffhanger) + '</p>' : '') +
-                '<div class="flex flex-wrap items-center pt-1">' + framesBtn + produceBtn + '</div>' +
+                '<div class="flex flex-wrap items-center gap-2 pt-1">' + framesBtn + produceBtn +
+                  ((e.assets || []).some(a => a.kind === 'video_clip') && e.status !== 'generando_media'
+                    ? '<button onclick="vyEditor.open(\'' + e.id + '\')" class="px-3 py-1.5 rounded-lg bg-cyber-gold/10 border border-cyber-gold/40 text-cyber-gold text-xs font-mono hover:bg-cyber-gold/20"><i class="fa-solid fa-scissors mr-1"></i>Editar episodio</button>'
+                    : '') + '</div>' +
               '</div>' +
             '</details>'
           );
@@ -2524,5 +2531,6 @@
             </div>
         </div>
     </div>
+    <script src="editor.js?v=1"></script>
 </body>
 </html>
