@@ -14,17 +14,29 @@ function sanitize(plan) {
   const p = plan || {};
   const card = (c) => ({ enabled: !!(c && c.enabled), text: txt(c && c.text, 80), subtext: txt(c && c.subtext, 120), seconds: num(c && c.seconds, 1, 6, 2) });
   return {
-    version: 1,
+    version: 2,
     clips: (Array.isArray(p.clips) ? p.clips : []).slice(0, 60).map((c) => ({
       shot: Math.round(num(c.shot, 1, 999, 1)),
       include: c.include !== false,
       trim_start: num(c.trim_start, 0, 7, 0),
       trim_end: num(c.trim_end, 0, 7, 0),
       volume: num(c.volume, 0, 2, 1),
+      speed: num(c.speed, 0.5, 2, 1),
+      zoom: c.zoom === true,
+      transition: ['cut', 'crossfade', 'fade_black'].includes(c.transition) ? c.transition : 'cut',
+      transition_s: num(c.transition_s, 0.2, 1.5, 0.4),
       subtitle: c.subtitle == null || c.subtitle === '' ? null : txt(c.subtitle, 200),
       overlay: txt(c.overlay, 60)
     })),
-    subtitles: { enabled: !(p.subtitles && p.subtitles.enabled === false), size: num(p.subtitles && p.subtitles.size, 22, 70, 38), margin_v: num(p.subtitles && p.subtitles.margin_v, 20, 1150, 180) },
+    subtitles: {
+      enabled: !(p.subtitles && p.subtitles.enabled === false),
+      size: num(p.subtitles && p.subtitles.size, 22, 70, 38),
+      margin_v: num(p.subtitles && p.subtitles.margin_v, 20, 1150, 180),
+      style: p.subtitles && ['classic', 'yellow', 'box'].includes(p.subtitles.style) ? p.subtitles.style : 'classic',
+      karaoke: !!(p.subtitles && p.subtitles.karaoke),
+      speaker_colors: !!(p.subtitles && p.subtitles.speaker_colors),
+      animation: p.subtitles && p.subtitles.animation === 'pop' ? 'pop' : 'none'
+    },
     audio: {
       normalize: !(p.audio && p.audio.normalize === false),
       music_url: p.audio && typeof p.audio.music_url === 'string' && /^https:\/\//.test(p.audio.music_url) ? p.audio.music_url : null,
