@@ -57,7 +57,7 @@ function buildKeyframePrompt(shot, characterRows, storyBible, hasLocationRef) {
     parts.push(`There are exactly ${names.length} people: ${names.map((n) => n.split(' ')[0]).join(' and ')}. Each one wears only their own outfit; clothing and accessories are never shared.`);
   }
   if (loc) {
-    parts.push(`Setting: ${loc.visual.replace(/\.?$/, '.')}` + (hasLocationRef ? ' Match the set reference image exactly: same layout, colors, furniture and lighting.' : ''));
+    parts.push(`Setting: ${loc.visual.replace(/\.?$/, '.')}` + (hasLocationRef ? ' ' + SET_REF_SENTENCE : ''));
   }
   parts.push(`Moment: the instant this action begins, before anyone speaks — ${String(shot.action_en || '').replace(/\.?$/, '.')}`);
   parts.push('Natural anatomy and natural hands, expressive faces, cinematic composition.');
@@ -93,9 +93,15 @@ async function keyframeReferences(shot, characterRows, visualMemory) {
   return { refs, hasLocationRef: !!(locRef && locRef.url) };
 }
 
+const SET_REF_SENTENCE = 'Match the set reference image exactly: same layout, colors, furniture and lighting.';
+
 function effectiveKeyframePrompt(shot, characterRows, storyBible, hasLocationRef) {
-  return (shot.keyframe_prompt_override && shot.keyframe_prompt_override.trim()) ||
-    buildKeyframePrompt(shot, characterRows, storyBible, hasLocationRef);
+  const override = shot.keyframe_prompt_override && shot.keyframe_prompt_override.trim();
+  if (override) {
+    // Un prompt editado a mano no pierde la instrucción del set cuando sí se adjunta la imagen del lugar.
+    return hasLocationRef && !override.includes('set reference image') ? `${override} ${SET_REF_SENTENCE}` : override;
+  }
+  return buildKeyframePrompt(shot, characterRows, storyBible, hasLocationRef);
 }
 
 // Genera y guarda el cuadro inicial de UNA toma. Si ya había uno, lo reemplaza (misma fila
