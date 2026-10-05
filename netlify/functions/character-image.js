@@ -40,13 +40,13 @@ exports.handler = async (event) => {
     const supabase = getSupabaseClient();
     const { data: character, error: charError } = await supabase
       .from('characters')
-      .select('id, name, series:series_id(slug)')
+      .select('id, name, profile, series:series_id(slug)')
       .eq('id', body.character_id)
       .single();
     if (charError || !character) return json(404, { error: 'Personaje no encontrado.' });
 
     if (body.remove) {
-      const { error } = await supabase.from('characters').update({ reference_image_url: null }).eq('id', character.id);
+      const { error } = await supabase.from('characters').update({ reference_image_url: null, profile: Object.assign({}, character.profile || {}, { photo_source: null, style_reference: false }) }).eq('id', character.id);
       if (error) throw error;
       console.log('[character-image] foto quitada:', character.name);
       return json(200, { character_id: character.id, reference_image_url: null });
@@ -67,7 +67,7 @@ exports.handler = async (event) => {
 
     const { error: updateError } = await supabase
       .from('characters')
-      .update({ reference_image_url: publicUrl })
+      .update({ reference_image_url: publicUrl, profile: Object.assign({}, character.profile || {}, { photo_source: 'uploaded' }) })
       .eq('id', character.id);
     if (updateError) throw updateError;
 

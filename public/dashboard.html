@@ -268,6 +268,7 @@
                 </div>
                 <div class="flex flex-wrap items-center gap-2">
                     <button id="castToggleAll" onclick="toggleAllCast()" class="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 text-xs font-mono hover:bg-slate-700"><i class="fa-solid fa-up-right-and-down-left-from-center mr-1"></i>Abrir todas</button>
+                    <button id="genMissingPhotosBtn" onclick="generateMissingCharacterPhotos()" class="hidden px-3 py-1.5 rounded-lg text-xs font-mono border border-cyber-violet/50 bg-cyber-violet/15 text-cyber-violet hover:bg-cyber-violet/25" title="Genera con Gemini las fotos de cara que faltan, todas en el mismo estilo"></button>
                     <button id="deleteSeriesBtn" onclick="deleteSeries()" class="hidden px-3 py-1.5 rounded-lg text-xs font-mono border border-cyber-pink/40 bg-cyber-pink/10 text-cyber-pink hover:bg-cyber-pink/20" title="Borra la serie completa: episodios, personajes, tomas y archivos"><i class="fa-solid fa-trash mr-1"></i>Eliminar serie</button>
                 </div>
             </div>
@@ -935,6 +936,10 @@
         const episodes = data.episodes || [];
         const rules = (data.series.story_bible && data.series.story_bible.rules) || {};
         document.getElementById('deleteSeriesBtn').classList.remove('hidden');
+        const missingPhotos = chars.filter(c => !c.reference_image_url).length;
+        const gmb = document.getElementById('genMissingPhotosBtn');
+        gmb.classList.toggle('hidden', !missingPhotos);
+        gmb.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles mr-1"></i>Generar ' + missingPhotos + ' foto' + (missingPhotos === 1 ? '' : 's') + ' que falta' + (missingPhotos === 1 ? '' : 'n') + ' (~$' + (missingPhotos * IMAGE_PRICE_USD).toFixed(2) + ')';
         document.getElementById('castSubtitle').innerHTML = chars.length
           ? esc(chars.length + ' personajes de "' + data.series.title + '". ') +
             (rules.reference_images
@@ -964,6 +969,9 @@
                     (c.reference_image_url ? 'border-slate-700 text-slate-400 hover:text-cyber-cyan hover:border-cyber-cyan/40' : 'border-cyber-cyan/40 text-cyber-cyan bg-cyber-cyan/10 hover:bg-cyber-cyan/20') + '">' +
                     '<i class="fa-solid fa-upload mr-1"></i>' + (c.reference_image_url ? 'Cambiar' : 'Subir foto') +
                   '</button>' +
+                  '<button type="button" onclick="openCharacterPhotoEditor(event, \'' + esc(c.id) + '\')" title="Genera la foto con Gemini en el estilo de la serie (puedes editar el prompt antes)" ' +
+                    'class="text-[10px] font-mono px-2 py-0.5 rounded border border-cyber-violet/40 text-cyber-violet bg-cyber-violet/10 hover:bg-cyber-violet/20">' +
+                    '<i class="fa-solid fa-wand-magic-sparkles mr-1"></i>' + (c.reference_image_url ? 'Regenerar' : 'Generar') + ' (~$' + IMAGE_PRICE_USD.toFixed(2) + ')</button>' +
                   (pr.image_prompt
                     ? '<button type="button" onclick="copyTag(this, event)" data-tag="' + esc(pr.image_prompt) + '" title="Copia el prompt para generar la foto en Gemini" ' +
                         'class="text-[10px] font-mono px-2 py-0.5 rounded border border-cyber-violet/40 text-cyber-violet bg-cyber-violet/10 hover:bg-cyber-violet/20">' +
@@ -990,7 +998,14 @@
                       '<img src="' + esc(c.reference_image_url) + '" alt="' + esc(c.name) + '" class="h-48 rounded-lg border border-cyber-border object-cover group-hover/ph:border-cyber-cyan">' +
                       '<span class="absolute bottom-1.5 right-1.5 bg-black/70 text-white text-[10px] rounded px-1.5 py-0.5"><i class="fa-solid fa-expand"></i></span>' +
                     '</button>' +
-                    '<button type="button" onclick="removeCharacterImage(\'' + esc(c.id) + '\')" class="text-[10px] font-mono text-slate-500 hover:text-cyber-pink"><i class="fa-solid fa-trash mr-1"></i>Quitar foto</button>' +
+                    '<div class="flex flex-col items-start gap-2">' +
+                      (pr.photo_source === 'generated'
+                        ? '<span class="text-[10px] font-mono text-cyber-emerald"><i class="fa-solid fa-star mr-1"></i>Generada aquí: se usa como referencia de estilo</span>'
+                        : '<button type="button" onclick="toggleStyleReference(\'' + esc(c.id) + '\', ' + (pr.style_reference ? 'false' : 'true') + ')" title="Si la marcas, las fotos nuevas que se generen copiarán el estilo de esta (no su cara)" class="text-[10px] font-mono px-2 py-0.5 rounded border ' +
+                            (pr.style_reference ? 'border-cyber-emerald/50 text-cyber-emerald bg-cyber-emerald/10' : 'border-slate-700 text-slate-400 hover:text-white') + '"><i class="fa-' + (pr.style_reference ? 'solid' : 'regular') + ' fa-star mr-1"></i>' +
+                            (pr.style_reference ? 'Referencia de estilo: SÍ' : 'Usar como referencia de estilo') + '</button>') +
+                      '<button type="button" onclick="removeCharacterImage(\'' + esc(c.id) + '\')" class="text-[10px] font-mono text-slate-500 hover:text-cyber-pink"><i class="fa-solid fa-trash mr-1"></i>Quitar foto</button>' +
+                    '</div>' +
                   '</div>'
                 : '') +
               '<p class="text-[11px] text-slate-300">' + esc(c.description || '') + '</p>' +
@@ -1214,13 +1229,17 @@
         const d = btn ? btn.dataset : {};
         const o = Object.assign({ kind: d.kind, episodeId: d.ep, n: Number(d.n), locationKey: d.loc, mode: d.mode || 'generate', cost: d.cost }, opts || {});
         const ep = o.episodeId && lastLoadedData && (lastLoadedData.episodes || []).find(x => x.id === o.episodeId);
-        const title = o.kind === 'location'
+        const chr = o.kind === 'character' && lastLoadedData && (lastLoadedData.characters || []).find(x => String(x.id) === String(o.characterId));
+        const title = o.kind === 'character'
+          ? 'Foto de ' + (chr ? chr.name : 'personaje')
+          : o.kind === 'location'
           ? 'Lugar: ' + o.locationKey
           : 'EP ' + (ep ? ep.episode_number : '?') + ' · Toma ' + o.n + (o.kind === 'keyframe' ? ' · cuadro inicial' : ' · video');
         const price = o.kind === 'video' ? (o.cost ? Number(o.cost) : null) : IMAGE_PRICE_USD;
         document.getElementById('pmTitle').textContent = title;
         document.getElementById('pmSubtitle').textContent = o.kind === 'video'
           ? 'Prompt que recibirá Veo para esta toma.'
+          : o.kind === 'character' ? 'Prompt de la foto de cara (Gemini). Se adjuntan las fotos ya hechas de otros personajes SOLO como referencia de estilo, para que todas salgan iguales. Se guarda y se reutiliza en todos los cuadros.'
           : (o.kind === 'keyframe' ? 'Prompt del cuadro inicial (Gemini). Se le adjuntan las fotos de cara y la imagen fija del lugar.' : 'Prompt de la imagen fija del lugar (Gemini).');
         const gen = document.getElementById('pmGenerate');
         gen.classList.toggle('hidden', o.mode === 'save');
@@ -1230,7 +1249,9 @@
         pm = o;
         pmShow(true);
         try {
-          const url = o.kind === 'location'
+          const url = o.kind === 'character'
+            ? '/.netlify/functions/character-prompt?character_id=' + encodeURIComponent(o.characterId)
+            : o.kind === 'location'
             ? '/.netlify/functions/location-image?series=' + encodeURIComponent(DEFAULT_SERIES) + '&location_key=' + encodeURIComponent(o.locationKey)
             : '/.netlify/functions/shot-prompt?episode_id=' + encodeURIComponent(o.episodeId) + '&shot=' + o.n + '&kind=' + o.kind;
           const res = await fetch(url);
@@ -1253,8 +1274,10 @@
 
       async function persistPrompt(o, text) {
         const isOriginal = text.trim() === (o.original || '').trim();
-        const url = o.kind === 'location' ? '/.netlify/functions/location-image' : '/.netlify/functions/shot-prompt';
-        const body = o.kind === 'location'
+        const url = o.kind === 'character' ? '/.netlify/functions/character-prompt' : o.kind === 'location' ? '/.netlify/functions/location-image' : '/.netlify/functions/shot-prompt';
+        const body = o.kind === 'character'
+          ? (isOriginal ? { character_id: o.characterId, reset: true } : { character_id: o.characterId, prompt: text })
+          : o.kind === 'location'
           ? (isOriginal ? { series: DEFAULT_SERIES, location_key: o.locationKey, reset_prompt: true } : { series: DEFAULT_SERIES, location_key: o.locationKey, prompt: text })
           : (isOriginal ? { episode_id: o.episodeId, shot: o.n, kind: o.kind, reset: true } : { episode_id: o.episodeId, shot: o.n, kind: o.kind, prompt: text });
         const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -1279,6 +1302,7 @@
         if (o.kind === 'video') return window.generateShot(o.episodeId, o.n, o.cost, true);
         if (o.kind === 'keyframe') return generateKeyframe(o.episodeId, o.n);
         if (o.kind === 'location') return generateLocationImage(o.locationKey, text);
+        if (o.kind === 'character') return generateCharacterPhotos({ character_id: o.characterId }, [o.characterId]);
       };
 
       // Genera SOLO los cuadros iniciales que faltan del episodio (sin video) para revisarlos.
@@ -1402,6 +1426,45 @@
             '</div>'
           );
         }).join('');
+      }
+
+      // ---- Fotos de personajes generadas automáticamente (Gemini, mismo estilo para todos) ----
+      window.openCharacterPhotoEditor = function(ev, characterId) {
+        if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+        window.openPromptEditor(null, { kind: 'character', characterId, mode: 'generate' });
+      };
+      window.toggleStyleReference = async function(characterId, value) {
+        try {
+          const res = await fetch('/.netlify/functions/character-prompt', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ character_id: characterId, style_reference: value }) });
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+        } catch (err) { return alert('No se pudo guardar: ' + err.message); }
+        await loadDashboard();
+      };
+      window.generateMissingCharacterPhotos = async function() {
+        const chars = (lastLoadedData && lastLoadedData.characters) || [];
+        const missing = chars.filter(c => !c.reference_image_url);
+        if (!missing.length) return;
+        if (!confirm('Generar ' + missing.length + ' foto(s) de personaje con Gemini:\n\n' + missing.map(c => '• ' + c.name).join('\n') +
+          '\n\nCosto: ' + missing.length + ' × $' + IMAGE_PRICE_USD.toFixed(3) + ' = ~$' + (missing.length * IMAGE_PRICE_USD).toFixed(2) + ' USD.\n' +
+          'Se hacen en orden; cada foto nueva sirve de referencia de estilo para la siguiente. Después revisas cada una y regeneras solo la que no te guste. ¿Continuar?')) return;
+        await generateCharacterPhotos({ series: DEFAULT_SERIES, only_missing: true }, missing.map(c => c.id));
+      };
+      async function generateCharacterPhotos(body, ids) {
+        const before = {};
+        ((lastLoadedData && lastLoadedData.characters) || []).forEach(c => { before[c.id] = c.reference_image_url || null; });
+        try {
+          const res = await fetch('/.netlify/functions/character-photo-background', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+          });
+          if (!res.ok && res.status !== 202) throw new Error('HTTP ' + res.status);
+        } catch (err) { return alert('No se pudo generar: ' + err.message); }
+        document.getElementById('castSubtitle').innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>Generando ' + ids.length + ' foto(s) de personaje... (unos 20 s cada una)';
+        const ok = await pollUntil(d => ids.every(id => {
+          const c = (d.characters || []).find(x => String(x.id) === String(id));
+          return c && c.reference_image_url && c.reference_image_url !== before[id];
+        }), Math.max(3, ids.length * 1.5) * 60 * 1000);
+        await loadDashboard();
+        if (!ok) alert('Alguna foto no apareció a tiempo. Revisa la terminal de netlify dev (busca [character-photo]).');
       }
 
       async function generateLocationImage(key, prompt) {
