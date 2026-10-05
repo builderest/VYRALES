@@ -26,14 +26,18 @@ function makeState(platform) {
   const sig = crypto.createHmac('sha256', secret).update(payload).digest('hex').slice(0, 32);
   return `${payload}.${sig}`;
 }
-function checkState(platform, state) {
+// Devuelve null si el state es válido, o el MOTIVO exacto si no lo es.
+function stateProblem(platform, state) {
   const secret = platform === 'tiktok' ? need('TIKTOK_CLIENT_SECRET') : need('INSTAGRAM_APP_SECRET');
-  const [p, ts, sig] = String(state || '').split('.');
-  if (p !== platform || !ts || !sig) return false;
-  if (Date.now() - Number(ts) > 15 * 60000) return false;
+  if (!state) return 'La dirección llegó sin "state": hay que entrar dándole "Conectar" en VYRALES, no abriendo esta página directo.';
+  const [p, ts, sig] = String(state).split('.');
+  if (p !== platform || !ts || !sig) return 'El "state" llegó incompleto (' + String(state).slice(0, 20) + '…).';
+  if (Date.now() - Number(ts) > 15 * 60000) return 'Pasaron más de 15 minutos desde que le diste "Conectar". Vuelve a intentarlo.';
   const good = crypto.createHmac('sha256', secret).update(`${p}.${ts}`).digest('hex').slice(0, 32);
-  return crypto.timingSafeEqual(Buffer.from(good), Buffer.from(sig.padEnd(32, '0').slice(0, 32)));
+  if (good !== sig) return 'La firma no coincide: el TIKTOK_CLIENT_SECRET (o el de Instagram) de Netlify NO es igual al de tu .env. Conecta desde vyrales.app (no desde localhost) o iguala las llaves.';
+  return null;
 }
+function checkState(platform, state) { return stateProblem(platform, state) === null; }
 
 async function saveAccount(supabase, row) {
   const { error } = await supabase.from('social_accounts').upsert(Object.assign({ updated_at: new Date().toISOString() }, row));
@@ -180,4 +184,4 @@ async function instagramPublishReel(supabase, { videoUrl, coverUrl, caption, log
   return { mediaId: p.body.id, permalink };
 }
 
-module.exports = { tiktokAuthUrl, tiktokConnect, tiktokSendDraft, instagramAuthUrl, instagramConnect, instagramPublishReel, checkState, getAccount, REDIRECT };
+module.exports = { tiktokAuthUrl, tiktokConnect, tiktokSendDraft, instagramAuthUrl, instagramConnect, instagramPublishReel, checkState, stateProblem, getAccount, REDIRECT };
