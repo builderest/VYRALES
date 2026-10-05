@@ -1291,6 +1291,26 @@
         const o = pm;
         const text = document.getElementById('pmText').value;
         if (text.trim().length < 20) return pmError('El prompt está vacío o es demasiado corto.');
+        // Protección: un prompt pegado en la toma equivocada (pasó con EP1: el de la toma 8 se pegó en la 7).
+        if ((o.kind === 'keyframe' || o.kind === 'video') && lastLoadedData) {
+          const ep = (lastLoadedData.episodes || []).find(x => x.id === o.episodeId);
+          const shot = ep && (ep.shots || []).find(sh => sh.n === o.n);
+          if (shot) {
+            const inShot = (shot.characters || []).map(n => n.split(' ')[0].toLowerCase());
+            const first = n => n.split(' ')[0];
+            const foreign = (lastLoadedData.characters || []).map(c => first(c.name))
+              .filter(n => !inShot.includes(n.toLowerCase()) && new RegExp('\\b' + n + '\\b', 'i').test(text));
+            const missing = (shot.characters || []).map(first).filter(n => !new RegExp('\\b' + n + '\\b', 'i').test(text));
+            if (foreign.length || missing.length) {
+              const ok = await askConfirm('⚠️ Este prompt no parece de la Toma ' + o.n + '.\n\n' +
+                'La toma ' + o.n + ' es en "' + (shot.location || '?') + '" con: ' + ((shot.characters || []).join(', ') || 'nadie') + '.\n' +
+                (foreign.length ? 'El prompt menciona a: ' + foreign.join(', ') + ' (no salen en esta toma).\n' : '') +
+                (missing.length ? 'Al prompt le falta: ' + missing.join(', ') + '.\n' : '') +
+                '\n¿Guardarlo de todas formas en la Toma ' + o.n + '?');
+              if (!ok) return;
+            }
+          }
+        }
         try {
           await persistPrompt(o, text);
         } catch (err) {
