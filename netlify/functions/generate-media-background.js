@@ -1,0 +1,225 @@
+// Background function (hasta 15 min en producción Netlify): genera las tomas de video de
+// un episodio con Veo 3.1 — modo HÍBRIDO LITE/FAST como describe el dashboard: Lite para
+// las tomas normales, Fast para la toma del cliffhanger final (la última escena) — y las
+// sube a Supabase Storage. Si las 8 tomas salen bien, UNE automáticamente el video final
+// (ver _merge.js) antes de dejar el episodio en "en_revision" — así llega listo para el
+// filtro humano sin que haya que apretar ningún botón aparte.
+//
+// IMPORTANTE: esto sí consume la API de Veo de verdad y genera cargos reales en tu cuenta
+// de Google Cloud (según el presupuesto que ya configuraste). No es un test gratis como
+// los pasos anteriores. La unión final con ffmpeg sí es gratis (procesamiento local).
+//
+// Cómo probarlo en local con `netlify dev` (toma el episodio #1 que ya sembramos, en
+// estado "guion_generado"):
+//   http://localhost:8888/.netlify/functions/generate-media-background
+// o para un episodio específico:
+//   http://localhost:8888/.netlify/functions/generate-media-background?episode_id=<uuid>
+const { getSupabaseClient } = require('./_supabase');
+const { ensureMediaBucket, uploadClip } = require('./_storage');
+const { generateVeoClip } = require('./_veo');
+const { mergeEpisodeVideo } = require('./_merge');
+
+function parseScenes(script) {
+  return (script || '')
+    .split(/\n\s*\n/)
+    .map((block) => block.trim())
+    .filter(Boolean)
+    .map((block) => {
+      const match = block.match(/^(\d+)\.\s*([\s\S]*)$/);
+      return match ? { number: Number(match[1]), text: match[2].trim() } : null;
+    })
+    .filter(Boolean);
+}
+
+function buildPrompt(sceneText, characters, storyBible) {
+  const lowerText = sceneText.toLowerCase();
+  const tags = (characters || [])
+    .filter((c) => c.name && lowerText.includes(c.name.toLowerCase().split(' ')[0]))
+    .map((c) => c.fixed_prompt_tag)
+    .filter(Boolean);
+
+  const style = storyBible || {};
+  const stylePrefix = [style.setting, style.tone].filter(Boolean).join('. ');
+
+  return [
+    stylePrefix ? `${stylePrefix}.` : '',
+    tags.length ? `Characters: ${tags.join('; ')}.` : '',
+    'Vertical 9:16 cinematic shot, photorealistic, consistent lighting.',
+    sceneText
+  ]
+    .filter(Boolean)
+    .join(' ');
+}
+
+const LOG = '[generate-media]';
+
+exports.handler = async (event) => {
+  const supabase = getSupabaseClient();
+  const seriesSlug = process.env.DEFAULT_SERIES_SLUG || 'dragon_silicio';
+  const qs = event.queryStringParameters || {};
+
+  console.log(LOG, 'arrancó. series=', seriesSlug, 'episode_id=', qs.episode_id || '(ninguno, toma el más reciente pendiente)');
+
+  try {
+    const { data: series, error: seriesError } = await supabase
+      .from('series')
+      .select('id, slug, title, story_bible')
+      .eq('slug', seriesSlug)
+      .single();
+    if (seriesError || !series) throw seriesError || new Error('Serie no encontrada');
+    console.log(LOG, 'serie OK:', series.id);
+
+    let episodeQuery = supabase.from('episodes').select('*').eq('series_id', series.id);
+    episodeQuery = qs.episode_id
+      ? episodeQuery.eq('id', qs.episode_id)
+      : episodeQuery.eq('status', 'guion_generado').order('episode_number', { ascending: true }).limit(1);
+
+    const { data: episodes, error: episodeError } = await episodeQuery;
+    if (episodeError) throw episodeError;
+    const episode = episodes && episodes[0];
+    if (!episode) {
+      throw new Error('No hay ningún episodio en estado "guion_generado". Escribe el guion primero.');
+    }
+    console.log(LOG, 'episodio encontrado: #' + episode.episode_number, episode.id, 'status=', episode.status);
+
+    const { data: characters } = await supabase
+      .from('characters')
+      .select('name, fixed_prompt_tag')
+      .eq('series_id', series.id);
+
+    const allScenes = parseScenes(episode.script);
+    console.log(LOG, 'escenas parseadas:', allScenes.length);
+    if (allScenes.length === 0) {
+      throw new Error('El episodio no tiene un guion con escenas numeradas ("1. ...", "2. ...", etc.).');
+    }
+
+    // Si ya hay tomas generadas para este episodio (de un intento anterior que falló a
+    // medias), las saltamos — así un reintento solo genera lo que falta, sin gastar de
+    // más regenerando lo que ya salió bien.
+    const { data: existingAssets } = await supabase
+      .from('assets')
+      .select('shot_number')
+      .eq('episode_id', episode.id)
+      .eq('kind', 'video_clip');
+    const doneShots = new Set((existingAssets || []).map((a) => a.shot_number));
+
+    const scenes = allScenes.filter((s) => !doneShots.has(s.number));
+    if (doneShots.size > 0) {
+      console.log(LOG, `${doneShots.size} toma(s) ya existían de un intento anterior, se saltan:`, [...doneShots].sort((a, b) => a - b).join(', '));
+    }
+    if (scenes.length === 0) {
+      console.log(LOG, 'todas las tomas ya estaban generadas — nada que hacer.');
+      await supabase.from('episodes').update({ status: 'en_revision' }).eq('id', episode.id);
+      return { statusCode: 200, body: JSON.stringify({ episode_id: episode.id, shots_ok: [], shots_failed: [], note: 'ya estaban todas generadas' }) };
+    }
+
+    await ensureMediaBucket(supabase);
+    console.log(LOG, 'bucket "media" listo.');
+
+    await supabase.from('episodes').update({ status: 'generando_media' }).eq('id', episode.id);
+    console.log(LOG, 'episodio marcado como generando_media. Arrancando', scenes.length, 'tomas con Veo (esto tarda varios minutos)...');
+
+    const total = allScenes.length; // el total real del episodio, no solo lo que falta por generar
+    // Secuencial a propósito (no Promise.all): 8 solicitudes simultáneas chocan con la
+    // cuota de "requests por minuto" que Google asigna a cuentas de facturación recién
+    // activadas (ver 429 RESOURCE_EXHAUSTED). Una por una es más lento pero confiable.
+    const results = [];
+    for (const scene of scenes) {
+      const isCliffhanger = scene.number === total;
+      const modelKey = isCliffhanger ? 'veo_fast' : 'veo_lite';
+      const prompt = buildPrompt(scene.text, characters, series.story_bible);
+
+      console.log(LOG, `toma ${scene.number}/${total} (${modelKey}): arrancando generación con Veo...`);
+      try {
+        const { videoBuffer, costUsd, model } = await generateVeoClip({ modelKey, prompt });
+        console.log(LOG, `toma ${scene.number}/${total}: Veo terminó, subiendo a Supabase Storage...`);
+
+        const storagePath = `${series.slug}/ep${episode.episode_number}/shot-${String(scene.number).padStart(2, '0')}.mp4`;
+        const publicUrl = await uploadClip(supabase, { path: storagePath, buffer: videoBuffer });
+
+        const { data: asset, error: assetError } = await supabase
+          .from('assets')
+          .insert({
+            episode_id: episode.id,
+            kind: 'video_clip',
+            model: modelKey,
+            shot_number: scene.number,
+            storage_path: publicUrl,
+            prompt,
+            cost_usd: costUsd,
+            approved: false
+          })
+          .select()
+          .single();
+        if (assetError) throw assetError;
+
+        console.log(LOG, `toma ${scene.number}/${total}: OK ✅ (asset ${asset.id})`);
+        results.push({ status: 'fulfilled', value: { shot: scene.number, model, costUsd, assetId: asset.id } });
+      } catch (shotErr) {
+        console.error(LOG, `toma ${scene.number}/${total}: FALLÓ ❌`, shotErr);
+        results.push({ status: 'rejected', reason: shotErr });
+      }
+    }
+
+    const failures = results.filter((r) => r.status === 'rejected');
+    const succeeded = results.filter((r) => r.status === 'fulfilled').map((r) => r.value);
+
+    await supabase
+      .from('episodes')
+      .update({ status: failures.length === 0 ? 'en_revision' : 'guion_generado' })
+      .eq('id', episode.id);
+
+    console.log(
+      LOG,
+      'terminado. OK:', succeeded.length, '/', total,
+      failures.length ? ('— FALLOS: ' + failures.map((f) => f.reason && f.reason.message).join(' | ')) : ''
+    );
+
+    // Si TODAS las tomas salieron bien, unimos el video final automáticamente — así el
+    // episodio llega a "en_revision" ya listo para el filtro humano, sin un paso manual
+    // aparte. Si falla (ffmpeg, red, etc.), no tiramos todo el resultado: las 8 tomas ya
+    // están generadas y guardadas de todas formas — el botón "Unir" del dashboard sirve de
+    // respaldo para reintentarlo.
+    let finalRender = null;
+    let mergeError = null;
+    if (failures.length === 0) {
+      try {
+        console.log(LOG, 'todas las tomas OK — uniendo automáticamente el video final...');
+        const { data: freshEpisode, error: freshError } = await supabase
+          .from('episodes')
+          .select('*, assets(*)')
+          .eq('id', episode.id)
+          .single();
+        if (freshError || !freshEpisode) throw freshError || new Error('No se pudo releer el episodio para unir el video.');
+        const mergeResult = await mergeEpisodeVideo(supabase, {
+          episode: freshEpisode,
+          series,
+          log: (...args) => console.log(LOG, '[merge]', ...args)
+        });
+        finalRender = mergeResult.asset;
+        console.log(LOG, 'video final automático listo ✅:', finalRender.storage_path);
+      } catch (err) {
+        mergeError = err.message;
+        console.error(LOG, 'la unión automática del video final falló (las tomas sí quedaron guardadas — usa el botón "Unir" del dashboard para reintentar):', err, err.stderr || '');
+      }
+    }
+
+    // Nota: en producción, Netlify no devuelve este body a quien llamó la función (las
+    // background functions responden 202 de inmediato) — por eso todo lo importante va
+    // también a console.log/console.error, que sí se ve en la terminal de `netlify dev`
+    // (y en los logs de función en Netlify una vez desplegado).
+    return {
+      statusCode: failures.length === 0 ? 200 : 207,
+      body: JSON.stringify({
+        episode_id: episode.id,
+        shots_ok: succeeded,
+        shots_failed: failures.map((f) => f.reason && f.reason.message),
+        final_render: finalRender,
+        merge_error: mergeError
+      })
+    };
+  } catch (err) {
+    console.error(LOG, 'ERROR GENERAL:', err);
+    return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
+  }
+};

@@ -34,10 +34,21 @@ exports.handler = async (event) => {
       .select('*')
       .eq('series_id', series.id);
 
+    // Solo el conteo (head: true no trae filas, es barato) — para el panel de stats
+    // reales del dashboard (nada de números de maqueta).
+    const { count: channelsCount } = await supabase
+      .from('channels')
+      .select('id', { count: 'exact', head: true });
+
     return {
       statusCode: 200,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ series, episodes, characters: characters || [] })
+      body: JSON.stringify({
+        series,
+        episodes,
+        characters: characters || [],
+        channels_count: channelsCount || 0
+      })
     };
   } catch (err) {
     return { statusCode: 500, body: JSON.stringify({ error: err.message }) };

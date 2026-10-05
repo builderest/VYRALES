@@ -7,6 +7,8 @@
     "dev": "netlify dev"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.45.4"
+    "@google/genai": "^1.5.1",
+    "@supabase/supabase-js": "^2.45.4",
+    "ffmpeg-static": "^5.2.0"
   }
 }

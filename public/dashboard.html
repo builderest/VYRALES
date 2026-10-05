@@ -188,19 +188,19 @@
             <div class="glass-panel rounded-xl p-4 border-l-4 border-l-cyber-cyan relative overflow-hidden">
                 <div class="flex justify-between items-start mb-2">
                     <div>
-                        <p class="text-xs font-mono text-slate-400 uppercase tracking-wider">Presupuesto Mensual</p>
-                        <h3 class="text-2xl font-display font-bold text-white mt-1">$112.50 <span class="text-xs text-slate-400 font-normal">/ $150.00</span></h3>
+                        <p class="text-xs font-mono text-slate-400 uppercase tracking-wider">Gasto Real (Veo)</p>
+                        <h3 id="budgetSpentLabel" class="text-2xl font-display font-bold text-white mt-1">$0.00 <span class="text-xs text-slate-400 font-normal">/ $150.00</span></h3>
                     </div>
                     <div class="w-8 h-8 rounded-lg bg-cyber-cyan/10 border border-cyber-cyan/30 flex items-center justify-center text-cyber-cyan">
                         <i class="fa-solid fa-wallet"></i>
                     </div>
                 </div>
                 <div class="w-full bg-slate-800 rounded-full h-2 overflow-hidden mb-2">
-                    <div class="bg-gradient-to-r from-cyber-cyan to-cyber-violet h-full rounded-full" style="width: 75%"></div>
+                    <div id="budgetBar" class="bg-gradient-to-r from-cyber-cyan to-cyber-violet h-full rounded-full" style="width: 0%"></div>
                 </div>
                 <div class="flex justify-between text-[11px] font-mono text-slate-400">
-                    <span>~ $2.30 / Episodio (Lite)</span>
-                    <span class="text-cyber-cyan font-bold">75% Usado</span>
+                    <span id="budgetAvgLabel">~ $0.00 / Episodio</span>
+                    <span id="budgetPctLabel" class="text-cyber-cyan font-bold">0% Usado</span>
                 </div>
             </div>
 
@@ -208,8 +208,8 @@
             <div class="glass-panel rounded-xl p-4 border-l-4 border-l-cyber-violet">
                 <div class="flex justify-between items-start mb-2">
                     <div>
-                        <p class="text-xs font-mono text-slate-400 uppercase tracking-wider">Episodios este mes</p>
-                        <h3 class="text-2xl font-display font-bold text-white mt-1">28 / 30 <span class="text-xs text-emerald-400 font-normal"><i class="fa-solid fa-arrow-up"></i> 93%</span></h3>
+                        <p class="text-xs font-mono text-slate-400 uppercase tracking-wider">Episodios (total real)</p>
+                        <h3 id="episodeCountLabel" class="text-2xl font-display font-bold text-white mt-1">0</h3>
                     </div>
                     <div class="w-8 h-8 rounded-lg bg-cyber-violet/10 border border-cyber-violet/30 flex items-center justify-center text-cyber-violet">
                         <i class="fa-solid fa-film"></i>
@@ -218,15 +218,15 @@
                 <div class="grid grid-cols-3 gap-1 mt-3 text-center text-[10px] font-mono">
                     <div class="bg-slate-900/60 p-1 rounded border border-slate-800">
                         <span class="block text-slate-400">Listos</span>
-                        <span class="text-cyber-emerald font-bold text-xs">22</span>
+                        <span id="episodesListos" class="text-cyber-emerald font-bold text-xs">0</span>
                     </div>
                     <div class="bg-slate-900/60 p-1 rounded border border-slate-800">
                         <span class="block text-slate-400">Revisión</span>
-                        <span class="text-cyber-gold font-bold text-xs">4</span>
+                        <span id="episodesRevision" class="text-cyber-gold font-bold text-xs">0</span>
                     </div>
                     <div class="bg-slate-900/60 p-1 rounded border border-slate-800">
                         <span class="block text-slate-400">Cola</span>
-                        <span class="text-cyber-cyan font-bold text-xs">2</span>
+                        <span id="episodesCola" class="text-cyber-cyan font-bold text-xs">0</span>
                     </div>
                 </div>
             </div>
@@ -236,17 +236,17 @@
                 <div class="flex justify-between items-start mb-2">
                     <div>
                         <p class="text-xs font-mono text-slate-400 uppercase tracking-wider">Tasa de Aprobación Guion</p>
-                        <h3 class="text-2xl font-display font-bold text-white mt-1">88.4%</h3>
+                        <h3 id="approvalRateLabel" class="text-2xl font-display font-bold text-white mt-1">—</h3>
                     </div>
                     <div class="w-8 h-8 rounded-lg bg-cyber-pink/10 border border-cyber-pink/30 flex items-center justify-center text-cyber-pink">
                         <i class="fa-solid fa-shield-halved"></i>
                     </div>
                 </div>
                 <p class="text-xs text-slate-300 mt-2 font-mono">
-                    <i class="fa-solid fa-check text-cyber-emerald mr-1"></i> Story Bible Pass Rate
+                    <i class="fa-solid fa-check text-cyber-emerald mr-1"></i> Guiones no rechazados / total
                 </p>
                 <div class="mt-2 text-[11px] text-slate-400 font-mono">
-                    Reintentos automáticos: <span class="text-cyber-pink font-bold">1.2 prom.</span>
+                    Guiones rechazados: <span id="rejectedCountLabel" class="text-cyber-pink font-bold">0</span>
                 </div>
             </div>
 
@@ -261,7 +261,7 @@
                         <i class="fa-solid fa-wand-magic-sparkles"></i>
                     </div>
                 </div>
-                <p class="text-xs text-slate-400 mt-1">7 tomas Lite ($0.04/s) + 1 Fast Clip ($0.15/s) en el Cliffhanger final.</p>
+                <p class="text-xs text-slate-400 mt-1">7 tomas Lite (~$0.04/s) + 1 Fast Clip (~$0.16/s) en el Cliffhanger final. Precios calibrados contra gasto real.</p>
                 <span class="inline-block mt-2 text-[10px] font-mono bg-cyber-emerald/20 text-cyber-emerald border border-cyber-emerald/40 px-2 py-0.5 rounded">OPTIMIZADO DÍA DÍA</span>
             </div>
         </section>
@@ -502,6 +502,7 @@
                     </h3>
                     <p class="text-xs text-slate-400 font-mono">Filtro humano rápido de 1-2 minutos para evitar "looks IA" o inconsistencias antes de publicar.</p>
                     <p id="dataStatusBanner" class="text-[11px] font-mono text-cyber-gold mt-1"></p>
+                    <div id="finalRenderPanel" class="mt-3 hidden"></div>
                 </div>
 
                 <div class="flex items-center space-x-2">
@@ -661,12 +662,12 @@
             <div class="glass-panel rounded-2xl p-6 lg:col-span-2">
                 <div class="flex items-center justify-between border-b border-cyber-border pb-3 mb-4">
                     <div>
-                        <h3 class="font-display font-bold text-white text-base">TELEMETRÍA DE COSTOS Y CONSUMO DE API</h3>
-                        <p class="text-xs text-slate-400 font-mono">Consumo diario acumulado en Google AI Studio / Vertex AI</p>
+                        <h3 class="font-display font-bold text-white text-base">COSTO REAL POR TOMA (VEO)</h3>
+                        <p class="text-xs text-slate-400 font-mono">Datos reales de la tabla `assets` en Supabase — no simulados</p>
                     </div>
-                    <span class="text-xs font-mono text-cyber-emerald bg-cyber-emerald/10 border border-cyber-emerald/30 px-2 py-1 rounded">DENTRO DE PRESUPUESTO ($150 MAX)</span>
+                    <span id="budgetBadge" class="text-xs font-mono text-cyber-emerald bg-cyber-emerald/10 border border-cyber-emerald/30 px-2 py-1 rounded">SIN DATOS AÚN</span>
                 </div>
-                
+
                 <div class="h-64">
                     <canvas id="costChart"></canvas>
                 </div>
@@ -682,35 +683,36 @@
                 <div class="space-y-3 font-mono text-xs">
                     <div>
                         <div class="flex justify-between text-slate-300 mb-1">
-                            <span>Storage Usado (Clips + Render):</span>
-                            <span class="text-cyber-violet font-bold">14.2 GB / 50 GB</span>
+                            <span>Clips de video generados:</span>
+                            <span id="clipsCountLabel" class="text-cyber-violet font-bold">0</span>
                         </div>
                         <div class="w-full bg-slate-800 rounded-full h-1.5">
-                            <div class="bg-cyber-violet h-full rounded-full" style="width: 28.4%"></div>
+                            <div id="clipsApprovedBar" class="bg-cyber-violet h-full rounded-full" style="width: 0%"></div>
                         </div>
+                        <p id="clipsApprovedLabel" class="text-[10px] text-slate-500 mt-1">0 aprobados</p>
                     </div>
 
                     <div class="p-3 bg-cyber-darker rounded-lg border border-cyber-border space-y-2">
                         <div class="flex justify-between">
                             <span class="text-slate-400">Canales Registrados:</span>
-                            <span class="text-white font-bold">3 (TikTok, YT Shorts, IG)</span>
+                            <span id="channelsCountLabel" class="text-white font-bold">0</span>
                         </div>
                         <div class="flex justify-between">
-                            <span class="text-slate-400">Filas en `episodes`:</span>
-                            <span class="text-white font-bold">142 registros</span>
+                            <span class="text-slate-400">Filas en `episodes` (serie actual):</span>
+                            <span id="episodeRowsLabel" class="text-white font-bold">0</span>
                         </div>
                         <div class="flex justify-between">
                             <span class="text-slate-400">Tamaño Story Bible (JSON):</span>
-                            <span class="text-white font-bold">48 KB</span>
+                            <span id="storyBibleSizeLabel" class="text-white font-bold">— KB</span>
                         </div>
                     </div>
 
                     <div class="p-3 bg-slate-900/80 rounded-lg border border-cyber-cyan/20">
                         <p class="text-[11px] text-cyber-cyan font-semibold flex items-center gap-1">
-                            <i class="fa-solid fa-circle-info"></i> Alerta de Presupuesto Configurada
+                            <i class="fa-solid fa-circle-info"></i> Presupuesto de referencia: $150/mes
                         </p>
                         <p class="text-[10px] text-slate-400 mt-1">
-                            Billing Budget activado en $150.00 en Google Cloud Console para pausar Netlify functions automáticamente al alcanzar el límite.
+                            Recomendado: activa un Billing Budget de $150 en Google Cloud Console para recibir alertas automáticas (confírmalo ahí — este panel no puede verificarlo por ti).
                         </p>
                     </div>
                 </div>
@@ -928,56 +930,9 @@
             }
         }
 
-        window.onload = function() {
-            const ctx = document.getElementById('costChart').getContext('2d');
-            
-            new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: ['1 Oct', '2 Oct', '3 Oct', '4 Oct', '5 Oct', '6 Oct', '7 Oct'],
-                    datasets: [
-                        {
-                            label: 'Costo Veo Lite ($)',
-                            data: [2.5, 3.2, 2.8, 3.5, 3.0, 2.9, 3.1],
-                            borderColor: '#00ff88',
-                            backgroundColor: 'rgba(0, 255, 136, 0.1)',
-                            fill: true,
-                            tension: 0.4
-                        },
-                        {
-                            label: 'Costo Veo Fast ($)',
-                            data: [1.2, 1.5, 1.2, 2.0, 1.4, 1.3, 1.5],
-                            borderColor: '#ff007f',
-                            backgroundColor: 'rgba(255, 0, 127, 0.1)',
-                            fill: true,
-                            tension: 0.4
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            labels: {
-                                color: '#94a3b8',
-                                font: { family: 'JetBrains Mono', size: 11 }
-                            }
-                        }
-                    },
-                    scales: {
-                        x: {
-                            grid: { color: 'rgba(255,255,255,0.05)' },
-                            ticks: { color: '#94a3b8', font: { family: 'JetBrains Mono' } }
-                        },
-                        y: {
-                            grid: { color: 'rgba(255,255,255,0.05)' },
-                            ticks: { color: '#94a3b8', font: { family: 'JetBrains Mono' } }
-                        }
-                    }
-                }
-            });
-        };
+        // El chart de costos ahora se crea con datos reales dentro del script de
+        // conexión a Supabase más abajo (ver renderCostChart) — ya no hay datos de
+        // maqueta aquí.
     </script>
 
     <!-- ───────────────────────────────────────────────────────────────
@@ -987,6 +942,9 @@
     <script>
     (function() {
       const DEFAULT_SERIES = 'dragon_silicio';
+      const BUDGET_TARGET_USD = 150;
+      let costChartRef = null;
+      let lastLoadedData = null;
 
       function esc(s) {
         return (s || '').toString().replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -1000,10 +958,10 @@
           ? '<button disabled class="flex-1 py-1.5 rounded bg-slate-800 text-slate-500 border border-slate-700 text-xs font-mono font-semibold cursor-default"><i class="fa-solid fa-check mr-1"></i> Aprobada</button>'
           : '<button onclick="approveShot(\'' + asset.id + '\')" class="flex-1 py-1.5 rounded bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/40 text-xs font-mono font-semibold transition-all"><i class="fa-solid fa-check mr-1"></i> Aprobar</button>';
         return (
-          '<div class="demo-shot-card bg-cyber-darker rounded-xl border ' + (isCliff ? 'border-2 border-cyber-pink/60 shadow-neon-pink' : 'border-cyber-border') + ' overflow-hidden group hover:border-cyber-cyan transition-all flex flex-col justify-between">' +
+          '<div class="demo-shot-card bg-cyber-darker rounded-xl border ' + (isCliff ? 'border-2 border-cyber-pink/60 shadow-neon-pink' : 'border-cyber-border') + ' overflow-hidden group hover:border-cyber-cyan transition-all flex flex-col justify-between relative" data-asset-id="' + asset.id + '" data-updated-at="' + esc(asset.updated_at || '') + '">' +
             '<div>' +
               '<div class="relative aspect-[9/16] bg-slate-950 overflow-hidden flex items-center justify-center text-slate-600 text-xs font-mono text-center p-4">' +
-                (asset.storage_path ? ('<img src="' + esc(asset.storage_path) + '" class="w-full h-full object-cover absolute inset-0" alt="Toma ' + (index + 1) + '">') : 'Sin preview aún') +
+                (asset.storage_path ? ('<video src="' + esc(asset.storage_path) + '" controls preload="metadata" playsinline class="w-full h-full object-cover absolute inset-0 bg-black"></video>') : 'Sin preview aún') +
                 '<div class="absolute top-3 left-3 right-3 flex justify-between items-center text-[10px] font-mono">' +
                   '<span class="bg-black/80 text-cyber-cyan border border-cyber-cyan/30 px-2 py-0.5 rounded">TOMA ' + String(index + 1).padStart(2, '0') + ' / ' + total + '</span>' +
                   '<span class="bg-cyber-emerald/90 text-black font-bold px-2 py-0.5 rounded">' + modelLabel + ' (' + cost + ')</span>' +
@@ -1023,6 +981,151 @@
         );
       }
 
+      // Todo lo de aquí abajo se calcula a partir de lo que de verdad devuelve
+      // get-episodes (episodios + assets reales, con su cost_usd real) — nada de
+      // números de la maqueta original.
+      function renderStats(data) {
+        const episodes = data.episodes || [];
+        const allClips = episodes.flatMap(e =>
+          (e.assets || [])
+            .filter(a => a.kind === 'video_clip')
+            .map(a => Object.assign({}, a, { episode_number: e.episode_number }))
+        );
+
+        const totalSpent = allClips.reduce((sum, a) => sum + (Number(a.cost_usd) || 0), 0);
+        const episodesWithAssets = episodes.filter(e => (e.assets || []).length > 0);
+        const avgCostPerEpisode = episodesWithAssets.length ? totalSpent / episodesWithAssets.length : 0;
+        const pctUsed = Math.min(100, (totalSpent / BUDGET_TARGET_USD) * 100);
+
+        document.getElementById('budgetSpentLabel').innerHTML =
+          '$' + totalSpent.toFixed(2) + ' <span class="text-xs text-slate-400 font-normal">/ $' + BUDGET_TARGET_USD.toFixed(2) + '</span>';
+        document.getElementById('budgetBar').style.width = pctUsed.toFixed(1) + '%';
+        document.getElementById('budgetAvgLabel').textContent = '~ $' + avgCostPerEpisode.toFixed(2) + ' / Episodio';
+        document.getElementById('budgetPctLabel').textContent = pctUsed.toFixed(1) + '% Usado';
+
+        const badge = document.getElementById('budgetBadge');
+        if (totalSpent === 0) {
+          badge.textContent = 'SIN DATOS AÚN';
+        } else if (pctUsed < 90) {
+          badge.textContent = 'DENTRO DE PRESUPUESTO ($' + BUDGET_TARGET_USD + ' MAX)';
+        } else {
+          badge.textContent = 'CERCA DEL LÍMITE ($' + BUDGET_TARGET_USD + ' MAX)';
+          badge.classList.remove('text-cyber-emerald', 'bg-cyber-emerald/10', 'border-cyber-emerald/30');
+          badge.classList.add('text-cyber-pink', 'bg-cyber-pink/10', 'border-cyber-pink/30');
+        }
+
+        const counts = { listos: 0, revision: 0, cola: 0, rechazados: 0 };
+        episodes.forEach(e => {
+          if (e.status === 'publicado') counts.listos++;
+          else if (e.status === 'en_revision') counts.revision++;
+          else if (e.status === 'guion_rechazado') counts.rechazados++;
+          else counts.cola++; // guion_pendiente, guion_generado, generando_media
+        });
+        document.getElementById('episodeCountLabel').textContent = episodes.length;
+        document.getElementById('episodesListos').textContent = counts.listos;
+        document.getElementById('episodesRevision').textContent = counts.revision;
+        document.getElementById('episodesCola').textContent = counts.cola;
+
+        const approvalBase = episodes.length;
+        const approvalRateLabel = document.getElementById('approvalRateLabel');
+        approvalRateLabel.textContent = approvalBase
+          ? (((approvalBase - counts.rechazados) / approvalBase) * 100).toFixed(1) + '%'
+          : '—';
+        document.getElementById('rejectedCountLabel').textContent = counts.rechazados;
+
+        const approvedClips = allClips.filter(a => a.approved).length;
+        document.getElementById('clipsCountLabel').textContent = allClips.length;
+        document.getElementById('clipsApprovedBar').style.width = (allClips.length ? (approvedClips / allClips.length) * 100 : 0).toFixed(1) + '%';
+        document.getElementById('clipsApprovedLabel').textContent = approvedClips + ' aprobados de ' + allClips.length;
+
+        document.getElementById('channelsCountLabel').textContent = data.channels_count || 0;
+        document.getElementById('episodeRowsLabel').textContent = episodes.length;
+        const storyBibleBytes = data.series && data.series.story_bible
+          ? new TextEncoder().encode(JSON.stringify(data.series.story_bible)).length
+          : 0;
+        document.getElementById('storyBibleSizeLabel').textContent = (storyBibleBytes / 1024).toFixed(1) + ' KB';
+
+        renderCostChart(allClips);
+      }
+
+      function renderCostChart(allClips) {
+        const canvas = document.getElementById('costChart');
+        if (!canvas || typeof Chart === 'undefined') return;
+        const sorted = allClips.slice().sort((a, b) =>
+          (a.episode_number - b.episode_number) || ((a.shot_number || 0) - (b.shot_number || 0))
+        );
+        const labels = sorted.map(a => 'Ep' + a.episode_number + '-T' + String(a.shot_number).padStart(2, '0'));
+        const costs = sorted.map(a => Number(a.cost_usd) || 0);
+        const colors = sorted.map(a => a.model === 'veo_fast' ? '#ff007f' : '#00ff88');
+
+        if (costChartRef) {
+          costChartRef.data.labels = labels;
+          costChartRef.data.datasets[0].data = costs;
+          costChartRef.data.datasets[0].backgroundColor = colors;
+          costChartRef.update();
+          return;
+        }
+
+        costChartRef = new Chart(canvas.getContext('2d'), {
+          type: 'bar',
+          data: {
+            labels,
+            datasets: [{
+              label: 'Costo real por toma ($)',
+              data: costs,
+              backgroundColor: colors
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { labels: { color: '#94a3b8', font: { family: 'JetBrains Mono', size: 11 } } }
+            },
+            scales: {
+              x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8', font: { family: 'JetBrains Mono' } } },
+              y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8', font: { family: 'JetBrains Mono' } } }
+            }
+          }
+        });
+      }
+
+      // Panel de "unir tomas en video final" — aparece solo cuando el episodio tiene
+      // tomas de video generadas. Si ya existe un asset "final_render", muestra el video
+      // completo en vez del botón.
+      function renderFinalRenderPanel(episode) {
+        const panel = document.getElementById('finalRenderPanel');
+        if (!episode) {
+          panel.classList.add('hidden');
+          panel.innerHTML = '';
+          return;
+        }
+        const clips = (episode.assets || []).filter(a => a.kind === 'video_clip');
+        const finalRender = (episode.assets || []).find(a => a.kind === 'final_render');
+
+        if (finalRender) {
+          panel.classList.remove('hidden');
+          panel.innerHTML =
+            '<div class="flex items-center gap-3 bg-cyber-darker border border-cyber-emerald/40 rounded-lg p-2">' +
+              '<video src="' + esc(finalRender.storage_path) + '" controls preload="metadata" class="w-20 h-32 object-cover rounded bg-black"></video>' +
+              '<div class="text-xs font-mono">' +
+                '<p class="text-cyber-emerald font-bold"><i class="fa-solid fa-check-circle mr-1"></i>Video final del episodio #' + episode.episode_number + ' listo (' + clips.length + ' tomas unidas).</p>' +
+                '<a href="' + esc(finalRender.storage_path) + '" target="_blank" class="text-cyber-cyan hover:underline">Abrir / descargar</a>' +
+                ' · <button onclick="mergeEpisode(\'' + episode.id + '\')" class="text-slate-400 hover:text-cyber-cyan underline">Rehacer</button>' +
+              '</div>' +
+            '</div>';
+        } else if (clips.length > 0) {
+          panel.classList.remove('hidden');
+          panel.innerHTML =
+            '<button id="mergeBtn" onclick="mergeEpisode(\'' + episode.id + '\')" class="px-3 py-2 rounded-lg bg-cyber-cyan/10 border border-cyber-cyan/30 text-cyber-cyan text-xs font-mono hover:bg-cyber-cyan/20">' +
+              '<i class="fa-solid fa-film mr-1"></i> Unir las ' + clips.length + ' tomas en un solo video final' +
+            '</button>';
+        } else {
+          panel.classList.add('hidden');
+          panel.innerHTML = '';
+        }
+      }
+
       async function loadDashboard() {
         const banner = document.getElementById('dataStatusBanner');
         try {
@@ -1032,10 +1135,12 @@
           const episodes = data.episodes || [];
           const inReview = episodes.find(e => e.status === 'en_revision') || episodes[0];
 
+          renderStats(data);
+          renderFinalRenderPanel(inReview);
           document.querySelectorAll('.demo-shot-card').forEach(el => el.remove());
 
           if (inReview && inReview.assets && inReview.assets.length) {
-            const sorted = inReview.assets.slice().sort((a, b) => (a.shot_number || 0) - (b.shot_number || 0));
+            const sorted = inReview.assets.filter(a => a.kind === 'video_clip').sort((a, b) => (a.shot_number || 0) - (b.shot_number || 0));
             const addCard = document.getElementById('addChapterCard');
             sorted.forEach((asset, i) => {
               addCard.insertAdjacentHTML('beforebegin', renderShotCard(asset, i, sorted.length));
@@ -1044,11 +1149,39 @@
           } else {
             banner.textContent = 'Conectado a Supabase — todavía no hay episodios generados para esta serie. Corre el pipeline para crear el primero.';
           }
+          lastLoadedData = data;
         } catch (err) {
           banner.textContent = 'No se pudo conectar a Supabase todavía (' + err.message + '). Revisa las variables de entorno en Netlify.';
           banner.classList.remove('text-cyber-gold');
           banner.classList.add('text-cyber-pink');
         }
+      }
+
+      // Las acciones que llaman a Veo o a ffmpeg (regenerar toma, unir video final) pueden
+      // tardar de segundos a varios minutos — por eso son background functions (responden
+      // 202 de inmediato, el trabajo real sigue en segundo plano) y este polling es lo que
+      // le avisa al dashboard cuándo terminaron de verdad, comparando el `updated_at` del
+      // asset antes/después (lo mantiene al día un trigger de Postgres, ver schema.sql).
+      const POLL_INTERVAL_MS = 8000;
+      const POLL_MAX_MS = 6.5 * 60 * 1000; // un poco más que el máximo documentado de Veo
+
+      async function pollUntilAssetChanged(findAsset, prevUpdatedAt) {
+        const start = Date.now();
+        while (Date.now() - start < POLL_MAX_MS) {
+          await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+          try {
+            const res = await fetch('/.netlify/functions/get-episodes?series=' + DEFAULT_SERIES);
+            if (!res.ok) continue;
+            const data = await res.json();
+            const asset = findAsset(data);
+            if (asset && (!prevUpdatedAt || asset.updated_at !== prevUpdatedAt)) {
+              return true;
+            }
+          } catch (_) {
+            // red caída un momento, reintenta en el siguiente ciclo
+          }
+        }
+        return false;
       }
 
       // Sobreescribe las funciones de demo de la maqueta original con las reales
@@ -1066,17 +1199,72 @@
       };
 
       window.regenShot = async function(assetId) {
+        const card = document.querySelector('[data-asset-id="' + assetId + '"]');
+        const prevUpdatedAt = card ? card.getAttribute('data-updated-at') : null;
+        let overlay = null;
+        if (card) {
+          card.querySelectorAll('button').forEach((b) => (b.disabled = true));
+          overlay = document.createElement('div');
+          overlay.className = 'absolute inset-0 bg-black/80 flex flex-col items-center justify-center z-10 text-center p-3 gap-1';
+          overlay.innerHTML =
+            '<i class="fa-solid fa-spinner fa-spin text-xl text-cyber-pink"></i>' +
+            '<p class="text-[11px] font-mono text-cyber-pink">Regenerando con Veo...</p>' +
+            '<p class="text-[10px] font-mono text-slate-400">puede tardar varios minutos</p>';
+          card.appendChild(overlay);
+        }
         try {
-          const res = await fetch('/.netlify/functions/regen-shot', {
+          const res = await fetch('/.netlify/functions/regen-shot-background', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ assetId })
           });
           if (!res.ok) throw new Error('HTTP ' + res.status);
-          const data = await res.json();
-          alert(data.note || 'Toma marcada para regenerar.');
+          const found = await pollUntilAssetChanged(
+            (data) => (data.episodes || []).flatMap((e) => e.assets || []).find((a) => a.id === assetId),
+            prevUpdatedAt
+          );
           await loadDashboard();
+          if (!found) {
+            alert('La toma todavía se está regenerando después de varios minutos — revisa la terminal de netlify dev, puede que haya fallado o esté tardando más de lo normal.');
+          }
         } catch (err) {
           alert('No se pudo regenerar: ' + err.message);
+          if (card) {
+            card.querySelectorAll('button').forEach((b) => (b.disabled = false));
+            if (overlay) overlay.remove();
+          }
+        }
+      };
+
+      window.mergeEpisode = async function(episodeId) {
+        const btn = document.getElementById('mergeBtn');
+        const prevFinalRender = lastLoadedData
+          ? (lastLoadedData.episodes || []).flatMap((e) => e.assets || []).find((a) => a.kind === 'final_render' && a.episode_id === episodeId)
+          : null;
+        const prevUpdatedAt = prevFinalRender ? prevFinalRender.updated_at : null;
+        if (btn) {
+          btn.disabled = true;
+          btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Uniendo tomas (puede tardar unos minutos)...';
+        }
+        try {
+          const res = await fetch('/.netlify/functions/merge-episode-background', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ episode_id: episodeId })
+          });
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          const found = await pollUntilAssetChanged(
+            (data) => (data.episodes || []).flatMap((e) => e.assets || []).find((a) => a.kind === 'final_render' && a.episode_id === episodeId),
+            prevUpdatedAt
+          );
+          await loadDashboard();
+          if (!found) {
+            alert('La unión todavía está corriendo después de varios minutos — revisa la terminal de netlify dev, puede que haya fallado o esté tardando más de lo normal.');
+          }
+        } catch (err) {
+          alert('No se pudo unir el video: ' + err.message);
+          if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-film mr-1"></i> Unir las tomas en un solo video final';
+          }
         }
       };
 

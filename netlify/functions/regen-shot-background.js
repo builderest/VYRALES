@@ -1,16 +1,24 @@
-// ⚠️ SUPERADA — el dashboard ya NO llama a esta función. Úsala `regen-shot-background.js`
-// en su lugar (misma lógica, pero como background function — esta versión síncrona se
-// quedaba corta contra el límite de ~30s de Netlify cuando Veo tardaba más de eso, que es
-// casi siempre). Se deja aquí sin usar por ahora — candidata a borrar en la limpieza antes
-// de producción (junto con seed-characters.js / seed-script-episode1.js).
+// POST /.netlify/functions/regen-shot-background   body: { assetId }
 //
-// POST /.netlify/functions/regen-shot   body: { assetId }
-// Regenera UNA toma puntual con Veo, reusando el mismo prompt que se guardó la primera
-// vez (assets.prompt), y reemplaza el video en Supabase Storage. Consume la API de Veo
-// de verdad (cargo real, igual que generate-media-background).
+// Regenera UNA toma puntual con Veo, reusando el mismo prompt guardado (assets.prompt), y
+// reemplaza el video en Supabase Storage. Consume la API de Veo de verdad (cargo real,
+// igual que generate-media-background).
+//
+// Por qué es background function y no una normal: Veo tarda entre ~11 segundos y varios
+// minutos en generar un clip, y las funciones normales de Netlify (y `netlify dev` local)
+// cortan la ejecución a los ~30 segundos ("Task timed out"). `regen-shot.js` (la versión
+// vieja, sin "-background") se quedó corta por eso — esta es su reemplazo, el dashboard ya
+// llama a esta. La vieja queda sin usar, se puede borrar en la limpieza antes de producción.
+//
+// El dashboard no espera la respuesta de esta función (las background functions responden
+// 202 de inmediato) — hace polling a get-episodes y detecta que terminó cuando cambia el
+// `updated_at` de la toma (lo actualiza un trigger de Postgres automáticamente en cada
+// UPDATE, ver supabase/schema.sql).
 const { getSupabaseClient } = require('./_supabase');
 const { uploadClip } = require('./_storage');
 const { generateVeoClip } = require('./_veo');
+
+const LOG = '[regen-shot]';
 
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {
@@ -19,8 +27,10 @@ exports.handler = async (event) => {
   try {
     const { assetId } = JSON.parse(event.body || '{}');
     if (!assetId) {
+      console.error(LOG, 'falta assetId en el body');
       return { statusCode: 400, body: JSON.stringify({ error: 'Falta assetId' }) };
     }
+    console.log(LOG, 'arrancó. assetId=', assetId);
     const supabase = getSupabaseClient();
 
     const { data: asset, error: fetchError } = await supabase
@@ -39,7 +49,9 @@ exports.handler = async (event) => {
     if (episodeError || !episode) throw episodeError || new Error('Episodio no encontrado');
 
     const modelKey = asset.model === 'veo_fast' ? 'veo_fast' : 'veo_lite';
+    console.log(LOG, 'generando con Veo (' + modelKey + ')... esto tarda un rato.');
     const { videoBuffer, costUsd, model } = await generateVeoClip({ modelKey, prompt: asset.prompt });
+    console.log(LOG, 'Veo terminó, subiendo a Supabase Storage...');
 
     const storagePath = `${episode.series.slug}/ep${episode.episode_number}/shot-${String(asset.shot_number).padStart(2, '0')}.mp4`;
     const publicUrl = await uploadClip(supabase, { path: storagePath, buffer: videoBuffer });
@@ -52,8 +64,10 @@ exports.handler = async (event) => {
       .single();
     if (updateError) throw updateError;
 
+    console.log(LOG, 'listo ✅. Toma', updated.shot_number, 'regenerada:', publicUrl);
     return { statusCode: 200, body: JSON.stringify({ asset: updated, model }) };
   } catch (err) {
+    console.error(LOG, 'ERROR:', err);
     return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
   }
 };

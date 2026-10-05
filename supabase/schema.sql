@@ -118,13 +118,33 @@ create table if not exists assets (
   quality_score numeric(5,2),            -- 0-100, si se corre un chequeo automático de calidad
   approved      boolean not null default false,
   approved_at   timestamptz,
-  created_at    timestamptz not null default now()
+  created_at    timestamptz not null default now(),
+  -- updated_at: se usa desde el dashboard para saber cuándo una regeneración (regen-shot)
+  -- o una unión de video final (merge-episode) YA terminó — el frontend guarda el valor
+  -- de antes de disparar la acción y hace polling a get-episodes hasta que cambia. El
+  -- trigger de abajo lo actualiza solo en cada UPDATE, sin que el código tenga que
+  -- acordarse de tocarlo a mano.
+  updated_at    timestamptz not null default now()
 );
 
 create index if not exists idx_episodes_series on episodes(series_id);
 create index if not exists idx_episodes_status on episodes(status);
 create index if not exists idx_assets_episode on assets(episode_id);
 create index if not exists idx_characters_series on characters(series_id);
+
+create or replace function set_assets_updated_at()
+returns trigger as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$ language plpgsql;
+
+drop trigger if exists trg_assets_updated_at on assets;
+create trigger trg_assets_updated_at
+  before update on assets
+  for each row
+  execute function set_assets_updated_at();
 
 -- ─────────────────────────────────────────────────────────────────────────
 -- Bloquear todo por defecto (ver nota de seguridad arriba)
