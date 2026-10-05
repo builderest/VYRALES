@@ -672,7 +672,7 @@
       }
       const DEFAULT_SERIES = readSeriesParam();
       // Mismos precios calibrados que netlify/functions/_veo.js (VEO_PRICE_PER_SECOND_USD).
-      const VEO_PRICE_PER_SEC = { veo_lite: 0.042, veo_fast: 0.157, veo_standard: 0.419 };
+      const VEO_PRICE_PER_SEC = { veo_lite: 0.05, veo_fast: 0.10, veo_standard: 0.40 }; // 720p, precio oficial de Google
       const IMAGE_PRICE_USD = 0.067; // cuadro inicial / imagen de lugar (gemini-3.1-flash-image, 1K)
       function usesKeyframes(series) { return !!(series && series.story_bible && series.story_bible.rules && series.story_bible.rules.keyframes); }
       function frameFor(ep, n) { return (ep.assets || []).find(a => a.kind === 'image' && a.shot_number === n) || null; }

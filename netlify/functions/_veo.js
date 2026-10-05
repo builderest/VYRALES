@@ -27,9 +27,9 @@ const VEO_MODELS = {
 // hasta 24h en aparecer) en vez de este panel de "Gasto de la API de Gemini".
 // Fuente de precios públicos: https://ai.google.dev/gemini-api/docs/pricing
 const VEO_PRICE_PER_SECOND_USD = {
-  veo_lite: 0.042,
-  veo_fast: 0.157,
-  veo_standard: 0.419
+  veo_lite: 0.05, // 720p — precio oficial (marzo 2026): Lite $0.05/s, Fast $0.10/s, Standard $0.40/s
+  veo_fast: 0.10,
+  veo_standard: 0.40
 };
 
 function getGenAIClient() {
