@@ -986,6 +986,7 @@
             '</div>' +
             '<div class="p-3 bg-slate-900/80 border-t border-cyber-border flex items-center justify-between gap-2">' +
               approveBtn +
+              (asset.storage_path ? '<button onclick="openMedia(this)" data-src="' + esc(asset.storage_path) + '" data-kind="video" data-title="Toma ' + String(index + 1).padStart(2, '0') + '" class="px-2.5 py-1.5 rounded bg-cyber-cyan/10 hover:bg-cyber-cyan/20 text-cyber-cyan border border-cyber-cyan/30 text-xs font-mono transition-all" title="Ver en grande / descargar"><i class="fa-solid fa-expand"></i></button>' : '') +
               '<button onclick="regenShot(\'' + asset.id + '\')" class="px-2.5 py-1.5 rounded bg-cyber-pink/20 hover:bg-cyber-pink/30 text-cyber-pink border border-cyber-pink/40 text-xs font-mono transition-all" title="Regenerar toma"><i class="fa-solid fa-rotate"></i></button>' +
             '</div>' +
           '</div>'
@@ -1121,7 +1122,7 @@
               '<video src="' + esc(finalRender.storage_path) + '" controls preload="metadata" class="w-20 h-32 object-cover rounded bg-black"></video>' +
               '<div class="text-xs font-mono">' +
                 '<p class="text-cyber-emerald font-bold"><i class="fa-solid fa-check-circle mr-1"></i>Video final del episodio #' + episode.episode_number + ' listo (' + clips.length + ' tomas unidas).</p>' +
-                '<a href="' + esc(finalRender.storage_path) + '" target="_blank" class="text-cyber-cyan hover:underline">Abrir / descargar</a>' +
+                '<button type="button" onclick="openMedia(this)" data-src="' + esc(finalRender.storage_path) + '" data-kind="video" data-title="EP ' + episode.episode_number + ' · Video final" class="text-cyber-cyan hover:underline"><i class="fa-solid fa-circle-play mr-1"></i>Ver / descargar</button>' +
                 ' · <button onclick="mergeEpisode(\'' + episode.id + '\')" class="text-slate-400 hover:text-cyber-cyan underline">Rehacer</button>' +
               '</div>' +
             '</div>';
@@ -1239,7 +1240,10 @@
               '<div class="px-4 pb-4 flex flex-col gap-3 border-t border-cyber-border/60 pt-3">' +
               (c.reference_image_url
                 ? '<div class="flex items-end gap-3">' +
-                    '<a href="' + esc(c.reference_image_url) + '" target="_blank" title="Ver en tamaño completo"><img src="' + esc(c.reference_image_url) + '" alt="' + esc(c.name) + '" class="h-48 rounded-lg border border-cyber-border object-cover"></a>' +
+                    '<button type="button" onclick="openMedia(this)" data-src="' + esc(c.reference_image_url) + '" data-kind="image" data-title="' + esc(c.name) + ' — foto de referencia" title="Ver en grande" class="relative group/ph">' +
+                      '<img src="' + esc(c.reference_image_url) + '" alt="' + esc(c.name) + '" class="h-48 rounded-lg border border-cyber-border object-cover group-hover/ph:border-cyber-cyan">' +
+                      '<span class="absolute bottom-1.5 right-1.5 bg-black/70 text-white text-[10px] rounded px-1.5 py-0.5"><i class="fa-solid fa-expand"></i></span>' +
+                    '</button>' +
                     '<button type="button" onclick="removeCharacterImage(\'' + esc(c.id) + '\')" class="text-[10px] font-mono text-slate-500 hover:text-cyber-pink"><i class="fa-solid fa-trash mr-1"></i>Quitar foto</button>' +
                   '</div>'
                 : '') +
@@ -1339,6 +1343,66 @@
           await loadDashboard();
         } catch (err) {
           alert('No se pudo quitar la foto: ' + err.message);
+        }
+      };
+
+      // ── Visor propio de fotos/videos ─────────────────────────────────────────
+      let currentMedia = null;
+
+      window.openMedia = function(el, ev) {
+        if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+        const src = el.getAttribute('data-src');
+        const kind = el.getAttribute('data-kind') || 'video';
+        const title = el.getAttribute('data-title') || '';
+        if (!src) return;
+        currentMedia = { src, kind, title };
+        document.getElementById('mediaTitle').textContent = title;
+        const body = document.getElementById('mediaBody');
+        body.innerHTML = kind === 'image'
+          ? '<img src="' + esc(src) + '" alt="' + esc(title) + '" class="max-h-[85vh] w-auto object-contain">'
+          : '<video src="' + esc(src) + '" controls autoplay playsinline class="max-h-[85vh] w-full bg-black"></video>';
+        document.getElementById('mediaModal').classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+      };
+
+      window.closeMedia = function() {
+        const modal = document.getElementById('mediaModal');
+        if (modal.classList.contains('hidden')) return;
+        const v = modal.querySelector('video');
+        if (v) { v.pause(); v.removeAttribute('src'); v.load(); }
+        document.getElementById('mediaBody').innerHTML = '';
+        modal.classList.add('hidden');
+        document.body.style.overflow = '';
+        currentMedia = null;
+      };
+      document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') window.closeMedia(); });
+
+      // Descarga directa sin salir de la página: se baja el archivo como blob y se guarda
+      // con su nombre. Respaldo: Supabase fuerza la descarga con ?download=<nombre>.
+      window.downloadMedia = async function() {
+        if (!currentMedia) return;
+        const btn = document.getElementById('mediaDownloadBtn');
+        const original = btn.innerHTML;
+        const fileName = decodeURIComponent(currentMedia.src.split('?')[0].split('/').pop() || 'vyrales-media');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>Descargando...';
+        try {
+          const res = await fetch(currentMedia.src);
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          const blob = await res.blob();
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url; a.download = fileName;
+          document.body.appendChild(a); a.click(); a.remove();
+          setTimeout(() => URL.revokeObjectURL(url), 5000);
+        } catch (_) {
+          const a = document.createElement('a');
+          a.href = currentMedia.src + (currentMedia.src.includes('?') ? '&' : '?') + 'download=' + encodeURIComponent(fileName);
+          a.download = fileName;
+          document.body.appendChild(a); a.click(); a.remove();
+        } finally {
+          btn.disabled = false;
+          btn.innerHTML = original;
         }
       };
 
@@ -1450,7 +1514,7 @@
                               '</div></details>'
                           : '') +
                         (clip
-                          ? '<a href="' + esc(clip.storage_path) + '" target="_blank" class="text-[10px] font-mono text-cyber-emerald hover:underline"><i class="fa-solid fa-film mr-1"></i>Ver toma generada (' + (clip.approved ? 'aprobada' : 'pendiente de revisión') + ')</a>'
+                          ? '<button type="button" onclick="openMedia(this)" data-src="' + esc(clip.storage_path) + '" data-kind="video" data-title="EP ' + e.episode_number + ' · Toma ' + sh.n + '" class="text-[10px] font-mono text-cyber-emerald hover:underline"><i class="fa-solid fa-circle-play mr-1"></i>Ver toma generada (' + (clip.approved ? 'aprobada' : 'pendiente de revisión') + ')</button>'
                           : (canGenerateShots
                               ? '<button onclick="generateShot(\'' + e.id + '\', ' + sh.n + ', ' + shotCost + ')" class="text-[10px] font-mono px-2 py-0.5 rounded border border-cyber-gold/40 text-cyber-gold bg-cyber-gold/10 hover:bg-cyber-gold/20"><i class="fa-solid fa-flask mr-1"></i>Generar solo esta toma (~$' + shotCost + ')</button>'
                               : '')) +
@@ -1960,6 +2024,20 @@
                 </div>
                 <div id="novelResult"></div>
             </div>
+        </div>
+    </div>
+
+    <!-- MODAL: visor propio de fotos y videos (sin abrir links externos) -->
+    <div id="mediaModal" class="hidden fixed inset-0 z-[110] bg-black/85 backdrop-blur-sm flex items-center justify-center p-4" onclick="if (event.target === this) closeMedia()">
+        <div class="relative w-full max-w-md flex flex-col max-h-[94vh]">
+            <div class="flex items-center justify-between gap-3 mb-2">
+                <p id="mediaTitle" class="text-sm font-display font-semibold text-white truncate"></p>
+                <div class="flex items-center gap-2 flex-shrink-0">
+                    <button id="mediaDownloadBtn" onclick="downloadMedia()" class="px-3 py-1.5 rounded-lg text-xs font-mono border border-cyber-cyan/40 bg-cyber-cyan/10 text-cyber-cyan hover:bg-cyber-cyan/20"><i class="fa-solid fa-download mr-1"></i>Descargar</button>
+                    <button onclick="closeMedia()" title="Cerrar (Esc)" class="w-8 h-8 rounded-lg border border-cyber-border bg-cyber-card text-slate-300 hover:text-white hover:border-cyber-pink"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+            </div>
+            <div id="mediaBody" class="rounded-xl overflow-hidden border border-cyber-border bg-black flex items-center justify-center min-h-[200px]"></div>
         </div>
     </div>
 </body>
