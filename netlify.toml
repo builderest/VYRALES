@@ -24,3 +24,13 @@
   status = 200
 
 # Candado: todo el sitio y las funciones piden sesión — netlify/edge-functions/auth.js (path "/*" en su config).
+
+# Direcciones limpias para TikTok / Instagram (TikTok rechaza "/.netlify/..." como Redirect URI).
+[[redirects]]
+  from = "/auth/tiktok/callback"
+  to = "/.netlify/functions/oauth-tiktok-callback"
+  status = 200
+[[redirects]]
+  from = "/auth/instagram/callback"
+  to = "/.netlify/functions/oauth-instagram-callback"
+  status = 200

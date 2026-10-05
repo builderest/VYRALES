@@ -9,7 +9,8 @@ const PUBLIC = [
   /^\/privacidad\.html$/, /^\/terminos\.html$/, /^\/login\.html$/, /^\/robots\.txt$/,
   /^\/tiktok[\w.-]*\.txt$/, /^\/favicon/,
   /^\/\.netlify\/functions\/login$/,
-  /^\/\.netlify\/functions\/oauth-(tiktok|instagram)-callback$/
+  /^\/\.netlify\/functions\/oauth-(tiktok|instagram)-callback$/,
+  /^\/auth\/(tiktok|instagram)\/callback$/
 ];
 
 const enc = new TextEncoder();

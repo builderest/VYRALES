@@ -10,7 +10,7 @@
 const crypto = require('crypto');
 
 const BASE_URL = () => (process.env.PUBLIC_BASE_URL || 'https://vyrales.app').replace(/\/$/, '');
-const REDIRECT = (platform) => `${BASE_URL()}/.netlify/functions/oauth-${platform}-callback`;
+const REDIRECT = (platform) => `${BASE_URL()}/auth/${platform}/callback`;
 const IG_GRAPH = 'https://graph.instagram.com/v23.0';
 
 function need(name) {
