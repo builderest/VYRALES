@@ -19,7 +19,6 @@ const LOG = '[merge-episode]';
 
 exports.handler = async (event) => {
   const supabase = getSupabaseClient();
-  const seriesSlug = process.env.DEFAULT_SERIES_SLUG || 'dragon_silicio';
   const qs = event.queryStringParameters || {};
   let body = {};
   try {
@@ -27,6 +26,7 @@ exports.handler = async (event) => {
   } catch (_) {
     body = {};
   }
+  const seriesSlug = body.series || qs.series || process.env.DEFAULT_SERIES_SLUG || 'dragon_silicio';
   const episodeId = body.episode_id || qs.episode_id;
   console.log(LOG, 'arrancó. episode_id=', episodeId || '(ninguno, toma el más reciente en en_revision)');
 

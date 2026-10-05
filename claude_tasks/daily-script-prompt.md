@@ -1,3 +1,6 @@
+> **OBSOLETO (2026-10-05):** este flujo de un guion por día fue reemplazado por novelas
+> escritas completas en `series/<slug>.json` + importación desde el dashboard. Ver README.
+
 # Tarea programada diaria — Guion de VYRALES
 
 Esto NO es un archivo que se ejecute solo. Es el texto que pegas como `prompt` al crear

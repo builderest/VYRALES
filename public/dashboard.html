@@ -146,10 +146,8 @@
             <div class="flex items-center space-x-3 bg-cyber-darker/80 border border-cyber-border px-3 py-1.5 rounded-lg">
                 <i class="fa-solid fa-tv text-cyber-pink text-xs"></i>
                 <span class="text-xs text-slate-400 font-mono hidden sm:inline">SERIE ACTIVA:</span>
-                <select id="seriesSelector" onchange="switchSeries(this.value)" class="bg-transparent text-sm font-semibold text-cyber-cyan focus:outline-none cursor-pointer">
-                    <option value="dragon" class="bg-cyber-card text-white">El Dragón de Silicio (Sci-Fi)</option>
-                    <option value="herencia" class="bg-cyber-card text-white">La Herencia de Cristal (Drama)</option>
-                    <option value="tokio" class="bg-cyber-card text-white">Sombras en Tokio (Cyberpunk Thriller)</option>
+                <select id="seriesSelector" onchange="switchSeries(this.value)" class="bg-transparent text-sm font-semibold text-cyber-cyan focus:outline-none cursor-pointer max-w-[220px]">
+                    <option class="bg-cyber-card text-white">Cargando series...</option>
                 </select>
             </div>
 
@@ -264,6 +262,21 @@
                 <p class="text-xs text-slate-400 mt-1">7 tomas Lite (~$0.04/s) + 1 Fast Clip (~$0.16/s) en el Cliffhanger final. Precios calibrados contra gasto real.</p>
                 <span class="inline-block mt-2 text-[10px] font-mono bg-cyber-emerald/20 text-cyber-emerald border border-cyber-emerald/40 px-2 py-0.5 rounded">OPTIMIZADO DÍA DÍA</span>
             </div>
+        </section>
+
+        <!-- ELENCO: PERSONAJES PRINCIPALES (datos reales de Supabase, tabla characters) -->
+        <section id="castSection" class="glass-panel rounded-2xl p-6">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-cyber-border pb-4 mb-5">
+                <div>
+                    <h3 class="font-display font-bold text-lg text-white flex items-center gap-2">
+                        <i class="fa-solid fa-masks-theater text-cyber-pink"></i>
+                        <span>ELENCO // PERSONAJES PRINCIPALES</span>
+                    </h3>
+                    <p id="castSubtitle" class="text-xs text-slate-400 font-mono">Cargando personajes desde Supabase...</p>
+                </div>
+                <div id="importBar" class="flex flex-wrap items-center gap-2"></div>
+            </div>
+            <div id="castGrid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"></div>
         </section>
 
         <!-- PIPELINE WORKFLOW VISUALIZER (INTERACTIVE NODES) -->
@@ -427,68 +440,26 @@
                 <div class="mt-4 pt-3 border-t border-cyber-border">
                     <h4 class="text-xs font-mono font-bold text-slate-300 mb-2 flex items-center justify-between">
                         <span>MEMORIA DE CONTINUIDAD</span>
-                        <span class="text-[10px] text-cyber-cyan">Episodio 14 &rarr; 15</span>
+                        <span id="continuityEpLabel" class="text-[10px] text-cyber-cyan">—</span>
                     </h4>
                     <div class="bg-cyber-darker p-3 rounded-lg border border-cyber-border/80 text-[11px] font-mono text-slate-400 space-y-1.5">
-                        <p><strong class="text-cyber-cyan">Último Cliffhanger:</strong> "Elena descubre el chip con la ubicación de la IA central oculta en su prótesis."</p>
-                        <p><strong class="text-cyber-pink">Estado Pendiente:</strong> "Kenji irrumpe en el laboratorio armado. Tensión máxima."</p>
+                        <p><strong class="text-cyber-cyan">Último Cliffhanger:</strong> <span id="continuityCliff">—</span></p>
+                        <p><strong class="text-cyber-pink">Estado Pendiente:</strong> <span id="continuityPending">—</span></p>
                     </div>
                 </div>
             </div>
 
-            <!-- Fixed Character Reference Profiles (Visual Consistency Vault) -->
+            <!-- ARCO COMPLETO: los guiones de todos los episodios (datos reales) -->
             <div class="glass-panel rounded-2xl p-6 lg:col-span-2">
                 <div class="flex items-center justify-between border-b border-cyber-border pb-3 mb-4">
                     <div class="flex items-center space-x-2">
-                        <i class="fa-solid fa-users-viewfinder text-cyber-cyan"></i>
-                        <h3 class="font-display font-bold text-white text-base">REFERENCIAS VISUALES FIJAS DE PERSONAJES</h3>
+                        <i class="fa-solid fa-scroll text-cyber-cyan"></i>
+                        <h3 class="font-display font-bold text-white text-base">ARCO COMPLETO // GUIONES</h3>
                     </div>
-                    <span class="text-xs font-mono text-slate-400">Nano Banana Pro Generated References</span>
+                    <span id="arcCountLabel" class="text-xs font-mono text-slate-400"></span>
                 </div>
-
-                <div id="characterCardsContainer" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <!-- Character 1 Card -->
-                    <div class="bg-cyber-darker p-4 rounded-xl border border-cyber-border hover:border-cyber-cyan transition-all flex space-x-4">
-                        <div class="relative w-24 h-32 rounded-lg overflow-hidden flex-shrink-0 border border-cyber-cyan/30">
-                            <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80" alt="Elena Vance" class="w-full h-full object-cover">
-                            <span class="absolute bottom-1 left-1 right-1 text-[9px] font-mono bg-black/80 text-cyber-cyan text-center py-0.5 rounded">REF_FIXED_01</span>
-                        </div>
-                        <div class="space-y-1 text-xs">
-                            <div class="flex items-center justify-between">
-                                <h4 class="font-display font-bold text-white text-sm">Elena Vance</h4>
-                                <span class="text-[10px] font-mono text-cyber-cyan bg-cyber-cyan/10 px-1.5 py-0.5 rounded">PROTAGONISTA</span>
-                            </div>
-                            <p class="text-[11px] text-slate-400">Ingeniera cibernética rebelde. Pelo corto plateado, chaqueta de cuero con neón violeta, prótesis ocular derecha.</p>
-                            <div class="pt-2 text-[10px] font-mono text-slate-400">
-                                <strong class="text-slate-300">Prompt Tag Fijo:</strong>
-                                <p class="text-cyber-cyan/90 bg-slate-900 p-1.5 rounded mt-0.5 border border-slate-800">
-                                    "25yo cybernetic engineer female, short silver hair, glowing violet ocular lens, cyberpunk street jacket"
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Character 2 Card -->
-                    <div class="bg-cyber-darker p-4 rounded-xl border border-cyber-border hover:border-cyber-violet transition-all flex space-x-4">
-                        <div class="relative w-24 h-32 rounded-lg overflow-hidden flex-shrink-0 border border-cyber-violet/30">
-                            <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80" alt="Kenji Sato" class="w-full h-full object-cover">
-                            <span class="absolute bottom-1 left-1 right-1 text-[9px] font-mono bg-black/80 text-cyber-violet text-center py-0.5 rounded">REF_FIXED_02</span>
-                        </div>
-                        <div class="space-y-1 text-xs">
-                            <div class="flex items-center justify-between">
-                                <h4 class="font-display font-bold text-white text-sm">Kenji Sato</h4>
-                                <span class="text-[10px] font-mono text-cyber-pink bg-cyber-pink/10 px-1.5 py-0.5 rounded">ANTAGONISTA</span>
-                            </div>
-                            <p class="text-[11px] text-slate-400">Agente corporativo de SilicoCorp. Traje táctico de corte limpio, cicatriz diagonal en barbilla, mirada implacable.</p>
-                            <div class="pt-2 text-[10px] font-mono text-slate-400">
-                                <strong class="text-slate-300">Prompt Tag Fijo:</strong>
-                                <p class="text-cyber-violet/90 bg-slate-900 p-1.5 rounded mt-0.5 border border-slate-800">
-                                    "35yo Japanese male operative, sharp black tech suit, clean jawline with subtle scar, intense gaze"
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <p id="arcSynopsis" class="text-[11px] text-slate-400 mb-3"></p>
+                <div id="arcList" class="space-y-2 max-h-[620px] overflow-y-auto pr-1"></div>
             </div>
         </section>
 
@@ -941,7 +912,29 @@
          versiones que sí llaman al backend. -->
     <script>
     (function() {
-      const DEFAULT_SERIES = 'dragon_silicio';
+      // Serie activa: ?series=<slug> en la URL > la última elegida > dulce_engano.
+      function readSeriesParam() {
+        const fromUrl = new URLSearchParams(location.search).get('series');
+        if (fromUrl) return fromUrl;
+        try { return localStorage.getItem('vyrales_series') || 'dulce_engano'; } catch (_) { return 'dulce_engano'; }
+      }
+      const DEFAULT_SERIES = readSeriesParam();
+      const VEO_LITE_PER_SEC = 0.042;
+      const VEO_FAST_PER_SEC = 0.157;
+      const STATUS_LABELS = {
+        guion_pendiente: ['GUION PENDIENTE', 'text-slate-400 border-slate-600'],
+        guion_generado: ['LISTO PARA PRODUCIR', 'text-cyber-cyan border-cyber-cyan/40'],
+        guion_rechazado: ['GUION RECHAZADO', 'text-cyber-pink border-cyber-pink/40'],
+        generando_media: ['GENERANDO VIDEO', 'text-cyber-gold border-cyber-gold/40'],
+        en_revision: ['EN REVISIÓN', 'text-cyber-violet border-cyber-violet/40'],
+        publicado: ['PUBLICADO', 'text-cyber-emerald border-cyber-emerald/40'],
+        archivado: ['ARCHIVADO', 'text-slate-500 border-slate-700']
+      };
+      const ROLE_STYLES = {
+        protagonista: 'text-cyber-cyan bg-cyber-cyan/10 border-cyber-cyan/30',
+        antagonista: 'text-cyber-pink bg-cyber-pink/10 border-cyber-pink/30',
+        secundario: 'text-cyber-gold bg-cyber-gold/10 border-cyber-gold/30'
+      };
       const BUDGET_TARGET_USD = 150;
       let costChartRef = null;
       let lastLoadedData = null;
@@ -1126,14 +1119,262 @@
         }
       }
 
+      function renderSeriesSelector(allSeries, current) {
+        const sel = document.getElementById('seriesSelector');
+        const list = allSeries.slice();
+        if (!list.find(x => x.slug === DEFAULT_SERIES)) list.unshift({ slug: DEFAULT_SERIES, title: DEFAULT_SERIES + ' (no importada)' });
+        sel.innerHTML = list.map(x =>
+          '<option value="' + esc(x.slug) + '" class="bg-cyber-card text-white"' + (x.slug === DEFAULT_SERIES ? ' selected' : '') + '>' +
+            esc(x.title) + (x.genre ? ' (' + esc(x.genre) + ')' : '') +
+          '</option>'
+        ).join('');
+      }
+
+      window.switchSeries = function(slug) {
+        try { localStorage.setItem('vyrales_series', slug); } catch (_) {}
+        location.search = '?series=' + encodeURIComponent(slug);
+      };
+
+      function initials(name) {
+        return (name || '?').split(/\s+/).map(w => w.charAt(0)).join('').slice(0, 2).toUpperCase();
+      }
+
+      function renderCast(data) {
+        const grid = document.getElementById('castGrid');
+        const chars = data.characters || [];
+        const episodes = data.episodes || [];
+        document.getElementById('castSubtitle').textContent = chars.length
+          ? chars.length + ' personajes de "' + data.series.title + '" — el tag fijo en inglés se inyecta en cada toma de Veo donde aparecen.'
+          : 'Esta serie todavía no tiene personajes guardados.';
+        grid.innerHTML = chars.map(c => {
+          const pr = c.profile || {};
+          const appearances = episodes.filter(e => (e.shots || []).some(s => (s.characters || []).includes(c.name))).length;
+          const roleCls = ROLE_STYLES[c.role] || 'text-slate-300 bg-slate-800 border-slate-700';
+          const avatar = c.reference_image_url
+            ? '<img src="' + esc(c.reference_image_url) + '" alt="' + esc(c.name) + '" class="w-full h-full object-cover">'
+            : '<span class="font-display font-bold text-2xl text-white">' + esc(initials(c.name)) + '</span>';
+          const row = (label, val) => val ? '<p><strong class="text-slate-300">' + label + ':</strong> ' + esc(val) + '</p>' : '';
+          return (
+            '<div class="bg-cyber-darker p-4 rounded-xl border border-cyber-border hover:border-cyber-cyan transition-all flex flex-col gap-3">' +
+              '<div class="flex items-start gap-3">' +
+                '<div class="w-16 h-20 rounded-lg flex-shrink-0 flex items-center justify-center overflow-hidden bg-gradient-to-br from-cyber-violet/60 to-cyber-pink/40 border border-cyber-border">' + avatar + '</div>' +
+                '<div class="min-w-0 flex-1">' +
+                  '<div class="flex items-center justify-between gap-2">' +
+                    '<h4 class="font-display font-bold text-white text-base truncate">' + esc(c.name) + '</h4>' +
+                    '<span class="text-[10px] font-mono px-1.5 py-0.5 rounded border ' + roleCls + '">' + esc((c.role || '').toUpperCase()) + '</span>' +
+                  '</div>' +
+                  '<p class="text-[11px] font-mono text-slate-400">' + (pr.age ? pr.age + ' años · ' : '') + esc(pr.archetype || '') + '</p>' +
+                  '<p class="text-[10px] font-mono text-cyber-cyan mt-0.5">Aparece en ' + appearances + ' de ' + episodes.length + ' episodios' + (c.reference_image_url ? '' : ' · sin imagen de referencia') + '</p>' +
+                '</div>' +
+              '</div>' +
+              '<p class="text-[11px] text-slate-300">' + esc(c.description || '') + '</p>' +
+              '<div class="text-[11px] text-slate-400 space-y-1">' +
+                row('Personalidad', pr.personality) + row('Quiere', pr.wants) + row('Miedo', pr.fear) + row('Arco', pr.arc) + row('Vestuario base', pr.default_outfit) +
+              '</div>' +
+              '<div class="text-[10px] font-mono">' +
+                '<div class="flex items-center justify-between"><strong class="text-slate-300">Prompt tag fijo (Veo)</strong>' +
+                  '<button onclick="copyTag(this)" data-tag="' + esc(c.fixed_prompt_tag || '') + '" class="text-cyber-cyan hover:underline"><i class="fa-regular fa-copy mr-1"></i>Copiar</button></div>' +
+                '<p class="text-cyber-cyan/90 bg-slate-900 p-2 rounded mt-1 border border-slate-800">' + esc(c.fixed_prompt_tag || '— sin tag —') + '</p>' +
+              '</div>' +
+            '</div>'
+          );
+        }).join('');
+      }
+
+      window.copyTag = function(btn) {
+        const text = btn.getAttribute('data-tag') || '';
+        (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject())
+          .then(() => { btn.innerHTML = '<i class="fa-solid fa-check mr-1"></i>Copiado'; setTimeout(() => (btn.innerHTML = '<i class="fa-regular fa-copy mr-1"></i>Copiar'), 1500); })
+          .catch(() => prompt('Copia el tag:', text));
+      };
+
+      function estimateEpisodeCost(ep) {
+        const n = (ep.shots && ep.shots.length) || 8;
+        return (n - 1) * 8 * VEO_LITE_PER_SEC + 8 * VEO_FAST_PER_SEC;
+      }
+
+      function renderArc(data) {
+        const list = document.getElementById('arcList');
+        const eps = (data.episodes || []).slice().sort((a, b) => a.episode_number - b.episode_number);
+        const nextToProduce = eps.find(e => e.status === 'guion_generado');
+        document.getElementById('arcCountLabel').textContent = eps.length + ' episodios';
+        document.getElementById('arcSynopsis').textContent = data.series.synopsis || '';
+        if (!eps.length) {
+          list.innerHTML = '<p class="text-xs font-mono text-slate-500">Todavía no hay episodios escritos para esta serie.</p>';
+          return;
+        }
+        list.innerHTML = eps.map(e => {
+          const st = STATUS_LABELS[e.status] || [e.status, 'text-slate-400 border-slate-600'];
+          const shots = e.shots || [];
+          const clips = (e.assets || []).filter(a => a.kind === 'video_clip').length;
+          const words = e.validator_report && e.validator_report.words;
+          const cont = e.continuity || {};
+          const shotsHtml = shots.length
+            ? shots.map(sh =>
+                '<div class="border-l-2 ' + (sh.n === shots.length ? 'border-cyber-pink' : 'border-cyber-border') + ' pl-3 py-1">' +
+                  '<p class="text-[10px] font-mono text-slate-500">TOMA ' + String(sh.n).padStart(2, '0') + (sh.n === shots.length ? ' · CLIFFHANGER (Veo Fast)' : '') + ' · ' + esc(sh.location) + ' · ' + esc((sh.characters || []).join(', ')) + '</p>' +
+                  '<p class="text-[12px] text-slate-200">' + esc(sh.scene_es) + '</p>' +
+                  (sh.dialogue || []).map(d => '<p class="text-[11px] text-cyber-cyan font-mono">— ' + esc(d.speaker) + ': ' + esc(d.line) + '</p>').join('') +
+                '</div>'
+              ).join('')
+            : '<pre class="text-[11px] text-slate-300 whitespace-pre-wrap">' + esc(e.script || 'Sin guion todavía.') + '</pre>';
+          const produceBtn = (nextToProduce && nextToProduce.id === e.id)
+            ? '<button onclick="produceEpisode(\'' + e.id + '\')" class="px-3 py-1.5 rounded-lg bg-cyber-pink/20 border border-cyber-pink/50 text-cyber-pink text-xs font-mono hover:bg-cyber-pink/30"><i class="fa-solid fa-bolt mr-1"></i>Producir este episodio (~$' + estimateEpisodeCost(e).toFixed(2) + ')</button>'
+            : '';
+          return (
+            '<details class="bg-cyber-darker rounded-lg border border-cyber-border open:border-cyber-cyan/50">' +
+              '<summary class="cursor-pointer list-none p-3 flex items-center justify-between gap-2">' +
+                '<span class="text-sm text-white font-display font-semibold truncate"><span class="font-mono text-cyber-cyan mr-2">EP ' + String(e.episode_number).padStart(2, '0') + '</span>' + esc(e.title || 'Sin título') + '</span>' +
+                '<span class="flex items-center gap-2 flex-shrink-0">' +
+                  (clips ? '<span class="text-[10px] font-mono text-slate-400">' + clips + '/' + (shots.length || 8) + ' clips</span>' : '') +
+                  (words ? '<span class="text-[10px] font-mono text-slate-500 hidden sm:inline">' + words + ' palabras</span>' : '') +
+                  '<span class="text-[10px] font-mono px-1.5 py-0.5 rounded border ' + st[1] + '">' + st[0] + '</span>' +
+                '</span>' +
+              '</summary>' +
+              '<div class="px-3 pb-3 space-y-2">' +
+                (cont.summary ? '<p class="text-[11px] text-slate-400"><strong class="text-slate-300">Resumen:</strong> ' + esc(cont.summary) + '</p>' : '') +
+                shotsHtml +
+                (cont.last_cliffhanger ? '<p class="text-[11px] text-cyber-pink"><strong>Gancho:</strong> ' + esc(cont.last_cliffhanger) + '</p>' : '') +
+                produceBtn +
+              '</div>' +
+            '</details>'
+          );
+        }).join('');
+      }
+
+      function renderContinuity(data) {
+        const eps = (data.episodes || []).slice().sort((a, b) => a.episode_number - b.episode_number);
+        // El último episodio ya producido (con video) es el que marca la continuidad; si
+        // ninguno se produjo todavía, el primero escrito.
+        const produced = eps.filter(e => ['en_revision', 'publicado', 'archivado'].includes(e.status));
+        const ref = produced.length ? produced[produced.length - 1] : eps[0];
+        const label = document.getElementById('continuityEpLabel');
+        if (!ref) { label.textContent = '—'; return; }
+        const next = eps.find(e => e.episode_number === ref.episode_number + 1);
+        label.innerHTML = 'Episodio ' + ref.episode_number + (next ? ' &rarr; ' + next.episode_number : ' (final del arco)');
+        document.getElementById('continuityCliff').textContent = (ref.continuity && ref.continuity.last_cliffhanger) || '—';
+        document.getElementById('continuityPending').textContent = (ref.continuity && ref.continuity.pending_state) || '—';
+      }
+
+      async function loadImportBar() {
+        const bar = document.getElementById('importBar');
+        try {
+          const res = await fetch('/.netlify/functions/import-series');
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          const data = await res.json();
+          bar.innerHTML = (data.series || []).map(x =>
+            '<button onclick="importSeries(\'' + esc(x.slug) + '\')" ' + (x.valid ? '' : 'disabled title="' + esc(x.errors.join(' | ')) + '"') +
+              ' class="px-3 py-1.5 rounded-lg text-xs font-mono border ' + (x.valid ? 'bg-cyber-emerald/10 border-cyber-emerald/40 text-cyber-emerald hover:bg-cyber-emerald/20' : 'bg-slate-800 border-slate-700 text-slate-500 cursor-not-allowed') + '">' +
+              '<i class="fa-solid fa-file-import mr-1"></i>' + (x.imported ? 'Actualizar' : 'Importar') + ' "' + esc(x.title) + '" (' + x.episodes + ' eps · ' + x.characters + ' personajes)' +
+              (x.valid ? '' : ' — NO VÁLIDA') +
+            '</button>'
+          ).join('');
+        } catch (err) {
+          bar.innerHTML = '<span class="text-[11px] font-mono text-cyber-pink">No se pudo leer import-series (' + esc(err.message) + ')</span>';
+        }
+      }
+
+      window.importSeries = async function(slug) {
+        if (!confirm('Se va a importar/actualizar la novela "' + slug + '" en Supabase (serie, personajes y guiones). No llama a Veo ni cuesta dinero. Los episodios que ya están en producción no se tocan. ¿Continuar?')) return;
+        const bar = document.getElementById('importBar');
+        bar.innerHTML = '<span class="text-xs font-mono text-cyber-gold"><i class="fa-solid fa-spinner fa-spin mr-1"></i>Importando...</span>';
+        try {
+          const res = await fetch('/.netlify/functions/import-series', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ slug })
+          });
+          const out = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error((out.error || ('HTTP ' + res.status)) + (out.errors ? '\n- ' + out.errors.join('\n- ') : ''));
+          const ep = out.episodes || {};
+          alert('Importado ✅\nPersonajes: ' + out.characters + '\nEpisodios nuevos: ' + (ep.inserted || []).length + '\nActualizados: ' + (ep.updated || []).length + '\nProtegidos (ya en producción): ' + (ep.protected || []).length);
+          try { localStorage.setItem('vyrales_series', slug); } catch (_) {}
+          location.search = '?series=' + encodeURIComponent(slug);
+        } catch (err) {
+          alert('No se pudo importar:\n' + err.message);
+          loadImportBar();
+        }
+      };
+
+      // Producción manual de un episodio (cuesta dinero real en Veo). Solo se ofrece para
+      // el siguiente episodio en "guion_generado", en orden.
+      window.produceEpisode = async function(episodeId) {
+        const ep = lastLoadedData && (lastLoadedData.episodes || []).find(e => e.id === episodeId);
+        if (!ep) return alert('No encontré el episodio. Recarga la página.');
+        const cost = estimateEpisodeCost(ep);
+        if (!confirm('Producir EP ' + ep.episode_number + ' "' + (ep.title || '') + '" con Veo.\n\nCosto estimado: ~$' + cost.toFixed(2) + ' USD (7 tomas Lite + 1 Fast). Es un cargo REAL en Google Cloud.\nTarda entre 10 y 30 minutos. ¿Continuar?')) return;
+        const banner = document.getElementById('dataStatusBanner');
+        try {
+          const res = await fetch('/.netlify/functions/generate-media-background', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ series: DEFAULT_SERIES, episode_id: episodeId })
+          });
+          if (!res.ok && res.status !== 202) throw new Error('HTTP ' + res.status);
+        } catch (err) {
+          return alert('No se pudo arrancar la producción: ' + err.message);
+        }
+        const start = Date.now();
+        const MAX_MS = 45 * 60 * 1000;
+        while (Date.now() - start < MAX_MS) {
+          await new Promise(r => setTimeout(r, 20000));
+          try {
+            const r = await fetch('/.netlify/functions/get-episodes?series=' + encodeURIComponent(DEFAULT_SERIES));
+            if (!r.ok) continue;
+            const d = await r.json();
+            const cur = (d.episodes || []).find(e => e.id === episodeId);
+            if (!cur) continue;
+            const clips = (cur.assets || []).filter(a => a.kind === 'video_clip').length;
+            const total = (cur.shots || []).length || 8;
+            const mins = Math.round((Date.now() - start) / 60000);
+            banner.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>Produciendo EP ' + cur.episode_number + ': ' + clips + '/' + total + ' tomas listas (' + mins + ' min)...';
+            if (cur.status === 'en_revision') {
+              await loadDashboard();
+              return alert('EP ' + cur.episode_number + ' listo para revisión ✅');
+            }
+            if (cur.status === 'guion_generado' && Date.now() - start > 90000) {
+              await loadDashboard();
+              return alert('La producción terminó con ' + clips + '/' + total + ' tomas. Algunas fallaron — vuelve a apretar "Producir": solo genera las que faltan.');
+            }
+          } catch (_) {}
+        }
+        await loadDashboard();
+        alert('La producción sigue corriendo después de 45 min. Revisa los logs de la función en Netlify.');
+      };
+
+      // El botón "EJECUTAR PIPELINE" del header ya no es una simulación: produce el
+      // siguiente episodio listo (con confirmación y costo estimado).
+      window.triggerPipelineRun = function() {
+        const eps = lastLoadedData ? (lastLoadedData.episodes || []).slice().sort((a, b) => a.episode_number - b.episode_number) : [];
+        const generating = eps.find(e => e.status === 'generando_media');
+        if (generating) return alert('El EP ' + generating.episode_number + ' ya se está generando.');
+        const next = eps.find(e => e.status === 'guion_generado');
+        if (!next) return alert('No hay ningún episodio listo para producir en esta serie.');
+        window.produceEpisode(next.id);
+      };
+
       async function loadDashboard() {
         const banner = document.getElementById('dataStatusBanner');
         try {
-          const res = await fetch('/.netlify/functions/get-episodes?series=' + DEFAULT_SERIES);
+          const res = await fetch('/.netlify/functions/get-episodes?series=' + encodeURIComponent(DEFAULT_SERIES));
+          if (res.status === 404) {
+            const nf = await res.json().catch(() => ({}));
+            renderSeriesSelector(nf.all_series || [], null);
+            const others = (nf.all_series || []).filter(x => x.slug !== DEFAULT_SERIES);
+            document.getElementById('castSubtitle').textContent = 'La serie "' + DEFAULT_SERIES + '" todavía no está en la base. Usa el botón de importar.';
+            banner.textContent = 'La serie "' + DEFAULT_SERIES + '" no existe todavía en Supabase.' + (others.length ? ' Elige otra arriba o impórtala.' : ' Impórtala con el botón de la sección Elenco.');
+            return;
+          }
           if (!res.ok) throw new Error('HTTP ' + res.status);
           const data = await res.json();
           const episodes = data.episodes || [];
-          const inReview = episodes.find(e => e.status === 'en_revision') || episodes[0];
+          renderSeriesSelector(data.all_series || [], data.series);
+          renderCast(data);
+          renderArc(data);
+          renderContinuity(data);
+          const inReview =
+            episodes.find(e => e.status === 'en_revision') ||
+            episodes.find(e => e.status === 'generando_media') ||
+            episodes.find(e => (e.assets || []).some(a => a.kind === 'video_clip')) ||
+            null;
 
           renderStats(data);
           renderFinalRenderPanel(inReview);
@@ -1170,7 +1411,7 @@
         while (Date.now() - start < POLL_MAX_MS) {
           await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
           try {
-            const res = await fetch('/.netlify/functions/get-episodes?series=' + DEFAULT_SERIES);
+            const res = await fetch('/.netlify/functions/get-episodes?series=' + encodeURIComponent(DEFAULT_SERIES));
             if (!res.ok) continue;
             const data = await res.json();
             const asset = findAsset(data);
@@ -1248,7 +1489,7 @@
         try {
           const res = await fetch('/.netlify/functions/merge-episode-background', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ episode_id: episodeId })
+            body: JSON.stringify({ episode_id: episodeId, series: DEFAULT_SERIES })
           });
           if (!res.ok) throw new Error('HTTP ' + res.status);
           const found = await pollUntilAssetChanged(
@@ -1268,7 +1509,10 @@
         }
       };
 
-      document.addEventListener('DOMContentLoaded', loadDashboard);
+      document.addEventListener('DOMContentLoaded', () => {
+        loadDashboard();
+        loadImportBar();
+      });
     })();
     </script>
 

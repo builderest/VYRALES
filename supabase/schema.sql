@@ -1,4 +1,6 @@
 -- VYRALES — esquema inicial de Supabase
+-- IMPORTANTE: después de este archivo corre también supabase/migrations/002_novela_completa.sql
+-- (columnas title/shots/profile/sort_order, índice único de personajes y permisos).
 -- Cómo usarlo: Supabase Dashboard → tu proyecto → SQL Editor → pega todo esto → Run.
 -- Seguridad: RLS queda ACTIVADO en todas las tablas y sin políticas públicas a propósito.
 -- Eso significa que nadie puede leer ni escribir estos datos desde el navegador con la

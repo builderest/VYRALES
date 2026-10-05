@@ -4,19 +4,29 @@ const { getSupabaseClient } = require('./_supabase');
 
 exports.handler = async (event) => {
   try {
-    const seriesSlug = event.queryStringParameters && event.queryStringParameters.series;
+    const seriesSlug =
+      (event.queryStringParameters && event.queryStringParameters.series) ||
+      process.env.DEFAULT_SERIES_SLUG ||
+      'dragon_silicio';
     const supabase = getSupabaseClient();
+
+    // Lista de todas las series para el selector del dashboard.
+    const { data: allSeries } = await supabase
+      .from('series')
+      .select('id, slug, title, genre, created_at')
+      .order('created_at', { ascending: false });
 
     const { data: series, error: seriesError } = await supabase
       .from('series')
-      .select('id, slug, title, genre, story_bible')
-      .eq('slug', seriesSlug || 'dragon_silicio')
-      .single();
+      .select('id, slug, title, genre, synopsis, story_bible')
+      .eq('slug', seriesSlug)
+      .maybeSingle();
 
     if (seriesError || !series) {
       return {
         statusCode: 404,
-        body: JSON.stringify({ error: 'Serie no encontrada' })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ error: 'Serie no encontrada: ' + seriesSlug, all_series: allSeries || [] })
       };
     }
 
@@ -25,14 +35,15 @@ exports.handler = async (event) => {
       .select('*, assets(*)')
       .eq('series_id', series.id)
       .order('episode_number', { ascending: false })
-      .limit(20);
+      .limit(50);
 
     if (episodesError) throw episodesError;
 
     const { data: characters } = await supabase
       .from('characters')
       .select('*')
-      .eq('series_id', series.id);
+      .eq('series_id', series.id)
+      .order('sort_order', { ascending: true });
 
     // Solo el conteo (head: true no trae filas, es barato) — para el panel de stats
     // reales del dashboard (nada de números de maqueta).
@@ -45,6 +56,7 @@ exports.handler = async (event) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         series,
+        all_series: allSeries || [],
         episodes,
         characters: characters || [],
         channels_count: channelsCount || 0

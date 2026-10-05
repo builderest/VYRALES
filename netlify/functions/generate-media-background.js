@@ -18,6 +18,16 @@ const { getSupabaseClient } = require('./_supabase');
 const { ensureMediaBucket, uploadClip } = require('./_storage');
 const { generateVeoClip } = require('./_veo');
 const { mergeEpisodeVideo } = require('./_merge');
+const { buildShotPrompt } = require('./_series');
+
+// Estilo por defecto SOLO para series viejas sin story_bible.visual_style (dragon_silicio).
+// Las novelas nuevas definen su estilo en story_bible.visual_style (ej. animación 3D).
+const LEGACY_STYLE = 'Vertical 9:16 cinematic shot, photorealistic, consistent lighting.';
+
+// Las background functions de Netlify cortan a los 15 min. Si se acerca el límite y aún
+// faltan tomas, la función se vuelve a llamar a sí misma (las tomas ya hechas se saltan),
+// así un episodio lento no se queda a medias.
+const TIME_BUDGET_MS = 11 * 60 * 1000;
 
 function parseScenes(script) {
   return (script || '')
@@ -44,7 +54,7 @@ function buildPrompt(sceneText, characters, storyBible) {
   return [
     stylePrefix ? `${stylePrefix}.` : '',
     tags.length ? `Characters: ${tags.join('; ')}.` : '',
-    'Vertical 9:16 cinematic shot, photorealistic, consistent lighting.',
+    style.visual_style || LEGACY_STYLE,
     sceneText
   ]
     .filter(Boolean)
@@ -53,12 +63,30 @@ function buildPrompt(sceneText, characters, storyBible) {
 
 const LOG = '[generate-media]';
 
-exports.handler = async (event) => {
-  const supabase = getSupabaseClient();
-  const seriesSlug = process.env.DEFAULT_SERIES_SLUG || 'dragon_silicio';
-  const qs = event.queryStringParameters || {};
+function selfUrl(event, params) {
+  const headers = event.headers || {};
+  const host = headers.host || headers.Host;
+  const proto = headers['x-forwarded-proto'] || (host && host.startsWith('localhost') ? 'http' : 'https');
+  const base = host ? `${proto}://${host}` : process.env.URL;
+  return `${base}/.netlify/functions/generate-media-background?${new URLSearchParams(params).toString()}`;
+}
 
-  console.log(LOG, 'arrancó. series=', seriesSlug, 'episode_id=', qs.episode_id || '(ninguno, toma el más reciente pendiente)');
+exports.handler = async (event) => {
+  const startedAt = Date.now();
+  const supabase = getSupabaseClient();
+  const qs = event.queryStringParameters || {};
+  let body = {};
+  try {
+    body = JSON.parse(event.body || '{}');
+  } catch (_) {
+    body = {};
+  }
+  const seriesSlug = body.series || qs.series || process.env.DEFAULT_SERIES_SLUG || 'dragon_silicio';
+  const episodeId = body.episode_id || qs.episode_id;
+  const isContinuation = qs.continue === '1';
+  const force = qs.force === '1' || body.force === true;
+
+  console.log(LOG, 'arrancó. series=', seriesSlug, 'episode_id=', episodeId || '(ninguno, toma el siguiente en guion_generado)', isContinuation ? '(continuación)' : '');
 
   try {
     const { data: series, error: seriesError } = await supabase
@@ -70,8 +98,8 @@ exports.handler = async (event) => {
     console.log(LOG, 'serie OK:', series.id);
 
     let episodeQuery = supabase.from('episodes').select('*').eq('series_id', series.id);
-    episodeQuery = qs.episode_id
-      ? episodeQuery.eq('id', qs.episode_id)
+    episodeQuery = episodeId
+      ? episodeQuery.eq('id', episodeId)
       : episodeQuery.eq('status', 'guion_generado').order('episode_number', { ascending: true }).limit(1);
 
     const { data: episodes, error: episodeError } = await episodeQuery;
@@ -82,12 +110,27 @@ exports.handler = async (event) => {
     }
     console.log(LOG, 'episodio encontrado: #' + episode.episode_number, episode.id, 'status=', episode.status);
 
-    const { data: characters } = await supabase
-      .from('characters')
-      .select('name, fixed_prompt_tag')
-      .eq('series_id', series.id);
+    // Evita gastar doble: si alguien aprieta el botón dos veces, la segunda llamada no
+    // arranca otra generación en paralelo. ?force=1 sirve si una corrida anterior se cayó
+    // y dejó el episodio trabado en "generando_media".
+    if (episode.status === 'generando_media' && !isContinuation && !force) {
+      console.warn(LOG, 'el episodio ya se está generando — no arranco otra corrida. Usa ?force=1 si quedó trabado.');
+      return { statusCode: 409, body: JSON.stringify({ error: 'El episodio ya se está generando.' }) };
+    }
 
-    const allScenes = parseScenes(episode.script);
+    const { data: characters, error: charactersError } = await supabase
+      .from('characters')
+      .select('name, fixed_prompt_tag, profile')
+      .eq('series_id', series.id);
+    if (charactersError) throw charactersError;
+
+    // Novelas nuevas: tomas estructuradas (episodes.shots). Series viejas: se parsea el
+    // texto del guion como antes.
+    const structured = Array.isArray(episode.shots) && episode.shots.length > 0;
+    const allScenes = structured
+      ? episode.shots.map((shot) => ({ number: shot.n, text: shot.scene_es, shot }))
+      : parseScenes(episode.script);
+    console.log(LOG, structured ? 'usando tomas estructuradas (episodes.shots)' : 'usando guion de texto (modo legacy)');
     console.log(LOG, 'escenas parseadas:', allScenes.length);
     if (allScenes.length === 0) {
       throw new Error('El episodio no tiene un guion con escenas numeradas ("1. ...", "2. ...", etc.).');
@@ -123,11 +166,25 @@ exports.handler = async (event) => {
     // Secuencial a propósito (no Promise.all): 8 solicitudes simultáneas chocan con la
     // cuota de "requests por minuto" que Google asigna a cuentas de facturación recién
     // activadas (ver 429 RESOURCE_EXHAUSTED). Una por una es más lento pero confiable.
+    // Se arman TODOS los prompts antes de llamar a Veo: si alguno falla (personaje sin
+    // tag, etc.) se aborta sin haber gastado nada.
+    const prompts = {};
+    for (const scene of scenes) {
+      prompts[scene.number] = scene.shot
+        ? buildShotPrompt(scene.shot, characters, series.story_bible)
+        : buildPrompt(scene.text, characters, series.story_bible);
+    }
+
     const results = [];
     for (const scene of scenes) {
+      if (Date.now() - startedAt > TIME_BUDGET_MS) {
+        console.warn(LOG, 'cerca del límite de 15 min de Netlify — me vuelvo a llamar para seguir con las tomas que faltan...');
+        await fetch(selfUrl(event, { series: seriesSlug, episode_id: episode.id, continue: '1' }), { method: 'POST' });
+        return { statusCode: 202, body: JSON.stringify({ episode_id: episode.id, continued: true, shots_ok_this_run: results.filter((r) => r.status === 'fulfilled').length }) };
+      }
       const isCliffhanger = scene.number === total;
       const modelKey = isCliffhanger ? 'veo_fast' : 'veo_lite';
-      const prompt = buildPrompt(scene.text, characters, series.story_bible);
+      const prompt = prompts[scene.number];
 
       console.log(LOG, `toma ${scene.number}/${total} (${modelKey}): arrancando generación con Veo...`);
       try {
