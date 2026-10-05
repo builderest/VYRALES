@@ -13,3 +13,10 @@
 # con import-series. Si algun dia se quiere volver a automatizar, reponer aqui:
 # [functions."daily-trigger"]
 #   schedule = "0 13 * * *"
+
+# La raíz del sitio abre el dashboard directo (http://localhost:8888/ y https://vyrales.netlify.app/).
+# status 200 = rewrite: la URL se queda en "/" y se sirve dashboard.html. /dashboard.html sigue funcionando.
+[[redirects]]
+  from = "/"
+  to = "/dashboard.html"
+  status = 200
