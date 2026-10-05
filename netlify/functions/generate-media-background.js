@@ -217,12 +217,17 @@ exports.handler = async (event) => {
           made++;
         } catch (err) {
           console.error(LOG, `cuadro de la toma ${scene.number} FALLÓ:`, err.message);
-          failed.push(scene.number);
+          failed.push({ shot: scene.number, error: String(err.message || err).slice(0, 300) });
         }
       }
-      await supabase.from('episodes').update({ status: 'guion_generado' }).eq('id', episode.id);
+      // Resultado de la corrida guardado en el episodio para que el dashboard lo muestre
+      // (antes solo quedaba en la terminal de netlify dev).
+      const report = Object.assign({}, episode.validator_report || {}, {
+        last_frames_run: { at: new Date().toISOString(), created: made, failed }
+      });
+      await supabase.from('episodes').update({ status: 'guion_generado', validator_report: report }).eq('id', episode.id);
       markedGenerating = null;
-      console.log(LOG, 'cuadros listos:', made, failed.length ? '— fallaron: ' + failed.join(', ') : '');
+      console.log(LOG, 'cuadros listos:', made, failed.length ? '— fallaron: ' + failed.map((f) => f.shot + ' (' + f.error + ')').join(', ') : '');
       return { statusCode: 200, body: JSON.stringify({ frames_created: made, frames_failed: failed }) };
     }
 

@@ -1093,7 +1093,7 @@
       };
 
       window.removeCharacterImage = async function(characterId) {
-        if (!confirm('¿Quitar la foto de referencia de este personaje?')) return;
+        if (!await askConfirm('¿Quitar la foto de referencia de este personaje?')) return;
         try {
           const res = await fetch('/.netlify/functions/character-image', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -1311,7 +1311,7 @@
         const ep = lastLoadedData && (lastLoadedData.episodes || []).find(x => x.id === episodeId);
         if (!ep) return;
         const missing = (ep.shots || []).filter(sh => !frameFor(ep, sh.n) && !clipFor(ep, sh.n)).length;
-        if (!confirm('Generar ' + missing + ' cuadros iniciales del EP ' + ep.episode_number + ' (sin video).\n\nCosto: ' + missing + ' × $' + IMAGE_PRICE_USD.toFixed(3) + ' = ~$' + (missing * IMAGE_PRICE_USD).toFixed(2) + ' USD.\nDespués revisas cada cuadro y regeneras solo los que salgan mal, antes de gastar en video. ¿Continuar?')) return;
+        if (!await askConfirm('Generar ' + missing + ' cuadros iniciales del EP ' + ep.episode_number + ' (sin video).\n\nCosto: ' + missing + ' × $' + IMAGE_PRICE_USD.toFixed(3) + ' = ~$' + (missing * IMAGE_PRICE_USD).toFixed(2) + ' USD.\nDespués revisas cada cuadro y regeneras solo los que salgan mal, antes de gastar en video. ¿Continuar?')) return;
         btn.disabled = true;
         btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>Generando cuadros...';
         try {
@@ -1330,6 +1330,12 @@
           return left === 0 || (cur.status === 'guion_generado' && Date.now() - start > 30000);
         }, 15 * 60 * 1000);
         await loadDashboard();
+        const after = lastLoadedData && (lastLoadedData.episodes || []).find(x => x.id === episodeId);
+        const run = after && after.validator_report && after.validator_report.last_frames_run;
+        if (run && new Date(run.at).getTime() >= start - 5000 && run.failed && run.failed.length) {
+          alert('Se hicieron ' + run.created + ' cuadro(s). Fallaron ' + run.failed.length + ':\n\n' +
+            run.failed.map(f => '• Toma ' + f.shot + ': ' + f.error).join('\n') + '\n\nLas que fallan no se cobran.');
+        }
       };
 
       // Regenerar desde el panel de revisión: primero el modal con el prompt actual.
@@ -1444,7 +1450,7 @@
         const chars = (lastLoadedData && lastLoadedData.characters) || [];
         const missing = chars.filter(c => !c.reference_image_url);
         if (!missing.length) return;
-        if (!confirm('Generar ' + missing.length + ' foto(s) de personaje con Gemini:\n\n' + missing.map(c => '• ' + c.name).join('\n') +
+        if (!await askConfirm('Generar ' + missing.length + ' foto(s) de personaje con Gemini:\n\n' + missing.map(c => '• ' + c.name).join('\n') +
           '\n\nCosto: ' + missing.length + ' × $' + IMAGE_PRICE_USD.toFixed(3) + ' = ~$' + (missing.length * IMAGE_PRICE_USD).toFixed(2) + ' USD.\n' +
           'Se hacen en orden; cada foto nueva sirve de referencia de estilo para la siguiente. Después revisas cada una y regeneras solo la que no te guste. ¿Continuar?')) return;
         await generateCharacterPhotos({ series: DEFAULT_SERIES, only_missing: true }, missing.map(c => c.id));
@@ -1509,7 +1515,7 @@
       };
       window.removeLocationImage = async function(btn) {
         const key = btn.dataset.loc;
-        if (!confirm('¿Quitar la imagen fija de "' + key + '"?')) return;
+        if (!await askConfirm('¿Quitar la imagen fija de "' + key + '"?')) return;
         try {
           const res = await fetch('/.netlify/functions/location-image', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -1835,7 +1841,7 @@
       }
 
       window.importSeries = async function(slug) {
-        if (!confirm('Se va a importar/actualizar la novela "' + slug + '" en Supabase (serie, personajes y guiones). No llama a Veo ni cuesta dinero. Los episodios que ya están en producción no se tocan. ¿Continuar?')) return;
+        if (!await askConfirm('Se va a importar/actualizar la novela "' + slug + '" en Supabase (serie, personajes y guiones). No llama a Veo ni cuesta dinero. Los episodios que ya están en producción no se tocan. ¿Continuar?')) return;
         const bar = document.getElementById('importBar');
         bar.innerHTML = '<span class="text-xs font-mono text-cyber-gold"><i class="fa-solid fa-spinner fa-spin mr-1"></i>Importando...</span>';
         try {
@@ -1861,7 +1867,7 @@
         const ep = lastLoadedData && (lastLoadedData.episodes || []).find(e => e.id === episodeId);
         if (!ep) return alert('No encontré el episodio. Recarga la página.');
         const cost = estimateEpisodeCost(ep);
-        if (!confirm('Producir EP ' + ep.episode_number + ' "' + (ep.title || '') + '" con Veo.\n\nCosto estimado: ~$' + cost.toFixed(2) + ' USD (' + costBreakdownLabel(ep) + '). Es un cargo REAL en Google Cloud.\nTarda entre 10 y 30 minutos. ¿Continuar?')) return;
+        if (!await askConfirm('Producir EP ' + ep.episode_number + ' "' + (ep.title || '') + '" con Veo.\n\nCosto estimado: ~$' + cost.toFixed(2) + ' USD (' + costBreakdownLabel(ep) + '). Es un cargo REAL en Google Cloud.\nTarda entre 10 y 30 minutos. ¿Continuar?')) return;
         const banner = document.getElementById('dataStatusBanner');
         try {
           const res = await fetch('/.netlify/functions/generate-media-background', {
@@ -1906,7 +1912,7 @@
       window.generateShot = async function(episodeId, shotNumber, cost, skipConfirm) {
         const ep = lastLoadedData && (lastLoadedData.episodes || []).find(x => x.id === episodeId);
         if (!ep) return alert('No encontré el episodio. Recarga la página.');
-        if (!skipConfirm && !confirm('Generar SOLO la toma ' + shotNumber + ' del EP ' + ep.episode_number + ' con Veo.\n\nCosto: ~$' + Number(cost).toFixed(2) + ' USD (cargo real en Google Cloud). Tarda de 1 a 6 minutos. ¿Continuar?')) return;
+        if (!skipConfirm && !await askConfirm('Generar SOLO la toma ' + shotNumber + ' del EP ' + ep.episode_number + ' con Veo.\n\nCosto: ~$' + Number(cost).toFixed(2) + ' USD (cargo real en Google Cloud). Tarda de 1 a 6 minutos. ¿Continuar?')) return;
         const box = document.querySelector('[data-shot="' + episodeId + '-' + shotNumber + '"]');
         const btn = box && box.querySelector('button[data-kind="video"][data-mode="generate"]');
         if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>Generando con Veo... (1–6 min)'; }
@@ -2075,6 +2081,23 @@
         const next = eps.find(e => e.status === 'guion_generado');
         if (!next) return alert('No hay ningún episodio listo para producir en esta serie.');
         window.produceEpisode(next.id);
+      };
+
+      // Confirmación propia (modal en la página). El confirm() del navegador puede quedar
+      // bloqueado en silencio ("no permitir más diálogos") y entonces el botón "no hace nada".
+      window.askConfirm = function(message) {
+        return new Promise(resolve => {
+          const m = document.getElementById('confirmModal');
+          document.getElementById('cfText').textContent = message;
+          const done = v => { m.classList.add('hidden'); document.removeEventListener('keydown', onKey); resolve(v); };
+          const onKey = e => { if (e.key === 'Escape') done(false); };
+          document.getElementById('cfOk').onclick = () => done(true);
+          document.getElementById('cfCancel').onclick = () => done(false);
+          m.onclick = e => { if (e.target === m) done(false); };
+          document.addEventListener('keydown', onKey);
+          m.classList.remove('hidden');
+          document.getElementById('cfOk').focus();
+        });
       };
 
       async function loadDashboard() {
@@ -2285,6 +2308,16 @@
     </div>
 
     <!-- MODAL: visor propio de fotos y videos (sin abrir links externos) -->
+    <div id="confirmModal" class="hidden fixed inset-0 z-[120] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+      <div class="w-full max-w-lg bg-cyber-darker border border-cyber-cyan/50 rounded-xl p-5 shadow-2xl">
+        <h4 class="font-display font-bold text-white mb-3"><i class="fa-solid fa-circle-question text-cyber-cyan mr-2"></i>Confirmar</h4>
+        <p id="cfText" class="text-sm text-slate-300 whitespace-pre-line"></p>
+        <div class="flex justify-end gap-2 mt-5">
+          <button id="cfCancel" class="px-4 py-1.5 rounded-lg bg-slate-800 text-slate-300 text-xs font-mono hover:bg-slate-700">Cancelar</button>
+          <button id="cfOk" class="px-4 py-1.5 rounded-lg bg-cyber-cyan/20 border border-cyber-cyan/60 text-cyber-cyan text-xs font-mono hover:bg-cyber-cyan/30">Sí, continuar</button>
+        </div>
+      </div>
+    </div>
     <div id="mediaModal" class="hidden fixed inset-0 z-[110] bg-black/85 backdrop-blur-sm flex items-center justify-center p-4" onclick="if (event.target === this) closeMedia()">
         <div class="relative w-full max-w-md flex flex-col max-h-[94vh]">
             <div class="flex items-center justify-between gap-3 mb-2">
