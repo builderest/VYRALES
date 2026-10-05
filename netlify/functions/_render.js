@@ -18,7 +18,10 @@ const H = 1280;
 const FPS = 24;
 const FONT_FILE = 'Montserrat-ExtraBold.ttf';
 const FONT_NAME = 'Montserrat Thin ExtraBold'; // nombre de familia real dentro del archivo (fontsource)
-const SPEECH = [0.25, 6.1]; // el diálogo se dice entre 0 y 6 s de cada toma (así lo pide el prompt)
+const SPEECH = [0.25, 6.1];
+// Transiciones con encimado (xfade de ffmpeg). 'cut' = corte directo; 'fade_black' = baja a
+// negro y sube (sin encimar, con fade en cada toma).
+const XFADE = { crossfade: 'fade', dissolve: 'dissolve', slide: 'slideleft', slide_up: 'slideup', wipe: 'wipeleft', zoom: 'zoomin', circle: 'circleopen', blur: 'hblur', flash: 'fadewhite' }; // el diálogo se dice entre 0 y 6 s de cada toma (así lo pide el prompt)
 
 function run(args, cwd) {
   return new Promise((resolve, reject) => {
@@ -264,7 +267,7 @@ async function renderEpisode({ episode, series, log = console.log, fetchFile = d
       const fadeIn = prev && prev.transition === 'fade_black' ? tSec(prev) / 2 : 0;
       const fadeOut = c.transition === 'fade_black' && i < chosen.length ? tSec(c) / 2 : 0;
       const dur = await renderClip({ cwd, input: src, out, c, subtitle, speakerColor: spk ? SPEAKER_COLORS[speakers.indexOf(spk) % SPEAKER_COLORS.length] : null, sub, fadeIn, fadeOut });
-      parts.push({ file: out, dur, xfade: c.transition === 'crossfade' && i < chosen.length ? Math.min(tSec(c), dur / 2) : 0 });
+      parts.push({ file: out, dur, xfade: XFADE[c.transition] && i < chosen.length ? Math.min(tSec(c), dur / 2) : 0, xname: XFADE[c.transition] || 'fade' });
     }
     if (plan.end_card.enabled && (plan.end_card.text || plan.end_card.subtext)) {
       log('tarjeta final...');
@@ -287,7 +290,7 @@ async function renderEpisode({ episode, series, log = console.log, fetchFile = d
         const aOut = `[a${k}]`;
         if (x > 0) {
           offset -= x;
-          f.push(`${vPrev}[iv${k}]xfade=transition=fade:duration=${x.toFixed(3)}:offset=${offset.toFixed(3)}${vOut}`);
+          f.push(`${vPrev}[iv${k}]xfade=transition=${parts[k - 1].xname}:duration=${x.toFixed(3)}:offset=${offset.toFixed(3)}${vOut}`);
           f.push(`${aPrev}[ia${k}]acrossfade=d=${x.toFixed(3)}${aOut}`);
         } else {
           f.push(`${vPrev}[iv${k}]concat=n=2:v=1:a=0,settb=AVTB,fps=${FPS}${vOut}`);

@@ -11,7 +11,9 @@
   const MIN_SECONDS = 90;
   const FRAME = 1 / 24;
   const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
-  const TRANSITIONS = { cut: 'Corte', crossfade: 'Fundido cruzado', fade_black: 'Fundido a negro' };
+  const TRANSITIONS = { cut: 'Corte directo', crossfade: 'Fundido cruzado', fade_black: 'Fundido a negro', dissolve: 'Disolver', slide: 'Deslizar ←', slide_up: 'Deslizar ↑', wipe: 'Barrido', zoom: 'Zoom', circle: 'Círculo', blur: 'Desenfoque', flash: 'Destello blanco' };
+  const TR_ICON = { cut: '|', crossfade: '◐', fade_black: '■', dissolve: '░', slide: '←', slide_up: '↑', wipe: '▶', zoom: '⊕', circle: '◯', blur: '≈', flash: '✦' };
+  const OVERLAP = (t) => t && t !== 'cut' && t !== 'fade_black'; // transiciones que enciman las tomas
   const SUB_STYLES = { classic: 'Clásico', yellow: 'Amarillo', box: 'Caja negra' };
   const SPEAKER_CSS = ['#ffffff', '#8cf0ff', '#ff8cb9', '#b4ff80', '#c49eff', '#ffc880'];
 
@@ -171,7 +173,14 @@
     <div class="px-4 pb-2">
       <div class="flex items-center justify-between text-[11px] font-mono text-slate-400 mb-1">
         <span>LÍNEA DE TIEMPO · arrastra los bordes amarillos para recortar · arrastra una toma para moverla · ○ = transición</span>
-        <span class="flex items-center gap-1">Zoom <button onclick="vyEditor.zoomTl(-1)" class="${btn} border-cyber-border">−</button><button onclick="vyEditor.zoomTl(1)" class="${btn} border-cyber-border">+</button></span>
+        <span class="flex items-center gap-1 flex-wrap justify-end">
+          <span class="text-cyber-violet">Transiciones automáticas:</span>
+          <select id="edAutoType" class="bg-black border border-cyber-border rounded px-1 py-0.5 text-slate-200">${Object.entries(TRANSITIONS).filter(([k]) => k !== 'cut').map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select>
+          <button onclick="vyEditor.autoTransitions('scene')" class="${btn} border-cyber-violet/60 text-cyber-violet hover:bg-cyber-violet/10" title="Pone la transición solo donde cambia el lugar; dentro de la misma escena deja corte directo">Al cambiar de escena</button>
+          <button onclick="vyEditor.autoTransitions('all')" class="${btn} border-cyber-border" title="Entre todas las tomas">En todas</button>
+          <button onclick="vyEditor.autoTransitions('none')" class="${btn} border-cyber-border" title="Todo con corte directo">Quitar</button>
+          <span class="ml-2">Zoom</span><button onclick="vyEditor.zoomTl(-1)" class="${btn} border-cyber-border">−</button><button onclick="vyEditor.zoomTl(1)" class="${btn} border-cyber-border">+</button>
+        </span>
       </div>
       <div id="edTlWrap" class="overflow-x-auto bg-black/40 border border-cyber-border rounded-lg">
         <div id="edTimeline" class="relative" style="height:96px"></div>
@@ -269,7 +278,7 @@
   }
   // Duración real del video final: los fundidos cruzados se enciman.
   function totalDur(seq) {
-    return seq.reduce((s, x) => s + x.dur, 0) - seq.reduce((s, x) => s + (x.type === 'clip' && x.transition === 'crossfade' ? Math.min(x.transition_s, x.dur / 2) : 0), 0);
+    return seq.reduce((s, x) => s + x.dur, 0) - seq.reduce((s, x) => s + (x.type === 'clip' && OVERLAP(x.transition) ? Math.min(x.transition_s, x.dur / 2) : 0), 0);
   }
 
   // ================= Deshacer / rehacer =================
@@ -333,7 +342,7 @@
     const on = i === st.sel;
     const cut = (Number(c.trim_start) || Number(c.trim_end));
     const tags = [cut ? '<span class="text-cyber-gold" title="recortada">✂</span>' : '', speedOf(c) !== 1 ? `<span class="text-cyber-cyan">${speedOf(c)}×</span>` : '', c.zoom ? '<span class="text-cyber-violet" title="zoom">🔍</span>' : '',
-      c.transition && c.transition !== 'cut' ? '<span class="text-cyber-violet" title="transición">◐</span>' : '', c.overlay ? '<span class="text-yellow-300" title="texto arriba">T</span>' : '', c.include === false ? '<span class="text-cyber-pink">quitada</span>' : ''].filter(Boolean).join(' ');
+      c.transition && c.transition !== 'cut' ? `<span class="text-cyber-violet" title="transición: ${TRANSITIONS[c.transition]}">${TR_ICON[c.transition] || '◐'}</span>` : '', c.overlay ? '<span class="text-yellow-300" title="texto arriba">T</span>' : '', c.include === false ? '<span class="text-cyber-pink">quitada</span>' : ''].filter(Boolean).join(' ');
     return `<div id="edItem${i}" onclick="vyEditor.select(${i})" class="flex items-center gap-2 rounded-lg p-1.5 cursor-pointer border ${on ? 'border-cyber-cyan bg-cyber-cyan/10' : 'border-cyber-border hover:border-slate-500'} ${c.include === false ? 'opacity-40' : ''}">
       ${a ? `<video src="${esc(a.storage_path)}#t=1" preload="metadata" muted class="w-9 h-16 object-cover rounded bg-black flex-shrink-0 pointer-events-none"></video>` : '<div class="w-9 h-16 rounded bg-slate-900 flex-shrink-0"></div>'}
       <div class="flex-1 min-w-0 text-[11px] font-mono">
@@ -427,7 +436,7 @@
       </div>`;
       const nextIt = seq[seq.indexOf(it) + 1];
       if (nextIt && nextIt.type === 'clip') {
-        const icon = { cut: '|', crossfade: '◐', fade_black: '■' }[c.transition || 'cut'];
+        const icon = TR_ICON[c.transition || 'cut'] || '◐';
         html += `<div class="tl-tr ${c.transition && c.transition !== 'cut' ? 'on' : ''}" data-tr="${i}" style="left:${10 + (it.t0 + it.dur) * px - 1}px" title="Transición: ${TRANSITIONS[c.transition || 'cut']} (clic para cambiar)">${icon}</div>`;
       }
     });
@@ -480,9 +489,10 @@
       const tr = e.target.closest('.tl-tr');
       if (tr) {
         const i = Number(tr.dataset.tr);
-        const order = ['cut', 'crossfade', 'fade_black'];
+        const order = Object.keys(TRANSITIONS);
         const c = st.plan.clips[i];
         setClip('transition', order[(order.indexOf(c.transition || 'cut') + 1) % order.length], i);
+        window.vyEditor.select(i);
         return;
       }
       const block = e.target.closest('.tl-block');
@@ -619,8 +629,8 @@
     let fade = 0;
     const fIn = prev && prev.type === 'clip' && prev.transition !== 'cut' ? prev.transition_s / 2 : 0;
     const fOut = item.transition !== 'cut' ? item.transition_s / 2 : 0;
-    if (fIn && tIn < fIn) fade = Math.max(fade, (prev.transition === 'crossfade' ? 0.5 : 1) * (1 - tIn / fIn));
-    if (fOut && tLeft < fOut) fade = Math.max(fade, (item.transition === 'crossfade' ? 0.5 : 1) * (1 - tLeft / fOut));
+    if (fIn && tIn < fIn) fade = Math.max(fade, (prev.transition === 'fade_black' ? 1 : 0.5) * (1 - tIn / fIn));
+    if (fOut && tLeft < fOut) fade = Math.max(fade, (item.transition === 'fade_black' ? 1 : 0.5) * (1 - tLeft / fOut));
     $('edFade').style.opacity = st.playing ? fade : 0;
   }
   function onTime() {
@@ -880,6 +890,21 @@
       $('edStatus').textContent = (which === 'start' ? 'Inicio' : 'Final') + ' de la TOMA ' + String(c.shot).padStart(2, '0') + ' en ' + t.toFixed(2) + 's (Ctrl+Z para deshacer).';
     },
     clearTrim: (i) => { const idx = i == null ? st.sel : i; const c = st.plan.clips[idx]; c.trim_start = 0; c.trim_end = 0; markDirty(); renderClips(); paintScrub(); },
+    autoTransitions: (mode) => {
+      const type = $('edAutoType').value || 'crossfade';
+      const inc = st.plan.clips.filter((c) => c.include !== false && clipAsset(c.shot));
+      let changed = 0;
+      inc.forEach((c, k) => {
+        const nxt = inc[k + 1];
+        let t = 'cut';
+        if (nxt && mode === 'all') t = type;
+        if (nxt && mode === 'scene' && (shotOf(c.shot).location || '') !== (shotOf(nxt.shot).location || '')) t = type;
+        if (c.transition !== t) { c.transition = t; changed++; }
+        if (t !== 'cut' && !c.transition_s) c.transition_s = 0.5;
+      });
+      markDirty(); renderClips();
+      $('edStatus').textContent = mode === 'none' ? 'Todas las transiciones quitadas.' : changed + ' transición(es) puestas (' + TRANSITIONS[type] + (mode === 'scene' ? ', solo al cambiar de lugar' : '') + '). Ctrl+Z para deshacer.';
+    },
     subStyle: (k) => { st.plan.subtitles.style = k; fillGlobals(); markDirty(); previewSub(); },
     zoomTl: (d) => { st.pxs = Math.min(60, Math.max(6, st.pxs * (d > 0 ? 1.4 : 1 / 1.4))); renderTimeline(); },
     tab: (name) => {

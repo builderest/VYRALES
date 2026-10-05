@@ -23,7 +23,7 @@ function sanitize(plan) {
       volume: num(c.volume, 0, 2, 1),
       speed: num(c.speed, 0.5, 2, 1),
       zoom: c.zoom === true,
-      transition: ['cut', 'crossfade', 'fade_black'].includes(c.transition) ? c.transition : 'cut',
+      transition: ['cut', 'crossfade', 'fade_black', 'dissolve', 'slide', 'slide_up', 'wipe', 'zoom', 'circle', 'blur', 'flash'].includes(c.transition) ? c.transition : 'cut',
       transition_s: num(c.transition_s, 0.2, 1.5, 0.4),
       subtitle: c.subtitle == null || c.subtitle === '' ? null : txt(c.subtitle, 200),
       overlay: txt(c.overlay, 60)
