@@ -3,7 +3,10 @@
 const { getSupabaseClient } = require('./_supabase');
 const json = (statusCode, body) => ({ statusCode, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 
+const { checkDashboardKey } = require('./_auth');
 exports.handler = async (event) => {
+  const denied = checkDashboardKey(event);
+  if (denied) return { statusCode: 401, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ error: denied }) };
   if (event.httpMethod !== 'POST') return json(405, { error: 'Method not allowed' });
   try {
     const b = JSON.parse(event.body || '{}');

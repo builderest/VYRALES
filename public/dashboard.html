@@ -746,10 +746,29 @@
         const running = pk && pk.status === 'running' && Date.now() - new Date(pk.at).getTime() < 3 * 60000;
         const copyBtn = (label, text) => '<button onclick="copyTag(this, event)" data-tag="' + esc(text || '') + '" class="text-[10px] font-mono px-2 py-0.5 rounded border border-cyber-cyan/40 text-cyber-cyan hover:bg-cyber-cyan/10"><i class="fa-regular fa-copy mr-1"></i>' + label + '</button>';
         const box = (title, text) => '<div class="bg-slate-950 border border-slate-800 rounded p-2"><div class="flex justify-between items-center mb-1"><span class="text-[10px] font-mono text-slate-400">' + title + '</span>' + copyBtn('Copiar', text) + '</div><p class="text-[11px] text-slate-200 whitespace-pre-wrap">' + esc(text || '') + '</p></div>';
+        const soc = window.__social || {};
+        const runs = vr.social_runs || {};
+        const apiRow = (key, label) => {
+          const acc = (soc.accounts || {})[key];
+          const run = runs[key];
+          const busy = run && run.status === 'running' && Date.now() - new Date(run.at).getTime() < 10 * 60000;
+          if (soc.table_missing) return '<p class="text-[10px] text-cyber-gold">Falta crear la tabla de cuentas (migración 006).</p>';
+          if (!(soc.keys || {})[key]) return '<p class="text-[10px] text-slate-500">' + label + ': faltan las llaves de la app en el .env / Netlify.</p>';
+          if (!acc) return '<button onclick="connectSocial(\'' + key + '\')" class="text-[10px] font-mono px-2 py-0.5 rounded border border-cyber-violet/50 text-cyber-violet hover:bg-cyber-violet/10"><i class="fa-solid fa-link mr-1"></i>Conectar ' + label + '</button>';
+          return '<div class="flex flex-wrap items-center gap-2 text-[10px] font-mono"><span class="text-cyber-emerald">● ' + esc(acc.name || label) + '</span>' +
+            (busy ? '<span class="text-cyber-pink"><i class="fa-solid fa-spinner fa-spin mr-1"></i>' + (key === 'tiktok' ? 'Enviando a TikTok...' : 'Publicando en Instagram...') + '</span>'
+              : '<button onclick="socialPublish(\'' + e.id + '\', \'' + key + '\')" class="px-2 py-0.5 rounded border border-cyber-pink/50 text-cyber-pink hover:bg-cyber-pink/10"><i class="fa-solid fa-paper-plane mr-1"></i>' + (key === 'tiktok' ? 'Enviar a TikTok (borrador)' : 'Publicar Reel ahora') + '</button>') +
+            (run && run.status === 'error' ? '<span class="text-cyber-pink">Error: ' + esc(run.error || '') + '</span>' : '') +
+            (run && run.status === 'draft_sent' ? '<span class="text-cyber-gold">Borrador enviado: abre la notificación en TikTok, activa “Contenido generado por IA” y publica.</span>' : '') +
+            (run && run.status === 'published' && run.url ? '<a href="' + esc(run.url) + '" target="_blank" class="text-cyber-emerald underline">ver Reel</a>' : '') +
+          '</div>';
+        };
         const platform = (key, label, steps) => {
           const done = pub[key];
           return '<div class="border ' + (done ? 'border-cyber-emerald/50' : 'border-cyber-border') + ' rounded-lg p-2 space-y-1">' +
             '<p class="text-[11px] font-mono font-bold ' + (done ? 'text-cyber-emerald' : 'text-white') + '">' + label + (done ? ' · PUBLICADO ' + (done.url ? '<a href="' + esc(done.url) + '" target="_blank" class="underline">ver</a>' : '') : '') + '</p>' +
+            '<div class="pb-1 border-b border-slate-800">' + apiRow(key, key === 'tiktok' ? 'TikTok' : 'Instagram') + '</div>' +
+            '<p class="text-[10px] text-slate-500">' + ((soc.accounts || {})[key] ? 'O a mano:' : 'A mano:') + '</p>' +
             '<ol class="list-decimal ml-4 text-[11px] text-slate-300 space-y-0.5">' + steps.map(x => '<li>' + x + '</li>').join('') + '</ol>' +
             (done
               ? '<button onclick="markPublished(\'' + e.id + '\', \'' + key + '\', true)" class="text-[10px] font-mono text-slate-500 hover:text-white underline">Desmarcar</button>'
@@ -802,6 +821,48 @@
         const poll = (n) => setTimeout(async () => { await loadDashboard(); const ep = (lastLoadedData.episodes || []).find(x => x.id === epId); const pk = ep && (ep.validator_report || {}).publish_package; if (n > 0 && pk && pk.status === 'running') poll(n - 1); }, 5000);
         poll(12);
       };
+      // Llave del dashboard (DASHBOARD_KEY): la piden las acciones de publicar/conectar. Se guarda
+      // solo en este navegador. Si el servidor dice que es incorrecta, se borra y se vuelve a pedir.
+      async function dashKey(force) {
+        let k = null;
+        try { k = force ? null : localStorage.getItem('vyrales_key'); } catch (_) {}
+        if (!k) {
+          k = await askText('Llave del dashboard (la DASHBOARD_KEY que pusiste en el .env y en Netlify):', '');
+          if (!k) return null;
+          try { localStorage.setItem('vyrales_key', k); } catch (_) {}
+        }
+        return k;
+      }
+      async function keyedFetch(url, body) {
+        for (let attempt = 0; attempt < 2; attempt++) {
+          const k = await dashKey(attempt > 0);
+          if (!k) throw new Error('Sin llave del dashboard.');
+          const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-vyrales-key': k }, body: JSON.stringify(body) });
+          if (res.status !== 401) return res;
+          const j = await res.json().catch(() => ({}));
+          if (/Falta DASHBOARD_KEY/.test(j.error || '')) throw new Error(j.error);
+          try { localStorage.removeItem('vyrales_key'); } catch (_) {}
+        }
+        throw new Error('Llave del dashboard incorrecta.');
+      }
+      window.connectSocial = async function(platform) {
+        const k = await dashKey();
+        if (!k) return;
+        window.open('/.netlify/functions/oauth-' + platform + '-start?k=' + encodeURIComponent(k), '_blank');
+      };
+      window.socialPublish = async function(epId, platform) {
+        const ep = (lastLoadedData.episodes || []).find(x => x.id === epId);
+        const msg = platform === 'tiktok'
+          ? 'Enviar el EP ' + ep.episode_number + ' a TikTok como BORRADOR.\n\nTe llega una notificación en la app: ahí pegas la descripción, activas “Contenido generado por IA” y publicas. ¿Enviar?'
+          : 'PUBLICAR el EP ' + ep.episode_number + ' en Instagram como Reel AHORA (público), con la descripción, la portada y el aviso de IA.\n\nNo se puede deshacer desde aquí (se borra desde la app). ¿Publicar?';
+        if (!await askConfirm(msg)) return;
+        try {
+          const res = await keyedFetch('/.netlify/functions/social-publish-background', { episode_id: epId, platform });
+          if (!res.ok && res.status !== 202) throw new Error('HTTP ' + res.status);
+        } catch (err) { return alert('No se pudo enviar: ' + err.message); }
+        const poll = (n) => setTimeout(async () => { await loadDashboard(); const e2 = (lastLoadedData.episodes || []).find(x => x.id === epId); const r = e2 && ((e2.validator_report || {}).social_runs || {})[platform]; if (n > 0 && r && r.status === 'running') poll(n - 1); }, 6000);
+        setTimeout(loadDashboard, 1500); poll(60);
+      };
       window.markPublished = async function(epId, platform, unmark) {
         let url = '';
         if (!unmark) {
@@ -809,7 +870,7 @@
           if (url === null) return;
         }
         try {
-          const res = await fetch('/.netlify/functions/publish-mark', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ episode_id: epId, platform, url, unmark: !!unmark }) });
+          const res = await keyedFetch('/.netlify/functions/publish-mark', { episode_id: epId, platform, url, unmark: !!unmark });
           const j = await res.json();
           if (!res.ok) throw new Error(j.error || res.status);
         } catch (err) { return alert('No se pudo guardar: ' + err.message); }
@@ -2542,6 +2603,7 @@
       async function loadDashboard() {
         const banner = document.getElementById('dataStatusBanner');
         try {
+          const socialP = fetch('/.netlify/functions/social-status').then(r => r.json()).catch(() => null);
           const res = await fetch('/.netlify/functions/get-episodes?series=' + encodeURIComponent(DEFAULT_SERIES));
           if (res.status === 404) {
             const nf = await res.json().catch(() => ({}));
@@ -2557,6 +2619,7 @@
           const data = await res.json();
           const episodes = data.episodes || [];
           lastLoadedData = data; // las funciones de costo leen la serie activa de aquí
+          window.__social = await socialP; // cuentas conectadas (sin tokens) para el panel PUBLICAR
           renderSeriesSelector(data.all_series || [], data.series);
           renderVeoMode(data.series);
           renderCast(data);
