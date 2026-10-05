@@ -11,7 +11,8 @@ const os = require('os');
 const path = require('path');
 const { execFile } = require('child_process');
 const ffmpegPath = require('ffmpeg-static');
-const { ensureMediaBucket, uploadClip } = require('./_storage');
+const { ensureMediaBucket, uploadClip, removeByPublicUrl } = require('./_storage');
+const { narrationConfig } = require('./_series');
 
 function run(cmd, args) {
   return new Promise((resolve, reject) => {
@@ -37,6 +38,9 @@ async function downloadToFile(url, destPath) {
 // log: función de logging opcional (por defecto console.log) para que el llamador pueda
 // prefijar sus propios logs.
 async function mergeEpisodeVideo(supabase, { episode, series, log = console.log }) {
+  // Documentales con narrador de voz fija: la unión simple de abajo NO lleva la voz (los clips
+  // vienen sin narración). Se usa el renderizador del editor, que mezcla narración + música.
+  if (narrationConfig(series && series.story_bible)) return mergeWithNarration(supabase, { episode, series, log });
   const clips = (episode.assets || [])
     .filter((a) => a.kind === 'video_clip' && a.storage_path)
     .sort((a, b) => (a.shot_number || 0) - (b.shot_number || 0));
@@ -138,6 +142,43 @@ async function mergeEpisodeVideo(supabase, { episode, series, log = console.log 
     return { asset, shots_joined: clips.length };
   } finally {
     fs.rmSync(workDir, { recursive: true, force: true });
+  }
+}
+
+async function mergeWithNarration(supabase, { episode, series, log }) {
+  // 1) Narraciones que falten o estén desactualizadas (~$0.004 c/u): sin ellas el video saldría mudo.
+  const { handler: narrate } = require('./narration-background');
+  log('narrador de voz fija: revisando narraciones que falten...');
+  const nr = await narrate({ httpMethod: 'POST', body: JSON.stringify({ episode_id: episode.id }) });
+  const nb = JSON.parse(nr.body || '{}');
+  if (nr.statusCode !== 200) throw new Error('No se pudo generar la narración: ' + (nb.error || nr.statusCode));
+  if ((nb.created || []).length) log('narraciones generadas ahora:', nb.created.map((c) => 'T' + c.shot).join(', '));
+  if ((nb.failed || []).length) throw new Error('Fallaron narraciones: ' + nb.failed.map((f) => 'T' + f.shot + ' ' + f.error).join(' | '));
+  // 2) Render con el plan del editor (o el plan por defecto): voz, ducking, subtítulos, -14 LUFS.
+  const { data: fresh, error } = await supabase.from('episodes').select('*, assets(*)').eq('id', episode.id).single();
+  if (error || !fresh) throw error || new Error('No se pudo releer el episodio.');
+  const { renderEpisode } = require('./_render');
+  const result = await renderEpisode({ episode: fresh, series, log });
+  try {
+    await ensureMediaBucket(supabase);
+    const url = await uploadClip(supabase, { path: `${series.slug}/ep${fresh.episode_number}/final-v${Date.now()}.mp4`, buffer: fs.readFileSync(result.file) });
+    const old = (fresh.assets || []).find((a) => a.kind === 'final_render');
+    let asset;
+    if (old) {
+      const { data, error: uErr } = await supabase.from('assets').update({ storage_path: url, cost_usd: 0, approved: false, approved_at: null }).eq('id', old.id).select().single();
+      if (uErr) throw uErr;
+      asset = data;
+      if (old.storage_path && old.storage_path !== url) await removeByPublicUrl(supabase, old.storage_path, log);
+    } else {
+      const { data, error: iErr } = await supabase.from('assets').insert({ episode_id: fresh.id, kind: 'final_render', model: 'other', storage_path: url, cost_usd: 0, approved: false }).select().single();
+      if (iErr) throw iErr;
+      asset = data;
+    }
+    await supabase.from('episodes').update({ final_video_path: url }).eq('id', fresh.id);
+    log('video final con narración listo:', url, result.seconds.toFixed(1) + ' s');
+    return { asset, shots_joined: result.pieces };
+  } finally {
+    result.cleanup();
   }
 }
 
