@@ -7,7 +7,7 @@
   const SUB_WINDOW = [0.25, 6.1]; // el diálogo se dice entre 0 y 6 s de cada toma
   const MIN_SECONDS = 90;
 
-  const st = { ep: null, plan: null, seq: [], idx: 0, playing: false, timer: null, dirty: false };
+  const st = { ep: null, plan: null, seq: [], idx: 0, playing: false, timer: null, dirty: false, undo: [], redo: [], lastSnap: 0, base: null };
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const fmt = (s) => { s = Math.max(0, Math.round(s)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
@@ -89,6 +89,8 @@
         </div>
         <div class="flex flex-wrap items-center gap-2 pt-2 border-t border-cyber-border">
           <button onclick="vyEditor.save()" class="px-3 py-2 rounded-lg bg-slate-800 text-white text-xs font-mono hover:bg-slate-700"><i class="fa-solid fa-floppy-disk mr-1"></i>Guardar</button>
+          <button id="edUndo" onclick="vyEditor.undo()" class="px-3 py-2 rounded-lg bg-slate-800 text-white text-xs font-mono hover:bg-slate-700" title="Deshacer (Ctrl+Z)"><i class="fa-solid fa-rotate-left mr-1"></i>Deshacer</button>
+          <button id="edRedo" onclick="vyEditor.redo()" class="px-3 py-2 rounded-lg bg-slate-800 text-white text-xs font-mono hover:bg-slate-700" title="Rehacer (Ctrl+Y)"><i class="fa-solid fa-rotate-right mr-1"></i>Rehacer</button>
           <button onclick="vyEditor.reset()" class="px-3 py-2 rounded-lg text-slate-400 text-xs font-mono hover:text-white">Restablecer todo</button>
           <button id="edRenderBtn" onclick="vyEditor.render()" class="ml-auto px-4 py-2 rounded-lg bg-cyber-emerald/20 border border-cyber-emerald/60 text-cyber-emerald text-xs font-mono hover:bg-cyber-emerald/30"><i class="fa-solid fa-film mr-1"></i>Guardar y renderizar video final ($0)</button>
         </div>
@@ -117,10 +119,42 @@
     bind('edEndSub', (el) => { st.plan.end_card.subtext = el.value; });
     bind('edEndSecs', (el) => { st.plan.end_card.seconds = Number(el.value) || 2; });
     $('edScrub').addEventListener('input', (e) => { if (st.scrubShot != null) showFrame(st.scrubShot, Number(e.target.value)); });
-    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('edModal').classList.contains('hidden')) close(); });
+    document.addEventListener('keydown', (e) => {
+      if ($('edModal').classList.contains('hidden')) return;
+      if (e.key === 'Escape') close();
+      const inText = /INPUT|TEXTAREA/.test((e.target && e.target.tagName) || '') && e.target.type !== 'range' && e.target.type !== 'checkbox';
+      if ((e.ctrlKey || e.metaKey) && !inText && e.key.toLowerCase() === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); }
+      if ((e.ctrlKey || e.metaKey) && !inText && e.key.toLowerCase() === 'y') { e.preventDefault(); redo(); }
+    });
   }
 
-  function markDirty() { st.dirty = true; renderTotals(); $('edStatus').textContent = 'Cambios sin guardar.'; }
+  // Deshacer / rehacer: se guarda una foto del plan ANTES de cada cambio. Los movimientos
+  // seguidos de una barra (menos de 0.7 s entre sí) cuentan como un solo cambio.
+  function snapshot() {
+    const now = Date.now();
+    if (st.base != null && now - st.lastSnap > 700) {
+      st.undo.push(st.base); if (st.undo.length > 100) st.undo.shift();
+      st.redo = [];
+    }
+    st.lastSnap = now;
+  }
+  function markDirty() {
+    snapshot();
+    st.base = JSON.stringify(st.plan);
+    st.dirty = true; renderTotals(); updateUndoBtns(); $('edStatus').textContent = 'Cambios sin guardar.';
+  }
+  function updateUndoBtns() {
+    if (!$('edUndo')) return;
+    $('edUndo').disabled = !st.undo.length; $('edRedo').disabled = !st.redo.length;
+    $('edUndo').style.opacity = st.undo.length ? 1 : 0.4; $('edRedo').style.opacity = st.redo.length ? 1 : 0.4;
+  }
+  function restore(json) {
+    st.plan = JSON.parse(json); st.base = json; st.lastSnap = 0; st.dirty = true;
+    fillGlobals(); renderClips(); paintScrub(); previewSub(); updateUndoBtns();
+    $('edStatus').textContent = 'Cambios sin guardar.';
+  }
+  function undo() { if (!st.undo.length) return; st.redo.push(JSON.stringify(st.plan)); restore(st.undo.pop()); }
+  function redo() { if (!st.redo.length) return; st.undo.push(JSON.stringify(st.plan)); restore(st.redo.pop()); }
 
   const clipAsset = (n) => (st.ep.assets || []).find((a) => a.kind === 'video_clip' && a.shot_number === n);
   const shotOf = (n) => (st.ep.shots || []).find((s) => s.n === n) || {};
@@ -160,7 +194,8 @@
         </div>
         <div class="flex-1 min-w-0 grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-1 text-[11px] font-mono text-slate-300">
           <div class="sm:col-span-2 flex items-center justify-between gap-2">
-            <span class="text-white font-bold">TOMA ${String(c.shot).padStart(2, '0')} <span class="text-slate-500 font-normal">· ${esc((shotOf(c.shot).characters || []).map((n) => n.split(' ')[0]).join(' + '))} · <span id="edDur${i}">${clipDur(c).toFixed(1)}s</span></span></span>
+            <span class="text-white font-bold">TOMA ${String(c.shot).padStart(2, '0')} <span class="text-slate-500 font-normal">· ${esc((shotOf(c.shot).characters || []).map((n) => n.split(' ')[0]).join(' + '))} · <span id="edDur${i}">${clipDur(c).toFixed(1)}s</span></span>
+            ${(Number(c.trim_start) || Number(c.trim_end)) ? `<button onclick="vyEditor.clearTrim(${i})" class="text-cyber-gold hover:underline" title="Vuelve a dejar la toma completa (8 s)"><i class="fa-solid fa-rotate-left mr-1"></i>Quitar cortes</button>` : ''}</span>
             <label class="flex items-center gap-1"><input type="checkbox" ${c.include === false ? '' : 'checked'} onchange="vyEditor.set(${i},'include',this.checked)"> Incluir</label>
           </div>
           <label class="flex items-center gap-2">Cortar inicio <input type="range" min="0" max="6" step="0.1" value="${c.trim_start || 0}" oninput="vyEditor.set(${i},'trim_start',this.value);vyEditor.seekShot(${c.shot},Number(this.value));this.nextElementSibling.textContent=Number(this.value).toFixed(1)+'s'" class="flex-1"><span class="w-9 text-right">${(Number(c.trim_start) || 0).toFixed(1)}s</span></label>
@@ -344,11 +379,11 @@
       st.plan.title_card.text = (d.series && d.series.title) || '';
       st.plan.title_card.subtext = 'Episodio ' + st.ep.episode_number + (st.ep.title ? ' · ' + st.ep.title : '');
     }
-    st.dirty = false;
+    st.dirty = false; st.undo = []; st.redo = []; st.base = JSON.stringify(st.plan); st.lastSnap = 0;
     $('edTitle').textContent = 'Editor · EP ' + st.ep.episode_number + (st.ep.title ? ' — ' + st.ep.title : '');
     const clips = (st.ep.assets || []).filter((a) => a.kind === 'video_clip').length;
     $('edStatus').textContent = clips + ' de ' + (st.ep.shots || []).length + ' tomas con video.' + (out.saved ? ' Plan guardado cargado.' : ' Plan nuevo (aún sin guardar).');
-    fillGlobals(); renderClips();
+    fillGlobals(); renderClips(); updateUndoBtns();
     $('edModal').classList.remove('hidden');
     document.body.style.overflow = 'hidden';
     st.idx = 0; st.seq = buildSeq(); stop();
@@ -367,7 +402,7 @@
     const res = await fetch('/.netlify/functions/edit-plan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ episode_id: st.ep.id, plan: st.plan }) });
     const out = await res.json().catch(() => ({}));
     if (!res.ok) { alert('No se pudo guardar: ' + (out.error || res.status)); return false; }
-    st.plan = out.plan; st.dirty = false;
+    st.plan = out.plan; st.base = JSON.stringify(st.plan); st.dirty = false;
     if (!silent) $('edStatus').textContent = 'Guardado ✓';
     return true;
   }
@@ -375,7 +410,8 @@
     if (!(await window.askConfirm('¿Restablecer el editor? Se borran recortes, orden, textos y música de este episodio (los videos no se tocan).'))) return;
     const res = await fetch('/.netlify/functions/edit-plan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ episode_id: st.ep.id, reset: true }) });
     const out = await res.json();
-    st.plan = out.plan; st.dirty = false; fillGlobals(); renderClips(); $('edStatus').textContent = 'Restablecido.';
+    st.undo.push(JSON.stringify(st.plan)); st.redo = [];
+    st.plan = out.plan; st.base = JSON.stringify(st.plan); st.dirty = false; fillGlobals(); renderClips(); updateUndoBtns(); $('edStatus').textContent = 'Restablecido. (Puedes deshacerlo, pero ya está guardado así; dale Guardar después de deshacer.)';
   }
   async function render() {
     if (!(await save(true))) return;
@@ -445,6 +481,8 @@
     },
     move: (i, d) => { const a = st.plan.clips; const j = i + d; if (j < 0 || j >= a.length) return; [a[i], a[j]] = [a[j], a[i]]; markDirty(); renderClips(); },
     seekShot: (shot, t) => showFrame(shot, t),
+    undo, redo,
+    clearTrim: (i) => { const c = st.plan.clips[i]; c.trim_start = 0; c.trim_end = 0; markDirty(); renderClips(); paintScrub(); },
     cutHere: (which) => {
       if (st.scrubShot == null) return alert('Primero elige una toma: dale clic a su miniatura o mueve sus barras de corte.');
       const i = st.plan.clips.findIndex((x) => x.shot === st.scrubShot);
