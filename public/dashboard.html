@@ -1233,6 +1233,28 @@
         body.innerHTML = kind === 'image'
           ? '<img src="' + esc(src) + '" alt="' + esc(title) + '" class="max-h-[85vh] w-auto object-contain">'
           : '<video src="' + esc(src) + '" controls autoplay playsinline class="max-h-[85vh] w-full bg-black"></video>';
+        // Toma con narrador de voz fija: la voz suena encima del video, igual que en el render
+        // (empieza a 0.3 s, se acelera hasta 1.2x si no cabe; la voz vieja de Veo se silencia).
+        const narrUrl = kind === 'video' && el.getAttribute('data-narr');
+        if (narrUrl) {
+          const v = body.querySelector('video');
+          const a = new Audio(narrUrl);
+          a.preload = 'auto';
+          const secs = Number(el.getAttribute('data-narr-secs')) || 6;
+          a.playbackRate = Math.min(1.2, Math.max(1, secs / 7.55));
+          if (el.getAttribute('data-mute') === '1') v.muted = true;
+          let on = false;
+          const sync = () => {
+            const t = v.currentTime - 0.3;
+            if (v.paused || t < 0 || t > secs / a.playbackRate) { if (on) { a.pause(); on = false; } return; }
+            if (!on) { try { a.currentTime = t * a.playbackRate; } catch (_) {} a.play().catch(() => {}); on = true; }
+          };
+          v.addEventListener('timeupdate', sync);
+          v.addEventListener('play', sync);
+          v.addEventListener('pause', () => { a.pause(); on = false; });
+          v.addEventListener('seeking', () => { a.pause(); on = false; });
+          currentMedia.narr = a;
+        }
         document.getElementById('mediaModal').classList.remove('hidden');
         document.body.style.overflow = 'hidden';
       };
@@ -1242,6 +1264,7 @@
         if (modal.classList.contains('hidden')) return;
         const v = modal.querySelector('video');
         if (v) { v.pause(); v.removeAttribute('src'); v.load(); }
+        if (currentMedia && currentMedia.narr) { currentMedia.narr.pause(); currentMedia.narr.removeAttribute('src'); }
         document.getElementById('mediaBody').innerHTML = '';
         modal.classList.add('hidden');
         document.body.style.overflow = '';
@@ -1851,7 +1874,13 @@
                             '</div>'
                           : '') +
                         (clip
-                          ? '<button type="button" onclick="openMedia(this)" data-src="' + esc(clip.storage_path) + '" data-kind="video" data-title="EP ' + e.episode_number + ' · Toma ' + sh.n + '" class="text-[10px] font-mono text-cyber-emerald hover:underline"><i class="fa-solid fa-circle-play mr-1"></i>Ver toma generada (' + (clip.approved ? 'aprobada' : 'pendiente de revisión') + ')</button>'
+                          ? (function() {
+                              const ns = narrationState(data.series, sh);
+                              const nar = ns && ns.n && ns.n.url ? ns.n : null;
+                              return '<button type="button" onclick="openMedia(this)" data-src="' + esc(clip.storage_path) + '" data-kind="video" data-title="EP ' + e.episode_number + ' · Toma ' + sh.n + (nar ? ' · con narración' : '') + '"' +
+                                (nar ? ' data-narr="' + esc(nar.url) + '" data-narr-secs="' + (nar.seconds || 6) + '" data-mute="' + (/Voice-over narration/i.test(clip.prompt || '') ? '1' : '0') + '"' : '') +
+                                ' class="text-[10px] font-mono text-cyber-emerald hover:underline"><i class="fa-solid fa-circle-play mr-1"></i>Ver toma generada' + (nar ? ' con narración' : '') + ' (' + (clip.approved ? 'aprobada' : 'pendiente de revisión') + ')</button>';
+                            })()
                           : (canGenerateShots
                               ? '<button onclick="openPromptEditor(this)" data-kind="video" data-ep="' + e.id + '" data-n="' + sh.n + '" data-mode="generate" data-cost="' + shotCost + '" class="text-[10px] font-mono px-2 py-0.5 rounded border border-cyber-gold/40 text-cyber-gold bg-cyber-gold/10 hover:bg-cyber-gold/20"><i class="fa-solid fa-flask mr-1"></i>' + (kf ? (frame ? '2 · Animar TOMA ' + String(sh.n).padStart(2, '0') : 'Cuadro + animar TOMA ' + String(sh.n).padStart(2, '0')) : 'Generar solo la TOMA ' + String(sh.n).padStart(2, '0')) + ' (~$' + shotCost + ')</button>'
                               : '')) +
