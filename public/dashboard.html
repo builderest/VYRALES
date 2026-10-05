@@ -2147,7 +2147,17 @@
           step(3, 'fa-masks-theater', 'Memoria visual', withPhoto + '/' + chars.length + ' caras', rules.keyframes ? (locWithImg + '/' + locKeys.length + ' lugares · ' + frames + ' cuadros') : (rules.reference_images ? 'las fotos se envían a Veo' : 'fotos solo de referencia'), photoState, 'castSection'),
           step(4, 'fa-video', 'Tomas en Veo', clips.length + '/' + totalShots, generating ? 'generando EP ' + generating.episode_number + '…' : (finals + ' episodio(s) unido(s)'), generating ? 'work' : (totalShots && clips.length >= totalShots ? 'ok' : 'todo'), 'arcSection'),
           step(5, 'fa-user-check', 'Revisión humana', approved + '/' + clips.length, 'tomas aprobadas', clips.length && approved === clips.length ? 'ok' : (clips.length ? 'work' : 'todo'), 'reviewSection'),
-          step(6, 'fa-share-nodes', 'Publicación', '—', 'TikTok / YT / Reels: todavía no está construido', 'off', null)
+          (function() {
+            // Paso 6 real: episodios con video final, cuántos publicados por red y cuentas conectadas.
+            const withFinal = eps.filter(e => (e.assets || []).some(a => a.kind === 'final_render'));
+            const pubOf = (k) => eps.filter(e => ((e.validator_report || {}).published || {})[k]).length;
+            const tt = pubOf('tiktok'), ig = pubOf('instagram');
+            const soc = window.__social || {};
+            const conn = ['tiktok', 'instagram'].filter(k => (soc.accounts || {})[k]).map(k => k === 'tiktok' ? 'TikTok' : 'Instagram');
+            const detail = 'TikTok ' + tt + ' · Instagram ' + ig + ' publicados · ' + (conn.length ? 'conectado: ' + conn.join(' + ') : 'sin cuentas conectadas (a mano)');
+            const state = !withFinal.length ? 'todo' : (tt + ig ? (tt >= withFinal.length && ig >= withFinal.length ? 'ok' : 'work') : 'work');
+            return step(6, 'fa-share-nodes', 'Publicación', withFinal.length + ' listo' + (withFinal.length === 1 ? '' : 's'), detail, state, 'arcSection');
+          })()
         ].join('');
 
         // Siguiente paso real
