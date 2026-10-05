@@ -20,6 +20,7 @@ const FPS = 24;
 const FONT_FILE = 'Montserrat-ExtraBold.ttf';
 const FONT_NAME = 'Montserrat Thin ExtraBold'; // nombre de familia real dentro del archivo (fontsource)
 const SPEECH = [0.25, 6.1];
+const MAX_UPLOAD_MB = 45; // límite de Supabase Storage del proyecto: 50 MB por archivo
 // Transiciones con encimado (xfade de ffmpeg). 'cut' = corte directo; 'fade_black' = baja a
 // negro y sube (sin encimar, con fade en cada toma).
 const XFADE = { crossfade: 'fade', dissolve: 'dissolve', slide: 'slideleft', slide_up: 'slideup', wipe: 'wipeleft', zoom: 'zoomin', circle: 'circleopen', blur: 'hblur', flash: 'fadewhite' }; // el diálogo se dice entre 0 y 6 s de cada toma (así lo pide el prompt)
@@ -396,7 +397,20 @@ async function renderEpisode({ episode, series, log = console.log, fetchFile = d
     args.push('-filter_complex', filters.join(';'), '-map', '0:v', '-map', '[aout]', '-c:v', 'copy', ...AUDIO_OUT, '-t', total.toFixed(3), '-movflags', '+faststart', 'final.mp4');
     log('audio final (música / volumen parejo)...');
     await run(args, cwd);
-    return { file: path.join(cwd, 'final.mp4'), seconds: total, pieces: parts.length, cleanup, plan };
+    // Supabase rechaza archivos de más de 50 MB (probado: 45 MB OK, 55 MB → 413). Un episodio de
+    // 2:40 salía en ~87 MB y la subida fallaba sin video final. Si pasa de MAX_UPLOAD_MB se
+    // recomprime al bitrate justo para quedar debajo (en 720p vertical no se nota).
+    let finalName = 'final.mp4';
+    const sizeMb = fs.statSync(path.join(cwd, finalName)).size / 1048576;
+    if (sizeMb > MAX_UPLOAD_MB) {
+      const audioK = 160;
+      const videoK = Math.max(600, Math.floor((MAX_UPLOAD_MB * 0.94 * 8 * 1024) / total - audioK));
+      log(`el video final pesa ${sizeMb.toFixed(0)} MB (límite ${MAX_UPLOAD_MB}); recomprimiendo a ${videoK} kb/s...`);
+      await run(['-y', '-i', 'final.mp4', '-c:v', 'libx264', '-preset', 'medium', '-b:v', videoK + 'k', '-maxrate', Math.round(videoK * 1.3) + 'k', '-bufsize', (videoK * 2) + 'k', '-pix_fmt', 'yuv420p', '-c:a', 'copy', '-movflags', '+faststart', 'final-small.mp4'], cwd);
+      finalName = 'final-small.mp4';
+      log(`recomprimido: ${(fs.statSync(path.join(cwd, finalName)).size / 1048576).toFixed(1)} MB`);
+    }
+    return { file: path.join(cwd, finalName), seconds: total, pieces: parts.length, cleanup, plan };
   } catch (err) {
     cleanup();
     throw err;
