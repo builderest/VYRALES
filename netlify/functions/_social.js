@@ -2,16 +2,13 @@
 //   TikTok   — Login Kit + Content Posting API. Sin auditoría de TikTok: "Upload" (el video
 //              llega como BORRADOR a la bandeja de la app; el usuario activa la etiqueta de IA
 //              y publica). Docs: developers.tiktok.com/doc/content-posting-api-get-started-upload-content
-//   Instagram — "Instagram API with Instagram Login" (cuenta Creador/Empresa). Reels por
-//              video_url (URL pública de Supabase) → contenedor → media_publish. Límite 100/24 h.
-//              Docs: developers.facebook.com/docs/instagram-platform/content-publishing
-// Llaves en .env / Netlify: TIKTOK_CLIENT_KEY, TIKTOK_CLIENT_SECRET, INSTAGRAM_APP_ID,
-// INSTAGRAM_APP_SECRET. Los tokens se guardan en la tabla social_accounts (migración 006).
+//   Meta      — "Facebook Login": una conexión da la Página de Facebook y su Instagram vinculado
+//              (ver sección Meta abajo).
+// Llaves en .env / Netlify: TIKTOK_CLIENT_KEY, TIKTOK_CLIENT_SECRET, META_APP_ID, META_APP_SECRET. Los tokens se guardan en la tabla social_accounts (migración 006).
 const crypto = require('crypto');
 
 const BASE_URL = () => (process.env.PUBLIC_BASE_URL || 'https://vyrales.app').replace(/\/$/, '');
 const REDIRECT = (platform) => `${BASE_URL()}/auth/${platform}/callback`;
-const IG_GRAPH = 'https://graph.instagram.com/v23.0';
 
 function need(name) {
   const v = process.env[name];
@@ -20,21 +17,22 @@ function need(name) {
 }
 
 // state anti-CSRF firmado (sin guardar nada): plataforma + hora + firma HMAC con el secreto.
+const stateSecret = (platform) => platform === 'tiktok' ? need('TIKTOK_CLIENT_SECRET') : metaSecret();
 function makeState(platform) {
-  const secret = platform === 'tiktok' ? need('TIKTOK_CLIENT_SECRET') : need('INSTAGRAM_APP_SECRET');
+  const secret = stateSecret(platform);
   const payload = `${platform}.${Date.now()}`;
   const sig = crypto.createHmac('sha256', secret).update(payload).digest('hex').slice(0, 32);
   return `${payload}.${sig}`;
 }
 // Devuelve null si el state es válido, o el MOTIVO exacto si no lo es.
 function stateProblem(platform, state) {
-  const secret = platform === 'tiktok' ? need('TIKTOK_CLIENT_SECRET') : need('INSTAGRAM_APP_SECRET');
+  const secret = stateSecret(platform);
   if (!state) return 'La dirección llegó sin "state": hay que entrar dándole "Conectar" en VYRALES, no abriendo esta página directo.';
   const [p, ts, sig] = String(state).split('.');
   if (p !== platform || !ts || !sig) return 'El "state" llegó incompleto (' + String(state).slice(0, 20) + '…).';
   if (Date.now() - Number(ts) > 15 * 60000) return 'Pasaron más de 15 minutos desde que le diste "Conectar". Vuelve a intentarlo.';
   const good = crypto.createHmac('sha256', secret).update(`${p}.${ts}`).digest('hex').slice(0, 32);
-  if (good !== sig) return 'La firma no coincide: el TIKTOK_CLIENT_SECRET (o el de Instagram) de Netlify NO es igual al de tu .env. Conecta desde vyrales.app (no desde localhost) o iguala las llaves.';
+  if (good !== sig) return 'La firma no coincide: el TIKTOK_CLIENT_SECRET (o el META_APP_SECRET) de Netlify NO es igual al de tu .env. Conecta desde vyrales.app (no desde localhost) o iguala las llaves.';
   return null;
 }
 function checkState(platform, state) { return stateProblem(platform, state) === null; }
@@ -123,65 +121,97 @@ async function tiktokSendDraft(supabase, { videoBuffer, log = console.log }) {
   return { publishId, status: 'PROCESSING' };
 }
 
-// ---------------- Instagram ----------------
-const IG_SCOPES = 'instagram_business_basic,instagram_business_content_publish';
-function instagramAuthUrl() {
-  const q = new URLSearchParams({ client_id: need('INSTAGRAM_APP_ID'), redirect_uri: REDIRECT('instagram'), response_type: 'code', scope: IG_SCOPES, state: makeState('instagram') });
-  return `https://www.instagram.com/oauth/authorize?${q}`;
+// ---------------- Meta: Facebook (Página) + Instagram ----------------
+// UNA sola conexión con "Facebook Login": da el token de tu PÁGINA de Facebook, y con ese mismo
+// token se publica en el Instagram profesional vinculado a la Página.
+//   Facebook Reels → /{page-id}/video_reels (start → rupload con file_url → finish PUBLISHED)
+//     docs: developers.facebook.com/docs/video-api/guides/reels-publishing (30 Reels/24 h)
+//   Instagram Reels → /{ig-user-id}/media (REELS, video_url) → media_publish (100/24 h)
+// El token de Página sacado de un token de usuario largo NO caduca (hasta que cambies la
+// contraseña o quites la app). Llaves: META_APP_ID, META_APP_SECRET (Opcional META_PAGE_ID si
+// administras varias Páginas).
+const FB_GRAPH = 'https://graph.facebook.com/v25.0';
+const META_SCOPES = 'pages_show_list,pages_read_engagement,pages_manage_posts,instagram_basic,instagram_content_publish,business_management';
+const metaId = () => process.env.META_APP_ID || need('INSTAGRAM_APP_ID');
+const metaSecret = () => process.env.META_APP_SECRET || need('INSTAGRAM_APP_SECRET');
+function metaAuthUrl() {
+  const q = new URLSearchParams({ client_id: metaId(), redirect_uri: REDIRECT('meta'), response_type: 'code', scope: META_SCOPES, state: makeState('meta') });
+  return `https://www.facebook.com/v25.0/dialog/oauth?${q}`;
 }
-async function instagramConnect(supabase, code) {
-  const short = await jsonFetch('https://api.instagram.com/oauth/access_token', {
-    method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ client_id: need('INSTAGRAM_APP_ID'), client_secret: need('INSTAGRAM_APP_SECRET'), grant_type: 'authorization_code', redirect_uri: REDIRECT('instagram'), code })
-  });
-  const sb = short.body && (short.body.data ? short.body.data[0] : short.body);
-  if (!short.res.ok || !sb || !sb.access_token) throw new Error('Instagram no dio el token: ' + JSON.stringify(short.body).slice(0, 300));
-  const long = await jsonFetch(`https://graph.instagram.com/access_token?${new URLSearchParams({ grant_type: 'ig_exchange_token', client_secret: need('INSTAGRAM_APP_SECRET'), access_token: sb.access_token })}`);
-  if (!long.res.ok || !long.body.access_token) throw new Error('Instagram no dio el token largo: ' + JSON.stringify(long.body).slice(0, 300));
-  const me = await jsonFetch(`${IG_GRAPH}/me?${new URLSearchParams({ fields: 'user_id,username,account_type', access_token: long.body.access_token })}`);
-  const userId = (me.body && (me.body.user_id || me.body.id)) || String(sb.user_id);
-  await saveAccount(supabase, {
-    platform: 'instagram', account_id: String(userId), account_name: me.body && me.body.username, access_token: long.body.access_token,
-    expires_at: new Date(Date.now() + (long.body.expires_in || 5184000) * 1000).toISOString(), scopes: IG_SCOPES
-  });
-  return (me.body && me.body.username) || userId;
+const graphErr = (b) => JSON.stringify((b && b.error) ? { message: b.error.message, code: b.error.code, sub: b.error.error_subcode } : b).slice(0, 300);
+async function metaConnect(supabase, code) {
+  const short = await jsonFetch(`${FB_GRAPH}/oauth/access_token?${new URLSearchParams({ client_id: metaId(), client_secret: metaSecret(), redirect_uri: REDIRECT('meta'), code })}`);
+  if (!short.res.ok || !short.body.access_token) throw new Error('Meta no dio el token: ' + graphErr(short.body));
+  const long = await jsonFetch(`${FB_GRAPH}/oauth/access_token?${new URLSearchParams({ grant_type: 'fb_exchange_token', client_id: metaId(), client_secret: metaSecret(), fb_exchange_token: short.body.access_token })}`);
+  if (!long.res.ok || !long.body.access_token) throw new Error('Meta no dio el token largo: ' + graphErr(long.body));
+  const pages = await jsonFetch(`${FB_GRAPH}/me/accounts?${new URLSearchParams({ fields: 'id,name,access_token,instagram_business_account{id,username}', limit: '50', access_token: long.body.access_token })}`);
+  if (!pages.res.ok) throw new Error('No se pudieron leer tus Páginas: ' + graphErr(pages.body));
+  const list = (pages.body.data || []);
+  if (!list.length) throw new Error('Meta no devolvió ninguna Página. En la pantalla de permisos tienes que MARCAR tu Página de VYRALES (y su Instagram). Vuelve a darle Conectar.');
+  const page = (process.env.META_PAGE_ID && list.find((p) => p.id === process.env.META_PAGE_ID)) || list.find((p) => p.instagram_business_account) || list[0];
+  await saveAccount(supabase, { platform: 'facebook', account_id: page.id, account_name: page.name, access_token: page.access_token, expires_at: null, scopes: 'meta' });
+  const ig = page.instagram_business_account;
+  if (ig) await saveAccount(supabase, { platform: 'instagram', account_id: ig.id, account_name: ig.username, access_token: page.access_token, expires_at: null, scopes: 'meta' });
+  return 'Facebook: ' + page.name + (ig ? ' · Instagram: @' + ig.username : ' · (esta Página NO tiene Instagram vinculado)');
 }
-async function instagramAccess(supabase) {
-  const acc = await getAccount(supabase, 'instagram');
-  if (!acc) throw new Error('Instagram no está conectado. Dale "Conectar Instagram".');
-  // Token largo (60 días): se renueva solo cuando le quedan menos de 10 días.
-  if (acc.expires_at && new Date(acc.expires_at).getTime() - Date.now() < 10 * 86400000) {
-    const r = await jsonFetch(`https://graph.instagram.com/refresh_access_token?${new URLSearchParams({ grant_type: 'ig_refresh_token', access_token: acc.access_token })}`);
-    if (r.res.ok && r.body.access_token) {
-      acc.access_token = r.body.access_token;
-      acc.expires_at = new Date(Date.now() + (r.body.expires_in || 5184000) * 1000).toISOString();
-      await saveAccount(supabase, acc);
-    }
-  }
+async function metaAccount(supabase, platform) {
+  const acc = await getAccount(supabase, platform);
+  if (!acc) throw new Error((platform === 'facebook' ? 'Facebook' : 'Instagram') + ' no está conectado. Dale "Conectar Facebook + Instagram".');
+  if (acc.scopes !== 'meta') throw new Error('La conexión de ' + platform + ' es antigua. Dale "Conectar Facebook + Instagram" otra vez.');
   return acc;
 }
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
 async function instagramPublishReel(supabase, { videoUrl, coverUrl, caption, log = console.log }) {
-  const acc = await instagramAccess(supabase);
+  const acc = await metaAccount(supabase, 'instagram');
   const params = { media_type: 'REELS', video_url: videoUrl, caption: String(caption || '').slice(0, 2200), share_to_feed: 'true', access_token: acc.access_token };
   if (coverUrl) params.cover_url = coverUrl;
-  const c = await jsonFetch(`${IG_GRAPH}/${acc.account_id}/media`, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(params) });
-  if (!c.res.ok || !c.body.id) throw new Error('Instagram rechazó el Reel: ' + JSON.stringify(c.body.error || c.body).slice(0, 300));
+  const c = await jsonFetch(`${FB_GRAPH}/${acc.account_id}/media`, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(params) });
+  if (!c.res.ok || !c.body.id) throw new Error('Instagram rechazó el Reel: ' + graphErr(c.body));
   const containerId = c.body.id;
   log('[instagram] contenedor', containerId, '— esperando que Instagram procese el video...');
   let status = '';
-  for (let i = 0; i < 60; i++) {
-    await new Promise((r) => setTimeout(r, 5000));
-    const s = await jsonFetch(`${IG_GRAPH}/${containerId}?${new URLSearchParams({ fields: 'status_code,status', access_token: acc.access_token })}`);
+  for (let i = 0; i < 72; i++) {
+    await sleep(5000);
+    const s = await jsonFetch(`${FB_GRAPH}/${containerId}?${new URLSearchParams({ fields: 'status_code,status', access_token: acc.access_token })}`);
     status = s.body && s.body.status_code;
     if (status === 'FINISHED') break;
     if (status === 'ERROR' || status === 'EXPIRED') throw new Error('Instagram no pudo procesar el video: ' + JSON.stringify(s.body).slice(0, 300));
   }
   if (status !== 'FINISHED') throw new Error('Instagram tardó demasiado en procesar el video (estado ' + status + ').');
-  const p = await jsonFetch(`${IG_GRAPH}/${acc.account_id}/media_publish`, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ creation_id: containerId, access_token: acc.access_token }) });
-  if (!p.res.ok || !p.body.id) throw new Error('Instagram no publicó: ' + JSON.stringify(p.body.error || p.body).slice(0, 300));
+  const p = await jsonFetch(`${FB_GRAPH}/${acc.account_id}/media_publish`, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ creation_id: containerId, access_token: acc.access_token }) });
+  if (!p.res.ok || !p.body.id) throw new Error('Instagram no publicó: ' + graphErr(p.body));
   let permalink = null;
-  try { const m = await jsonFetch(`${IG_GRAPH}/${p.body.id}?${new URLSearchParams({ fields: 'permalink', access_token: acc.access_token })}`); permalink = m.body.permalink || null; } catch (_) {}
+  try { const m = await jsonFetch(`${FB_GRAPH}/${p.body.id}?${new URLSearchParams({ fields: 'permalink', access_token: acc.access_token })}`); permalink = m.body.permalink || null; } catch (_) {}
   return { mediaId: p.body.id, permalink };
 }
 
-module.exports = { tiktokAuthUrl, tiktokConnect, tiktokSendDraft, instagramAuthUrl, instagramConnect, instagramPublishReel, checkState, stateProblem, getAccount, REDIRECT };
+async function facebookPublishReel(supabase, { videoUrl, caption, log = console.log }) {
+  const acc = await metaAccount(supabase, 'facebook');
+  const post = (params) => jsonFetch(`${FB_GRAPH}/${acc.account_id}/video_reels`, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(Object.assign({ access_token: acc.access_token }, params)) });
+  const st = await post({ upload_phase: 'start' });
+  if (!st.res.ok || !st.body.video_id) throw new Error('Facebook rechazó el inicio del Reel: ' + graphErr(st.body));
+  const videoId = st.body.video_id;
+  log('[facebook] video', videoId, '— Facebook baja el archivo desde Supabase...');
+  const up = await jsonFetch(`https://rupload.facebook.com/video-upload/v25.0/${videoId}`, { method: 'POST', headers: { Authorization: `OAuth ${acc.access_token}`, file_url: videoUrl } });
+  if (!up.res.ok || (up.body && up.body.success === false)) throw new Error('Facebook no pudo bajar el video: ' + graphErr(up.body));
+  const fin = await post({ video_id: videoId, upload_phase: 'finish', video_state: 'PUBLISHED', description: String(caption || '').slice(0, 2200) });
+  if (!fin.res.ok || fin.body.success === false) throw new Error('Facebook no publicó el Reel: ' + graphErr(fin.body));
+  // Esperar a que termine de procesarse/publicarse (para avisar si falla).
+  for (let i = 0; i < 72; i++) {
+    await sleep(5000);
+    const s = await jsonFetch(`${FB_GRAPH}/${videoId}?${new URLSearchParams({ fields: 'status,permalink_url', access_token: acc.access_token })}`);
+    const status = (s.body && s.body.status) || {};
+    const phases = [status.uploading_phase, status.processing_phase, status.publishing_phase].filter(Boolean);
+    const bad = phases.find((ph) => ph.status === 'error');
+    if (status.video_status === 'error' || bad) throw new Error('Facebook falló al procesar el Reel: ' + JSON.stringify((bad && bad.errors) || status).slice(0, 300));
+    log('[facebook] estado:', status.video_status, status.publishing_phase && status.publishing_phase.status);
+    if (status.publishing_phase && status.publishing_phase.status === 'complete') {
+      const link = s.body.permalink_url ? (String(s.body.permalink_url).startsWith('http') ? s.body.permalink_url : 'https://www.facebook.com' + s.body.permalink_url) : `https://www.facebook.com/reel/${videoId}`;
+      return { videoId, permalink: link };
+    }
+  }
+  return { videoId, permalink: `https://www.facebook.com/reel/${videoId}`, pending: true };
+}
+
+module.exports = { tiktokAuthUrl, tiktokConnect, tiktokSendDraft, metaAuthUrl, metaConnect, instagramPublishReel, facebookPublishReel, checkState, stateProblem, getAccount, REDIRECT };

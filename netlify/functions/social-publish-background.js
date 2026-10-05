@@ -1,9 +1,10 @@
-// POST /.netlify/functions/social-publish-background  { episode_id, platform: 'tiktok'|'instagram' }
+// POST /.netlify/functions/social-publish-background  { episode_id, platform: 'tiktok'|'instagram'|'facebook' }
 //   tiktok    → envía el video final como BORRADOR a la bandeja de TikTok (el usuario termina en la app)
 //   instagram → publica el Reel con la descripción, la portada y el aviso de IA del paquete
+//   facebook  → publica el Reel en tu Página de Facebook (misma descripción que Instagram)
 // Resultado en episodes.validator_report.social_runs[platform] { status, at, error?, url? }.
 const { getSupabaseClient } = require('./_supabase');
-const { tiktokSendDraft, instagramPublishReel } = require('./_social');
+const { tiktokSendDraft, instagramPublishReel, facebookPublishReel } = require('./_social');
 
 const LOG = '[social]';
 
@@ -28,7 +29,7 @@ exports.handler = async (event) => {
     await supabase.from('episodes').update(upd).eq('id', epId);
   };
   try {
-    if (!['tiktok', 'instagram'].includes(platform)) throw new Error('Plataforma no válida.');
+    if (!['tiktok', 'instagram', 'facebook'].includes(platform)) throw new Error('Plataforma no válida.');
     const { data: ep, error } = await supabase.from('episodes').select('id, episode_number, validator_report, assets(kind, storage_path)').eq('id', epId || '').single();
     if (error || !ep) throw error || new Error('Episodio no encontrado.');
     const final = (ep.assets || []).find((a) => a.kind === 'final_render' && a.storage_path);
@@ -42,6 +43,10 @@ exports.handler = async (event) => {
       const r = await tiktokSendDraft(supabase, { videoBuffer: Buffer.from(await res.arrayBuffer()), log: (...a) => console.log(LOG, ...a) });
       await save({ status: 'draft_sent', publish_id: r.publishId, tiktok_status: r.status });
       console.log(LOG, 'TikTok: borrador enviado ✅', r.status);
+    } else if (platform === 'facebook') {
+      const r = await facebookPublishReel(supabase, { videoUrl: final.storage_path, caption: pk.facebook || pk.instagram, log: (...a) => console.log(LOG, ...a) });
+      await save({ status: 'published', url: r.permalink, video_id: r.videoId, pending: !!r.pending }, { url: r.permalink, via: 'api' });
+      console.log(LOG, 'Facebook: Reel publicado ✅', r.permalink);
     } else {
       const r = await instagramPublishReel(supabase, { videoUrl: final.storage_path, coverUrl: pk.cover_url, caption: pk.instagram, log: (...a) => console.log(LOG, ...a) });
       await save({ status: 'published', url: r.permalink, media_id: r.mediaId }, { url: r.permalink, via: 'api' });

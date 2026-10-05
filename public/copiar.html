@@ -95,14 +95,15 @@ function render() {
       (final ? '<a class="btn" href="' + esc(dl(final.storage_path, vname)) + '">⬇ Video (a Archivos)</a>' : '') +
     '</div></div></div>' +
     block('DESCRIPCIÓN TIKTOK', pk.tiktok) +
-    block('DESCRIPCIÓN INSTAGRAM', pk.instagram) +
-    block('COMENTARIO PARA FIJAR (en las dos)', pk.pinned_comment) +
+    block('DESCRIPCIÓN INSTAGRAM / FACEBOOK', pk.instagram) +
+    block('COMENTARIO PARA FIJAR (en todas)', pk.pinned_comment) +
     block('TEXTO DE PORTADA', pk.cover_text) +
     '<div class="card"><h2>ANTES DE PUBLICAR</h2><ol>' +
       '<li>TikTok: abre el borrador (Bandeja de entrada → notificación) o sube el video con +.</li>' +
       '<li>Pega la descripción y elige la portada.</li>' +
       '<li class="warn">TikTok: Más opciones → activa “Contenido generado por IA”.</li>' +
       '<li class="warn">Instagram: Configuración avanzada → activa la etiqueta de IA.</li>' +
+      '<li class="warn">Facebook (Página): botón «AI label» junto a «Público» → activado.</li>' +
       '<li>Publica y fija el comentario.</li>' +
     '</ol></div>';
 }

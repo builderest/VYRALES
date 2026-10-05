@@ -34,3 +34,7 @@
   from = "/auth/instagram/callback"
   to = "/.netlify/functions/oauth-instagram-callback"
   status = 200
+[[redirects]]
+  from = "/auth/meta/callback"
+  to = "/.netlify/functions/oauth-meta-callback"
+  status = 200

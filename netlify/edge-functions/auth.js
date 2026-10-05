@@ -6,11 +6,11 @@
 // Lo único público: privacidad/términos, login, el archivo de verificación de TikTok y las
 // URLs a las que TikTok/Instagram regresan después de autorizar.
 const PUBLIC = [
-  /^\/privacidad\.html$/, /^\/terminos\.html$/, /^\/login\.html$/, /^\/robots\.txt$/,
+  /^\/privacidad\.html$/, /^\/eliminar-datos\.html$/, /^\/terminos\.html$/, /^\/login\.html$/, /^\/robots\.txt$/,
   /^\/tiktok[\w.-]*\.txt$/, /^\/favicon/,
   /^\/\.netlify\/functions\/login$/,
-  /^\/\.netlify\/functions\/oauth-(tiktok|instagram)-callback$/,
-  /^\/auth\/(tiktok|instagram)\/callback$/
+  /^\/\.netlify\/functions\/oauth-(tiktok|instagram|meta)-callback$/,
+  /^\/auth\/(tiktok|instagram|meta)\/callback$/
 ];
 
 const enc = new TextEncoder();
