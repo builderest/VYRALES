@@ -365,6 +365,12 @@
 
             </div>
 
+            <!-- Textos para publicar (copiar y pegar): desplegable -->
+            <details id="copyTextsDetails" class="mb-4 rounded-xl border border-cyber-pink/40 bg-cyber-darker/30 hidden">
+                <summary id="copyTextsSummary" class="cursor-pointer list-none px-4 py-3 text-sm font-mono text-cyber-pink hover:text-white select-none"></summary>
+                <div id="copyTextsInner" class="p-4 pt-0 space-y-3"></div>
+            </details>
+
             <!-- Tomas del episodio en revisión: desplegable (cerrado si ya están todas aprobadas) -->
             <details id="shotCardsDetails" class="mb-6 rounded-xl border border-cyber-border bg-cyber-darker/30 hidden">
                 <summary id="shotCardsSummary" class="cursor-pointer list-none px-4 py-3 text-sm font-mono text-cyber-cyan hover:text-white select-none"></summary>
@@ -1214,7 +1220,36 @@
       // Panel de "unir tomas en video final" — aparece solo cuando el episodio tiene
       // tomas de video generadas. Si ya existe un asset "final_render", muestra el video
       // completo en vez del botón.
+      // Desplegable "TEXTOS PARA PUBLICAR": descripciones + comentario con botón Copiar.
+      // Solo se cambia el contenido; el <details> no se recrea, así queda abierto/cerrado como lo dejaste.
+      function renderCopyTexts(episode) {
+        const box = document.getElementById('copyTextsDetails');
+        const final = episode && (episode.assets || []).find(a => a.kind === 'final_render');
+        if (!final) { box.classList.add('hidden'); return; }
+        box.classList.remove('hidden');
+        const pk = (episode.validator_report || {}).publish_package;
+        const ready = pk && pk.status === 'done';
+        const mobile = '/copiar.html?series=' + encodeURIComponent(DEFAULT_SERIES) + '&ep=' + episode.episode_number;
+        document.getElementById('copyTextsSummary').innerHTML = '<i class="fa-regular fa-copy mr-2"></i>TEXTOS PARA PUBLICAR · EP ' + episode.episode_number +
+          (ready ? ' · <span class="text-cyber-emerald">listos</span>' : ' · <span class="text-cyber-gold">sin preparar</span>') + ' <span class="text-slate-500">▾ ver / ocultar</span>';
+        const block = (title, text) => !text ? '' :
+          '<div class="bg-slate-950 border border-slate-800 rounded-lg p-3">' +
+            '<div class="flex justify-between items-center mb-2"><span class="text-[11px] font-mono text-slate-400">' + title + '</span>' +
+            '<button onclick="copyTag(this, event)" data-tag="' + esc(text) + '" class="text-xs font-mono px-3 py-1 rounded border border-cyber-cyan/50 text-cyber-cyan hover:bg-cyber-cyan/10"><i class="fa-regular fa-copy mr-1"></i>Copiar</button></div>' +
+            '<p class="text-sm text-slate-200 whitespace-pre-wrap">' + esc(text) + '</p></div>';
+        document.getElementById('copyTextsInner').innerHTML = !ready
+          ? '<button onclick="makePublishPackage(\'' + episode.id + '\')" class="text-xs font-mono px-3 py-2 rounded border border-cyber-pink/50 text-cyber-pink hover:bg-cyber-pink/10"><i class="fa-solid fa-wand-magic-sparkles mr-1"></i>Preparar textos y portada (~$0.001)</button>'
+          : '<div class="flex flex-wrap gap-2">' +
+              '<a href="' + mobile + '" target="_blank" class="text-xs font-mono px-3 py-1 rounded border border-cyber-cyan/50 text-cyber-cyan hover:bg-cyber-cyan/10"><i class="fa-solid fa-mobile-screen mr-1"></i>Abrir en el celular</a>' +
+              '<button onclick="copyTag(this, event)" data-tag="' + esc(location.origin + mobile) + '" class="text-xs font-mono px-3 py-1 rounded border border-slate-600 text-slate-300 hover:bg-slate-800"><i class="fa-solid fa-link mr-1"></i>Copiar enlace para el celular</button>' +
+            '</div>' +
+            '<div class="grid grid-cols-1 lg:grid-cols-2 gap-3">' + block('DESCRIPCIÓN TIKTOK', pk.tiktok) + block('DESCRIPCIÓN INSTAGRAM', pk.instagram) + '</div>' +
+            '<div class="grid grid-cols-1 lg:grid-cols-2 gap-3">' + block('COMENTARIO PARA FIJAR (en las dos)', pk.pinned_comment) + block('TEXTO DE PORTADA', pk.cover_text) + '</div>' +
+            '<p class="text-[11px] font-mono text-cyber-gold">Recuerda: activa la etiqueta de IA en la app (TikTok: Más opciones → “Contenido generado por IA”; Instagram: Configuración avanzada).</p>';
+      }
+
       function renderFinalRenderPanel(episode) {
+        renderCopyTexts(episode);
         const panel = document.getElementById('finalRenderPanel');
         if (!episode) {
           panel.classList.add('hidden');
