@@ -1822,7 +1822,18 @@
           '<p class="text-[10px] text-slate-500 leading-snug pt-1">Estas reglas vienen de la novela creada con PROMPT; el validador las hace cumplir al crearla.</p>';
       }
 
+      // Mientras un episodio se genera, el dashboard se recarga solo cada 20 s (toda la página:
+      // tarjeta, progreso, arco y tomas) hasta que termina.
+      let genRefreshTimer = null;
+      function scheduleGenerationRefresh(data) {
+        clearTimeout(genRefreshTimer);
+        if ((data.episodes || []).some(e => e.status === 'generando_media')) {
+          genRefreshTimer = setTimeout(() => { loadDashboard(); }, 20000);
+        }
+      }
+
       function renderNextEpisodeCard(data) {
+        scheduleGenerationRefresh(data);
         const eps = (data.episodes || []).slice().sort((a, b) => a.episode_number - b.episode_number);
         const next = eps.find(e => e.status === 'guion_generado');
         const generating = eps.find(e => e.status === 'generando_media');
@@ -1831,8 +1842,10 @@
         const desc = document.getElementById('nextEpDesc');
         btn.classList.add('hidden');
         if (generating) {
-          title.textContent = 'Generando EP ' + generating.episode_number;
-          desc.textContent = 'Veo está trabajando. Esta página se actualiza sola.';
+          const total = (generating.shots || []).length || 0;
+          const done = (generating.assets || []).filter(a => a.kind === 'video_clip').length;
+          title.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>Generando EP ' + generating.episode_number;
+          desc.textContent = done + ' de ' + total + ' tomas listas · se actualiza sola cada 20 s';
         } else if (next) {
           title.textContent = 'Siguiente: EP ' + next.episode_number + ' — ' + (next.title || '');
           desc.textContent = ((next.shots || []).length || 0) + ' tomas · ~$' + estimateEpisodeCost(next).toFixed(2) + ' en Veo';
@@ -1916,6 +1929,9 @@
         } catch (err) {
           return alert('No se pudo arrancar la producción: ' + err.message);
         }
+        // Que todo el dashboard muestre el estado "generando" de inmediato.
+        await new Promise(r => setTimeout(r, 2500));
+        await loadDashboard();
         const start = Date.now();
         const MAX_MS = 45 * 60 * 1000;
         while (Date.now() - start < MAX_MS) {
@@ -2197,7 +2213,9 @@
             sorted.forEach((asset, i) => {
               addCard.insertAdjacentHTML('beforebegin', renderShotCard(asset, i, sorted.length));
             });
-            banner.textContent = 'Revisando EP ' + inReview.episode_number + ' de "' + data.series.title + '".';
+            banner.innerHTML = inReview.status === 'generando_media'
+              ? '<i class="fa-solid fa-spinner fa-spin mr-1"></i>Generando EP ' + inReview.episode_number + ' de "' + esc(data.series.title) + '": ' + sorted.length + ' de ' + ((inReview.shots || []).length || '?') + ' tomas listas. Puedes ir revisando las que ya salieron.'
+              : 'Revisando EP ' + inReview.episode_number + ' de "' + esc(data.series.title) + '".';
           } else {
             banner.textContent = 'Todavía no hay tomas generadas en esta serie.';
           }
