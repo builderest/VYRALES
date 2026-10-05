@@ -17,6 +17,7 @@
 const { getSupabaseClient } = require('./_supabase');
 const { uploadClip } = require('./_storage');
 const { generateVeoClip } = require('./_veo');
+const { buildShotPrompt } = require('./_series');
 
 const LOG = '[regen-shot]';
 
@@ -39,26 +40,42 @@ exports.handler = async (event) => {
       .eq('id', assetId)
       .single();
     if (fetchError || !asset) throw fetchError || new Error('Toma no encontrada');
-    if (!asset.prompt) throw new Error('Esta toma no tiene un prompt guardado para regenerar.');
-
     const { data: episode, error: episodeError } = await supabase
       .from('episodes')
-      .select('episode_number, series:series_id(slug)')
+      .select('episode_number, shots, series_id, series:series_id(slug, story_bible)')
       .eq('id', asset.episode_id)
       .single();
     if (episodeError || !episode) throw episodeError || new Error('Episodio no encontrado');
 
+    // Novelas con tomas estructuradas: el prompt se RECONSTRUYE con el guion y los
+    // personajes actuales, así cualquier corrección (vestuario, cámara, reglas del prompt)
+    // se aplica al regenerar. Series viejas: se reusa el prompt guardado como antes.
+    let prompt = asset.prompt;
+    const shot = Array.isArray(episode.shots) ? episode.shots.find((x) => x.n === asset.shot_number) : null;
+    if (shot) {
+      const { data: characters, error: charsError } = await supabase
+        .from('characters')
+        .select('name, fixed_prompt_tag, profile')
+        .eq('series_id', episode.series_id);
+      if (charsError) throw charsError;
+      prompt = buildShotPrompt(shot, characters, episode.series && episode.series.story_bible);
+      console.log(LOG, 'prompt reconstruido desde el guion actual (toma', asset.shot_number + ').');
+    }
+    if (!prompt) throw new Error('Esta toma no tiene un prompt para regenerar.');
+
     const modelKey = ['veo_lite', 'veo_fast', 'veo_standard'].includes(asset.model) ? asset.model : 'veo_lite';
     console.log(LOG, 'generando con Veo (' + modelKey + ')... esto tarda un rato.');
-    const { videoBuffer, costUsd, model } = await generateVeoClip({ modelKey, prompt: asset.prompt });
+    const { videoBuffer, costUsd, model } = await generateVeoClip({ modelKey, prompt });
     console.log(LOG, 'Veo terminó, subiendo a Supabase Storage...');
 
-    const storagePath = `${episode.series.slug}/ep${episode.episode_number}/shot-${String(asset.shot_number).padStart(2, '0')}.mp4`;
+    // Nombre con versión: si se reusara shot-NN.mp4, la caché del navegador/CDN podría
+    // seguir mostrando el video viejo después de regenerar.
+    const storagePath = `${episode.series.slug}/ep${episode.episode_number}/shot-${String(asset.shot_number).padStart(2, '0')}-v${Date.now()}.mp4`;
     const publicUrl = await uploadClip(supabase, { path: storagePath, buffer: videoBuffer });
 
     const { data: updated, error: updateError } = await supabase
       .from('assets')
-      .update({ storage_path: publicUrl, cost_usd: costUsd, approved: false, approved_at: null })
+      .update({ storage_path: publicUrl, prompt, cost_usd: costUsd, approved: false, approved_at: null })
       .eq('id', assetId)
       .select()
       .single();

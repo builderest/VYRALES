@@ -29,8 +29,13 @@ const RISK_PATTERNS = [
   [/\bcrowd(s|ed)?\b|\bdozens of\b|\bhundreds of\b/i, 'multitudes (caras deformes al fondo)'],
   [/\bfight(s|ing)?\b|\bpunch(es|ing)?\b|\bkick(s|ing)?\b|\bwrestl/i, 'peleas/golpes (movimientos rotos)'],
   [/\b(runs|running|run) (toward|towards|away|across|through|after|into|down the|up the)\b|\bsprint|\bchase\b/i, 'carreras/persecuciones (movimiento rápido)'],
-  [/\btyping\b|\bfingers\b|\bpiano\b/i, 'dedos/manos en primer plano (manos deformes)']
+  [/\btyping\b|\bfingers\b|\bpiano\b/i, 'dedos/manos en primer plano (manos deformes)'],
+  [/\b(letter|document|contract|report|newspaper|menu|sign)\b(?![^.]*\b(back of the page|facing away|folded closed|blurred)\b)/i, 'papel/documento visible (Veo inventa texto legible: muéstralo por detrás o enfoca la reacción)']
 ];
+
+// Frases en negativo dentro de lo que describe la imagen: la guía de Veo recomienda
+// describir en positivo; en la prueba real "with no tie" generó una corbata.
+const NEGATION_RE = /\b(no|not|without|never)\s+[a-z]/i;
 
 function countWords(text) {
   return String(text || '')
@@ -110,6 +115,9 @@ function validateSeries(data) {
       errors.push(`${label}: el fixed_prompt_tag debe empezar con "${c.key}," (así Veo sabe quién habla).`);
     }
     if (c.fixed_prompt_tag && /"/.test(c.fixed_prompt_tag)) errors.push(`${label}: el fixed_prompt_tag tiene comillas dobles.`);
+    [['fixed_prompt_tag', c.fixed_prompt_tag], ['default_outfit', c.profile && c.profile.default_outfit]].forEach(([f, v]) => {
+      if (v && NEGATION_RE.test(v)) warnings.push(`${label}: ${f} tiene una frase en negativo ("${v.match(NEGATION_RE)[0]}…"): descríbelo en positivo (ej. "open-collar shirt" en vez de "no tie").`);
+    });
     if (byKey[c.key]) errors.push(`Personaje duplicado: ${c.key}.`);
     byKey[c.key] = c;
   });
@@ -152,6 +160,7 @@ function validateSeries(data) {
       });
 
       Object.keys(s.wardrobe || {}).forEach((k) => {
+        if (s.wardrobe[k] && NEGATION_RE.test(s.wardrobe[k])) warnings.push(`${st}: vestuario de ${k} en negativo: descríbelo en positivo.`);
         req(byKey[k], `${st}: vestuario para personaje desconocido "${k}".`);
         if (byKey[k] && !cast.includes(k)) warnings.push(`${st}: vestuario de ${k}, pero ${k} no está en la toma.`);
       });
@@ -273,7 +282,17 @@ function buildShotPrompt(shot, characterRows, storyBible) {
     const outfit = (shot.wardrobe && shot.wardrobe[name]) || (row.profile && row.profile.default_outfit);
     return outfit ? `${row.fixed_prompt_tag}, wearing ${outfit}` : row.fixed_prompt_tag;
   });
-  if (cast.length) parts.push(isV2 ? cast.map((c) => c.replace(/\.?$/, '.')).join(' ') : `Characters: ${cast.join('; ')}.`);
+  if (cast.length) {
+    if (!isV2) {
+      parts.push(`Characters: ${cast.join('; ')}.`);
+    } else if (cast.length === 1) {
+      parts.push(cast[0].replace(/\.?$/, '.'));
+    } else {
+      parts.push(cast.map((c, i) => `Character ${i + 1}: ${c.replace(/\.?$/, '.')}`).join(' '));
+      const firstNames = (shot.characters || []).map((n) => n.split(' ')[0]);
+      parts.push(`There are exactly ${cast.length} people in focus: ${firstNames.join(' and ')}. Each one wears only their own outfit described above; clothing and accessories are never shared between them.`);
+    }
+  }
 
   // 3) Acción con marcas de tiempo: diálogo en 0–6 s, reacción quieta en 6–8 s (corte limpio)
   const extras = sb.extras || {};
