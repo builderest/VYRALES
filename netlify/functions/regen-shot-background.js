@@ -15,17 +15,11 @@
 // `updated_at` de la toma (lo actualiza un trigger de Postgres automáticamente en cada
 // UPDATE, ver supabase/schema.sql).
 const { getSupabaseClient } = require('./_supabase');
-const { BUCKET, uploadClip } = require('./_storage');
+const { BUCKET, uploadClip, storagePathFromPublicUrl } = require('./_storage');
 
-// De una URL pública de Supabase Storage saca la ruta interna dentro del bucket.
-// https://<proyecto>.supabase.co/storage/v1/object/public/media/<ruta> → <ruta>
-function storagePathFromPublicUrl(url) {
-  const marker = `/object/public/${BUCKET}/`;
-  const i = String(url || '').indexOf(marker);
-  return i === -1 ? null : decodeURIComponent(String(url).slice(i + marker.length).split('?')[0]);
-}
 const { generateVeoClip, loadReferenceImages } = require('./_veo');
-const { buildShotPrompt, referenceUrlsForShot } = require('./_series');
+const { effectiveShotPrompt, referenceUrlsForShot } = require('./_series');
+const { createKeyframe, loadExistingKeyframe } = require('./_keyframe');
 
 const LOG = '[regen-shot]';
 
@@ -50,7 +44,7 @@ exports.handler = async (event) => {
     if (fetchError || !asset) throw fetchError || new Error('Toma no encontrada');
     const { data: episode, error: episodeError } = await supabase
       .from('episodes')
-      .select('episode_number, shots, series_id, series:series_id(slug, story_bible)')
+      .select('id, episode_number, shots, series_id, series:series_id(slug, story_bible, visual_memory)')
       .eq('id', asset.episode_id)
       .single();
     if (episodeError || !episode) throw episodeError || new Error('Episodio no encontrado');
@@ -60,6 +54,7 @@ exports.handler = async (event) => {
     // se aplica al regenerar. Series viejas: se reusa el prompt guardado como antes.
     let prompt = asset.prompt;
     let referenceImages = [];
+    let startImage = null;
     const shot = Array.isArray(episode.shots) ? episode.shots.find((x) => x.n === asset.shot_number) : null;
     if (shot) {
       const { data: characters, error: charsError } = await supabase
@@ -68,9 +63,18 @@ exports.handler = async (event) => {
         .eq('series_id', episode.series_id);
       if (charsError) throw charsError;
       const sb = (episode.series && episode.series.story_bible) || {};
-      prompt = buildShotPrompt(shot, characters, sb);
+      prompt = effectiveShotPrompt(shot, characters, sb);
       if (sb.rules && sb.rules.reference_images) {
         referenceImages = await loadReferenceImages(referenceUrlsForShot(shot, characters));
+      }
+      // Memoria visual: se anima desde el cuadro inicial guardado (o se crea uno si no hay).
+      if (sb.rules && sb.rules.keyframes) {
+        const existingFrame = await loadExistingKeyframe(supabase, episode.id, shot.n);
+        const frame = existingFrame || (await createKeyframe(supabase, {
+          series: Object.assign({ id: episode.series_id }, episode.series),
+          episode, shot, characters, log: (...a) => console.log(LOG, ...a)
+        }));
+        startImage = frame.startImage;
       }
       console.log(LOG, 'prompt reconstruido desde el guion actual (toma', asset.shot_number + ').');
     }
@@ -82,7 +86,7 @@ exports.handler = async (event) => {
     let modelKey = ['veo_lite', 'veo_fast', 'veo_standard'].includes(asset.model) ? asset.model : 'veo_lite';
     if (referenceImages.length) modelKey = rules.shot_model === 'veo_standard' ? 'veo_standard' : 'veo_fast';
     console.log(LOG, 'generando con Veo (' + modelKey + ')... esto tarda un rato.');
-    const { videoBuffer, costUsd, model } = await generateVeoClip({ modelKey, prompt, referenceImages });
+    const { videoBuffer, costUsd, model } = await generateVeoClip({ modelKey, prompt, referenceImages, startImage });
     console.log(LOG, 'Veo terminó, subiendo a Supabase Storage...');
 
     // Nombre con versión: si se reusara shot-NN.mp4, la caché del navegador/CDN podría

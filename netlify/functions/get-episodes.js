@@ -18,7 +18,7 @@ exports.handler = async (event) => {
 
     const { data: series, error: seriesError } = await supabase
       .from('series')
-      .select('id, slug, title, genre, synopsis, story_bible')
+      .select('id, slug, title, genre, synopsis, story_bible, visual_memory')
       .eq('slug', seriesSlug)
       .maybeSingle();
 

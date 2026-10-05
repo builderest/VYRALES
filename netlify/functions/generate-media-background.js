@@ -18,7 +18,8 @@ const { getSupabaseClient } = require('./_supabase');
 const { ensureMediaBucket, uploadClip } = require('./_storage');
 const { generateVeoClip, loadReferenceImages } = require('./_veo');
 const { mergeEpisodeVideo } = require('./_merge');
-const { buildShotPrompt, referenceUrlsForShot } = require('./_series');
+const { effectiveShotPrompt, referenceUrlsForShot } = require('./_series');
+const { createKeyframe, loadExistingKeyframe } = require('./_keyframe');
 
 // Estilo por defecto SOLO para series viejas sin story_bible.visual_style (dragon_silicio).
 // Las novelas nuevas definen su estilo en story_bible.visual_style (ej. animación 3D).
@@ -96,7 +97,7 @@ exports.handler = async (event) => {
   try {
     const { data: series, error: seriesError } = await supabase
       .from('series')
-      .select('id, slug, title, story_bible')
+      .select('id, slug, title, story_bible, visual_memory')
       .eq('slug', seriesSlug)
       .single();
     if (seriesError || !series) throw seriesError || new Error('Serie no encontrada');
@@ -173,15 +174,27 @@ exports.handler = async (event) => {
     const prompts = {};
     const refUrls = {};
     const useRefs = !!(series.story_bible && series.story_bible.rules && series.story_bible.rules.reference_images);
+    const useKeyframes = !!(series.story_bible && series.story_bible.rules && series.story_bible.rules.keyframes);
     for (const scene of scenes) {
       prompts[scene.number] = scene.shot
-        ? buildShotPrompt(scene.shot, characters, series.story_bible)
+        ? effectiveShotPrompt(scene.shot, characters, series.story_bible)
         : buildPrompt(scene.text, characters, series.story_bible);
+      // Memoria visual: cada toma arranca desde su cuadro inicial, que necesita la foto de
+      // cara de cada personaje. Si falta una, se aborta aquí, sin gastar nada.
+      if (useKeyframes && scene.shot) {
+        (scene.shot.characters || []).forEach((name) => {
+          const row = characters.find((c) => c.name === name);
+          if (!row || !row.reference_image_url) {
+            throw new Error(`Falta la foto de cara de "${name}" (toma ${scene.number}). Súbela en el Elenco: el cuadro inicial la necesita.`);
+          }
+        });
+      }
       // Con fotos de referencia activadas, TODAS las tomas deben tener la foto de cada
       // personaje: si falta una, se aborta aquí, antes de gastar en Veo.
       if (useRefs && scene.shot) refUrls[scene.number] = referenceUrlsForShot(scene.shot, characters);
     }
     if (useRefs) console.log(LOG, 'fotos de referencia ACTIVADAS: cada toma lleva la foto de sus personajes.');
+    if (useKeyframes) console.log(LOG, 'memoria visual ACTIVADA: cada toma se anima desde su cuadro inicial.');
 
     await ensureMediaBucket(supabase);
     console.log(LOG, 'bucket "media" listo.');
@@ -216,7 +229,14 @@ exports.handler = async (event) => {
       console.log(LOG, `toma ${scene.number}/${total} (${modelKey}): arrancando generación con Veo...`);
       try {
         const referenceImages = refUrls[scene.number] ? await loadReferenceImages(refUrls[scene.number]) : [];
-        const { videoBuffer, costUsd, model } = await generateVeoClip({ modelKey, prompt, referenceImages });
+        let startImage = null;
+        if (useKeyframes && scene.shot) {
+          const existingFrame = await loadExistingKeyframe(supabase, episode.id, scene.number);
+          const frame = existingFrame || (await createKeyframe(supabase, { series, episode, shot: scene.shot, characters, log: (...a) => console.log(LOG, ...a) }));
+          startImage = frame.startImage;
+          console.log(LOG, `toma ${scene.number}/${total}: ${existingFrame ? 'usando el cuadro inicial ya guardado' : 'cuadro inicial creado'}.`);
+        }
+        const { videoBuffer, costUsd, model } = await generateVeoClip({ modelKey, prompt, referenceImages, startImage });
         console.log(LOG, `toma ${scene.number}/${total}: Veo terminó, subiendo a Supabase Storage...`);
 
         const storagePath = `${series.slug}/ep${episode.episode_number}/shot-${String(scene.number).padStart(2, '0')}.mp4`;

@@ -1,0 +1,160 @@
+// Memoria visual de una novela: prompts e insumos para
+//   1) la imagen fija de cada LUGAR (se genera una vez y se reutiliza siempre), y
+//   2) el CUADRO INICIAL de cada toma (personajes con su foto + lugar con su imagen fija),
+//      que después Veo Lite anima. Así el video arranca con la cara, la ropa y el set
+//      correctos, aunque Lite no acepte fotos de referencia directamente.
+const { loadReferenceImages } = require('./_veo');
+const { MAX_CHARACTER_REFS, generateImage } = require('./_image');
+const { ensureMediaBucket, uploadFile, removeByPublicUrl } = require('./_storage');
+
+function locationOf(sb, key) {
+  const loc = sb.locations && sb.locations[key];
+  if (!loc) return null;
+  return typeof loc === 'string' ? { visual: loc, ambient: '' } : loc;
+}
+
+const CLEAN_FRAME =
+  'Every surface is clean and blank: walls, papers, screens and signs show only soft, blurry, unreadable shapes, ' +
+  'with zero letters, words, numbers or logos anywhere in the image.';
+
+function buildLocationPrompt(locationKey, storyBible) {
+  const sb = storyBible || {};
+  const loc = locationOf(sb, locationKey);
+  if (!loc) throw new Error(`El lugar "${locationKey}" no existe en story_bible.locations.`);
+  return [
+    `${(sb.visual_style || 'Cinematic style').replace(/\.?$/, '.')}`,
+    `Empty establishing view of the set, with nobody in it: ${loc.visual.replace(/\.?$/, '.')}`,
+    'Vertical 9:16 composition, eye-level medium-wide view, soft cinematic lighting, rich detail.',
+    'This image is a fixed set reference that will be reused in every scene, so keep it simple, coherent and timeless.',
+    CLEAN_FRAME
+  ].join(' ');
+}
+
+// shot: elemento de episodes.shots; characterRows: filas de `characters`; storyBible.
+// hasLocationRef: si se adjunta la imagen fija del lugar.
+function buildKeyframePrompt(shot, characterRows, storyBible, hasLocationRef) {
+  const sb = storyBible || {};
+  const loc = locationOf(sb, shot.location);
+  const names = shot.characters || [];
+  const parts = [
+    `Create the very first frame of a vertical 9:16 video shot. ${(sb.visual_style || '').replace(/\.?$/, '.')}`,
+    shot.camera ? `Framing: ${shot.camera.replace(/\.?$/, '.')}` : ''
+  ];
+  names.forEach((name, i) => {
+    const row = (characterRows || []).find((r) => r.name === name);
+    if (!row) throw new Error(`El personaje "${name}" no existe.`);
+    const first = name.split(' ')[0];
+    const outfit = (shot.wardrobe && shot.wardrobe[name]) || (row.profile && row.profile.default_outfit) || '';
+    parts.push(
+      `${names.length > 1 ? `Character ${i + 1}: ` : ''}${row.fixed_prompt_tag.replace(/\.?$/, '')}` +
+      (outfit ? `, wearing ${outfit}` : '') +
+      `. Use the face reference image of ${first} for the exact face, skin tone, eyes and hair.`
+    );
+  });
+  if (names.length > 1) {
+    parts.push(`There are exactly ${names.length} people: ${names.map((n) => n.split(' ')[0]).join(' and ')}. Each one wears only their own outfit; clothing and accessories are never shared.`);
+  }
+  if (loc) {
+    parts.push(`Setting: ${loc.visual.replace(/\.?$/, '.')}` + (hasLocationRef ? ' Match the set reference image exactly: same layout, colors, furniture and lighting.' : ''));
+  }
+  parts.push(`Moment: the instant this action begins, before anyone speaks — ${String(shot.action_en || '').replace(/\.?$/, '.')}`);
+  parts.push('Natural anatomy and natural hands, expressive faces, cinematic composition.');
+  parts.push(CLEAN_FRAME);
+  return parts.filter(Boolean).join(' ');
+}
+
+// Junta las imágenes de referencia de una toma: fotos de cara (obligatorias) + imagen fija
+// del lugar (si existe en la memoria visual). Lanza error si falta la foto de un personaje.
+async function keyframeReferences(shot, characterRows, visualMemory) {
+  const names = shot.characters || [];
+  if (names.length > MAX_CHARACTER_REFS) throw new Error(`La toma ${shot.n} tiene más de ${MAX_CHARACTER_REFS} personajes.`);
+  const faceUrls = names.map((name) => {
+    const row = (characterRows || []).find((r) => r.name === name);
+    if (!row || !row.reference_image_url) {
+      throw new Error(`Falta la foto de cara de "${name}" (toma ${shot.n}). Súbela en el Elenco: el cuadro inicial la necesita.`);
+    }
+    return row.reference_image_url;
+  });
+  const locRef = visualMemory && visualMemory.locations && visualMemory.locations[shot.location];
+  const urls = locRef && locRef.url ? [...faceUrls, locRef.url] : faceUrls;
+  const images = await loadReferenceImages(urls);
+  const refs = images.map((img, i) => ({
+    ...img,
+    label: i < names.length ? `face reference of ${names[i].split(' ')[0]}` : `fixed set reference of ${shot.location}`
+  }));
+  return { refs, hasLocationRef: !!(locRef && locRef.url) };
+}
+
+function effectiveKeyframePrompt(shot, characterRows, storyBible, hasLocationRef) {
+  return (shot.keyframe_prompt_override && shot.keyframe_prompt_override.trim()) ||
+    buildKeyframePrompt(shot, characterRows, storyBible, hasLocationRef);
+}
+
+// Genera y guarda el cuadro inicial de UNA toma. Si ya había uno, lo reemplaza (misma fila
+// de `assets`, archivo viejo borrado de Storage solo después de subir el nuevo).
+// Devuelve el asset y los bytes del cuadro (para pasárselo directo a Veo).
+async function createKeyframe(supabase, { series, episode, shot, characters, log = console.log }) {
+  const { refs, hasLocationRef } = await keyframeReferences(shot, characters, series.visual_memory);
+  const prompt = effectiveKeyframePrompt(shot, characters, series.story_bible, hasLocationRef);
+  log('generando cuadro inicial de la toma', shot.n, 'con', refs.length, 'imagen(es) de referencia...');
+  const img = await generateImage({ prompt, references: refs });
+
+  await ensureMediaBucket(supabase);
+  const ext = img.mimeType.includes('jpeg') ? 'jpg' : 'png';
+  const storagePath = `${series.slug}/ep${episode.episode_number}/frame-${String(shot.n).padStart(2, '0')}-v${Date.now()}.${ext}`;
+  const url = await uploadFile(supabase, { path: storagePath, buffer: img.buffer, contentType: img.mimeType });
+
+  const { data: existing } = await supabase
+    .from('assets')
+    .select('id, storage_path')
+    .eq('episode_id', episode.id)
+    .eq('kind', 'image')
+    .eq('shot_number', shot.n)
+    .maybeSingle();
+
+  let asset;
+  if (existing) {
+    const { data, error } = await supabase
+      .from('assets')
+      .update({ storage_path: url, prompt, cost_usd: img.costUsd, model: 'nano_banana', approved: false, approved_at: null })
+      .eq('id', existing.id)
+      .select()
+      .single();
+    if (error) throw error;
+    asset = data;
+    if (existing.storage_path && existing.storage_path !== url) await removeByPublicUrl(supabase, existing.storage_path, log);
+  } else {
+    const { data, error } = await supabase
+      .from('assets')
+      .insert({ episode_id: episode.id, kind: 'image', model: 'nano_banana', shot_number: shot.n, storage_path: url, prompt, cost_usd: img.costUsd, approved: false })
+      .select()
+      .single();
+    if (error) throw error;
+    asset = data;
+  }
+  log('cuadro inicial listo:', url);
+  return { asset, startImage: { imageBytes: img.buffer.toString('base64'), mimeType: img.mimeType } };
+}
+
+// Cuadro inicial ya guardado de una toma (para reutilizarlo al animar o regenerar el video).
+async function loadExistingKeyframe(supabase, episodeId, shotNumber) {
+  const { data: frame } = await supabase
+    .from('assets')
+    .select('id, storage_path')
+    .eq('episode_id', episodeId)
+    .eq('kind', 'image')
+    .eq('shot_number', shotNumber)
+    .maybeSingle();
+  if (!frame || !frame.storage_path) return null;
+  const [img] = await loadReferenceImages([frame.storage_path]);
+  return { asset: frame, startImage: img };
+}
+
+module.exports = {
+  buildLocationPrompt,
+  buildKeyframePrompt,
+  effectiveKeyframePrompt,
+  keyframeReferences,
+  createKeyframe,
+  loadExistingKeyframe
+};

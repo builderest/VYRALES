@@ -70,6 +70,8 @@ Un ÚNICO objeto JSON válido (nada de texto antes o después), con EXACTAMENTE 
 7. story_bible.rules: shots_per_episode = número de tomas pedido; shot_seconds = 8; max_dialogue_words_per_shot = 15; max_characters_per_shot = 2; max_words_per_episode = 450.
    - Si en MI IDEA pido "usar fotos de referencia" (caras idénticas en todas las tomas): reference_images = true, shot_model = "veo_fast", cliffhanger_model = "veo_fast" (Veo Lite NO acepta fotos).
    - Si no lo pido: reference_images = false, shot_model = "veo_lite", cliffhanger_model = "veo_lite".
+   - keyframes = true SIEMPRE (memoria visual: cada toma se anima desde un cuadro inicial generado con las fotos de los personajes y la imagen fija del lugar).
+   - Por eso las descripciones de "locations" deben ser muy concretas y estables (colores, muebles, luz), y cada action_en debe empezar describiendo la posición inicial de los personajes.
 8. Cada episodio tiene EXACTAMENTE shots_per_episode tomas, numeradas n = 1, 2, 3… y episode_number consecutivo desde 1.
 8b. Audio: describe solo los sonidos de quienes están en cuadro. Nunca pidas risas, aplausos ni voces de fondo si no hay gente que las haga.
 9. Cada toma:

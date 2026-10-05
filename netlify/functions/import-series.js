@@ -154,7 +154,7 @@ exports.handler = async (event) => {
     // 3) Episodios
     const { data: existingEpisodes, error: exError } = await supabase
       .from('episodes')
-      .select('id, episode_number, status')
+      .select('id, episode_number, status, shots')
       .eq('series_id', series.id);
     if (exError) throw exError;
 
@@ -185,6 +185,15 @@ exports.handler = async (event) => {
         if (error) throw error;
         result.inserted.push(r.episode_number);
       } else if (EDITABLE_STATUSES.has(current.status)) {
+        // Los prompts editados a mano en el dashboard (por toma) NO se pierden al re-importar.
+        const oldShots = Array.isArray(current.shots) ? current.shots : [];
+        payload.shots = payload.shots.map((s) => {
+          const old = oldShots.find((o) => o.n === s.n) || {};
+          const keep = {};
+          if (old.prompt_override) keep.prompt_override = old.prompt_override;
+          if (old.keyframe_prompt_override) keep.keyframe_prompt_override = old.keyframe_prompt_override;
+          return Object.assign({}, s, keep);
+        });
         const { error } = await supabase.from('episodes').update(payload).eq('id', current.id);
         if (error) throw error;
         result.updated.push(r.episode_number);

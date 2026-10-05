@@ -35,4 +35,19 @@ async function uploadFile(supabase, { path: storagePath, buffer, contentType }) 
   return data.publicUrl;
 }
 
-module.exports = { BUCKET, ensureMediaBucket, uploadClip, uploadFile };
+// De una URL pública de Supabase Storage saca la ruta interna dentro del bucket.
+function storagePathFromPublicUrl(url) {
+  const marker = `/object/public/${BUCKET}/`;
+  const i = String(url || '').indexOf(marker);
+  return i === -1 ? null : decodeURIComponent(String(url).slice(i + marker.length).split('?')[0]);
+}
+
+// Borra un archivo viejo por su URL pública (no falla si no se puede: solo avisa).
+async function removeByPublicUrl(supabase, url, log = console.log) {
+  const p = storagePathFromPublicUrl(url);
+  if (!p) return;
+  const { error } = await supabase.storage.from(BUCKET).remove([p]);
+  if (error) log('no se pudo borrar el archivo viejo (no es grave):', p, error.message);
+}
+
+module.exports = { BUCKET, ensureMediaBucket, uploadClip, uploadFile, storagePathFromPublicUrl, removeByPublicUrl };

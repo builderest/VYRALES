@@ -23,7 +23,8 @@
       "max_dialogue_words_per_shot": 15,
       "max_characters_per_shot": 2,
       "shot_model": "veo_lite",
-      "cliffhanger_model": "veo_lite"
+      "cliffhanger_model": "veo_lite",
+      "keyframes": true
     },
     "locations": {
       "bakery": {

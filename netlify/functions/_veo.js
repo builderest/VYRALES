@@ -66,7 +66,9 @@ const MODELS_WITH_REFERENCE_IMAGES = new Set(['veo_fast', 'veo_standard']);
 // modelKey: 'veo_lite' | 'veo_fast' | 'veo_standard'
 // referenceImages: [{ imageBytes: <base64>, mimeType: 'image/jpeg' }] (máx. 3) — fotos de
 // los personajes de la toma para que Veo mantenga sus caras.
-async function generateVeoClip({ modelKey, prompt, aspectRatio = '9:16', durationSeconds = 8, referenceImages = [] }) {
+// startImage: { imageBytes, mimeType } — CUADRO INICIAL (image-to-video). Veo 3.1 Lite sí lo
+// acepta: es como la memoria visual llega a Lite (la cara y el set ya vienen en el cuadro).
+async function generateVeoClip({ modelKey, prompt, aspectRatio = '9:16', durationSeconds = 8, referenceImages = [], startImage = null }) {
   const model = VEO_MODELS[modelKey];
   if (!model) throw new Error('Modelo de Veo desconocido: ' + modelKey);
   if (referenceImages.length) {
@@ -87,6 +89,7 @@ async function generateVeoClip({ modelKey, prompt, aspectRatio = '9:16', duratio
     ai.models.generateVideos({
       model,
       prompt,
+      ...(startImage ? { image: { imageBytes: startImage.imageBytes, mimeType: startImage.mimeType || 'image/png' } } : {}),
       config: Object.assign(
         { aspectRatio, durationSeconds: durationSecondsNum },
         referenceImages.length

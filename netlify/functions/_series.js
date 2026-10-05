@@ -91,6 +91,7 @@ function validateSeries(data) {
     if (rules[k] !== undefined) req(VALID_MODELS.includes(rules[k]), `story_bible.rules.${k} inválido: "${rules[k]}" (usa ${VALID_MODELS.join(', ')}).`);
   });
   if (rules.shot_seconds !== undefined) req([4, 6, 8].includes(rules.shot_seconds), 'story_bible.rules.shot_seconds debe ser 4, 6 u 8.');
+  if (rules.keyframes !== undefined) req(typeof rules.keyframes === 'boolean', 'story_bible.rules.keyframes debe ser true o false.');
   if (rules.reference_images) {
     ['shot_model', 'cliffhanger_model'].forEach((k) => {
       const m = rules[k] || (k === 'shot_model' ? 'veo_lite' : 'veo_fast');
@@ -408,7 +409,14 @@ function referenceUrlsForShot(shot, characterRows) {
   return urls;
 }
 
+// Prompt que REALMENTE se usa para una toma: el editado a mano en el dashboard (si existe)
+// o el que arma buildShotPrompt con el guion y los personajes actuales.
+function effectiveShotPrompt(shot, characterRows, storyBible) {
+  return (shot.prompt_override && shot.prompt_override.trim()) || buildShotPrompt(shot, characterRows, storyBible);
+}
+
 module.exports = {
+  effectiveShotPrompt,
   referenceUrlsForShot,
   validateSeries,
   toEpisodeRows,

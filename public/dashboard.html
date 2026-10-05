@@ -275,6 +275,22 @@
             <input type="file" id="charImageInput" accept="image/jpeg,image/png,image/webp" class="hidden" onchange="handleCharacterImage(this.files[0])">
         </section>
 
+        <!-- MEMORIA VISUAL: imagen fija de cada lugar (series.visual_memory) -->
+        <section id="locationsSection" class="glass-panel rounded-2xl p-6">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-cyber-border pb-4 mb-5">
+                <div>
+                    <h3 class="font-display font-bold text-lg text-white flex items-center gap-2">
+                        <i class="fa-solid fa-map-location-dot text-cyber-violet"></i>
+                        <span>MEMORIA VISUAL // LUGARES</span>
+                    </h3>
+                    <p id="locationsSubtitle" class="text-xs text-slate-400 font-mono">Cada lugar tiene una imagen fija que se reutiliza en todas sus tomas.</p>
+                </div>
+                <button id="locToggleAll" onclick="toggleLocations()" class="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 text-xs font-mono hover:bg-slate-700"><i class="fa-solid fa-chevron-down mr-1"></i>Ver lugares</button>
+            </div>
+            <div id="locationsGrid" class="hidden grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4"></div>
+            <input type="file" id="locImageInput" accept="image/jpeg,image/png,image/webp" class="hidden" onchange="handleLocationImage(this.files[0])">
+        </section>
+
         <!-- PROGRESO REAL DE LA SERIE ACTIVA (calculado con los datos de Supabase).
              Reemplaza la maqueta "Orquestación del pipeline", cuyos estados eran fijos. -->
         <section class="glass-panel rounded-2xl p-6">
@@ -656,6 +672,10 @@
       const DEFAULT_SERIES = readSeriesParam();
       // Mismos precios calibrados que netlify/functions/_veo.js (VEO_PRICE_PER_SECOND_USD).
       const VEO_PRICE_PER_SEC = { veo_lite: 0.042, veo_fast: 0.157, veo_standard: 0.419 };
+      const IMAGE_PRICE_USD = 0.067; // cuadro inicial / imagen de lugar (gemini-3.1-flash-image, 1K)
+      function usesKeyframes(series) { return !!(series && series.story_bible && series.story_bible.rules && series.story_bible.rules.keyframes); }
+      function frameFor(ep, n) { return (ep.assets || []).find(a => a.kind === 'image' && a.shot_number === n) || null; }
+      function clipFor(ep, n) { return (ep.assets || []).find(a => a.kind === 'video_clip' && a.shot_number === n) || null; }
       const VEO_LABEL = { veo_lite: 'Lite', veo_fast: 'Fast', veo_standard: 'Standard' };
       function seriesModels(series) {
         const r = (series && series.story_bible && series.story_bible.rules) || {};
@@ -1162,6 +1182,254 @@
         }
       };
 
+      // ── Modal de prompt editable ──────────────────────────────────────────────
+      let pm = null; // { kind, episodeId, n, locationKey, mode, cost, original, onGenerate }
+
+      function pmShow(on) {
+        document.getElementById('promptModal').classList.toggle('hidden', !on);
+        document.body.style.overflow = on ? 'hidden' : '';
+      }
+      window.closePromptModal = function() { pmShow(false); pm = null; };
+      document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && pm) window.closePromptModal(); });
+
+      window.updatePromptCount = function() {
+        const t = document.getElementById('pmText').value;
+        document.getElementById('pmCount').textContent = t.trim().split(/\s+/).filter(Boolean).length + ' palabras';
+        const edited = pm && t.trim() !== (pm.original || '').trim();
+        const b = document.getElementById('pmBadge');
+        b.textContent = edited ? 'EDITADO' : 'AUTOMÁTICO';
+        b.className = 'text-[10px] font-mono px-2 py-0.5 rounded border ' + (edited ? 'border-cyber-violet/50 text-cyber-violet' : 'border-cyber-border text-slate-400');
+      };
+
+      function pmError(msg) {
+        const e = document.getElementById('pmError');
+        e.textContent = msg || '';
+        e.classList.toggle('hidden', !msg);
+      }
+
+      // Abre el modal desde un botón con data-kind (video|keyframe|location), data-ep, data-n,
+      // data-loc, data-mode (generate|save) y data-cost.
+      window.openPromptEditor = async function(btn, opts) {
+        const d = btn ? btn.dataset : {};
+        const o = Object.assign({ kind: d.kind, episodeId: d.ep, n: Number(d.n), locationKey: d.loc, mode: d.mode || 'generate', cost: d.cost }, opts || {});
+        const ep = o.episodeId && lastLoadedData && (lastLoadedData.episodes || []).find(x => x.id === o.episodeId);
+        const title = o.kind === 'location'
+          ? 'Lugar: ' + o.locationKey
+          : 'EP ' + (ep ? ep.episode_number : '?') + ' · Toma ' + o.n + (o.kind === 'keyframe' ? ' · cuadro inicial' : ' · video');
+        const price = o.kind === 'video' ? (o.cost ? Number(o.cost) : null) : IMAGE_PRICE_USD;
+        document.getElementById('pmTitle').textContent = title;
+        document.getElementById('pmSubtitle').textContent = o.kind === 'video'
+          ? 'Prompt que recibirá Veo para esta toma.'
+          : (o.kind === 'keyframe' ? 'Prompt del cuadro inicial (Gemini). Se le adjuntan las fotos de cara y la imagen fija del lugar.' : 'Prompt de la imagen fija del lugar (Gemini).');
+        const gen = document.getElementById('pmGenerate');
+        gen.classList.toggle('hidden', o.mode === 'save');
+        gen.innerHTML = '<i class="fa-solid fa-bolt mr-1"></i>Guardar y generar' + (price ? ' (~$' + price.toFixed(2) + ')' : '');
+        document.getElementById('pmText').value = 'Cargando...';
+        pmError('');
+        pm = o;
+        pmShow(true);
+        try {
+          const url = o.kind === 'location'
+            ? '/.netlify/functions/location-image?series=' + encodeURIComponent(DEFAULT_SERIES) + '&location_key=' + encodeURIComponent(o.locationKey)
+            : '/.netlify/functions/shot-prompt?episode_id=' + encodeURIComponent(o.episodeId) + '&shot=' + o.n + '&kind=' + o.kind;
+          const res = await fetch(url);
+          const out = await res.json();
+          if (!res.ok) throw new Error(out.error || ('HTTP ' + res.status));
+          pm.original = out.original;
+          document.getElementById('pmText').value = out.prompt;
+          window.updatePromptCount();
+        } catch (err) {
+          document.getElementById('pmText').value = '';
+          pmError('No se pudo cargar el prompt: ' + err.message);
+        }
+      };
+
+      window.resetPromptModal = function() {
+        if (!pm || pm.original == null) return;
+        document.getElementById('pmText').value = pm.original;
+        window.updatePromptCount();
+      };
+
+      async function persistPrompt(o, text) {
+        const isOriginal = text.trim() === (o.original || '').trim();
+        const url = o.kind === 'location' ? '/.netlify/functions/location-image' : '/.netlify/functions/shot-prompt';
+        const body = o.kind === 'location'
+          ? (isOriginal ? { series: DEFAULT_SERIES, location_key: o.locationKey, reset_prompt: true } : { series: DEFAULT_SERIES, location_key: o.locationKey, prompt: text })
+          : (isOriginal ? { episode_id: o.episodeId, shot: o.n, kind: o.kind, reset: true } : { episode_id: o.episodeId, shot: o.n, kind: o.kind, prompt: text });
+        const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        const out = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(out.error || ('HTTP ' + res.status));
+        return out;
+      }
+
+      window.savePromptModal = async function(andGenerate) {
+        if (!pm) return;
+        const o = pm;
+        const text = document.getElementById('pmText').value;
+        if (text.trim().length < 20) return pmError('El prompt está vacío o es demasiado corto.');
+        try {
+          await persistPrompt(o, text);
+        } catch (err) {
+          return pmError('No se pudo guardar: ' + err.message);
+        }
+        window.closePromptModal();
+        if (!andGenerate) { await loadDashboard(); return; }
+        if (o.onGenerate) return o.onGenerate();
+        if (o.kind === 'video') return window.generateShot(o.episodeId, o.n, o.cost, true);
+        if (o.kind === 'keyframe') return generateKeyframe(o.episodeId, o.n);
+        if (o.kind === 'location') return generateLocationImage(o.locationKey, text);
+      };
+
+      // Regenerar desde el panel de revisión: primero el modal con el prompt actual.
+      window.regenShot = function(assetId) {
+        const ep = (lastLoadedData && lastLoadedData.episodes || []).find(e => (e.assets || []).some(a => a.id === assetId));
+        const asset = ep && ep.assets.find(a => a.id === assetId);
+        if (!ep || !asset || !Array.isArray(ep.shots) || !ep.shots.length) return runRegenShot(assetId);
+        const m = seriesModels(lastLoadedData.series);
+        const model = asset.model === 'veo_fast' || asset.model === 'veo_standard' ? asset.model : m.shot;
+        window.openPromptEditor(null, {
+          kind: 'video', episodeId: ep.id, n: asset.shot_number, mode: 'generate',
+          cost: (m.secs * VEO_PRICE_PER_SEC[model]).toFixed(2),
+          onGenerate: () => runRegenShot(assetId)
+        });
+      };
+
+      async function pollUntil(check, maxMs) {
+        const start = Date.now();
+        while (Date.now() - start < maxMs) {
+          await new Promise(r => setTimeout(r, 8000));
+          try {
+            const r = await fetch('/.netlify/functions/get-episodes?series=' + encodeURIComponent(DEFAULT_SERIES));
+            if (r.ok && check(await r.json())) return true;
+          } catch (_) {}
+        }
+        return false;
+      }
+
+      async function generateKeyframe(episodeId, n) {
+        const ep = lastLoadedData && (lastLoadedData.episodes || []).find(x => x.id === episodeId);
+        const prev = ep && frameFor(ep, n);
+        const prevUpdated = prev ? prev.updated_at : null;
+        const box = document.querySelector('[data-shot="' + episodeId + '-' + n + '"]');
+        const btn = box && box.querySelector('button[data-kind="keyframe"]');
+        if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>Generando cuadro...'; }
+        try {
+          const res = await fetch('/.netlify/functions/keyframe-background', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ episode_id: episodeId, shot: n })
+          });
+          if (!res.ok && res.status !== 202) throw new Error('HTTP ' + res.status);
+        } catch (err) {
+          alert('No se pudo generar el cuadro: ' + err.message);
+          return loadDashboard();
+        }
+        const ok = await pollUntil(d => {
+          const cur = (d.episodes || []).find(x => x.id === episodeId);
+          const f = cur && frameFor(cur, n);
+          return f && f.updated_at !== prevUpdated;
+        }, 4 * 60 * 1000);
+        await loadDashboard();
+        if (!ok) alert('El cuadro no apareció después de 4 minutos. Revisa la terminal de netlify dev.');
+      }
+
+      // ── Lugares (memoria visual) ─────────────────────────────────────────────
+      let pendingLocationKey = null;
+      window.toggleLocations = function() {
+        const g = document.getElementById('locationsGrid');
+        const open = g.classList.contains('hidden');
+        g.classList.toggle('hidden', !open);
+        document.getElementById('locToggleAll').innerHTML = open ? '<i class="fa-solid fa-chevron-up mr-1"></i>Ocultar lugares' : '<i class="fa-solid fa-chevron-down mr-1"></i>Ver lugares';
+      };
+
+      function renderLocations(data) {
+        const sb = data.series.story_bible || {};
+        const locs = sb.locations || {};
+        const vm = (data.series.visual_memory && data.series.visual_memory.locations) || {};
+        const keys = Object.keys(locs);
+        const eps = data.episodes || [];
+        const withImg = keys.filter(k => vm[k] && vm[k].url).length;
+        const kf = usesKeyframes(data.series);
+        document.getElementById('locationsSubtitle').innerHTML = esc(withImg + ' de ' + keys.length + ' lugares con imagen fija. ') +
+          (kf ? 'Se adjunta al cuadro inicial de cada toma de ese lugar.' : '<span class="text-cyber-gold">Esta serie no usa memoria visual (rules.keyframes = false).</span>');
+        document.getElementById('locationsGrid').innerHTML = keys.map(k => {
+          const loc = typeof locs[k] === 'string' ? { visual: locs[k] } : locs[k];
+          const mem = vm[k] || {};
+          const uses = eps.reduce((n, e) => n + (e.shots || []).filter(s => s.location === k).length, 0);
+          return (
+            '<div class="bg-cyber-darker rounded-xl border border-cyber-border p-3 flex gap-3">' +
+              (mem.url
+                ? '<button type="button" onclick="openMedia(this)" data-src="' + esc(mem.url) + '" data-kind="image" data-title="Lugar: ' + esc(k) + '" class="flex-shrink-0"><img src="' + esc(mem.url) + '" class="w-16 h-28 object-cover rounded-lg border border-cyber-border hover:border-cyber-cyan"></button>'
+                : '<div class="w-16 h-28 flex-shrink-0 rounded-lg border border-dashed border-cyber-border flex items-center justify-center text-slate-600"><i class="fa-solid fa-image"></i></div>') +
+              '<div class="min-w-0 flex-1 space-y-1.5">' +
+                '<p class="font-display font-bold text-white text-sm truncate">' + esc(k) + (mem.prompt_override ? ' <span class="text-[9px] font-mono text-cyber-violet border border-cyber-violet/40 rounded px-1">prompt editado</span>' : '') + '</p>' +
+                '<p class="text-[10px] font-mono text-slate-500">' + uses + ' tomas · ' + (mem.url ? (mem.source === 'uploaded' ? 'imagen subida' : 'imagen generada') : 'sin imagen') + '</p>' +
+                '<p class="text-[10px] text-slate-400 line-clamp-3">' + esc(loc.visual || '') + '</p>' +
+                '<div class="flex flex-wrap gap-1.5 pt-1">' +
+                  '<button onclick="openPromptEditor(this)" data-kind="location" data-loc="' + esc(k) + '" data-mode="generate" class="text-[10px] font-mono px-2 py-0.5 rounded border border-cyber-violet/40 text-cyber-violet bg-cyber-violet/10 hover:bg-cyber-violet/20"><i class="fa-solid fa-wand-magic-sparkles mr-1"></i>' + (mem.url ? 'Regenerar' : 'Generar') + ' (~$' + IMAGE_PRICE_USD.toFixed(2) + ')</button>' +
+                  '<button onclick="pickLocationImage(this)" data-loc="' + esc(k) + '" class="text-[10px] font-mono px-2 py-0.5 rounded border border-cyber-cyan/40 text-cyber-cyan hover:bg-cyber-cyan/10"><i class="fa-solid fa-upload mr-1"></i>Subir</button>' +
+                  '<button onclick="openPromptEditor(this)" data-kind="location" data-loc="' + esc(k) + '" data-mode="save" class="text-[10px] font-mono px-2 py-0.5 rounded border border-slate-700 text-slate-400 hover:text-white"><i class="fa-solid fa-pen mr-1"></i>Prompt</button>' +
+                  (mem.url ? '<button onclick="removeLocationImage(this)" data-loc="' + esc(k) + '" class="text-[10px] font-mono px-2 py-0.5 rounded text-slate-500 hover:text-cyber-pink"><i class="fa-solid fa-trash"></i></button>' : '') +
+                '</div>' +
+              '</div>' +
+            '</div>'
+          );
+        }).join('');
+      }
+
+      async function generateLocationImage(key, prompt) {
+        const before = lastLoadedData && lastLoadedData.series.visual_memory && lastLoadedData.series.visual_memory.locations && lastLoadedData.series.visual_memory.locations[key];
+        const prevUrl = before ? before.url : null;
+        try {
+          const res = await fetch('/.netlify/functions/location-image-background', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ series: DEFAULT_SERIES, location_key: key, prompt })
+          });
+          if (!res.ok && res.status !== 202) throw new Error('HTTP ' + res.status);
+        } catch (err) { return alert('No se pudo generar: ' + err.message); }
+        document.getElementById('locationsSubtitle').innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>Generando imagen de "' + esc(key) + '"...';
+        const ok = await pollUntil(d => {
+          const m = d.series && d.series.visual_memory && d.series.visual_memory.locations && d.series.visual_memory.locations[key];
+          return m && m.url && m.url !== prevUrl;
+        }, 4 * 60 * 1000);
+        await loadDashboard();
+        if (!ok) alert('La imagen no apareció después de 4 minutos. Revisa la terminal de netlify dev.');
+      }
+
+      window.pickLocationImage = function(btn) {
+        pendingLocationKey = btn.dataset.loc;
+        const input = document.getElementById('locImageInput');
+        input.value = '';
+        input.click();
+      };
+      window.handleLocationImage = async function(file) {
+        const key = pendingLocationKey; pendingLocationKey = null;
+        if (!file || !key) return;
+        if (!/^image\/(jpeg|png|webp)$/.test(file.type)) return alert('Usa una imagen JPG, PNG o WEBP.');
+        try {
+          const { base64 } = await shrinkImage(file);
+          const res = await fetch('/.netlify/functions/location-image', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ series: DEFAULT_SERIES, location_key: key, content_type: 'image/jpeg', data_base64: base64 })
+          });
+          const out = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(out.error || ('HTTP ' + res.status));
+          await loadDashboard();
+        } catch (err) { alert('No se pudo subir: ' + err.message); }
+      };
+      window.removeLocationImage = async function(btn) {
+        const key = btn.dataset.loc;
+        if (!confirm('¿Quitar la imagen fija de "' + key + '"?')) return;
+        try {
+          const res = await fetch('/.netlify/functions/location-image', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ series: DEFAULT_SERIES, location_key: key, remove: true })
+          });
+          const out = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(out.error || ('HTTP ' + res.status));
+          await loadDashboard();
+        } catch (err) { alert('No se pudo quitar: ' + err.message); }
+      };
+
       window.toggleAllCast = function() {
         const cards = [...document.querySelectorAll('#castGrid details.cast-card')];
         const open = !cards.every(d => d.open);
@@ -1201,18 +1469,26 @@
         if (ok) done(); else prompt('Copia el texto:', text);
       }
 
+      // Solo cuenta lo que FALTA: tomas sin video y, con memoria visual, cuadros sin generar.
       function estimateEpisodeCost(ep) {
-        const n = (ep.shots && ep.shots.length) || 8;
-        const m = seriesModels(lastLoadedData && lastLoadedData.series);
-        return (n - 1) * m.secs * VEO_PRICE_PER_SEC[m.shot] + m.secs * VEO_PRICE_PER_SEC[m.cliff];
+        const series = lastLoadedData && lastLoadedData.series;
+        const m = seriesModels(series);
+        const shots = (ep.shots && ep.shots.length) ? ep.shots : Array.from({ length: 8 }, (_, i) => ({ n: i + 1 }));
+        const total = shots.length;
+        return shots.reduce((sum, sh) => {
+          if (clipFor(ep, sh.n)) return sum;
+          const model = sh.n === total ? m.cliff : m.shot;
+          return sum + m.secs * VEO_PRICE_PER_SEC[model] + (usesKeyframes(series) && !frameFor(ep, sh.n) ? IMAGE_PRICE_USD : 0);
+        }, 0);
       }
 
       function costBreakdownLabel(ep) {
         const n = (ep.shots && ep.shots.length) || 8;
         const m = seriesModels(lastLoadedData && lastLoadedData.series);
-        return m.shot === m.cliff
+        const base = m.shot === m.cliff
           ? n + ' tomas ' + VEO_LABEL[m.shot]
           : (n - 1) + ' tomas ' + VEO_LABEL[m.shot] + ' + 1 ' + VEO_LABEL[m.cliff];
+        return base + (usesKeyframes(lastLoadedData && lastLoadedData.series) ? ' + cuadros iniciales que falten' : '') + '; solo lo que falta';
       }
 
       function renderVeoMode(series) {
@@ -1254,25 +1530,42 @@
                 (() => {
                   const isCliff = sh.n === shots.length;
                   const model = isCliff ? m.cliff : m.shot;
-                  const clip = (e.assets || []).find(a => a.kind === 'video_clip' && a.shot_number === sh.n);
-                  const shotCost = (m.secs * VEO_PRICE_PER_SEC[model]).toFixed(2);
+                  const clip = clipFor(e, sh.n);
+                  const frame = frameFor(e, sh.n);
+                  const kf = usesKeyframes(data.series);
+                  const shotCost = (m.secs * VEO_PRICE_PER_SEC[model] + (kf && !frame ? IMAGE_PRICE_USD : 0)).toFixed(2);
+                  const effectivePrompt = sh.prompt_override || sh.prompt_preview || '';
                   return (
                     '<div class="border-l-2 ' + (isCliff ? 'border-cyber-pink' : 'border-cyber-border') + ' pl-3 py-1.5" data-shot="' + e.id + '-' + sh.n + '">' +
                       '<p class="text-[10px] font-mono text-slate-500">TOMA ' + String(sh.n).padStart(2, '0') + (isCliff ? ' · CLIFFHANGER' : '') + ' · Veo ' + VEO_LABEL[model] + ' · ' + esc(sh.location) + ' · ' + esc((sh.characters || []).join(', ')) + (sh.camera ? ' · ' + esc(sh.camera) : '') + '</p>' +
                       '<p class="text-[12px] text-slate-200">' + esc(sh.scene_es) + '</p>' +
                       (sh.dialogue || []).map(d => '<p class="text-[11px] text-cyber-cyan font-mono">— ' + esc(d.speaker) + ': ' + esc(d.line) + '</p>').join('') +
                       '<div class="flex flex-wrap items-center gap-2 mt-1.5">' +
-                        (sh.prompt_preview
+                        (sh.prompt_override ? '<span class="text-[10px] font-mono px-1.5 py-0.5 rounded border border-cyber-violet/40 text-cyber-violet"><i class="fa-solid fa-pen mr-1"></i>prompt editado</span>' : '') +
+                        (effectivePrompt
                           ? '<details class="w-full"><summary class="cursor-pointer text-[10px] font-mono text-cyber-violet hover:underline list-none inline-block"><i class="fa-solid fa-terminal mr-1"></i>Ver prompt de Veo</summary>' +
                               '<div class="mt-1 bg-slate-950 border border-slate-800 rounded p-2">' +
-                                '<div class="flex justify-end"><button onclick="copyTag(this, event)" data-tag="' + esc(sh.prompt_preview) + '" class="text-[10px] font-mono text-cyber-violet hover:underline"><i class="fa-regular fa-copy mr-1"></i>Copiar</button></div>' +
-                                '<p class="text-[10px] font-mono text-slate-300 whitespace-pre-wrap">' + esc(sh.prompt_preview) + '</p>' +
+                                '<div class="flex justify-end gap-3">' +
+                                  '<button onclick="openPromptEditor(this)" data-kind="video" data-ep="' + e.id + '" data-n="' + sh.n + '" data-mode="save" class="text-[10px] font-mono text-cyber-cyan hover:underline"><i class="fa-solid fa-pen mr-1"></i>Editar</button>' +
+                                  '<button onclick="copyTag(this, event)" data-tag="' + esc(effectivePrompt) + '" class="text-[10px] font-mono text-cyber-violet hover:underline"><i class="fa-regular fa-copy mr-1"></i>Copiar</button>' +
+                                '</div>' +
+                                '<p class="text-[10px] font-mono text-slate-300 whitespace-pre-wrap">' + esc(effectivePrompt) + '</p>' +
                               '</div></details>'
+                          : '') +
+                        (kf
+                          ? '<div class="flex flex-wrap items-center gap-2">' +
+                              (frame
+                                ? '<button type="button" onclick="openMedia(this)" data-src="' + esc(frame.storage_path) + '" data-kind="image" data-title="EP ' + e.episode_number + ' · Toma ' + sh.n + ' · cuadro inicial" class="relative" title="Ver cuadro inicial"><img src="' + esc(frame.storage_path) + '" class="h-16 w-9 object-cover rounded border border-cyber-border hover:border-cyber-cyan"></button>'
+                                : '') +
+                              (canGenerateShots && !clip
+                                ? '<button onclick="openPromptEditor(this)" data-kind="keyframe" data-ep="' + e.id + '" data-n="' + sh.n + '" data-mode="generate" class="text-[10px] font-mono px-2 py-0.5 rounded border border-cyber-violet/40 text-cyber-violet bg-cyber-violet/10 hover:bg-cyber-violet/20"><i class="fa-solid fa-image mr-1"></i>' + (frame ? 'Regenerar cuadro' : '1 · Generar cuadro') + ' (~$' + IMAGE_PRICE_USD.toFixed(2) + ')</button>'
+                                : '') +
+                            '</div>'
                           : '') +
                         (clip
                           ? '<button type="button" onclick="openMedia(this)" data-src="' + esc(clip.storage_path) + '" data-kind="video" data-title="EP ' + e.episode_number + ' · Toma ' + sh.n + '" class="text-[10px] font-mono text-cyber-emerald hover:underline"><i class="fa-solid fa-circle-play mr-1"></i>Ver toma generada (' + (clip.approved ? 'aprobada' : 'pendiente de revisión') + ')</button>'
                           : (canGenerateShots
-                              ? '<button onclick="generateShot(\'' + e.id + '\', ' + sh.n + ', ' + shotCost + ')" class="text-[10px] font-mono px-2 py-0.5 rounded border border-cyber-gold/40 text-cyber-gold bg-cyber-gold/10 hover:bg-cyber-gold/20"><i class="fa-solid fa-flask mr-1"></i>Generar solo esta toma (~$' + shotCost + ')</button>'
+                              ? '<button onclick="openPromptEditor(this)" data-kind="video" data-ep="' + e.id + '" data-n="' + sh.n + '" data-mode="generate" data-cost="' + shotCost + '" class="text-[10px] font-mono px-2 py-0.5 rounded border border-cyber-gold/40 text-cyber-gold bg-cyber-gold/10 hover:bg-cyber-gold/20"><i class="fa-solid fa-flask mr-1"></i>' + (kf ? (frame ? '2 · Animar toma' : 'Cuadro + animar toma') : 'Generar solo esta toma') + ' (~$' + shotCost + ')</button>'
                               : '')) +
                       '</div>' +
                     '</div>'
@@ -1338,11 +1631,16 @@
           );
         };
 
-        const photoState = !chars.length ? 'todo' : (withPhoto === chars.length ? 'ok' : (rules.reference_images ? 'warn' : 'todo'));
+        const needPhotos = rules.reference_images || rules.keyframes;
+        const photoState = !chars.length ? 'todo' : (withPhoto === chars.length ? 'ok' : (needPhotos ? 'warn' : 'todo'));
+        const locKeys = Object.keys((data.series.story_bible || {}).locations || {});
+        const vmLocs = (data.series.visual_memory && data.series.visual_memory.locations) || {};
+        const locWithImg = locKeys.filter(k => vmLocs[k] && vmLocs[k].url).length;
+        const frames = eps.flatMap(e => (e.assets || []).filter(a => a.kind === 'image')).length;
         document.getElementById('pipelineSteps').innerHTML = [
           step(1, 'fa-feather', 'Novela escrita', eps.length + ' eps', totalShots + ' tomas · creada con PROMPT', eps.length ? 'ok' : 'todo', 'arcSection'),
           step(2, 'fa-shield-halved', 'Validación', '0 errores', warnings ? warnings + ' avisos de riesgo visual' : 'sin avisos', eps.length ? (warnings ? 'warn' : 'ok') : 'todo', 'arcSection'),
-          step(3, 'fa-masks-theater', 'Personajes y fotos', withPhoto + '/' + chars.length, rules.reference_images ? 'las fotos se envían a Veo' : 'fotos solo de referencia (Veo Lite no las usa)', photoState, 'castSection'),
+          step(3, 'fa-masks-theater', 'Memoria visual', withPhoto + '/' + chars.length + ' caras', rules.keyframes ? (locWithImg + '/' + locKeys.length + ' lugares · ' + frames + ' cuadros') : (rules.reference_images ? 'las fotos se envían a Veo' : 'fotos solo de referencia'), photoState, 'castSection'),
           step(4, 'fa-video', 'Tomas en Veo', clips.length + '/' + totalShots, generating ? 'generando EP ' + generating.episode_number + '…' : (finals + ' episodio(s) unido(s)'), generating ? 'work' : (totalShots && clips.length >= totalShots ? 'ok' : 'todo'), 'arcSection'),
           step(5, 'fa-user-check', 'Revisión humana', approved + '/' + clips.length, 'tomas aprobadas', clips.length && approved === clips.length ? 'ok' : (clips.length ? 'work' : 'todo'), 'reviewSection'),
           step(6, 'fa-share-nodes', 'Publicación', '—', 'TikTok / YT / Reels: todavía no está construido', 'off', null)
@@ -1353,7 +1651,8 @@
         const nextEp = eps.find(e => e.status === 'guion_generado');
         const inReview = eps.find(e => e.status === 'en_revision');
         if (!eps.length) next = 'Crea una novela con el botón <b>PROMPT</b>.';
-        else if (rules.reference_images && withPhoto < chars.length) next = 'Sube la foto de los ' + (chars.length - withPhoto) + ' personaje(s) que faltan en <b>Elenco</b>: esta serie las envía a Veo y no se puede producir sin ellas.';
+        else if (needPhotos && withPhoto < chars.length) next = 'Sube la foto de cara de los ' + (chars.length - withPhoto) + ' personaje(s) que faltan en <b>Elenco</b>: sin ellas no se puede producir.';
+        else if (rules.keyframes && locWithImg < locKeys.length) next = 'Recomendado: genera o sube la imagen fija de los ' + (locKeys.length - locWithImg) + ' lugares que faltan en <b>Memoria visual</b> (o produce igual: se usa solo el texto del lugar).';
         else if (generating) next = 'Veo está generando el EP ' + generating.episode_number + '. Espera a que termine.';
         else if (inReview) next = 'Revisa el <b>EP ' + inReview.episode_number + '</b> en el panel de revisión: aprueba o regenera cada toma.';
         else if (nextEp) next = 'Siguiente: produce el <b>EP ' + nextEp.episode_number + ' — ' + esc(nextEp.title || '') + '</b> desde Arco completo (~$' + estimateEpisodeCost(nextEp).toFixed(2) + ').';
@@ -1377,6 +1676,7 @@
           row('Diálogo por toma', '1 hablante · máx. ' + (r.max_dialogue_words_per_shot || 15) + ' palabras') +
           row('Modelo de video', model('shot_model') + (r.cliffhanger_model && r.cliffhanger_model !== r.shot_model ? ' (+ ' + model('cliffhanger_model') + ' en el gancho)' : '')) +
           row('Fotos de referencia a Veo', r.reference_images ? 'Sí' : 'No', !!r.reference_images) +
+          row('Memoria visual (cuadro inicial)', r.keyframes ? 'Sí' : 'No', !!r.keyframes) +
           '<p class="text-[10px] text-slate-500 leading-snug pt-1">Estas reglas vienen de la novela creada con PROMPT; el validador las hace cumplir al crearla.</p>';
       }
 
@@ -1505,12 +1805,12 @@
       // Toma de prueba: genera UNA sola toma (cargo real ~$0.34 en Lite) para revisar el
       // formato del prompt antes de gastar el episodio completo. Queda guardada como parte
       // del episodio; si sale bien, "Producir" ya no la vuelve a generar.
-      window.generateShot = async function(episodeId, shotNumber, cost) {
+      window.generateShot = async function(episodeId, shotNumber, cost, skipConfirm) {
         const ep = lastLoadedData && (lastLoadedData.episodes || []).find(x => x.id === episodeId);
         if (!ep) return alert('No encontré el episodio. Recarga la página.');
-        if (!confirm('Generar SOLO la toma ' + shotNumber + ' del EP ' + ep.episode_number + ' con Veo.\n\nCosto: ~$' + Number(cost).toFixed(2) + ' USD (cargo real en Google Cloud). Tarda de 1 a 6 minutos. ¿Continuar?')) return;
+        if (!skipConfirm && !confirm('Generar SOLO la toma ' + shotNumber + ' del EP ' + ep.episode_number + ' con Veo.\n\nCosto: ~$' + Number(cost).toFixed(2) + ' USD (cargo real en Google Cloud). Tarda de 1 a 6 minutos. ¿Continuar?')) return;
         const box = document.querySelector('[data-shot="' + episodeId + '-' + shotNumber + '"]');
-        const btn = box && box.querySelector('button[onclick^="generateShot"]');
+        const btn = box && box.querySelector('button[data-kind="video"][data-mode="generate"]');
         if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>Generando con Veo... (1–6 min)'; }
         try {
           const res = await fetch('/.netlify/functions/generate-media-background', {
@@ -1704,6 +2004,7 @@
           renderContinuity(data);
           renderPipeline(data);
           renderRules(data);
+          renderLocations(data);
           renderNextEpisodeCard(data);
           const inReview =
             episodes.find(e => e.status === 'en_revision') ||
@@ -1774,7 +2075,7 @@
         }
       };
 
-      window.regenShot = async function(assetId) {
+      async function runRegenShot(assetId) {
         const card = document.querySelector('[data-asset-id="' + assetId + '"]');
         const prevUpdatedAt = card ? card.getAttribute('data-updated-at') : null;
         let overlay = null;
@@ -1896,6 +2197,36 @@
                 </div>
             </div>
             <div id="mediaBody" class="rounded-xl overflow-hidden border border-cyber-border bg-black flex items-center justify-center min-h-[200px]"></div>
+        </div>
+    </div>
+
+    <!-- MODAL: prompt editable antes de generar/regenerar (toma, cuadro inicial o lugar) -->
+    <div id="promptModal" class="hidden fixed inset-0 z-[105] bg-black/80 backdrop-blur-sm flex items-start justify-center overflow-y-auto p-4" onclick="if (event.target === this) closePromptModal()">
+        <div class="w-full max-w-3xl bg-cyber-card border border-cyber-border rounded-2xl shadow-neon-cyan my-8">
+            <div class="flex items-center justify-between px-6 py-4 border-b border-cyber-border">
+                <div class="min-w-0">
+                    <h3 id="pmTitle" class="font-display font-bold text-white text-lg truncate">Prompt</h3>
+                    <p id="pmSubtitle" class="text-[11px] font-mono text-slate-400"></p>
+                </div>
+                <button onclick="closePromptModal()" class="text-slate-400 hover:text-white text-lg" title="Cerrar"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="p-6 space-y-3">
+                <div class="flex items-center justify-between gap-2">
+                    <span id="pmBadge" class="text-[10px] font-mono px-2 py-0.5 rounded border border-cyber-border text-slate-400">AUTOMÁTICO</span>
+                    <span id="pmCount" class="text-[10px] font-mono text-slate-500"></span>
+                </div>
+                <textarea id="pmText" rows="14" spellcheck="false" oninput="updatePromptCount()"
+                    class="w-full bg-slate-950 border border-slate-800 focus:border-cyber-cyan/60 rounded-lg p-3 text-[12px] font-mono text-slate-200 outline-none leading-relaxed"></textarea>
+                <p class="text-[11px] text-slate-500 font-mono">Edita lo que salió mal (ropa, acción, cámara, sonido…). Lo que guardes queda fijo para ESTA toma y lo usa también Producir. Evita frases en negativo ("no tie" → "open-collar shirt").</p>
+                <div id="pmError" class="hidden text-[12px] font-mono text-cyber-pink"></div>
+                <div class="flex flex-wrap items-center justify-between gap-2 pt-1">
+                    <button id="pmReset" onclick="resetPromptModal()" class="px-3 py-1.5 rounded-lg text-xs font-mono border border-slate-700 text-slate-400 hover:text-white"><i class="fa-solid fa-rotate-left mr-1"></i>Restaurar automático</button>
+                    <div class="flex items-center gap-2">
+                        <button onclick="savePromptModal(false)" class="px-3 py-1.5 rounded-lg text-xs font-mono border border-cyber-cyan/40 bg-cyber-cyan/10 text-cyber-cyan hover:bg-cyber-cyan/20"><i class="fa-solid fa-floppy-disk mr-1"></i>Guardar sin generar</button>
+                        <button id="pmGenerate" onclick="savePromptModal(true)" class="px-3 py-1.5 rounded-lg text-xs font-mono border border-cyber-gold/50 bg-cyber-gold/15 text-cyber-gold hover:bg-cyber-gold/25"><i class="fa-solid fa-bolt mr-1"></i>Guardar y generar</button>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </body>
