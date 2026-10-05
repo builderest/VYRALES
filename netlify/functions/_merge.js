@@ -54,21 +54,44 @@ async function mergeEpisodeVideo(supabase, { episode, series, log = console.log 
       localFiles.push(dest);
     }
 
-    const listPath = path.join(workDir, 'list.txt');
-    fs.writeFileSync(listPath, localFiles.map((f) => `file '${f.replace(/'/g, "'\\''")}'`).join('\n'));
-
     const outputPath = path.join(workDir, 'final.mp4');
-    log('uniendo', clips.length, 'tomas con ffmpeg (recodificando — cada toma viene de una llamada distinta a Veo)...');
-    await run(ffmpegPath, [
-      '-y',
-      '-f', 'concat',
-      '-safe', '0',
-      '-i', listPath,
-      '-c:v', 'libx264',
-      '-c:a', 'aac',
-      '-movflags', '+faststart',
-      outputPath
-    ]);
+
+    // Unión con micro-fundido de audio (0.08 s) al inicio y final de cada toma: evita el
+    // "clic" que se oye cuando se corta el audio de golpe entre clips de Veo. El video va
+    // con corte directo (lo normal en microdramas verticales).
+    // El fade-out sin conocer la duración se hace con areverse → fade-in → areverse.
+    const FADE = 0.08;
+    const inputs = localFiles.flatMap((f) => ['-i', f]);
+    const chains = localFiles.map((_, i) =>
+      `[${i}:v]setpts=PTS-STARTPTS,setsar=1[v${i}];` +
+      `[${i}:a]aresample=48000,asetpts=PTS-STARTPTS,afade=t=in:st=0:d=${FADE},areverse,afade=t=in:st=0:d=${FADE},areverse[a${i}]`
+    );
+    const concatInputs = localFiles.map((_, i) => `[v${i}][a${i}]`).join('');
+    const filter = `${chains.join(';')};${concatInputs}concat=n=${localFiles.length}:v=1:a=1[v][a]`;
+
+    log('uniendo', clips.length, 'tomas con ffmpeg (corte directo + micro-fundido de audio)...');
+    try {
+      await run(ffmpegPath, [
+        '-y', ...inputs,
+        '-filter_complex', filter,
+        '-map', '[v]', '-map', '[a]',
+        '-c:v', 'libx264', '-preset', 'medium', '-crf', '20', '-pix_fmt', 'yuv420p',
+        '-c:a', 'aac', '-b:a', '160k',
+        '-movflags', '+faststart',
+        outputPath
+      ]);
+    } catch (err) {
+      // Respaldo: si algún clip vino sin pista de audio (u otro formato raro), se une como
+      // antes, sin fundidos, para no dejar el episodio sin video final.
+      log('la unión con fundidos falló, usando unión simple de respaldo:', (err.stderr || err.message || '').slice(-300));
+      const listPath = path.join(workDir, 'list.txt');
+      fs.writeFileSync(listPath, localFiles.map((f) => `file '${f.replace(/'/g, "'\\''")}'`).join('\n'));
+      await run(ffmpegPath, [
+        '-y', '-f', 'concat', '-safe', '0', '-i', listPath,
+        '-c:v', 'libx264', '-c:a', 'aac', '-movflags', '+faststart',
+        outputPath
+      ]);
+    }
 
     await ensureMediaBucket(supabase);
     const finalBuffer = fs.readFileSync(outputPath);

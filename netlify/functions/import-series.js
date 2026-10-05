@@ -1,31 +1,34 @@
-// Importa una novela COMPLETA (serie + personajes + todos los episodios ya escritos) desde
-// /series/<slug>.json a Supabase. Se dispara desde el dashboard (botón "Importar novela").
+// Importa una novela COMPLETA (serie + personajes + todos los episodios ya escritos) a
+// Supabase. Se dispara desde el dashboard.
 //
-//   GET  /.netlify/functions/import-series              → lista las novelas disponibles en
-//                                                          el repo, si pasan la validación y
-//                                                          si ya están en la base.
-//   POST /.netlify/functions/import-series  { slug }    → valida e importa.
-//   POST ... { slug, dry_run: true }                    → solo valida, no escribe nada.
+//   GET  /.netlify/functions/import-series               → novelas incluidas en el repo
+//                                                           (series/*.json), si son válidas
+//                                                           y si ya están en la base.
+//   GET  /.netlify/functions/import-series?master=1      → "prompt maestro" para pedirle a
+//                                                           Claude una novela nueva.
+//   POST { slug }                                         → importa una novela del repo.
+//   POST { series: {…json completo…} }                    → importa una novela PEGADA en el
+//                                                           modal "PROMPT" del dashboard.
+//   Cualquier POST con dry_run: true                      → solo valida y resume, no escribe.
 //
 // Reglas de seguridad:
 //   - Si la validación tiene UN solo error, no se escribe nada (422 con la lista).
-//   - Es idempotente: se puede correr varias veces. Serie y personajes se actualizan por
-//     slug / (serie, nombre).
+//   - Es idempotente: serie y personajes se actualizan por slug / (serie, nombre). La foto de
+//     referencia de un personaje existente NO se toca.
 //   - Un episodio que ya pasó a producción (generando_media, en_revision, publicado,
-//     archivado) NUNCA se sobreescribe — sus tomas ya costaron dinero y su prompt quedó
-//     guardado. Solo se actualizan episodios en guion_pendiente / guion_generado /
-//     guion_rechazado.
+//     archivado) NUNCA se sobreescribe.
 //   - No llama a Veo ni a ninguna API de pago.
 const { getSupabaseClient } = require('./_supabase');
 const { validateSeries, toEpisodeRows, buildImagePrompt } = require('./_series');
+const { buildMasterPrompt } = require('./_master_prompt');
 
-// esbuild necesita require() estáticos para empaquetar los JSON: para agregar una novela
-// nueva, crea series/<slug>.json y agrégala aquí.
+// esbuild necesita require() estáticos para empaquetar los JSON del repo.
 const BUNDLED = {
   dulce_engano: require('../../series/dulce_engano.json')
 };
 
 const EDITABLE_STATUSES = new Set(['guion_pendiente', 'guion_generado', 'guion_rechazado']);
+const MAX_BODY_BYTES = 5 * 1024 * 1024;
 
 const json = (statusCode, body) => ({
   statusCode,
@@ -33,8 +36,30 @@ const json = (statusCode, body) => ({
   body: JSON.stringify(body)
 });
 
+function summarize(data, validation, existingSeries) {
+  return {
+    slug: data.slug,
+    title: data.title,
+    genre: data.genre || null,
+    exists: !!existingSeries,
+    characters: (data.characters || []).map((c) => ({ key: c.key, name: c.name, role: c.role })),
+    episodes: (data.episodes || []).map((e) => ({ n: e.episode_number, title: e.title, shots: (e.shots || []).length })),
+    ...validation
+  };
+}
+
 exports.handler = async (event) => {
   try {
+    const qs = event.queryStringParameters || {};
+
+    if (event.httpMethod === 'GET' && qs.master) {
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+        body: buildMasterPrompt(BUNDLED.dulce_engano)
+      };
+    }
+
     const supabase = getSupabaseClient();
 
     if (event.httpMethod === 'GET') {
@@ -58,6 +83,7 @@ exports.handler = async (event) => {
     }
 
     if (event.httpMethod !== 'POST') return json(405, { error: 'Method not allowed' });
+    if ((event.body || '').length > MAX_BODY_BYTES) return json(413, { error: 'La novela pesa más de 5 MB.' });
 
     let body = {};
     try {
@@ -66,17 +92,26 @@ exports.handler = async (event) => {
       return json(400, { error: 'Body JSON inválido.' });
     }
 
-    const data = BUNDLED[body.slug];
-    if (!data) return json(404, { error: `No existe series/${body.slug}.json en el proyecto.` });
+    let data;
+    if (body.series && typeof body.series === 'object') {
+      data = body.series; // pegada en el modal del dashboard
+    } else if (body.slug) {
+      data = BUNDLED[body.slug];
+      if (!data) return json(404, { error: `No existe series/${body.slug}.json en el proyecto.` });
+    } else {
+      return json(400, { error: 'Manda { slug } o { series: {...} }.' });
+    }
 
     const validation = validateSeries(data);
+    const { data: existingSeries } = await supabase.from('series').select('id').eq('slug', data.slug || '').maybeSingle();
+
     if (!validation.ok) {
-      return json(422, { error: 'La novela no pasó la validación. No se importó nada.', ...validation });
+      return json(422, { error: 'La novela no pasó la validación. No se importó nada.', ...summarize(data, validation, existingSeries) });
     }
 
     const rows = toEpisodeRows(data);
     if (body.dry_run) {
-      return json(200, { dry_run: true, ...validation, episodes: rows.map((r) => ({ n: r.episode_number, title: r.title, words: r.words })) });
+      return json(200, { dry_run: true, ...summarize(data, validation, existingSeries) });
     }
 
     // 1) Serie
@@ -99,7 +134,7 @@ exports.handler = async (event) => {
       .single();
     if (seriesError) throw seriesError;
 
-    // 2) Personajes
+    // 2) Personajes (con su prompt de foto ya generado)
     const characterPayload = data.characters.map((c) => ({
       series_id: series.id,
       name: c.name,
@@ -134,7 +169,8 @@ exports.handler = async (event) => {
         continuity: r.continuity,
         status: 'guion_generado',
         validator_report: {
-          source: 'arco_completo',
+          source: body.series ? 'pegada_en_dashboard' : 'repo',
+          format_version: data.format_version || 1,
           validated_at: new Date().toISOString(),
           cliffhanger_unresolved: true,
           words: r.words,
@@ -156,6 +192,15 @@ exports.handler = async (event) => {
         result.protected.push({ episode: r.episode_number, status: current.status });
       }
     }
+
+    // Episodios que sobran (la versión nueva tiene menos) y no están en producción: se
+    // archivan para que no queden guiones viejos colgando en la cola.
+    const newNumbers = new Set(rows.map((r) => r.episode_number));
+    const leftovers = (existingEpisodes || []).filter((e) => !newNumbers.has(e.episode_number) && EDITABLE_STATUSES.has(e.status));
+    for (const e of leftovers) {
+      await supabase.from('episodes').update({ status: 'archivado' }).eq('id', e.id);
+    }
+    result.archived = leftovers.map((e) => e.episode_number);
 
     console.log('[import-series]', series.slug, JSON.stringify(result));
     return json(200, {

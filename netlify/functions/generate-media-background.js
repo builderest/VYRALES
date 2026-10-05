@@ -85,6 +85,10 @@ exports.handler = async (event) => {
   const episodeId = body.episode_id || qs.episode_id;
   const isContinuation = qs.continue === '1';
   const force = qs.force === '1' || body.force === true;
+  // ?shot=N (o body.shot) → genera SOLO esa toma: sirve de "toma de prueba" antes de gastar
+  // el episodio completo. La toma queda guardada como parte del episodio (si se aprueba, ya
+  // no se vuelve a generar cuando se produzca el resto).
+  const onlyShot = Number(body.shot || qs.shot) || null;
 
   console.log(LOG, 'arrancó. series=', seriesSlug, 'episode_id=', episodeId || '(ninguno, toma el siguiente en guion_generado)', isContinuation ? '(continuación)' : '');
 
@@ -146,7 +150,14 @@ exports.handler = async (event) => {
       .eq('kind', 'video_clip');
     const doneShots = new Set((existingAssets || []).map((a) => a.shot_number));
 
-    const scenes = allScenes.filter((s) => !doneShots.has(s.number));
+    if (onlyShot && !allScenes.find((s) => s.number === onlyShot)) {
+      throw new Error(`El episodio no tiene la toma ${onlyShot}.`);
+    }
+    if (onlyShot && doneShots.has(onlyShot)) {
+      console.log(LOG, `la toma ${onlyShot} ya existe — usa Regenerar en el dashboard si quieres otra versión.`);
+      return { statusCode: 200, body: JSON.stringify({ episode_id: episode.id, note: `la toma ${onlyShot} ya existía` }) };
+    }
+    const scenes = allScenes.filter((s) => !doneShots.has(s.number) && (!onlyShot || s.number === onlyShot));
     if (doneShots.size > 0) {
       console.log(LOG, `${doneShots.size} toma(s) ya existían de un intento anterior, se saltan:`, [...doneShots].sort((a, b) => a - b).join(', '));
     }
@@ -228,9 +239,13 @@ exports.handler = async (event) => {
     const failures = results.filter((r) => r.status === 'rejected');
     const succeeded = results.filter((r) => r.status === 'fulfilled').map((r) => r.value);
 
+    // El episodio queda "en_revision" solo si YA tiene TODAS sus tomas (las de corridas
+    // anteriores + las de esta). Si falta alguna (fallo o toma de prueba suelta), vuelve a
+    // "guion_generado" y el botón Producir solo genera las que faltan.
+    const allDone = doneShots.size + succeeded.length >= total;
     await supabase
       .from('episodes')
-      .update({ status: failures.length === 0 ? 'en_revision' : 'guion_generado' })
+      .update({ status: allDone ? 'en_revision' : 'guion_generado' })
       .eq('id', episode.id);
 
     console.log(
@@ -246,7 +261,7 @@ exports.handler = async (event) => {
     // respaldo para reintentarlo.
     let finalRender = null;
     let mergeError = null;
-    if (failures.length === 0) {
+    if (allDone && failures.length === 0) {
       try {
         console.log(LOG, 'todas las tomas OK — uniendo automáticamente el video final...');
         const { data: freshEpisode, error: freshError } = await supabase
@@ -274,6 +289,7 @@ exports.handler = async (event) => {
     // (y en los logs de función en Netlify una vez desplegado).
     return {
       statusCode: failures.length === 0 ? 200 : 207,
+      // (allDone=false con 200 = toma de prueba o parcial, sin fallos)
       body: JSON.stringify({
         episode_id: episode.id,
         shots_ok: succeeded,

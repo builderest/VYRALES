@@ -1,48 +1,104 @@
 {
+  "format_version": 2,
   "slug": "dulce_engano",
   "title": "Dulce Engaño",
   "genre": "Romance / Drama",
   "language": "es",
   "synopsis": "Valentina Ríos, una pastelera de Coyoacán a punto de perder la panadería de su difunta madre, acepta un matrimonio por contrato con Mateo Alcázar, heredero de un imperio hotelero que necesita casarse en treinta días para no perder la empresa a manos de su madrastra Regina. Entre firmas falsificadas, una exprometida celosa y un secreto de sangre, el contrato tiene una sola regla: nadie se enamora.",
   "story_bible": {
-    "tone": "romance dramático con tensión, humor ligero y giros de telenovela; ritmo rápido de microdrama vertical",
+    "tone": "romance dramático con tensión, humor ligero y giros de telenovela; ritmo rápido de microdrama vertical, casi todo conversado",
     "setting": "Ciudad de México, actualidad: Coyoacán y la Torre Alcázar",
     "visual_style": "High-end 3D animated feature film style, stylized expressive characters with large soulful eyes, soft cinematic lighting, warm rich color palette, detailed textures, shallow depth of field, vertical 9:16 framing",
-    "negative": "No on-screen text, no subtitles, no captions, no logos, no watermarks. Keep every character's face, hair and outfit exactly as described.",
+    "negative": "A clean cinematic frame, free of any on-screen text, captions, subtitles, logos or watermarks. Every character keeps exactly the face, hair and outfit described above, with natural anatomy and natural hands",
     "themes": ["amor vs. interés", "familia elegida y familia de sangre", "no rendirse"],
     "rules": {
       "cliffhanger_required": true,
-      "shots_per_episode": 8,
+      "shots_per_episode": 12,
       "shot_seconds": 8,
-      "max_words_per_episode": 400,
-      "max_dialogue_words_per_shot": 16,
+      "max_words_per_episode": 450,
+      "max_dialogue_words_per_shot": 15,
+      "max_characters_per_shot": 2,
       "shot_model": "veo_lite",
       "cliffhanger_model": "veo_lite"
     },
     "locations": {
-      "bakery": "Dulce Ríos, a small cozy family bakery in Coyoacán, Mexico City: cobalt-blue walls, hand-painted Talavera tiles, wooden shelves full of conchas and pan dulce, an old brick oven, a vintage brass cash register, warm yellow lights, and a framed photo of a smiling middle-aged woman on the wall behind the counter",
-      "street_bakery": "a cobblestone street in Coyoacán with colorful colonial houses and jacaranda trees, in front of a small bakery with a cobalt-blue facade and a rolling metal shutter",
-      "tower_lobby": "the lobby of the Grupo Alcázar headquarters, a towering modern glass skyscraper: white marble floors, gold accents, a long reception and security desk, glass entrance doors",
-      "elevator": "a sleek mirrored elevator with brass panels and soft overhead lighting inside the Grupo Alcázar tower",
-      "boardroom": "the Grupo Alcázar boardroom on the top floor: a long black glass table, leather chairs, floor-to-ceiling windows overlooking the Mexico City skyline, a large wall screen",
-      "tower_hallway": "a top-floor corridor of the Grupo Alcázar tower with glass walls, modern art and polished floors",
-      "mateo_office": "Mateo's executive office: minimalist dark wood and glass, city skyline behind a large desk, and a wall of security monitors",
-      "lawyer_office": "a classic law office with a walnut desk, leather chairs and tall bookshelves",
-      "mansion_dining": "the Alcázar family mansion dining room: a crystal chandelier, a long table with white linen, candles and oil portraits on the walls",
-      "mansion_garden": "the Alcázar mansion garden at golden hour: a stone fountain, white flowers, string lights and a short aisle with white chairs",
-      "mansion_hallway": "a dim elegant mansion hallway at night with two separate bedroom doors side by side and warm wall sconces",
-      "mansion_study": "Mateo's private study in the mansion: dark wood bookshelves, a mahogany desk with drawers and a single brass desk lamp",
-      "mansion_kitchen": "a large modern mansion kitchen at night with a white marble island and warm pendant lights",
-      "guest_bedroom": "an elegant guest bedroom in the mansion with white linens, tall windows and soft morning light",
-      "regina_study": "Regina's private study in the mansion: dark green walls, a velvet armchair, a lit fireplace and heavy curtains",
-      "fernanda_apartment": "Fernanda's luxurious minimalist apartment at night: a white sofa and floor-to-ceiling windows with city lights",
-      "car_interior": "the interior of a luxury black car with tinted windows and cream leather seats",
-      "gala": "a grand hotel ballroom during a formal gala: crystal chandeliers, elegant guests, a stage with a microphone and a huge screen"
+      "bakery": {
+        "visual": "Dulce Ríos, a small cozy family bakery in Coyoacán, Mexico City: cobalt-blue walls, hand-painted Talavera tiles, wooden shelves full of conchas and pan dulce, an old brick oven, a vintage brass cash register, warm yellow lights, and a framed photo of a smiling middle-aged woman on the wall behind the counter",
+        "ambient": "the soft crackle of the brick oven and quiet street sounds from outside"
+      },
+      "street_bakery": {
+        "visual": "a cobblestone street in Coyoacán with colorful colonial houses and jacaranda trees, in front of a small bakery with a cobalt-blue facade and a rolling metal shutter",
+        "ambient": "distant traffic, birds and a quiet neighborhood street"
+      },
+      "tower_lobby": {
+        "visual": "the lobby of the Grupo Alcázar headquarters, a towering modern glass skyscraper: white marble floors, gold accents, a long reception desk and glass entrance doors",
+        "ambient": "a quiet echoing lobby with soft footsteps on marble"
+      },
+      "elevator": {
+        "visual": "a sleek modern elevator with brushed-steel doors, warm walnut wood-panel walls and soft overhead lighting inside the Grupo Alcázar tower",
+        "ambient": "the low steady hum of a moving elevator"
+      },
+      "boardroom": {
+        "visual": "the Grupo Alcázar boardroom on the top floor: a long black glass table, leather chairs, floor-to-ceiling windows overlooking the Mexico City skyline, a large wall screen, a few board members in dark suits seated in soft focus",
+        "ambient": "the quiet hush of a tense executive meeting room"
+      },
+      "tower_hallway": {
+        "visual": "a top-floor corridor of the Grupo Alcázar tower with frosted glass walls, abstract paintings and polished floors",
+        "ambient": "a silent corridor with a faint air-conditioning hum"
+      },
+      "mateo_office": {
+        "visual": "Mateo's executive office at night: minimalist dark wood and glass, the city skyline behind a large desk, and a wall of security monitors glowing blue",
+        "ambient": "a quiet office at night with a soft electronic hum from the monitors"
+      },
+      "lawyer_office": {
+        "visual": "a classic law office with a walnut desk, leather chairs and tall bookshelves",
+        "ambient": "a quiet office with a ticking wall clock"
+      },
+      "mansion_dining": {
+        "visual": "the Alcázar family mansion dining room: a crystal chandelier, a long table with white linen, candles and oil portraits on the walls",
+        "ambient": "the soft clink of silverware and crystal in a large quiet room"
+      },
+      "mansion_garden": {
+        "visual": "the Alcázar mansion garden at golden hour: a stone fountain, white flowers, string lights and a short aisle with white chairs and a few seated guests in soft focus",
+        "ambient": "a gentle fountain, birds and a soft breeze"
+      },
+      "mansion_hallway": {
+        "visual": "a dim elegant mansion hallway at night with two separate bedroom doors side by side and warm wall sconces",
+        "ambient": "a silent house at night"
+      },
+      "mansion_study": {
+        "visual": "Mateo's private study in the mansion at night: dark wood bookshelves, a mahogany desk with drawers and a single brass desk lamp",
+        "ambient": "a silent room at night with a faint clock ticking"
+      },
+      "mansion_kitchen": {
+        "visual": "a large modern mansion kitchen at night with a white marble island and warm pendant lights",
+        "ambient": "a quiet kitchen at night with a low refrigerator hum"
+      },
+      "guest_bedroom": {
+        "visual": "an elegant guest bedroom in the mansion with white linens, tall windows and soft morning light",
+        "ambient": "a quiet morning room with faint birdsong outside"
+      },
+      "regina_study": {
+        "visual": "Regina's private study in the mansion: dark green walls, a velvet armchair, a lit fireplace and heavy curtains",
+        "ambient": "the soft crackle of a fireplace"
+      },
+      "fernanda_apartment": {
+        "visual": "Fernanda's luxurious minimalist apartment at night: a white sofa and floor-to-ceiling windows with city lights",
+        "ambient": "a quiet apartment with distant city noise far below"
+      },
+      "car_interior": {
+        "visual": "the interior of a luxury black car with tinted windows and cream leather seats, parked on a street",
+        "ambient": "muffled street sounds through closed car windows"
+      },
+      "gala": {
+        "visual": "a grand hotel ballroom during a formal gala: crystal chandeliers, elegantly dressed guests in soft focus, a stage with a microphone and a huge screen",
+        "ambient": "soft string music and the murmur of elegant guests"
+      }
     },
     "extras": {
-      "Oficiante": "the officiant",
-      "Consejero": "the gray-haired board member",
-      "Capataz": "the foreman"
+      "Oficiante": { "who": "the officiant in a gray suit", "voice": "a formal, warm male voice" },
+      "Consejero": { "who": "the gray-haired board member", "voice": "a stern, deep older male voice" },
+      "Capataz": { "who": "the foreman in a hard hat", "voice": "a rough, loud male voice" }
     }
   },
   "characters": [
@@ -60,7 +116,8 @@
         "wants": "Salvar la panadería de su madre.",
         "fear": "Que la usen, como su padre usó a su madre.",
         "arc": "De aceptar un matrimonio por necesidad a pelear por amor y descubrir que tiene una hermana.",
-        "default_outfit": "a mustard-yellow cardigan over a white t-shirt, a light-blue apron dusted with flour, and jeans"
+        "default_outfit": "a mustard-yellow cardigan over a white t-shirt, a light-blue apron dusted with flour, and jeans",
+        "voice": "a warm, slightly husky young female voice with a soft Mexican accent"
       }
     },
     {
@@ -77,7 +134,8 @@
         "wants": "Conservar la empresa de su abuelo y alejarla de Regina.",
         "fear": "Volver a confiar y ser traicionado.",
         "arc": "De usar a Valentina como solución legal a arriesgarlo todo por ella.",
-        "default_outfit": "a tailored charcoal-gray three-piece suit, a white shirt with no tie, and a silver watch"
+        "default_outfit": "a tailored charcoal-gray three-piece suit, a white shirt with no tie, and a silver watch",
+        "voice": "a calm, deep, low male voice with a soft Mexican accent"
       }
     },
     {
@@ -94,7 +152,8 @@
         "wants": "Recuperar a Mateo y librarse de la amenaza de Regina.",
         "fear": "Que se sepa lo que hizo su padre.",
         "arc": "De sabotear a Valentina a ponerse de su lado como hermana.",
-        "default_outfit": "a fitted red designer dress and gold hoop earrings"
+        "default_outfit": "a fitted red designer dress and gold hoop earrings",
+        "voice": "a smooth, sharp, confident female voice with a refined Mexican accent"
       }
     },
     {
@@ -111,7 +170,8 @@
         "wants": "La presidencia de Grupo Alcázar y construir el hotel Alcázar Coyoacán.",
         "fear": "Perder el control.",
         "arc": "Manipula a todos hasta que su propia arrogancia la delata.",
-        "default_outfit": "a cream-white tailored skirt suit and a pearl necklace"
+        "default_outfit": "a cream-white tailored skirt suit and a pearl necklace",
+        "voice": "a cold, measured, elegant mature female voice with a crisp Mexican accent"
       }
     },
     {
@@ -128,7 +188,8 @@
         "wants": "Conocer a la hija que abandonó.",
         "fear": "El rechazo de sus dos hijas.",
         "arc": "Aparece en el último segundo del episodio 12 (temporada 2).",
-        "default_outfit": "a worn brown leather jacket over a plaid shirt"
+        "default_outfit": "a worn brown leather jacket over a plaid shirt",
+        "voice": "a tired, gravelly older male voice with a gentle Mexican accent"
       }
     }
   ],
@@ -138,58 +199,110 @@
       "title": "Treinta días",
       "wardrobe": {},
       "continuity": {
-        "summary": "Valentina recibe un aviso de desalojo de Inmobiliaria Alcázar y va a la torre a protestar. Conoce a Mateo en el elevador sin saber quién es. Regina lee el testamento: Mateo debe casarse en 30 días o pierde la presidencia. Fernanda se le ofrece y él la rechaza. Los guardias sacan a Valentina.",
+        "summary": "Valentina recibe un aviso de desalojo de Inmobiliaria Alcázar y va a la torre a reclamar. En el elevador conoce a Mateo sin saber quién es. Regina lee el testamento: Mateo debe casarse en 30 días o pierde la presidencia. Fernanda se le ofrece y él la rechaza. Los guardias sacan a Valentina.",
         "last_cliffhanger": "Mateo ve a Valentina en el monitor de seguridad y decide que ella será su esposa.",
         "pending_state": "Valentina no sabe que el hombre del elevador es Mateo Alcázar."
       },
       "shots": [
         {
           "n": 1, "location": "bakery", "characters": ["Valentina"],
-          "scene_es": "Amanecer en Coyoacán. Valentina saca del horno de leña una charola de conchas recién hechas y le sonríe a la foto de su madre, Rosa: Dulce Ríos sigue viva.",
-          "visual_en": "Early dawn. Close-up of Valentina pulling a tray of fresh golden conchas out of the old brick oven, steam rising. She turns and smiles softly at the framed photo of the smiling woman on the wall. Slow push-in, warm morning light through the window.",
-          "dialogue": [{"speaker": "Valentina", "line": "Buenos días, mamá. Hoy también abrimos."}]
+          "camera": "Medium shot at eye level, slow push-in",
+          "scene_es": "Amanecer en Coyoacán. Valentina saca una charola de conchas del horno y le sonríe a la foto de su madre, Rosa.",
+          "action_en": "Valentina pulls a tray of fresh golden conchas out of the brick oven, steam rising, and turns toward the framed photo on the wall with a warm smile",
+          "dialogue": { "speaker": "Valentina", "line": "Buenos días, mamá. Hoy también abrimos, como siempre." },
+          "reaction_en": "She stays still, smiling softly at the photo, holding the warm tray",
+          "sfx": "the oven door creaks open"
         },
         {
           "n": 2, "location": "bakery", "characters": ["Valentina"],
-          "scene_es": "Un sobre oficial entra por debajo de la puerta. Es un aviso de desalojo de Inmobiliaria Alcázar: treinta días para irse. A Valentina se le borra la sonrisa.",
-          "visual_en": "An official envelope with a red seal slides under the bakery door. Valentina picks it up, opens it and reads. Her smile fades, her hands tremble and her eyes fill with tears. Medium close-up.",
-          "dialogue": [{"speaker": "Valentina", "line": "¿Treinta días? Esta panadería era de mi mamá."}]
+          "camera": "Close-up, static camera",
+          "scene_es": "Un sobre oficial entra por debajo de la puerta. El remitente: Inmobiliaria Alcázar.",
+          "action_en": "An envelope with a red seal slides under the bakery door; Valentina picks it up and looks at it, puzzled",
+          "dialogue": { "speaker": "Valentina", "line": "¿Inmobiliaria Alcázar? Nunca había escuchado ese nombre." },
+          "reaction_en": "She tears the envelope open and pauses, frowning",
+          "sfx": "paper sliding across the floor"
         },
         {
-          "n": 3, "location": "tower_lobby", "characters": ["Valentina"],
-          "scene_es": "Valentina cruza el lobby de mármol de la Torre Alcázar con la carta en una mano y una caja rosa de pan en la otra, decidida a hablar con el dueño.",
-          "visual_en": "Valentina strides determined through the marble lobby, clutching the letter in one hand and a pink pastry box in the other, walking past a receptionist who raises a hand to stop her. Tracking shot from the front.",
-          "dialogue": []
+          "n": 3, "location": "bakery", "characters": ["Valentina"],
+          "camera": "Medium close-up, static camera",
+          "scene_es": "Es un aviso de desalojo: treinta días para irse. A Valentina se le borra la sonrisa.",
+          "action_en": "Valentina unfolds the official letter and reads it, her smile fading and her hands trembling",
+          "dialogue": { "speaker": "Valentina", "line": "¿Treinta días para desalojar? Esta panadería era de mi mamá." },
+          "reaction_en": "She lowers the letter and stays frozen, eyes full of tears, looking at the photo on the wall"
         },
         {
-          "n": 4, "location": "elevator", "characters": ["Valentina", "Mateo"],
-          "scene_es": "En el elevador, un desconocido de traje la escucha divertido. Ella no se calla: “Los Alcázar no tienen corazón, solo cuentas de banco”. Él sonríe sin decir quién es.",
-          "visual_en": "Inside the mirrored elevator, Valentina stands next to Mateo and vents angrily, waving the letter. Mateo glances at her sideways, amused, hiding a small smile and saying nothing. Two-shot with reflections in the mirrors.",
-          "dialogue": [{"speaker": "Valentina", "line": "Los Alcázar no tienen corazón, solo cuentas de banco."}]
+          "n": 4, "location": "bakery", "characters": ["Valentina"],
+          "camera": "Medium shot, slight low angle",
+          "scene_es": "Valentina se seca las lágrimas, toma una caja rosa de pan y la carta. Va a ir a reclamar.",
+          "action_en": "Valentina wipes her tears, grabs a pink pastry box and the letter, and stands tall, determined",
+          "dialogue": { "speaker": "Valentina", "line": "Si quieren mi panadería, me lo van a decir en la cara." },
+          "reaction_en": "She holds her determined stare for a moment, jaw set, box under her arm"
         },
         {
-          "n": 5, "location": "boardroom", "characters": ["Regina", "Mateo"],
-          "scene_es": "Arriba, Regina, la madrastra de Mateo, lee el testamento del abuelo Octavio frente al consejo: “Casado en treinta días, o la presidencia es mía”.",
-          "visual_en": "Regina sits at the head of the long table reading calmly from a thick legal document. Mateo stands by the window, jaw clenched. Board members in dark suits watch in silence. Slow dolly along the table toward Regina's cold smile.",
-          "dialogue": [{"speaker": "Regina", "line": "Casado en treinta días, Mateo, o la presidencia es mía."}]
+          "n": 5, "location": "tower_lobby", "characters": ["Valentina"],
+          "camera": "Tracking shot from the front, walking pace",
+          "scene_es": "Valentina cruza el lobby de la Torre Alcázar. La recepcionista intenta detenerla.",
+          "action_en": "Valentina walks confidently across the marble lobby with the letter and the pink box while a receptionist behind the desk raises a hand",
+          "dialogue": { "speaker": "Valentina", "line": "Vengo a ver al dueño. Y no, no tengo cita." },
+          "reaction_en": "She stops in front of the closed elevator doors and waits, chin up"
         },
         {
-          "n": 6, "location": "boardroom", "characters": ["Fernanda", "Mateo"],
-          "scene_es": "Fernanda, la exprometida de Mateo, entra sin tocar y le susurra al oído: “Cásate conmigo. Ya casi lo hicimos una vez”. Mateo ni siquiera la mira.",
-          "visual_en": "Fernanda walks in confidently, heels clicking, and leans close to Mateo's ear with a seductive smile. Mateo keeps looking out the window, expression cold, never turning to her. Close two-shot.",
-          "dialogue": [{"speaker": "Fernanda", "line": "Cásate conmigo, Mateo. Ya casi lo hicimos una vez."}]
+          "n": 6, "location": "elevator", "characters": ["Valentina", "Mateo"],
+          "camera": "Two-shot, static camera",
+          "scene_es": "En el elevador, un hombre de traje la escucha divertido. Ella no se calla.",
+          "action_en": "Inside the elevator, Valentina vents angrily, waving the letter, while Mateo stands beside her listening, amused",
+          "dialogue": { "speaker": "Valentina", "line": "Los Alcázar no tienen corazón, solo cuentas de banco." },
+          "reaction_en": "Mateo hides a small smile while Valentina glares at him, arms crossed"
         },
         {
-          "n": 7, "location": "tower_lobby", "characters": ["Valentina"],
-          "scene_es": "Abajo, dos guardias sacan a Valentina del lobby. La caja rosa cae al piso y las conchas ruedan por el mármol.",
-          "visual_en": "Two security guards firmly escort Valentina toward the glass exit as she protests. The pink pastry box slips from her hands and conchas roll across the shiny marble floor. Valentina looks back, furious and humiliated. Wide shot.",
-          "dialogue": [{"speaker": "Valentina", "line": "¡Esto no se va a quedar así!"}]
+          "n": 7, "location": "elevator", "characters": ["Mateo", "Valentina"],
+          "camera": "Close-up on Mateo, Valentina soft in the foreground",
+          "scene_es": "Él mira la carta sin decir quién es: “Tal vez el dueño no sabe lo que firman en su nombre”.",
+          "action_en": "Mateo glances calmly at the letter in her hand and then at her face",
+          "dialogue": { "speaker": "Mateo", "line": "Tal vez el dueño no sabe lo que firman en su nombre." },
+          "reaction_en": "The steel doors slide open and Mateo steps out without another word",
+          "sfx": "a soft elevator chime"
         },
         {
-          "n": 8, "location": "mateo_office", "characters": ["Mateo"],
-          "scene_es": "En su oficina, Mateo ve la escena en el monitor de seguridad. Mira a la mujer del elevador y toma una decisión: “Averigua quién es ella. Ya encontré a mi esposa”.",
-          "visual_en": "Mateo watches a security monitor showing a woman being escorted out of the lobby. He leans closer to the screen as a slow, intrigued smile forms, then speaks into his phone without looking away. Slow push-in on his face. Hold, then hard cut to black.",
-          "dialogue": [{"speaker": "Mateo", "line": "Averigua quién es ella. Ya encontré a mi esposa."}]
+          "n": 8, "location": "boardroom", "characters": ["Regina", "Mateo"],
+          "camera": "Slow dolly along the table toward Regina",
+          "scene_es": "Regina, la madrastra de Mateo, lee el testamento del abuelo Octavio frente al consejo.",
+          "action_en": "Regina sits at the head of the long table reading calmly from a thick legal document while Mateo stands by the window",
+          "dialogue": { "speaker": "Regina", "line": "Tu abuelo fue claro: casado en treinta días, o la presidencia es mía." },
+          "reaction_en": "Regina closes the document with a cold smile; Mateo's jaw tightens"
+        },
+        {
+          "n": 9, "location": "boardroom", "characters": ["Fernanda", "Mateo"],
+          "camera": "Close two-shot",
+          "scene_es": "Fernanda, la exprometida de Mateo, entra sin tocar y le habla al oído.",
+          "action_en": "Fernanda walks in confidently and leans close to Mateo's ear with a seductive smile",
+          "dialogue": { "speaker": "Fernanda", "line": "Cásate conmigo, Mateo. Ya casi lo hicimos una vez." },
+          "reaction_en": "Mateo keeps looking out the window, expression cold, never turning to her"
+        },
+        {
+          "n": 10, "location": "boardroom", "characters": ["Mateo", "Fernanda"],
+          "camera": "Close-up on Mateo",
+          "scene_es": "Mateo ni la mira: “Casi. Y sigo agradeciendo haber salido de esa iglesia a tiempo”.",
+          "action_en": "Mateo turns his head slowly toward Fernanda with an icy look",
+          "dialogue": { "speaker": "Mateo", "line": "Casi. Y sigo agradeciendo haber salido de esa iglesia a tiempo." },
+          "reaction_en": "Fernanda's smile freezes on her face"
+        },
+        {
+          "n": 11, "location": "tower_lobby", "characters": ["Valentina"],
+          "camera": "Wide shot, static camera",
+          "scene_es": "Abajo, dos guardias sacan a Valentina. La caja rosa cae y las conchas ruedan por el mármol.",
+          "action_en": "Two security guards escort Valentina toward the glass exit as she protests; the pink box slips from her hands and conchas roll across the marble floor",
+          "dialogue": { "speaker": "Valentina", "line": "¡Suéltenme! ¡Esto no se va a quedar así!" },
+          "reaction_en": "She stands outside the glass doors, breathing hard, staring back at the tower",
+          "sfx": "a pastry box hitting the floor"
+        },
+        {
+          "n": 12, "location": "mateo_office", "characters": ["Mateo"],
+          "camera": "Slow push-in on Mateo's face",
+          "scene_es": "En su oficina, Mateo ve la escena en el monitor de seguridad y toma una decisión.",
+          "action_en": "Mateo watches a security monitor showing a woman being escorted out, a slow intrigued smile forming, his phone at his ear",
+          "dialogue": { "speaker": "Mateo", "line": "Averigua quién es ella. Creo que ya encontré a mi esposa." },
+          "reaction_en": "He holds the intrigued smile, eyes fixed on the screen, completely still"
         }
       ]
     },
@@ -198,58 +311,113 @@
       "title": "No estoy en venta",
       "wardrobe": {},
       "continuity": {
-        "summary": "Mateo aparece en la panadería y se presenta. Valentina le avienta harina. Él le propone un matrimonio por contrato de seis meses a cambio de pagar su deuda con el banco y cancelar el desalojo. Ella lo corre. Fernanda los espía y avisa a Regina. Esa noche el banco le niega la prórroga.",
+        "summary": "Mateo aparece en la panadería y se presenta. Valentina le avienta harina. Él le propone seis meses de matrimonio por contrato a cambio de pagar su deuda y cancelar el desalojo. Ella lo corre. Fernanda los espía y avisa a Regina. Esa noche el banco le niega más tiempo.",
         "last_cliffhanger": "Valentina llama a Mateo: acepta, con la condición de que él nunca se enamore de ella.",
         "pending_state": "Hay que firmar el contrato y presentarse ante la familia Alcázar."
       },
       "shots": [
         {
           "n": 1, "location": "bakery", "characters": ["Valentina", "Mateo"],
-          "scene_es": "A la mañana siguiente, Valentina amasa con rabia. Suena la campanita de la puerta y se congela: es el hombre del elevador.",
-          "visual_en": "Morning. Valentina kneads dough angrily on the floured counter. The door bell chimes. She looks up and freezes, a smudge of flour on her cheek, as Mateo appears in the doorway. Over-the-shoulder shot.",
-          "dialogue": [{"speaker": "Valentina", "line": "¿Usted? ¿Qué hace aquí?"}]
+          "camera": "Over-the-shoulder from Valentina toward the door",
+          "scene_es": "A la mañana siguiente, Valentina amasa con rabia. Suena la campanita: es el hombre del elevador.",
+          "action_en": "Valentina kneads dough angrily on the floured counter; the door bell chimes and Mateo walks in",
+          "dialogue": { "speaker": "Valentina", "line": "Estamos cerrados... ¿Usted? ¿El del elevador?" },
+          "reaction_en": "She freezes with flour on her cheek, staring at him",
+          "sfx": "a small door bell chimes"
         },
         {
-          "n": 2, "location": "bakery", "characters": ["Valentina", "Mateo"],
-          "scene_es": "“Mateo Alcázar, mucho gusto”, dice él, extendiendo la mano. Valentina, sin pensarlo, le avienta un puño de harina. El traje carísimo queda blanco.",
-          "visual_en": "Mateo steps in and extends his hand politely. Valentina grabs a handful of flour and throws it at him. A white cloud covers his expensive suit. He stands still, blinking, then calmly brushes his lapel. Comedic beat, medium shot.",
-          "dialogue": [{"speaker": "Mateo", "line": "Mateo Alcázar. Mucho gusto."}]
+          "n": 2, "location": "bakery", "characters": ["Mateo", "Valentina"],
+          "camera": "Medium two-shot",
+          "scene_es": "Él se presenta: Mateo Alcázar. Viene a hablar del desalojo.",
+          "action_en": "Mateo stops at the counter and politely extends his hand",
+          "dialogue": { "speaker": "Mateo", "line": "Mateo Alcázar. Vengo a hablar de su desalojo." },
+          "reaction_en": "Valentina's eyes narrow as she slowly closes her hand around a fistful of flour"
         },
         {
           "n": 3, "location": "bakery", "characters": ["Valentina", "Mateo"],
-          "scene_es": "Sin perder la calma, Mateo pone una carpeta sobre el mostrador: seis meses de matrimonio por contrato. Él paga la deuda del banco y cancela el desalojo.",
-          "visual_en": "Mateo, still dusted with flour, places a black leather folder on the counter and slides it toward Valentina. She stares at it, then at him, in disbelief. Close-up on the folder, rack focus to her shocked face.",
-          "dialogue": [{"speaker": "Mateo", "line": "Seis meses casada conmigo. Pago tu deuda y cancelo el desalojo."}]
+          "camera": "Medium shot, static camera",
+          "scene_es": "Valentina le avienta un puño de harina. El traje carísimo queda blanco.",
+          "action_en": "Valentina throws the flour at Mateo and a white cloud covers his expensive suit",
+          "dialogue": { "speaker": "Valentina", "line": "¡Fuera de mi panadería, señor Alcázar!" },
+          "reaction_en": "Mateo stands perfectly still, blinking, his suit dusted white",
+          "sfx": "a soft whoosh of flour"
         },
         {
-          "n": 4, "location": "bakery", "characters": ["Valentina", "Mateo"],
-          "scene_es": "Valentina le regresa la carpeta de un golpe y le señala la puerta: “No estoy en venta”. Mateo deja su tarjeta junto a la caja registradora y se va.",
-          "visual_en": "Valentina shoves the folder back across the counter and points at the door, eyes blazing. Mateo calmly places a black business card next to the brass cash register, nods once and walks out. The bell chimes.",
-          "dialogue": [{"speaker": "Valentina", "line": "No estoy en venta, señor Alcázar."}]
+          "n": 4, "location": "bakery", "characters": ["Mateo", "Valentina"],
+          "camera": "Close-up on Mateo",
+          "scene_es": "Sin perder la calma, Mateo pone una carpeta en el mostrador y le hace su oferta.",
+          "action_en": "Mateo calmly brushes his lapel and places a black leather folder on the counter",
+          "dialogue": { "speaker": "Mateo", "line": "Seis meses casada conmigo. Pago su deuda y cancelo el desalojo." },
+          "reaction_en": "He slides the folder toward her and waits in silence"
         },
         {
-          "n": 5, "location": "car_interior", "characters": ["Fernanda"],
-          "scene_es": "Del otro lado de la calle, dentro de un auto negro, Fernanda lo vio todo. Llama por teléfono: “Ya sé a quién eligió. Una pastelera”.",
-          "visual_en": "Inside a black car parked across the street, Fernanda watches through the tinted window with her phone to her ear, lips tight with jealousy. The cobalt-blue bakery facade is visible through the glass.",
-          "dialogue": [{"speaker": "Fernanda", "line": "Ya sé a quién eligió, Regina. Una pastelera."}]
+          "n": 5, "location": "bakery", "characters": ["Valentina", "Mateo"],
+          "camera": "Close-up on Valentina",
+          "scene_es": "Valentina no lo puede creer: “¿Casarme con usted? ¿Está loco o solo es rico?”.",
+          "action_en": "Valentina stares at the folder, then up at him, stunned",
+          "dialogue": { "speaker": "Valentina", "line": "¿Casarme con usted? ¿Está loco o solo es rico?" },
+          "reaction_en": "Mateo raises an eyebrow, unbothered"
         },
         {
-          "n": 6, "location": "bakery", "characters": ["Valentina"],
-          "scene_es": "Esa noche, el banco le niega la prórroga. Valentina cuelga el teléfono y se deja caer al piso entre charolas vacías.",
-          "visual_en": "Night. The bakery is dim, chairs stacked on tables. Valentina hangs up an old wall phone and slides down against the counter to sit on the floor, hugging her knees, silent tears. Wide lonely shot lit by a single warm lamp.",
-          "dialogue": [{"speaker": "Valentina", "line": "Sin prórroga... entonces lo pierdo todo."}]
+          "n": 6, "location": "bakery", "characters": ["Mateo", "Valentina"],
+          "camera": "Two-shot, static camera",
+          "scene_es": "Él lo plantea como un trato justo: ella necesita su panadería y él una esposa.",
+          "action_en": "Mateo leans slightly on the counter, speaking calmly and directly",
+          "dialogue": { "speaker": "Mateo", "line": "Necesito una esposa en treinta días. Usted necesita su panadería. Es justo." },
+          "reaction_en": "Valentina crosses her arms and looks away"
         },
         {
-          "n": 7, "location": "bakery", "characters": ["Valentina"],
-          "scene_es": "Abre el viejo recetario de su madre. En la primera página, con la letra de Rosa: “Nunca dejes que apaguen el horno”. Valentina mira la tarjeta negra.",
-          "visual_en": "Valentina opens a worn handwritten recipe notebook full of illegible cursive. She touches the page tenderly, then her eyes move to the black business card on the counter. Determination grows on her face. Close-up.",
-          "dialogue": [{"speaker": "Valentina", "line": "No voy a dejar que lo apaguen, mamá."}]
+          "n": 7, "location": "bakery", "characters": ["Valentina", "Mateo"],
+          "camera": "Medium shot, static camera",
+          "scene_es": "Ella le regresa la carpeta y señala la puerta. Él deja su tarjeta y se va.",
+          "action_en": "Valentina shoves the folder back across the counter and points at the door",
+          "dialogue": { "speaker": "Valentina", "line": "No estoy en venta. La puerta está justo detrás de usted." },
+          "reaction_en": "Mateo places a black business card next to the brass register, nods once and walks out",
+          "sfx": "the door bell chimes"
         },
         {
-          "n": 8, "location": "bakery", "characters": ["Valentina"],
-          "scene_es": "Marca el número. “Acepto”, dice cuando Mateo contesta. “Con una condición: que nunca te enamores de mí”.",
-          "visual_en": "Valentina dials her phone and holds it to her ear, jaw set, half her face in warm lamplight. She speaks firmly, then a tiny defiant smile appears. Hold on her face. Hard cut to black.",
-          "dialogue": [{"speaker": "Valentina", "line": "Acepto. Con una condición: que nunca te enamores de mí."}]
+          "n": 8, "location": "car_interior", "characters": ["Fernanda"],
+          "camera": "Close-up through the side window",
+          "scene_es": "Desde un auto negro, Fernanda lo vio todo. Llama a Regina.",
+          "action_en": "Fernanda watches the blue bakery from inside a black car, phone to her ear, lips tight with jealousy",
+          "dialogue": { "speaker": "Fernanda", "line": "Ya sé a quién eligió, Regina. Una pastelera de Coyoacán." },
+          "reaction_en": "She lowers the phone slowly, eyes fixed on the bakery"
+        },
+        {
+          "n": 9, "location": "bakery", "characters": ["Valentina"],
+          "camera": "Wide shot, static camera",
+          "wardrobe": { "Valentina": "a mustard-yellow cardigan over a white t-shirt and jeans, without the apron" },
+          "scene_es": "Esa noche, el banco le niega más tiempo. Valentina se deja caer al piso.",
+          "action_en": "At night in the dim bakery, Valentina hangs up an old wall phone and slides down against the counter to sit on the floor",
+          "dialogue": { "speaker": "Valentina", "line": "El banco no me da más tiempo... lo voy a perder todo." },
+          "reaction_en": "She hugs her knees in silence under a single warm lamp"
+        },
+        {
+          "n": 10, "location": "bakery", "characters": ["Valentina"],
+          "camera": "Close-up, static camera",
+          "wardrobe": { "Valentina": "a mustard-yellow cardigan over a white t-shirt and jeans, without the apron" },
+          "scene_es": "Abre el viejo recetario de su madre y recuerda su consejo.",
+          "action_en": "Valentina opens a worn handwritten recipe notebook on her lap and touches a page tenderly",
+          "dialogue": { "speaker": "Valentina", "line": "Nunca dejes que apaguen el horno... eso me decías, mamá." },
+          "reaction_en": "Her eyes slowly move toward the black business card on the counter"
+        },
+        {
+          "n": 11, "location": "bakery", "characters": ["Valentina"],
+          "camera": "Medium close-up, static camera",
+          "wardrobe": { "Valentina": "a mustard-yellow cardigan over a white t-shirt and jeans, without the apron" },
+          "scene_es": "Toma la tarjeta y marca el número. Contesta Mateo.",
+          "action_en": "Valentina picks up the black card, dials her phone and holds it to her ear",
+          "dialogue": { "speaker": "Valentina", "line": "¿Señor Alcázar? Soy Valentina Ríos. Acepto su contrato." },
+          "reaction_en": "She closes her eyes for a moment, breathing deeply, phone at her ear"
+        },
+        {
+          "n": 12, "location": "bakery", "characters": ["Valentina"],
+          "camera": "Slow push-in on her face",
+          "wardrobe": { "Valentina": "a mustard-yellow cardigan over a white t-shirt and jeans, without the apron" },
+          "scene_es": "Pero pone una condición: “Que usted nunca, nunca se enamore de mí”.",
+          "action_en": "Valentina opens her eyes and speaks firmly into the phone",
+          "dialogue": { "speaker": "Valentina", "line": "Con una condición: que usted nunca, nunca se enamore de mí." },
+          "reaction_en": "A tiny defiant smile appears and she holds it, completely still"
         }
       ]
     },
@@ -261,58 +429,108 @@
         "Fernanda": "a fitted black cocktail dress and gold hoop earrings"
       },
       "continuity": {
-        "summary": "Firman el contrato: seis meses, cuartos separados, cariño solo en público y nadie se enamora. En la cena familiar, Regina recibe a Valentina con frialdad y Fernanda le tira vino tinto encima. Valentina responde con ingenio. Mateo le toma la mano bajo la mesa.",
-        "last_cliffhanger": "Regina insinúa que sabe quién es el padre de Valentina, quien creía no tener padre.",
-        "pending_state": "La boda es en dos semanas. Fernanda quedó impactada por lo que dijo Regina."
+        "summary": "Firman el contrato: seis meses, cuartos separados, cariño solo en público y nadie se enamora. En la cena familiar, Regina recibe a Valentina con frialdad y Fernanda le tira vino tinto encima. Valentina responde con ingenio y Mateo le toma la mano bajo la mesa.",
+        "last_cliffhanger": "Regina insinúa que sabe quién es el padre de Valentina, y Fernanda reacciona impactada.",
+        "pending_state": "La boda es en dos semanas. Fernanda quedó inquieta por lo que dijo Regina."
       },
       "shots": [
         {
           "n": 1, "location": "lawyer_office", "characters": ["Valentina", "Mateo"],
-          "scene_es": "Despacho del abogado. Firman el contrato: seis meses, cuartos separados, cariño solo en público y nadie se enamora. Ella firma primero, sin temblar.",
-          "visual_en": "Valentina and Mateo sit side by side at a walnut desk. Valentina signs a document first with a confident stroke and slides the pen to Mateo. He signs, glancing at her with curiosity. Close-ups on the pen and their faces.",
-          "dialogue": [{"speaker": "Mateo", "line": "Cuartos separados. Cariño solo en público."}]
+          "camera": "Medium two-shot across the desk",
+          "scene_es": "Despacho del abogado. Valentina firma primero, sin temblar. Mateo lee las reglas.",
+          "action_en": "Valentina signs a document with a confident stroke and slides the pen to Mateo, who reads the page",
+          "dialogue": { "speaker": "Mateo", "line": "Seis meses. Cuartos separados. Cariño solo en público." },
+          "reaction_en": "Mateo signs and glances at her with curiosity"
         },
         {
           "n": 2, "location": "lawyer_office", "characters": ["Valentina", "Mateo"],
-          "scene_es": "Mateo le ofrece el brazo: “Desde hoy somos la pareja más enamorada de México”. Ella pone los ojos en blanco y lo toma con una sonrisa falsa perfecta.",
-          "visual_en": "Mateo offers his arm with a playful look. Valentina rolls her eyes, then takes it and flashes a perfectly fake bright smile. They walk toward the door together. Medium shot, light comedic tone.",
-          "dialogue": [{"speaker": "Mateo", "line": "Desde hoy, somos la pareja más enamorada de México."}]
+          "camera": "Close-up on Valentina",
+          "scene_es": "Ella agrega la regla más importante: aquí nadie se enamora.",
+          "action_en": "Valentina taps the contract with one finger and looks straight at Mateo",
+          "dialogue": { "speaker": "Valentina", "line": "Y la cláusula más importante: aquí nadie se enamora." },
+          "reaction_en": "Mateo smirks and nods once"
         },
         {
-          "n": 3, "location": "mansion_dining", "characters": ["Valentina", "Mateo", "Regina"],
-          "scene_es": "Mansión Alcázar. Regina recibe a Valentina con una sonrisa helada y la mira de arriba abajo. Mateo la sostiene por la espalda.",
-          "visual_en": "Regina rises from the head of the table and greets Valentina with an icy smile, eyes scanning her from head to toe. Mateo stands protectively beside Valentina with his hand on her back. Medium-wide shot, candlelight.",
-          "dialogue": [{"speaker": "Regina", "line": "Así que tú eres la famosa panadera."}]
+          "n": 3, "location": "lawyer_office", "characters": ["Mateo", "Valentina"],
+          "camera": "Medium two-shot",
+          "scene_es": "Mateo le ofrece el brazo: desde hoy son la pareja más enamorada de México.",
+          "action_en": "Mateo stands and offers Valentina his arm with a playful look",
+          "dialogue": { "speaker": "Mateo", "line": "Entonces, señora Alcázar, desde hoy somos la pareja más enamorada de México." },
+          "reaction_en": "Valentina rolls her eyes, then takes his arm with a perfectly fake bright smile"
         },
         {
-          "n": 4, "location": "mansion_dining", "characters": ["Fernanda", "Valentina"],
-          "scene_es": "Fernanda está en la mesa como “amiga de la familia”. Al pasar junto a Valentina, le derrama una copa de vino tinto sobre el vestido.",
-          "visual_en": "Fernanda stands up holding a glass of red wine and deliberately spills it on Valentina's green dress as she passes. The wine spreads across the satin. Fernanda covers her mouth in fake surprise. Slow motion on the splash.",
-          "dialogue": [{"speaker": "Fernanda", "line": "¡Ay, qué torpe soy! Perdón."}]
+          "n": 4, "location": "mansion_dining", "characters": ["Regina", "Valentina"],
+          "camera": "Medium shot from behind Valentina toward Regina",
+          "scene_es": "Mansión Alcázar. Regina recibe a Valentina con una sonrisa helada.",
+          "action_en": "Regina rises from the head of the candlelit table and looks Valentina up and down",
+          "dialogue": { "speaker": "Regina", "line": "Así que tú eres la famosa panadera." },
+          "reaction_en": "Regina's icy smile stays fixed"
         },
         {
-          "n": 5, "location": "mansion_dining", "characters": ["Valentina", "Fernanda"],
-          "scene_es": "Valentina respira hondo, toma una servilleta y sonríe: “Tranquila. En mi panadería me mancho de cosas peores”. A Fernanda se le cae la sonrisa.",
-          "visual_en": "Valentina calmly dabs the stain with a white napkin, then looks up at Fernanda with a composed, sharp smile. Fernanda's fake smile falters. Shot-reverse-shot.",
-          "dialogue": [{"speaker": "Valentina", "line": "Tranquila. En mi panadería me mancho de cosas peores."}]
+          "n": 5, "location": "mansion_dining", "characters": ["Valentina", "Regina"],
+          "camera": "Close-up on Valentina",
+          "scene_es": "Valentina le ofrece pan de su panadería. Regina no lo toma.",
+          "action_en": "Valentina smiles politely and holds out a small pink pastry box",
+          "dialogue": { "speaker": "Valentina", "line": "Mucho gusto, señora. Le traje pan de mi panadería." },
+          "reaction_en": "The box stays in her hands; nobody takes it"
         },
         {
-          "n": 6, "location": "mansion_dining", "characters": ["Mateo", "Valentina"],
-          "scene_es": "Mateo disimula una risa. Por debajo de la mesa le toma la mano a Valentina. Ella lo mira sorprendida; él no la suelta.",
-          "visual_en": "Under-the-table close-up: Mateo's hand reaches over and holds Valentina's hand. Tilt up to her face: surprised, a faint blush. Mateo keeps looking straight ahead, hiding a smile.",
-          "dialogue": []
+          "n": 6, "location": "mansion_dining", "characters": ["Fernanda", "Valentina"],
+          "camera": "Medium two-shot, slow motion on the splash",
+          "scene_es": "Fernanda, “amiga de la familia”, le derrama una copa de vino tinto encima.",
+          "action_en": "Fernanda stands with a glass of red wine and spills it on Valentina's green dress as she passes",
+          "dialogue": { "speaker": "Fernanda", "line": "¡Ay, qué torpe soy! Perdóname, de verdad." },
+          "reaction_en": "Fernanda covers her mouth in fake surprise as the wine spreads across the satin",
+          "sfx": "a soft splash of wine"
         },
         {
-          "n": 7, "location": "mansion_dining", "characters": ["Regina", "Valentina"],
-          "scene_es": "Regina alza su copa: “¿Y qué opina tu padre de esta boda?”. Valentina se tensa: “Yo no tengo padre”.",
-          "visual_en": "Regina slowly raises her wine glass, eyes fixed on Valentina. Valentina's posture stiffens and her smile disappears. Candlelight flickers. Tight close-ups alternating between them.",
-          "dialogue": [{"speaker": "Regina", "line": "¿Y qué opina tu padre de esta boda?"}, {"speaker": "Valentina", "line": "Yo no tengo padre."}]
+          "n": 7, "location": "mansion_dining", "characters": ["Valentina", "Fernanda"],
+          "camera": "Close-up on Valentina",
+          "scene_es": "Valentina se limpia con calma y responde con una sonrisa.",
+          "action_en": "Valentina calmly dabs the stain with a white napkin and looks up at Fernanda",
+          "dialogue": { "speaker": "Valentina", "line": "Tranquila. En mi panadería me mancho de cosas peores... y más dulces." },
+          "reaction_en": "Fernanda's fake smile falters"
         },
         {
-          "n": 8, "location": "mansion_dining", "characters": ["Regina", "Valentina", "Fernanda"],
-          "scene_es": "Regina sonríe como quien guarda un secreto: “Eso crees tú, querida”. Al fondo, a Fernanda se le cae el tenedor.",
-          "visual_en": "Regina smiles slowly, like someone holding a dangerous secret. Valentina stares at her, shaken. In the background, Fernanda's fork slips from her fingers and clatters on the plate. Slow push-in on Regina. Hard cut to black.",
-          "dialogue": [{"speaker": "Regina", "line": "Eso crees tú, querida."}]
+          "n": 8, "location": "mansion_dining", "characters": ["Mateo", "Valentina"],
+          "camera": "Two-shot at the table",
+          "scene_es": "Ya sentados, Mateo le toma la mano por debajo de la mesa.",
+          "action_en": "Seated side by side, Mateo leans toward Valentina and gently takes her hand beside the table",
+          "dialogue": { "speaker": "Mateo", "line": "Bien jugado, señora Alcázar." },
+          "reaction_en": "Valentina blushes, surprised, and does not pull her hand away"
+        },
+        {
+          "n": 9, "location": "mansion_dining", "characters": ["Regina", "Valentina"],
+          "camera": "Close-up on Regina",
+          "scene_es": "Regina alza su copa y le hace una pregunta venenosa.",
+          "action_en": "Regina slowly raises her wine glass, eyes fixed on Valentina, candlelight flickering",
+          "dialogue": { "speaker": "Regina", "line": "Dime, Valentina, ¿y qué opina tu padre de esta boda tan repentina?" },
+          "reaction_en": "Regina takes a slow sip, never looking away"
+        },
+        {
+          "n": 10, "location": "mansion_dining", "characters": ["Valentina", "Regina"],
+          "camera": "Close-up on Valentina",
+          "scene_es": "Valentina se tensa: nunca conoció a su padre.",
+          "action_en": "Valentina's smile disappears and her posture stiffens",
+          "dialogue": { "speaker": "Valentina", "line": "Yo no tengo padre, señora. Nunca lo conocí." },
+          "reaction_en": "She lowers her eyes and holds her breath"
+        },
+        {
+          "n": 11, "location": "mansion_dining", "characters": ["Regina", "Valentina"],
+          "camera": "Slow push-in on Regina",
+          "scene_es": "Regina sonríe como quien guarda un secreto: “Eso crees tú, querida”.",
+          "action_en": "Regina smiles slowly, like someone holding a dangerous secret",
+          "dialogue": { "speaker": "Regina", "line": "Eso crees tú, querida. Eso crees tú." },
+          "reaction_en": "She sets her glass down with a soft click and keeps smiling"
+        },
+        {
+          "n": 12, "location": "mansion_dining", "characters": ["Fernanda"],
+          "camera": "Close-up on Fernanda",
+          "scene_es": "Al otro lado de la mesa, a Fernanda se le cae el tenedor. Algo sabe… o sospecha.",
+          "action_en": "Fernanda's fork slips from her hand and clatters on the plate as she stares at Regina",
+          "dialogue": { "speaker": "Fernanda", "line": "¿Qué sabe Regina...?" },
+          "reaction_en": "Fernanda stays frozen, pale, staring across the table",
+          "sfx": "a fork clattering on a porcelain plate"
         }
       ]
     },
@@ -325,58 +543,109 @@
         "Fernanda": "an elegant black dress and dark sunglasses"
       },
       "continuity": {
-        "summary": "Boda civil en el jardín de la mansión. El beso para las fotos se vuelve real y los deja confundidos. Fernanda, furiosa, contrata a alguien para investigar a Valentina. En la noche de bodas duermen en cuartos separados.",
+        "summary": "Boda civil en el jardín de la mansión. El beso para las fotos se vuelve real y los deja confundidos. Fernanda, furiosa, manda investigar a Valentina. En la noche de bodas duermen en cuartos separados.",
         "last_cliffhanger": "Valentina encuentra en el escritorio de Mateo la orden de demolición de su panadería, fechada esa semana y con la firma de Mateo.",
         "pending_state": "Valentina cree que Mateo le mintió desde el principio."
       },
       "shots": [
         {
           "n": 1, "location": "mansion_garden", "characters": ["Valentina", "Mateo"],
-          "scene_es": "Dos semanas después, boda civil en el jardín de la mansión. Valentina camina hacia Mateo entre flores blancas. Él se queda sin palabras.",
-          "visual_en": "Golden hour in the garden. Valentina walks down the short aisle in her wedding dress. At the end, Mateo turns and his composed expression breaks: he is speechless, eyes soft. Slow motion, romantic.",
-          "dialogue": []
+          "camera": "Slow motion medium shot down the aisle",
+          "scene_es": "Dos semanas después, boda civil en el jardín. Mateo ve a Valentina y se queda sin palabras.",
+          "action_en": "Valentina walks slowly down the short aisle in her wedding dress; Mateo turns and his composed expression breaks",
+          "dialogue": { "speaker": "Mateo", "line": "Estás... preciosa." },
+          "reaction_en": "He swallows, eyes soft, unable to look away"
         },
         {
-          "n": 2, "location": "mansion_garden", "characters": ["Valentina", "Mateo", "Regina"],
-          "scene_es": "El oficiante los declara marido y mujer. En primera fila, Regina aplaude despacio, sin sonreír.",
-          "visual_en": "An officiant in a gray suit closes a small book. Valentina and Mateo face each other nervously. In the front row, Regina claps slowly, unsmiling. Medium-wide shot.",
-          "dialogue": [{"speaker": "Oficiante", "line": "Los declaro marido y mujer. Puede besar a la novia."}]
+          "n": 2, "location": "mansion_garden", "characters": ["Valentina", "Mateo"],
+          "camera": "Close two-shot facing each other",
+          "scene_es": "Frente a frente, ella le susurra para calmarlo.",
+          "action_en": "Valentina stops in front of Mateo and leans in slightly to whisper",
+          "dialogue": { "speaker": "Valentina", "line": "Respira, señor Contrato. Es solo un trámite." },
+          "reaction_en": "Mateo lets out a nervous smile"
         },
         {
-          "n": 3, "location": "mansion_garden", "characters": ["Valentina", "Mateo"],
-          "scene_es": "Se supone que es solo para las fotos. Pero el beso dura más de lo planeado, y cuando se separan, ninguno de los dos respira bien.",
-          "visual_en": "Mateo cups Valentina's face and kisses her. What starts stiff becomes tender and lingers. They pull apart, both breathless and confused, staring at each other. Slow orbit around them, flower petals drifting in the air.",
-          "dialogue": []
+          "n": 3, "location": "mansion_garden", "characters": ["Regina"],
+          "camera": "Medium shot of Regina seated in the front row",
+          "scene_es": "En primera fila, Regina aplaude despacio, sin sonreír.",
+          "action_en": "Regina claps slowly in the front row, unsmiling, and murmurs to herself",
+          "dialogue": { "speaker": "Regina", "line": "Qué rápido consiguió una esposa de alquiler." },
+          "reaction_en": "She stops clapping and folds her hands in her lap, eyes cold"
         },
         {
-          "n": 4, "location": "car_interior", "characters": ["Fernanda"],
-          "scene_es": "Afuera de la mansión, Fernanda llora de rabia dentro de su auto. Se quita los lentes y marca un número: “Quiero saber todo de ella”.",
-          "visual_en": "Inside her black car outside the mansion gates, Fernanda removes her dark sunglasses, mascara slightly smudged, tears of rage. She dials her phone with sharp determination. Close-up.",
-          "dialogue": [{"speaker": "Fernanda", "line": "Quiero saber todo de ella. Todo."}]
+          "n": 4, "location": "mansion_garden", "characters": ["Valentina", "Mateo"],
+          "camera": "Medium shot from behind the officiant",
+          "scene_es": "El oficiante los declara marido y mujer.",
+          "action_en": "The officiant in a gray suit closes a small book as Valentina and Mateo face each other nervously",
+          "dialogue": { "speaker": "Oficiante", "line": "Los declaro marido y mujer. Puede besar a la novia." },
+          "reaction_en": "Valentina and Mateo look at each other, frozen for a second"
         },
         {
-          "n": 5, "location": "mansion_hallway", "characters": ["Valentina", "Mateo"],
-          "scene_es": "Noche de bodas. Frente a dos puertas separadas, Mateo duda. “Buenas noches, señora Alcázar”. “Buenas noches, señor Contrato”.",
-          "visual_en": "Night. Valentina, still in her wedding dress, and Mateo, bow tie loosened, stop between two bedroom doors. An awkward, charged pause. They each smile faintly and walk to opposite doors.",
-          "dialogue": [{"speaker": "Mateo", "line": "Buenas noches, señora Alcázar."}, {"speaker": "Valentina", "line": "Buenas noches, señor Contrato."}]
+          "n": 5, "location": "mansion_garden", "characters": ["Valentina", "Mateo"],
+          "camera": "Slow orbit around the couple",
+          "scene_es": "Es solo para las fotos… pero el beso dura más de lo planeado.",
+          "action_en": "Mateo gently cups Valentina's face and kisses her; what starts stiff becomes tender and lingers, flower petals drifting",
+          "dialogue": null,
+          "reaction_en": "They pull apart, both breathless, staring at each other"
         },
         {
-          "n": 6, "location": "mansion_study", "characters": ["Valentina"],
-          "scene_es": "Valentina no puede dormir. Baja al estudio de Mateo a buscar un libro y nota un cajón del escritorio entreabierto.",
-          "visual_en": "Valentina, barefoot and holding up the hem of her dress, quietly enters the dark study lit only by the desk lamp. She browses the bookshelves, then notices a desk drawer slightly open and approaches, curious.",
-          "dialogue": []
+          "n": 6, "location": "mansion_garden", "characters": ["Valentina", "Mateo"],
+          "camera": "Close-up on Valentina",
+          "scene_es": "Valentina, confundida, le susurra: “Eso no estaba en el contrato”.",
+          "action_en": "Valentina touches her lips, confused, and whispers to Mateo",
+          "dialogue": { "speaker": "Valentina", "line": "Eso... eso no estaba en el contrato." },
+          "reaction_en": "Mateo can't answer; he just looks at her"
         },
         {
-          "n": 7, "location": "mansion_study", "characters": ["Valentina"],
-          "scene_es": "Adentro hay una carpeta de Inmobiliaria Alcázar: la orden de demolición de Dulce Ríos, fechada esa misma semana.",
-          "visual_en": "Valentina pulls a folder from the drawer and opens it. Inside, a sketch of a small blue bakery crossed out with a big red X, on top of official papers. Her breath catches. Close-up on her face lit by the lamp.",
-          "dialogue": [{"speaker": "Valentina", "line": "Mi panadería... ¿esta semana?"}]
+          "n": 7, "location": "car_interior", "characters": ["Fernanda"],
+          "camera": "Close-up inside the car",
+          "scene_es": "Afuera de la mansión, Fernanda llora de rabia y manda investigar a Valentina.",
+          "action_en": "Fernanda removes her dark sunglasses, mascara slightly smudged, and speaks into her phone with sharp determination",
+          "dialogue": { "speaker": "Fernanda", "line": "Quiero saber todo de ella. Su familia, su pasado. Todo." },
+          "reaction_en": "She hangs up and stares through the windshield at the mansion gates"
         },
         {
-          "n": 8, "location": "mansion_study", "characters": ["Valentina"],
-          "scene_es": "Al final de la hoja hay una firma que reconoce de inmediato: la de Mateo Alcázar. Valentina siente que el piso desaparece.",
-          "visual_en": "Extreme close-up on an elegant illegible signature at the bottom of the page. Cut to Valentina's face: betrayal, tears welling, the paper trembling in her hands. Hard cut to black.",
-          "dialogue": [{"speaker": "Valentina", "line": "Me mentiste..."}]
+          "n": 8, "location": "mansion_hallway", "characters": ["Mateo", "Valentina"],
+          "camera": "Medium two-shot between the two doors",
+          "wardrobe": { "Mateo": "a classic black tuxedo with the bow tie loosened and the top button open" },
+          "scene_es": "Noche de bodas. Frente a dos puertas separadas, Mateo se despide.",
+          "action_en": "In the dim hallway, Mateo stops at his bedroom door and turns toward Valentina",
+          "dialogue": { "speaker": "Mateo", "line": "Buenas noches, señora Alcázar." },
+          "reaction_en": "He lingers in the doorway, hand on the door frame"
+        },
+        {
+          "n": 9, "location": "mansion_hallway", "characters": ["Valentina", "Mateo"],
+          "camera": "Close-up on Valentina at her door",
+          "wardrobe": { "Mateo": "a classic black tuxedo with the bow tie loosened and the top button open" },
+          "scene_es": "Ella le responde con media sonrisa: “Buenas noches, señor Contrato”.",
+          "action_en": "Valentina, holding the hem of her dress, smiles faintly from her own doorway",
+          "dialogue": { "speaker": "Valentina", "line": "Buenas noches, señor Contrato." },
+          "reaction_en": "Each of them slowly closes their own door",
+          "sfx": "two doors closing softly"
+        },
+        {
+          "n": 10, "location": "mansion_study", "characters": ["Valentina"],
+          "camera": "Medium shot, slow push-in",
+          "scene_es": "Valentina no puede dormir. Entra al estudio de Mateo y ve un cajón abierto.",
+          "action_en": "Valentina, barefoot in her wedding dress, enters the dark study lit by the desk lamp and notices a desk drawer slightly open",
+          "dialogue": { "speaker": "Valentina", "line": "No puedo dormir... a ver qué lee el señor Alcázar." },
+          "reaction_en": "She approaches the open drawer and pauses, curious"
+        },
+        {
+          "n": 11, "location": "mansion_study", "characters": ["Valentina"],
+          "camera": "Close-up on her face lit by the lamp",
+          "scene_es": "Adentro, una orden de demolición de Dulce Ríos… fechada esta semana.",
+          "action_en": "Valentina pulls out a folder and opens it: a sketch of a small blue bakery crossed out with a big red X",
+          "dialogue": { "speaker": "Valentina", "line": "¿Mi panadería? ¿Con fecha de esta semana?" },
+          "reaction_en": "Her breath catches; the paper trembles in her hands"
+        },
+        {
+          "n": 12, "location": "mansion_study", "characters": ["Valentina"],
+          "camera": "Extreme close-up on her eyes",
+          "scene_es": "Al final de la hoja, la firma de Mateo. Valentina siente que el piso desaparece.",
+          "action_en": "Valentina looks down at the bottom of the page, then her eyes fill with tears of betrayal",
+          "dialogue": { "speaker": "Valentina", "line": "Es su firma... Mateo, me mentiste." },
+          "reaction_en": "She stays frozen, one tear rolling down her cheek"
         }
       ]
     },
@@ -390,58 +659,110 @@
         "Regina": "a dark burgundy silk robe"
       },
       "continuity": {
-        "summary": "Valentina confronta a Mateo con la orden. Él jura que no la firmó. Ella se quita el anillo: el contrato sigue, pero ya no le cree. Se va a la panadería bajo la lluvia. Mateo encara a Regina, que se burla de él. Mateo se queda toda la noche en el escalón de la panadería.",
+        "summary": "Valentina confronta a Mateo con la orden. Él jura que no la firmó. Ella se quita el anillo: el contrato sigue, pero ya no le cree. Se va a la panadería bajo la lluvia. Mateo encara a Regina, que se burla de él, y se queda toda la noche en el escalón de la panadería.",
         "last_cliffhanger": "Fernanda toca la puerta trasera y le pregunta a Valentina si Mateo le contó por qué la dejó en el altar.",
         "pending_state": "El anillo quedó en el escritorio de Mateo. Mateo sigue afuera bajo la lluvia."
       },
       "shots": [
         {
           "n": 1, "location": "mansion_study", "characters": ["Valentina", "Mateo"],
-          "scene_es": "Se enciende la luz. Mateo la encuentra con la carpeta. Valentina se la avienta al pecho: “¿Tú vas a demoler mi panadería?”.",
-          "visual_en": "The study light switches on. Mateo stands in the doorway. Valentina, tears on her face, throws the folder at his chest and papers scatter through the air. Dramatic medium shot.",
-          "dialogue": [{"speaker": "Valentina", "line": "¿Tú vas a demoler mi panadería?"}]
+          "camera": "Medium two-shot from the doorway",
+          "scene_es": "Se enciende la luz. Valentina le avienta la carpeta a Mateo.",
+          "action_en": "The study light switches on; Valentina throws the folder at Mateo's chest and papers scatter",
+          "dialogue": { "speaker": "Valentina", "line": "¿Vas a demoler mi panadería? ¿Por eso te casaste conmigo?" },
+          "reaction_en": "The papers settle on the floor while she breathes hard"
         },
         {
-          "n": 2, "location": "mansion_study", "characters": ["Valentina", "Mateo"],
-          "scene_es": "Mateo recoge la hoja y palidece al ver la firma: “Yo no firmé esto, Valentina. Te lo juro”.",
-          "visual_en": "Mateo picks up a paper from the floor, reads it and turns pale. He looks up at Valentina, desperate and sincere. Close two-shot.",
-          "dialogue": [{"speaker": "Mateo", "line": "Yo no firmé esto, Valentina. Te lo juro."}]
+          "n": 2, "location": "mansion_study", "characters": ["Mateo", "Valentina"],
+          "camera": "Close-up on Mateo",
+          "scene_es": "Mateo lee la hoja y palidece: él no firmó eso.",
+          "action_en": "Mateo picks up a paper from the floor, reads it and turns pale",
+          "dialogue": { "speaker": "Mateo", "line": "Yo no firmé esto, Valentina. Te lo juro por mi abuelo." },
+          "reaction_en": "He looks up at her, desperate and sincere"
         },
         {
           "n": 3, "location": "mansion_study", "characters": ["Valentina", "Mateo"],
-          "scene_es": "Ella se quita el anillo de bodas y lo deja sobre el escritorio: “El contrato sigue. Pero ya no te creo”.",
-          "visual_en": "Valentina slowly slides the wedding ring off her finger and sets it on the desk with a soft click. Mateo reaches for her, but she steps back. Close-up on the ring under the lamp light.",
-          "dialogue": [{"speaker": "Valentina", "line": "El contrato sigue. Pero ya no te creo."}]
+          "camera": "Close-up on Valentina",
+          "scene_es": "Ella no le cree: vio esa firma en el despacho del abogado.",
+          "action_en": "Valentina shakes her head, tears falling",
+          "dialogue": { "speaker": "Valentina", "line": "Es tu firma, Mateo. La vi en el despacho del abogado." },
+          "reaction_en": "She wipes her cheek and looks away from him"
         },
         {
-          "n": 4, "location": "street_bakery", "characters": ["Valentina"],
-          "scene_es": "Bajo la lluvia, Valentina llega a su panadería y sube la cortina metálica con las manos temblando.",
-          "visual_en": "Night, heavy rain on the cobblestones. Valentina, soaked, pulls up the metal shutter of the blue bakery with trembling hands and slips inside. Wide shot, streetlights reflecting on the wet stones.",
-          "dialogue": []
+          "n": 4, "location": "mansion_study", "characters": ["Valentina", "Mateo"],
+          "camera": "Medium two-shot, then hold on the desk",
+          "scene_es": "Se quita el anillo y lo deja sobre el escritorio.",
+          "action_en": "Valentina slowly slides the wedding ring off and sets it on the desk under the lamp",
+          "dialogue": { "speaker": "Valentina", "line": "El contrato sigue. Pero yo ya no te creo nada." },
+          "reaction_en": "Mateo reaches for her, but she steps back and he lowers his hand",
+          "sfx": "a ring clicking on wood"
         },
         {
-          "n": 5, "location": "regina_study", "characters": ["Mateo", "Regina"],
-          "scene_es": "En la mansión, Mateo irrumpe en el estudio de Regina: “¿Usaste mi clave para firmar esa orden?”. Ella ni levanta la vista de su té.",
-          "visual_en": "Mateo bursts into the dark green study. Regina sits in a velvet armchair by the fireplace sipping tea, not even looking up. Firelight on her calm face.",
-          "dialogue": [{"speaker": "Mateo", "line": "¿Usaste mi clave para firmar esa orden?"}]
+          "n": 5, "location": "street_bakery", "characters": ["Valentina"],
+          "camera": "Wide shot at night in the rain",
+          "scene_es": "Bajo la lluvia, Valentina llega a su panadería.",
+          "action_en": "At night in heavy rain, Valentina, soaked, pulls up the metal shutter of the blue bakery",
+          "dialogue": { "speaker": "Valentina", "line": "Aquí nadie me miente, mamá. Aquí no." },
+          "reaction_en": "She slips inside and the shutter comes down halfway behind her",
+          "sfx": "heavy rain and a rattling metal shutter"
         },
         {
-          "n": 6, "location": "regina_study", "characters": ["Regina", "Mateo"],
-          "scene_es": "Regina sonríe: “Sin pruebas, querido, solo eres un niño con un juguete”. Mateo aprieta los puños.",
-          "visual_en": "Regina finally looks up and smiles coldly, setting the teacup down slowly. Mateo clenches his fists, jaw tight. Low angle on Regina, making her look powerful.",
-          "dialogue": [{"speaker": "Regina", "line": "Sin pruebas, querido, solo eres un niño con un juguete."}]
+          "n": 6, "location": "regina_study", "characters": ["Mateo", "Regina"],
+          "camera": "Medium shot from behind Mateo toward Regina",
+          "scene_es": "En la mansión, Mateo irrumpe en el estudio de Regina.",
+          "action_en": "Mateo bursts into the dark green study; Regina sits in a velvet armchair by the fireplace sipping tea",
+          "dialogue": { "speaker": "Mateo", "line": "¿Usaste mi clave para firmar esa orden de demolición?" },
+          "reaction_en": "Regina doesn't even look up from her tea"
         },
         {
-          "n": 7, "location": "street_bakery", "characters": ["Mateo"],
-          "scene_es": "Mateo maneja hasta Coyoacán y se sienta en el escalón de la panadería, empapado, del otro lado de la cortina cerrada.",
-          "visual_en": "Night rain. Mateo, soaked in his white shirt, sits on the bakery's front step with his back against the closed metal shutter, head lowered, rain running down his face. Warm light glows through a crack under the shutter.",
-          "dialogue": [{"speaker": "Mateo", "line": "No me voy a ir, Valentina."}]
+          "n": 7, "location": "regina_study", "characters": ["Regina", "Mateo"],
+          "camera": "Low angle on Regina",
+          "scene_es": "Regina se burla: sin pruebas, él no es nadie.",
+          "action_en": "Regina slowly sets her teacup down and finally looks up with a cold smile",
+          "dialogue": { "speaker": "Regina", "line": "Sin pruebas, querido, solo eres un niño defendiendo su juguete." },
+          "reaction_en": "Mateo clenches his fists at his sides"
         },
         {
-          "n": 8, "location": "bakery", "characters": ["Valentina", "Fernanda"],
-          "scene_es": "Tocan la puerta trasera. Valentina abre esperando a Mateo, pero es Fernanda: “Mateo no te contó por qué me dejó en el altar, ¿verdad?”.",
-          "visual_en": "Inside the bakery, a knock at the back door. Valentina opens it hopefully and her face falls: Fernanda stands there in a beige trench coat, rain dripping, a knowing smile. Close two-shot. Hard cut to black.",
-          "dialogue": [{"speaker": "Fernanda", "line": "Mateo no te contó por qué me dejó en el altar, ¿verdad?"}]
+          "n": 8, "location": "regina_study", "characters": ["Mateo", "Regina"],
+          "camera": "Close-up on Mateo",
+          "scene_es": "Mateo le advierte que va a encontrar las pruebas.",
+          "action_en": "Mateo steps closer, his voice controlled and quiet",
+          "dialogue": { "speaker": "Mateo", "line": "Entonces voy a encontrar las pruebas. Y no te va a gustar." },
+          "reaction_en": "He turns and leaves; behind him Regina's smile fades for a moment"
+        },
+        {
+          "n": 9, "location": "street_bakery", "characters": ["Mateo"],
+          "camera": "Medium shot at night in the rain",
+          "scene_es": "Mateo maneja hasta Coyoacán y se sienta en el escalón de la panadería.",
+          "action_en": "Mateo, soaked in his white shirt, sits on the bakery's front step with his back against the closed shutter",
+          "dialogue": { "speaker": "Mateo", "line": "No me voy a ir, Valentina. Aunque llueva toda la noche." },
+          "reaction_en": "He lowers his head as rain streams down his face",
+          "sfx": "steady rain on the street"
+        },
+        {
+          "n": 10, "location": "bakery", "characters": ["Valentina"],
+          "camera": "Medium close-up inside the dark bakery",
+          "scene_es": "Del otro lado de la cortina, Valentina lo escucha.",
+          "action_en": "Inside, Valentina sits on the floor leaning against the inner side of the shutter, listening",
+          "dialogue": { "speaker": "Valentina", "line": "¿Por qué sigues ahí, si me mentiste?" },
+          "reaction_en": "She presses her palm against the metal shutter and closes her eyes"
+        },
+        {
+          "n": 11, "location": "bakery", "characters": ["Valentina", "Fernanda"],
+          "camera": "Medium shot toward the back door",
+          "scene_es": "Tocan la puerta trasera. Valentina abre esperando a Mateo… pero es Fernanda.",
+          "action_en": "A knock at the back door; Valentina opens it hopefully and her face falls when she sees Fernanda in a wet trench coat",
+          "dialogue": { "speaker": "Valentina", "line": "¿Fernanda? ¿Qué haces aquí a esta hora?" },
+          "reaction_en": "Valentina holds the door half open, guarded",
+          "sfx": "three knocks on a wooden door"
+        },
+        {
+          "n": 12, "location": "bakery", "characters": ["Fernanda", "Valentina"],
+          "camera": "Close-up on Fernanda",
+          "scene_es": "Fernanda sonríe: “Mateo no te contó por qué me dejó en el altar, ¿verdad?”.",
+          "action_en": "Fernanda steps closer, rain dripping from her hair, with a knowing smile",
+          "dialogue": { "speaker": "Fernanda", "line": "Mateo no te contó por qué me dejó en el altar, ¿verdad?" },
+          "reaction_en": "She holds the knowing smile, waiting"
         }
       ]
     },
@@ -455,60 +776,111 @@
         "Regina": "a silver evening gown and a pearl necklace"
       },
       "continuity": {
-        "summary": "Fernanda le cuenta a Valentina que Mateo la dejó en el altar. Al amanecer, Mateo le explica que Fernanda espiaba para Regina y le devuelve el anillo; ella se lo deja poner. En la gala, bailan y la actuación deja de serlo. Regina presenta el hotel Alcázar Coyoacán, que ocupa la manzana de Dulce Ríos. Mateo le quita el micrófono y cancela el proyecto en público.",
+        "summary": "Fernanda le cuenta a Valentina que Mateo la dejó en el altar. Al amanecer, Mateo le explica que Fernanda espiaba para Regina y le devuelve el anillo. En la gala bailan y la actuación deja de serlo. Regina presenta el hotel Alcázar Coyoacán, que ocupa la manzana de Dulce Ríos. Mateo le quita el micrófono y cancela el proyecto en público.",
         "last_cliffhanger": "Regina le susurra a Mateo que acaba de declararle la guerra.",
         "pending_state": "Regina va a contraatacar contra el matrimonio."
       },
       "shots": [
         {
           "n": 1, "location": "bakery", "characters": ["Fernanda", "Valentina"],
-          "wardrobe": {"Valentina": "an oversized soft gray cardigan over a simple white cotton dress"},
-          "scene_es": "Fernanda cuenta su versión: hace dos años, Mateo la dejó plantada en el altar frente a quinientos invitados. “A ti también te va a usar”.",
-          "visual_en": "Night in the bakery. Fernanda sits at a small table speaking with wounded eyes while Valentina stands listening, arms crossed, conflicted. Rain streaks the window behind them.",
-          "dialogue": [{"speaker": "Fernanda", "line": "Me dejó en el altar frente a quinientas personas. A ti también te va a usar."}]
+          "camera": "Medium two-shot at a small table",
+          "wardrobe": { "Valentina": "an oversized soft gray cardigan over a simple white cotton dress" },
+          "scene_es": "Fernanda cuenta su versión: Mateo la dejó plantada en el altar.",
+          "action_en": "Fernanda sits at a small table speaking with wounded eyes while Valentina stands listening, arms crossed",
+          "dialogue": { "speaker": "Fernanda", "line": "Me dejó plantada frente a quinientos invitados. Sin una sola explicación." },
+          "reaction_en": "Fernanda looks down at her hands, eyes glistening"
         },
         {
-          "n": 2, "location": "street_bakery", "characters": ["Valentina", "Mateo"],
-          "wardrobe": {"Valentina": "an oversized soft gray cardigan over a simple white cotton dress", "Mateo": "a soaked white dress shirt with rolled-up sleeves and black trousers"},
-          "scene_es": "Al amanecer, Mateo sigue en el escalón: “Fernanda espiaba para Regina. Por eso cancelé la boda”. Le ofrece el anillo y Valentina se lo deja poner.",
-          "visual_en": "Dawn, the rain has stopped. Valentina lifts the shutter: Mateo is still on the step, exhausted and soaked. He stands, speaks honestly and holds out the wedding ring on his palm. After a long beat, she lets him slide it onto her finger.",
-          "dialogue": [{"speaker": "Mateo", "line": "Fernanda espiaba para Regina. Por eso cancelé la boda."}]
+          "n": 2, "location": "bakery", "characters": ["Fernanda", "Valentina"],
+          "camera": "Close-up on Fernanda",
+          "wardrobe": { "Valentina": "an oversized soft gray cardigan over a simple white cotton dress" },
+          "scene_es": "Y le advierte: “A ti también te va a usar”.",
+          "action_en": "Fernanda stands and leans toward Valentina, speaking in a low voice",
+          "dialogue": { "speaker": "Fernanda", "line": "Él usa a la gente, Valentina. A ti también te va a usar." },
+          "reaction_en": "Fernanda turns and walks out through the back door"
         },
         {
-          "n": 3, "location": "gala", "characters": ["Valentina", "Mateo"],
-          "scene_es": "Una semana después, gala anual de Grupo Alcázar. Valentina entra del brazo de Mateo con un vestido azul medianoche. Todos voltean.",
-          "visual_en": "The grand ballroom. Valentina enters on Mateo's arm in her midnight-blue gown. Guests turn their heads and whisper. Mateo looks at her with quiet pride. Wide crane shot descending toward them.",
-          "dialogue": []
+          "n": 3, "location": "street_bakery", "characters": ["Mateo", "Valentina"],
+          "camera": "Medium two-shot at dawn",
+          "wardrobe": { "Valentina": "an oversized soft gray cardigan over a simple white cotton dress", "Mateo": "a damp white dress shirt with rolled-up sleeves and black trousers" },
+          "scene_es": "Al amanecer, Valentina sube la cortina. Mateo sigue ahí y le cuenta la verdad.",
+          "action_en": "At dawn after the rain, Valentina lifts the shutter; Mateo, exhausted, stands up from the step and faces her",
+          "dialogue": { "speaker": "Mateo", "line": "Fernanda espiaba para Regina. Por eso cancelé la boda." },
+          "reaction_en": "Valentina studies his face in silence"
         },
         {
-          "n": 4, "location": "gala", "characters": ["Valentina", "Mateo"],
-          "scene_es": "Bailan. “¿Esto también es para el público?”, pregunta ella. “Ya no lo sé”, responde él.",
-          "visual_en": "Valentina and Mateo slow dance in the center of the ballroom, foreheads close. Soft spotlight, other couples blurred. Their eyes lock and the pretense melts away. Slow orbit.",
-          "dialogue": [{"speaker": "Valentina", "line": "¿Esto también es para el público?"}, {"speaker": "Mateo", "line": "Ya no lo sé."}]
+          "n": 4, "location": "street_bakery", "characters": ["Mateo", "Valentina"],
+          "camera": "Close-up on their hands, then their faces",
+          "wardrobe": { "Valentina": "an oversized soft gray cardigan over a simple white cotton dress", "Mateo": "a damp white dress shirt with rolled-up sleeves and black trousers" },
+          "scene_es": "Mateo le devuelve el anillo. Ella se lo deja poner.",
+          "action_en": "Mateo holds out the wedding ring on his open palm",
+          "dialogue": { "speaker": "Mateo", "line": "No te pido que me creas hoy. Solo que no te rindas." },
+          "reaction_en": "After a long beat, she lets him slide the ring onto her finger"
         },
         {
-          "n": 5, "location": "gala", "characters": ["Regina"],
-          "scene_es": "Regina sube al escenario: “Esta noche presentamos nuestro nuevo hotel: Alcázar Coyoacán”. Detrás de ella se enciende la pantalla gigante.",
-          "visual_en": "Regina steps onto the stage and speaks into the microphone with a triumphant smile. Behind her, the huge screen lights up with an architectural rendering of a luxury hotel tower. Guests applaud.",
-          "dialogue": [{"speaker": "Regina", "line": "Esta noche presentamos nuestro nuevo hotel: Alcázar Coyoacán."}]
+          "n": 5, "location": "gala", "characters": ["Valentina", "Mateo"],
+          "camera": "Wide crane shot descending toward the couple",
+          "scene_es": "Una semana después, gala de Grupo Alcázar. Todos voltean a verlos.",
+          "action_en": "Valentina enters the ballroom on Mateo's arm in her midnight-blue gown as nearby guests turn their heads",
+          "dialogue": { "speaker": "Valentina", "line": "Todos nos están mirando, Mateo." },
+          "reaction_en": "Mateo squeezes her hand proudly"
         },
         {
-          "n": 6, "location": "gala", "characters": ["Valentina", "Mateo"],
-          "scene_es": "En el plano, el hotel ocupa la manzana completa, incluida Dulce Ríos. Valentina suelta la mano de Mateo.",
-          "visual_en": "Close-up on the big screen: a map where a small blue bakery is highlighted and then replaced by the hotel tower. Cut to Valentina, devastated, slowly pulling her hand away from Mateo's while the guests applaud around her.",
-          "dialogue": []
+          "n": 6, "location": "gala", "characters": ["Mateo", "Valentina"],
+          "camera": "Close-up on Mateo",
+          "scene_es": "Él no la suelta: “Esta noche eres la mujer más hermosa del salón”.",
+          "action_en": "Mateo looks at her with quiet admiration",
+          "dialogue": { "speaker": "Mateo", "line": "Que miren. Esta noche eres la mujer más hermosa del salón." },
+          "reaction_en": "Valentina blushes and looks away, smiling"
         },
         {
-          "n": 7, "location": "gala", "characters": ["Mateo", "Regina"],
-          "scene_es": "Mateo sube al escenario y le quita el micrófono a Regina: “Este proyecto queda cancelado. Como presidente, lo cancelo yo”.",
-          "visual_en": "Mateo strides onto the stage and takes the microphone from Regina's hand. The applause dies. He faces the crowd firmly. Regina's smile freezes. Low-angle shot.",
-          "dialogue": [{"speaker": "Mateo", "line": "Este proyecto queda cancelado. Como presidente, lo cancelo yo."}]
+          "n": 7, "location": "gala", "characters": ["Valentina", "Mateo"],
+          "camera": "Slow orbit around the dancing couple",
+          "scene_es": "Bailan. Ella le pregunta si eso también es para el público.",
+          "action_en": "Valentina and Mateo slow dance in the center of the ballroom, foreheads close",
+          "dialogue": { "speaker": "Valentina", "line": "¿Esto también es para el público, señor Contrato?" },
+          "reaction_en": "Their foreheads draw even closer as they keep swaying"
         },
         {
-          "n": 8, "location": "gala", "characters": ["Regina", "Mateo"],
-          "scene_es": "Entre flashes, Regina se le acerca al oído con una sonrisa perfecta para las cámaras: “Acabas de declararme la guerra, Mateo”.",
-          "visual_en": "Camera flashes pop. Regina leans close to Mateo's ear, smiling for the cameras while her eyes stay pure ice. Mateo does not flinch. Extreme close-up on Regina's lips and eyes. Hard cut to black.",
-          "dialogue": [{"speaker": "Regina", "line": "Acabas de declararme la guerra, Mateo."}]
+          "n": 8, "location": "gala", "characters": ["Mateo", "Valentina"],
+          "camera": "Tight close-up on Mateo",
+          "scene_es": "“Ya no lo sé”, responde él. La actuación se derrite.",
+          "action_en": "Mateo answers honestly, eyes locked on hers",
+          "dialogue": { "speaker": "Mateo", "line": "Ya no lo sé, Valentina. Ya no lo sé." },
+          "reaction_en": "They keep swaying slowly, the pretense melting away"
+        },
+        {
+          "n": 9, "location": "gala", "characters": ["Regina"],
+          "camera": "Low angle on the stage",
+          "scene_es": "Regina sube al escenario y presenta el nuevo hotel: Alcázar Coyoacán.",
+          "action_en": "Regina stands on the stage at the microphone as the huge screen behind her lights up with a rendering of a luxury hotel tower",
+          "dialogue": { "speaker": "Regina", "line": "Esta noche presentamos nuestro nuevo hotel: Alcázar Coyoacán." },
+          "reaction_en": "Regina smiles triumphantly as applause fills the room",
+          "sfx": "polite applause"
+        },
+        {
+          "n": 10, "location": "gala", "characters": ["Valentina", "Mateo"],
+          "camera": "Close-up on Valentina, the screen glowing behind her",
+          "scene_es": "En el plano, el hotel ocupa la manzana completa… incluida Dulce Ríos.",
+          "action_en": "Valentina looks up at the screen, realizes what it shows, and slowly pulls her hand away from Mateo's",
+          "dialogue": { "speaker": "Valentina", "line": "Es mi calle... Ese hotel va encima de mi panadería." },
+          "reaction_en": "She stands frozen, devastated, as the applause continues around her"
+        },
+        {
+          "n": 11, "location": "gala", "characters": ["Mateo", "Regina"],
+          "camera": "Low angle on the stage",
+          "scene_es": "Mateo sube y le quita el micrófono a Regina: el proyecto queda cancelado.",
+          "action_en": "Mateo steps onto the stage, takes the microphone from Regina's hand and faces the room",
+          "dialogue": { "speaker": "Mateo", "line": "Este proyecto queda cancelado. Como presidente, lo cancelo yo." },
+          "reaction_en": "The applause dies; Regina's smile freezes beside him"
+        },
+        {
+          "n": 12, "location": "gala", "characters": ["Regina", "Mateo"],
+          "camera": "Extreme close-up on Regina",
+          "scene_es": "Entre flashes, Regina le susurra al oído: “Acabas de declararme la guerra”.",
+          "action_en": "Camera flashes pop as Regina leans close to Mateo's ear, smiling for the cameras",
+          "dialogue": { "speaker": "Regina", "line": "Acabas de declararme la guerra, Mateo." },
+          "reaction_en": "Her smile stays perfect while her eyes remain pure ice"
         }
       ]
     },
@@ -521,60 +893,110 @@
       },
       "continuity": {
         "summary": "Regina acusa ante el consejo que el matrimonio es un fraude. El consejo entrevistará a los esposos por separado. Esa noche estudian en la cocina: Mateo demuestra que conoce detalles íntimos de Valentina. Hornean juntos, ríen y casi se besan.",
-        "last_cliffhanger": "El investigador de Regina le entrega una copia del contrato matrimonial firmado.",
-        "pending_state": "La votación del consejo es mañana y Regina tiene el contrato."
+        "last_cliffhanger": "Regina recibe una copia del contrato matrimonial firmado y promete que Mateo lo perderá todo.",
+        "pending_state": "La votación es mañana y Regina tiene el contrato."
       },
       "shots": [
         {
           "n": 1, "location": "boardroom", "characters": ["Regina", "Mateo"],
-          "wardrobe": {"Mateo": "a tailored charcoal-gray three-piece suit, a white shirt with no tie, and a silver watch"},
-          "scene_es": "Al día siguiente, Regina golpea la mesa del consejo: “Este matrimonio es un fraude. Exijo una votación”.",
-          "visual_en": "Regina stands and slams a folder onto the glass table. Board members murmur. Mateo sits back calmly, but his eyes are sharp. Medium-wide shot.",
-          "dialogue": [{"speaker": "Regina", "line": "Este matrimonio es un fraude. Exijo una votación."}]
+          "camera": "Medium-wide shot down the table",
+          "wardrobe": { "Mateo": "a tailored charcoal-gray three-piece suit, a white shirt with no tie, and a silver watch" },
+          "scene_es": "Regina golpea la mesa del consejo: el matrimonio es un fraude.",
+          "action_en": "Regina stands and sets a folder down firmly on the glass table while Mateo sits back calmly",
+          "dialogue": { "speaker": "Regina", "line": "Este matrimonio es un fraude. Exijo una votación para destituirlo." },
+          "reaction_en": "The board members murmur; Mateo's eyes stay sharp"
         },
         {
           "n": 2, "location": "boardroom", "characters": ["Mateo"],
-          "wardrobe": {"Mateo": "a tailored charcoal-gray three-piece suit, a white shirt with no tie, and a silver watch"},
-          "scene_es": "El consejo decide: entrevistarán a los esposos por separado. Si sus respuestas no coinciden, Mateo pierde la presidencia.",
-          "visual_en": "A gray-haired board member speaks to Mateo across the table. Mateo nods slowly and a confident half-smile appears. Medium shot.",
-          "dialogue": [{"speaker": "Consejero", "line": "Los entrevistaremos por separado. Si no coinciden, pierde la presidencia."}]
+          "camera": "Medium shot of Mateo across the table",
+          "wardrobe": { "Mateo": "a tailored charcoal-gray three-piece suit, a white shirt with no tie, and a silver watch" },
+          "scene_es": "El consejo decide entrevistar a los esposos por separado.",
+          "action_en": "The gray-haired board member speaks to Mateo across the table",
+          "dialogue": { "speaker": "Consejero", "line": "Los entrevistaremos por separado. Si no coinciden, pierde la presidencia." },
+          "reaction_en": "Mateo nods slowly with a confident half-smile"
         },
         {
           "n": 3, "location": "mansion_kitchen", "characters": ["Valentina", "Mateo"],
-          "scene_es": "Esa noche estudian en la cocina como para un examen. “¿Mi color favorito?”. “Amarillo mostaza. Como tu suéter del primer día”.",
-          "visual_en": "Night. Valentina sits on the marble island holding index cards while Mateo leans against the counter. She quizzes him and he answers instantly. She lowers the cards, surprised. Warm pendant light.",
-          "dialogue": [{"speaker": "Valentina", "line": "¿Mi color favorito?"}, {"speaker": "Mateo", "line": "Amarillo mostaza. Como tu suéter del primer día."}]
+          "camera": "Medium two-shot at the kitchen island",
+          "scene_es": "Esa noche estudian en la cocina como para un examen.",
+          "action_en": "Valentina sits on the marble island holding index cards while Mateo leans against the counter",
+          "dialogue": { "speaker": "Valentina", "line": "Pregunta uno: ¿cuál es mi color favorito?" },
+          "reaction_en": "She raises an eyebrow, waiting"
         },
         {
-          "n": 4, "location": "mansion_kitchen", "characters": ["Valentina", "Mateo"],
-          "scene_es": "“¿Y qué hago cuando estoy nerviosa?”. “Tarareas cuando amasas. Y te tocas el lunar”. Valentina se queda callada: él sí le ponía atención.",
-          "visual_en": "Mateo steps closer and gently points near the small beauty mark under her left eye. Valentina's breath catches as she realizes he has been paying attention. Tight two-shot, soft background.",
-          "dialogue": [{"speaker": "Mateo", "line": "Tarareas cuando amasas. Y te tocas el lunar."}]
+          "n": 4, "location": "mansion_kitchen", "characters": ["Mateo", "Valentina"],
+          "camera": "Close-up on Mateo",
+          "scene_es": "Él responde sin dudar: amarillo mostaza, como su suéter del primer día.",
+          "action_en": "Mateo answers instantly with a small confident smile",
+          "dialogue": { "speaker": "Mateo", "line": "Amarillo mostaza. Como tu suéter del día que nos conocimos." },
+          "reaction_en": "Valentina lowers the cards, surprised"
         },
         {
           "n": 5, "location": "mansion_kitchen", "characters": ["Valentina", "Mateo"],
-          "scene_es": "Para relajarse, hornean pan juntos. Harina en la nariz, venganzas con harina y, por primera vez, risas de verdad.",
-          "visual_en": "Valentina and Mateo knead dough together. She taps flour onto his nose, he retaliates, and both burst out laughing genuinely. Flour floats in the warm light. Playful handheld shot.",
-          "dialogue": []
+          "camera": "Close-up on Valentina",
+          "scene_es": "Ella sube la dificultad: ¿qué hace cuando está nerviosa?",
+          "action_en": "Valentina narrows her eyes playfully and holds up the next card",
+          "dialogue": { "speaker": "Valentina", "line": "Suerte. A ver esta: ¿qué hago cuando estoy nerviosa?" },
+          "reaction_en": "She crosses her arms, confident he will fail"
         },
         {
-          "n": 6, "location": "mansion_kitchen", "characters": ["Valentina", "Mateo"],
-          "scene_es": "Las risas se apagan. Están muy cerca. Mateo le limpia la harina de la mejilla y casi se besan.",
-          "visual_en": "The laughter fades. Mateo gently wipes flour off Valentina's cheek with his thumb. They lean in slowly, inches apart, eyes starting to close. Slow push-in, almost a kiss.",
-          "dialogue": []
+          "n": 6, "location": "mansion_kitchen", "characters": ["Mateo", "Valentina"],
+          "camera": "Tight two-shot",
+          "scene_es": "Mateo señala su lunar: “Tarareas cuando amasas. Y te tocas este lunar”.",
+          "action_en": "Mateo steps closer and gently points near the small beauty mark under her left eye",
+          "dialogue": { "speaker": "Mateo", "line": "Tarareas cuando amasas. Y te tocas este lunar." },
+          "reaction_en": "Valentina's breath catches; she stays very still"
         },
         {
           "n": 7, "location": "mansion_kitchen", "characters": ["Valentina", "Mateo"],
-          "scene_es": "Un celular vibra sobre la isla y rompe el momento. Valentina se aparta nerviosa: “Mañana nos va a ir bien... creo”.",
-          "visual_en": "A phone buzzes loudly on the marble island. They jump apart. Valentina, flustered, tucks hair behind her ear and backs away smiling nervously. Mateo exhales, frustrated and charmed.",
-          "dialogue": [{"speaker": "Valentina", "line": "Mañana nos va a ir bien... creo."}]
+          "camera": "Close-up on Valentina",
+          "scene_es": "Ella se da cuenta de que él le ha puesto atención todo este tiempo.",
+          "action_en": "Valentina looks at him with new eyes, a little flustered",
+          "dialogue": { "speaker": "Valentina", "line": "¿Desde cuándo me pones tanta atención, Mateo Alcázar?" },
+          "reaction_en": "Mateo looks away, embarrassed, and rubs the back of his neck"
         },
         {
-          "n": 8, "location": "regina_study", "characters": ["Regina"],
-          "wardrobe": {"Regina": "a dark burgundy silk robe"},
-          "scene_es": "En su estudio, Regina abre un sobre de su investigador. Saca una copia del contrato matrimonial firmado: “Se acabó el juego, querido”.",
-          "visual_en": "Firelight. Regina opens a manila envelope and pulls out a copy of a signed contract, reading it with a slow, victorious smile. Close-up on her eyes. Hard cut to black.",
-          "dialogue": [{"speaker": "Regina", "line": "Se acabó el juego, querido."}]
+          "n": 8, "location": "mansion_kitchen", "characters": ["Mateo", "Valentina"],
+          "camera": "Playful handheld medium shot",
+          "scene_es": "Para relajarse hornean juntos. Ella le pone harina en la nariz.",
+          "action_en": "They knead dough together; Valentina taps flour onto Mateo's nose and he laughs",
+          "dialogue": { "speaker": "Mateo", "line": "¡Oye! Esto es la guerra, señora panadera." },
+          "reaction_en": "They both laugh genuinely, flour floating in the warm light"
+        },
+        {
+          "n": 9, "location": "mansion_kitchen", "characters": ["Valentina", "Mateo"],
+          "camera": "Slow push-in, almost a kiss",
+          "scene_es": "Las risas se apagan. Están muy cerca. Casi se besan.",
+          "action_en": "The laughter fades; Mateo gently wipes flour off Valentina's cheek with his thumb and they lean in slowly",
+          "dialogue": null,
+          "reaction_en": "They stay inches apart, eyes starting to close"
+        },
+        {
+          "n": 10, "location": "mansion_kitchen", "characters": ["Valentina", "Mateo"],
+          "camera": "Medium two-shot",
+          "scene_es": "Un celular vibra y rompe el momento. Ella se aparta nerviosa.",
+          "action_en": "A phone buzzes loudly on the island; they jump apart and Valentina tucks hair behind her ear",
+          "dialogue": { "speaker": "Valentina", "line": "Mañana... mañana nos va a ir muy bien, ¿verdad?" },
+          "reaction_en": "Mateo exhales, frustrated and charmed, and just nods",
+          "sfx": "a phone buzzing on marble"
+        },
+        {
+          "n": 11, "location": "regina_study", "characters": ["Regina"],
+          "camera": "Close-up on Regina by the fire",
+          "wardrobe": { "Regina": "a dark burgundy silk robe" },
+          "scene_es": "En su estudio, Regina abre un sobre: es una copia del contrato matrimonial.",
+          "action_en": "Regina opens a manila envelope and pulls out a signed contract, reading it in the firelight",
+          "dialogue": { "speaker": "Regina", "line": "Seis meses, cuartos separados... qué romántico." },
+          "reaction_en": "A slow victorious smile spreads across her face"
+        },
+        {
+          "n": 12, "location": "regina_study", "characters": ["Regina"],
+          "camera": "Slow push-in on Regina's eyes",
+          "wardrobe": { "Regina": "a dark burgundy silk robe" },
+          "scene_es": "Regina sentencia: “Se acabó el juego, querido. Mañana lo pierdes todo”.",
+          "action_en": "Regina sets the contract on her lap and looks into the fire",
+          "dialogue": { "speaker": "Regina", "line": "Se acabó el juego, querido. Mañana lo pierdes todo." },
+          "reaction_en": "She stays perfectly still, eyes cold, the fire reflected in them"
         }
       ]
     },
@@ -585,58 +1007,108 @@
         "Valentina": "an elegant white silk blouse tucked into a tailored black high-waisted skirt, hair in a low ponytail"
       },
       "continuity": {
-        "summary": "Regina proyecta el contrato frente al consejo. Valentina se pone de pie y confiesa que violó la cláusula: se enamoró de Mateo. La votación se pospone. En el mismo elevador donde se conocieron, Mateo le pregunta si era verdad y se besan sin cámaras.",
+        "summary": "Regina proyecta el contrato ante el consejo. Valentina se pone de pie y confiesa que violó la cláusula: se enamoró de Mateo. La votación se pospone. En el elevador donde se conocieron, Mateo le pregunta si era verdad y se besan sin cámaras.",
         "last_cliffhanger": "Fernanda lee un resultado de ADN y descubre que Valentina es su hermana.",
-        "pending_state": "Regina perdió la votación por ahora y está furiosa. Nadie más sabe lo del ADN."
+        "pending_state": "Regina perdió esta ronda y está furiosa. Nadie más sabe lo del ADN."
       },
       "shots": [
         {
-          "n": 1, "location": "boardroom", "characters": ["Regina", "Mateo", "Valentina"],
-          "scene_es": "Votación. Regina proyecta el contrato en la pantalla: “Seis meses, cuartos separados. Esto no es un matrimonio, es un negocio”.",
-          "visual_en": "Regina stands beside the large wall screen displaying a signed document. Board members gasp. Mateo and Valentina sit side by side, frozen. Wide shot.",
-          "dialogue": [{"speaker": "Regina", "line": "Esto no es un matrimonio. Es un negocio."}]
+          "n": 1, "location": "boardroom", "characters": ["Regina"],
+          "camera": "Medium shot of Regina beside the wall screen",
+          "scene_es": "Votación. Regina muestra el contrato frente a todo el consejo.",
+          "action_en": "Regina stands beside the large wall screen, which glows with a document page, and addresses the board",
+          "dialogue": { "speaker": "Regina", "line": "Seis meses, cuartos separados. Esto no es un matrimonio, es un negocio." },
+          "reaction_en": "She folds her arms as the board members gasp"
         },
         {
           "n": 2, "location": "boardroom", "characters": ["Mateo", "Valentina"],
-          "scene_es": "Los consejeros murmuran. Mateo cierra los ojos: lo va a perder todo. Valentina lo mira y toma una decisión.",
-          "visual_en": "Close-up on Mateo closing his eyes in defeat. Rack focus to Valentina beside him, her expression shifting from fear to resolve. She places her hand on the table and slowly begins to rise.",
-          "dialogue": []
+          "camera": "Close-up on Mateo, rack focus to Valentina",
+          "scene_es": "Mateo cierra los ojos: lo va a perder todo.",
+          "action_en": "Mateo closes his eyes in defeat and whispers to Valentina beside him",
+          "dialogue": { "speaker": "Mateo", "line": "Lo siento, Valentina. Se acabó." },
+          "reaction_en": "Valentina's expression shifts slowly from fear to resolve"
         },
         {
           "n": 3, "location": "boardroom", "characters": ["Valentina"],
-          "scene_es": "Valentina se pone de pie: “Sí, firmamos un contrato. Y yo violé una cláusula”.",
-          "visual_en": "Valentina stands and faces the board, voice steady, hands trembling slightly. All eyes are on her. Low angle with dramatic window light behind her.",
-          "dialogue": [{"speaker": "Valentina", "line": "Sí, firmamos un contrato. Y yo violé una cláusula."}]
+          "camera": "Low angle, window light behind her",
+          "scene_es": "Valentina se pone de pie y lo admite: sí firmaron un contrato.",
+          "action_en": "Valentina stands up and faces the board, voice steady",
+          "dialogue": { "speaker": "Valentina", "line": "Sí. Firmamos un contrato. No lo voy a negar." },
+          "reaction_en": "All eyes stay on her as she takes a breath"
         },
         {
-          "n": 4, "location": "boardroom", "characters": ["Valentina", "Mateo"],
-          "scene_es": "Mira a Mateo: “Decía que nadie se enamoraba. Yo me enamoré de él”. Mateo la mira como si el mundo se detuviera.",
-          "visual_en": "Valentina turns to look directly at Mateo. He looks up at her, stunned, eyes glistening, as if the world has stopped. Alternating close-ups, board members blurred in the background.",
-          "dialogue": [{"speaker": "Valentina", "line": "Decía que nadie se enamoraba. Yo me enamoré de él."}]
+          "n": 4, "location": "boardroom", "characters": ["Valentina"],
+          "camera": "Medium close-up, static camera",
+          "scene_es": "Pero ella violó una cláusula. La más importante.",
+          "action_en": "Valentina places both hands on the glass table and looks around the room",
+          "dialogue": { "speaker": "Valentina", "line": "Pero yo violé una cláusula. La más importante de todas." },
+          "reaction_en": "She pauses, hands trembling slightly on the table"
         },
         {
-          "n": 5, "location": "boardroom", "characters": ["Regina"],
-          "scene_es": "El consejo pospone la votación. Regina aprieta su pluma con tanta fuerza que la parte en dos.",
-          "visual_en": "Board members nod and close their folders. Close-up on Regina's hand gripping a fountain pen until it snaps in half and ink stains her fingers. Her face stays perfectly composed.",
-          "dialogue": []
+          "n": 5, "location": "boardroom", "characters": ["Valentina", "Mateo"],
+          "camera": "Over-the-shoulder from Mateo toward Valentina",
+          "scene_es": "Lo mira: “Decía que nadie se enamoraba. Y yo me enamoré de él”.",
+          "action_en": "Valentina turns and looks directly at Mateo",
+          "dialogue": { "speaker": "Valentina", "line": "Decía que nadie se enamoraba. Y yo me enamoré de él." },
+          "reaction_en": "Mateo looks up at her, stunned, eyes glistening"
         },
         {
-          "n": 6, "location": "elevator", "characters": ["Valentina", "Mateo"],
-          "scene_es": "En el mismo elevador donde se conocieron, Mateo rompe el silencio: “¿Era verdad?”. “¿Tú qué crees?”.",
-          "visual_en": "The mirrored elevator. Valentina and Mateo stand side by side, mirroring their first meeting. Mateo turns to her, vulnerable. She answers with a small smile. Their reflections multiply in the mirrors.",
-          "dialogue": [{"speaker": "Mateo", "line": "¿Era verdad?"}, {"speaker": "Valentina", "line": "¿Tú qué crees?"}]
+          "n": 6, "location": "boardroom", "characters": ["Mateo"],
+          "camera": "Medium shot of Mateo, board soft in the background",
+          "scene_es": "El consejo pospone la votación.",
+          "action_en": "The gray-haired board member closes his folder while Mateo keeps staring at Valentina",
+          "dialogue": { "speaker": "Consejero", "line": "La votación queda pospuesta. Tienen hasta fin de mes." },
+          "reaction_en": "Mateo exhales slowly, still in shock"
         },
         {
-          "n": 7, "location": "elevator", "characters": ["Valentina", "Mateo"],
-          "scene_es": "Mateo detiene el elevador y la besa. Esta vez sin cámaras, sin público y sin contrato.",
-          "visual_en": "Mateo presses the stop button; the elevator halts with a soft jolt and the lights dim. He takes her face in his hands and kisses her deeply. She melts into the kiss. Slow orbit, warm light.",
-          "dialogue": []
+          "n": 7, "location": "boardroom", "characters": ["Regina"],
+          "camera": "Close-up on Regina's hand, then her face",
+          "scene_es": "Regina aprieta su pluma hasta partirla en dos.",
+          "action_en": "Regina grips a fountain pen until it snaps in half and ink stains her hand, while her face stays composed",
+          "dialogue": { "speaker": "Regina", "line": "Muy conmovedor, panadera. Muy conmovedor." },
+          "reaction_en": "She stares straight ahead, perfectly still",
+          "sfx": "a pen snapping"
         },
         {
-          "n": 8, "location": "tower_hallway", "characters": ["Fernanda"],
-          "scene_es": "En el pasillo, Fernanda abre un sobre del laboratorio. Lee el resultado de ADN y se le cae de las manos: “No puede ser... somos hermanas”.",
-          "visual_en": "In the glass corridor, Fernanda tears open an envelope and reads a lab report. Her face drains of color and the paper slips from her fingers, floating to the floor. Extreme close-up on her shocked eyes. Hard cut to black.",
-          "dialogue": [{"speaker": "Fernanda", "line": "No puede ser... somos hermanas."}]
+          "n": 8, "location": "elevator", "characters": ["Mateo", "Valentina"],
+          "camera": "Two-shot, static camera",
+          "scene_es": "En el mismo elevador donde se conocieron, Mateo rompe el silencio.",
+          "action_en": "Inside the elevator, side by side as on the day they met, Mateo turns to Valentina, vulnerable",
+          "dialogue": { "speaker": "Mateo", "line": "¿Era verdad? ¿Lo que dijiste allá adentro?" },
+          "reaction_en": "He waits, barely breathing"
+        },
+        {
+          "n": 9, "location": "elevator", "characters": ["Valentina", "Mateo"],
+          "camera": "Close-up on Valentina",
+          "scene_es": "Ella sonríe: “¿Tú qué crees, señor Contrato?”.",
+          "action_en": "Valentina turns to him with a small, tender smile",
+          "dialogue": { "speaker": "Valentina", "line": "¿Tú qué crees, señor Contrato?" },
+          "reaction_en": "She holds his gaze, smiling"
+        },
+        {
+          "n": 10, "location": "elevator", "characters": ["Mateo", "Valentina"],
+          "camera": "Slow orbit, warm light",
+          "scene_es": "Mateo detiene el elevador y la besa. Sin cámaras, sin público, sin contrato.",
+          "action_en": "Mateo presses the stop button; the elevator halts gently and the lights dim as he takes her face in his hands and kisses her deeply",
+          "dialogue": null,
+          "reaction_en": "They stay in the kiss, foreheads touching afterwards",
+          "sfx": "a soft elevator jolt"
+        },
+        {
+          "n": 11, "location": "tower_hallway", "characters": ["Fernanda"],
+          "camera": "Medium close-up in the corridor",
+          "scene_es": "En el pasillo, Fernanda abre un sobre de laboratorio.",
+          "action_en": "Fernanda nervously tears open a lab envelope and pulls out a single folded report",
+          "dialogue": { "speaker": "Fernanda", "line": "El resultado de ADN... por fin." },
+          "reaction_en": "She hesitates before unfolding it, hands unsteady"
+        },
+        {
+          "n": 12, "location": "tower_hallway", "characters": ["Fernanda"],
+          "camera": "Extreme close-up on her eyes",
+          "scene_es": "Lo lee y se le cae de las manos: “Valentina es mi hermana”.",
+          "action_en": "Fernanda reads the report; her face drains of color and the paper slips from her grasp to the floor",
+          "dialogue": { "speaker": "Fernanda", "line": "No puede ser... Valentina es mi hermana." },
+          "reaction_en": "She stays frozen, staring at nothing"
         }
       ]
     },
@@ -649,58 +1121,109 @@
         "Fernanda": "a beige trench coat over a black turtleneck dress"
       },
       "continuity": {
-        "summary": "Fernanda visita Dulce Ríos y mira la foto de Rosa demasiado tiempo; Valentina le regala una concha. Regina obliga a Fernanda a sembrar el broche de diamantes de la familia en la bolsa de Valentina, amenazándola con revelar lo que hizo su padre con las cuentas del esposo de Regina. En el almuerzo del domingo, el broche aparece en la bolsa de Valentina.",
-        "last_cliffhanger": "Mateo duda un segundo y le pregunta a Valentina por qué estaba el broche en su bolsa.",
+        "summary": "Fernanda visita Dulce Ríos y pregunta por la foto de Rosa; Valentina le regala una concha. Regina obliga a Fernanda a sembrar el broche de la familia en la bolsa de Valentina, amenazándola con revelar lo que hizo su padre con las cuentas del esposo de Regina. En el almuerzo del domingo, el broche aparece en la bolsa de Valentina.",
+        "last_cliffhanger": "Mateo duda y le pregunta a Valentina por qué estaba el broche en su bolsa.",
         "pending_state": "Valentina está herida por la duda de Mateo. Fernanda carga con la culpa."
       },
       "shots": [
         {
           "n": 1, "location": "bakery", "characters": ["Fernanda", "Valentina"],
-          "scene_es": "Fernanda entra a Dulce Ríos por primera vez. Se queda mirando la foto de Rosa mucho más tiempo de lo normal.",
-          "visual_en": "Morning in the bakery. Fernanda enters hesitantly, removes her sunglasses and stares at the framed photo of the smiling woman on the wall, emotion trembling under the surface. Valentina watches from behind the counter, puzzled.",
-          "dialogue": []
+          "camera": "Medium shot from behind the counter",
+          "wardrobe": { "Valentina": "a mustard-yellow cardigan over a white t-shirt, a light-blue apron dusted with flour, and jeans" },
+          "scene_es": "Fernanda entra a Dulce Ríos y se queda mirando la foto de Rosa.",
+          "action_en": "Fernanda enters hesitantly, removes her sunglasses and stares at the framed photo of the smiling woman on the wall",
+          "dialogue": { "speaker": "Fernanda", "line": "Esa mujer de la foto... ¿es tu mamá?" },
+          "reaction_en": "Fernanda keeps staring at the photo, emotion trembling under the surface"
         },
         {
           "n": 2, "location": "bakery", "characters": ["Valentina", "Fernanda"],
-          "scene_es": "Valentina, desconfiada pero amable, le regala una concha: “Mi mamá decía que nadie se va triste de aquí”. Fernanda casi llora.",
-          "visual_en": "Valentina hands Fernanda a concha wrapped in paper with a cautious, kind smile. Fernanda takes it, her lip trembling, unable to speak. Close two-shot across the counter.",
-          "dialogue": [{"speaker": "Valentina", "line": "Mi mamá decía que nadie se va triste de aquí."}]
+          "camera": "Close-up on Valentina",
+          "wardrobe": { "Valentina": "a mustard-yellow cardigan over a white t-shirt, a light-blue apron dusted with flour, and jeans" },
+          "scene_es": "Valentina, desconfiada pero amable, le habla de su madre.",
+          "action_en": "Valentina glances at the photo tenderly, then back at Fernanda",
+          "dialogue": { "speaker": "Valentina", "line": "Sí. Rosa Ríos. Hizo esta panadería con sus propias manos." },
+          "reaction_en": "She smiles softly at the photo"
         },
         {
-          "n": 3, "location": "regina_study", "characters": ["Regina", "Fernanda"],
-          "scene_es": "Regina pone en la mano de Fernanda el broche de diamantes de la familia: “En el almuerzo del domingo, lo metes en la bolsa de la panadera”.",
-          "visual_en": "Regina places a sparkling antique diamond brooch into Fernanda's palm and closes her fingers around it. Fernanda looks down at it, conflicted. Firelight, ominous mood.",
-          "dialogue": [{"speaker": "Regina", "line": "El domingo, lo metes en la bolsa de la panadera."}]
+          "n": 3, "location": "bakery", "characters": ["Valentina", "Fernanda"],
+          "camera": "Close two-shot across the counter",
+          "wardrobe": { "Valentina": "a mustard-yellow cardigan over a white t-shirt, a light-blue apron dusted with flour, and jeans" },
+          "scene_es": "Le regala una concha: nadie se va triste de ahí.",
+          "action_en": "Valentina hands Fernanda a concha wrapped in paper with a cautious, kind smile",
+          "dialogue": { "speaker": "Valentina", "line": "Ten, invita la casa. Mi mamá decía que nadie se va triste de aquí." },
+          "reaction_en": "Fernanda takes it, lip trembling, unable to speak"
         },
         {
-          "n": 4, "location": "regina_study", "characters": ["Fernanda", "Regina"],
-          "scene_es": "“No puedo”, susurra Fernanda. Regina le levanta la barbilla: “Puedes. O todos sabrán lo que hizo tu padre con las cuentas de mi esposo”.",
-          "visual_en": "Regina lifts Fernanda's chin with one finger, cold and threatening. Fernanda's eyes fill with frightened tears. Tight close-up on both faces.",
-          "dialogue": [{"speaker": "Fernanda", "line": "No puedo."}, {"speaker": "Regina", "line": "Puedes. O todos sabrán lo que hizo tu padre."}]
+          "n": 4, "location": "regina_study", "characters": ["Regina", "Fernanda"],
+          "camera": "Medium two-shot by the fireplace",
+          "scene_es": "Esa tarde, Regina le entrega a Fernanda el broche de diamantes de la familia.",
+          "action_en": "Regina places a sparkling antique diamond brooch into Fernanda's palm and closes her hand around it",
+          "dialogue": { "speaker": "Regina", "line": "El domingo, en el almuerzo, metes esto en la bolsa de la panadera." },
+          "reaction_en": "Fernanda stares down at her closed hand, conflicted"
         },
         {
-          "n": 5, "location": "mansion_dining", "characters": ["Fernanda", "Valentina"],
-          "scene_es": "Domingo, almuerzo familiar. Fernanda pasa junto a la bolsa de Valentina y, temblando, deja caer algo adentro.",
-          "visual_en": "A sunny family lunch. While everyone talks, Fernanda walks behind the chair where Valentina's handbag hangs and, hands trembling, slips something shiny inside. Valentina laughs at the table, unaware. Over-the-shoulder shot.",
-          "dialogue": []
+          "n": 5, "location": "regina_study", "characters": ["Fernanda", "Regina"],
+          "camera": "Close-up on Fernanda",
+          "scene_es": "Fernanda se niega: Valentina no le ha hecho nada.",
+          "action_en": "Fernanda tries to hand the brooch back, shaking her head",
+          "dialogue": { "speaker": "Fernanda", "line": "No puedo, Regina. Ella... ella no me ha hecho nada." },
+          "reaction_en": "Her hand stays extended, trembling"
         },
         {
-          "n": 6, "location": "mansion_dining", "characters": ["Regina"],
-          "scene_es": "Regina se lleva la mano al pecho: “¡Mi broche! Era de la abuela de Mateo. Alguien en esta mesa lo tomó”.",
-          "visual_en": "Regina suddenly touches her lapel where a brooch should be, gasps theatrically and scans the table with accusing eyes. Everyone freezes mid-bite.",
-          "dialogue": [{"speaker": "Regina", "line": "¡Mi broche! Alguien en esta mesa lo tomó."}]
+          "n": 6, "location": "regina_study", "characters": ["Regina", "Fernanda"],
+          "camera": "Tight close-up on both faces",
+          "scene_es": "Regina la amenaza con revelar lo que hizo su padre.",
+          "action_en": "Regina lifts Fernanda's chin with one finger, cold and threatening",
+          "dialogue": { "speaker": "Regina", "line": "Puedes. O todos sabrán lo que hizo tu padre con las cuentas de mi esposo." },
+          "reaction_en": "Fernanda's eyes fill with frightened tears"
         },
         {
-          "n": 7, "location": "mansion_dining", "characters": ["Valentina", "Regina"],
-          "scene_es": "Regina abre la bolsa de Valentina y saca el broche, que brilla bajo el candil. Todos la miran. “Yo no lo tomé”.",
-          "visual_en": "Regina opens Valentina's handbag and lifts out the diamond brooch, sparkling under the chandelier. Gasps around the table. Valentina stands up, shocked, shaking her head. Medium shot.",
-          "dialogue": [{"speaker": "Valentina", "line": "Yo no lo tomé. ¡Lo juro!"}]
+          "n": 7, "location": "mansion_dining", "characters": ["Fernanda", "Valentina"],
+          "camera": "Over-the-shoulder behind the chairs",
+          "scene_es": "Domingo. Fernanda, temblando, mete el broche en la bolsa de Valentina.",
+          "action_en": "During a sunny family lunch, Fernanda walks behind the chair where Valentina's handbag hangs and slips something shiny inside",
+          "dialogue": { "speaker": "Fernanda", "line": "Perdóname... perdóname." },
+          "reaction_en": "Fernanda walks away quickly, wiping a tear, while Valentina laughs at the table, unaware"
         },
         {
-          "n": 8, "location": "mansion_dining", "characters": ["Mateo", "Valentina"],
-          "scene_es": "Mateo mira el broche y luego a Valentina. Duda un segundo de más: “¿Por qué estaba en tu bolsa?”. Ella, herida: “¿En serio me lo preguntas?”.",
-          "visual_en": "Mateo looks at the brooch, then at Valentina, a flicker of doubt in his eyes. Valentina sees that doubt and her heart visibly breaks. Extreme close-up on her wounded eyes. Hard cut to black.",
-          "dialogue": [{"speaker": "Mateo", "line": "¿Por qué estaba en tu bolsa?"}, {"speaker": "Valentina", "line": "¿En serio me lo preguntas?"}]
+          "n": 8, "location": "mansion_dining", "characters": ["Regina"],
+          "camera": "Medium close-up on Regina",
+          "scene_es": "Regina finge: “¡Mi broche! Alguien en esta mesa lo tomó”.",
+          "action_en": "Regina suddenly touches her lapel where a brooch should be and gasps theatrically",
+          "dialogue": { "speaker": "Regina", "line": "¡Mi broche! Era de la abuela de Mateo. Alguien en esta mesa lo tomó." },
+          "reaction_en": "She scans the table with accusing eyes; everyone freezes"
+        },
+        {
+          "n": 9, "location": "mansion_dining", "characters": ["Regina", "Valentina"],
+          "camera": "Medium two-shot",
+          "scene_es": "Regina abre la bolsa de Valentina y saca el broche.",
+          "action_en": "Regina opens Valentina's handbag and lifts out the diamond brooch, sparkling under the chandelier",
+          "dialogue": { "speaker": "Regina", "line": "Vaya, vaya. Miren lo que tenía la panadera." },
+          "reaction_en": "She holds the brooch up for everyone to see"
+        },
+        {
+          "n": 10, "location": "mansion_dining", "characters": ["Valentina"],
+          "camera": "Close-up on Valentina",
+          "scene_es": "Valentina se levanta: ella no lo tomó.",
+          "action_en": "Valentina stands up, shocked, shaking her head",
+          "dialogue": { "speaker": "Valentina", "line": "Yo no lo tomé. ¡Se los juro, yo no lo tomé!" },
+          "reaction_en": "She looks toward Mateo, pleading"
+        },
+        {
+          "n": 11, "location": "mansion_dining", "characters": ["Mateo", "Valentina"],
+          "camera": "Close-up on Mateo",
+          "scene_es": "Mateo mira el broche… y duda un segundo de más.",
+          "action_en": "Mateo looks at the brooch, then at Valentina, a flicker of doubt in his eyes",
+          "dialogue": { "speaker": "Mateo", "line": "Valentina... ¿por qué estaba en tu bolsa?" },
+          "reaction_en": "The doubt stays in his eyes"
+        },
+        {
+          "n": 12, "location": "mansion_dining", "characters": ["Valentina", "Mateo"],
+          "camera": "Extreme close-up on Valentina's eyes",
+          "scene_es": "Ella, herida: “¿En serio me lo estás preguntando, Mateo?”.",
+          "action_en": "Valentina sees his doubt and her heart visibly breaks",
+          "dialogue": { "speaker": "Valentina", "line": "¿En serio me lo estás preguntando, Mateo?" },
+          "reaction_en": "A tear rolls down her cheek; she doesn't move"
         }
       ]
     },
@@ -715,57 +1238,107 @@
       "continuity": {
         "summary": "Valentina deja el anillo y se va de la mansión. Mateo revisa las cámaras y ve a Fernanda sembrando el broche. La confronta: Fernanda confiesa que Regina la obligó y le revela que Valentina es su hermana. Al amanecer, una excavadora llega a Dulce Ríos con una orden de demolición; Regina observa desde su auto.",
         "last_cliffhanger": "Valentina se planta frente a la excavadora con los brazos abiertos.",
-        "pending_state": "Mateo y Fernanda saben la verdad, pero Valentina no. Valentina está sola frente a la máquina."
+        "pending_state": "Mateo y Fernanda saben la verdad, pero Valentina no. Está sola frente a la máquina."
       },
       "shots": [
         {
           "n": 1, "location": "guest_bedroom", "characters": ["Valentina"],
-          "wardrobe": {"Valentina": "a soft pink blouse with puffed sleeves and light jeans, hair down"},
-          "scene_es": "Valentina hace su maleta en silencio, deja el anillo de bodas sobre la almohada y se va de la mansión sin mirar atrás.",
-          "visual_en": "Valentina zips up a small suitcase in silence, slips off her wedding ring and places it gently on the white pillow. She walks out of the room without looking back. Close-up on the ring left behind.",
-          "dialogue": []
+          "camera": "Medium shot, then hold on the pillow",
+          "wardrobe": { "Valentina": "a soft pink blouse with puffed sleeves and light jeans, hair down" },
+          "scene_es": "Valentina hace su maleta, deja el anillo en la almohada y se va.",
+          "action_en": "Valentina zips up a small suitcase, slips off her wedding ring and places it gently on the white pillow",
+          "dialogue": { "speaker": "Valentina", "line": "Me equivoqué contigo, Mateo Alcázar." },
+          "reaction_en": "She walks out of frame; the ring stays alone on the pillow"
         },
         {
           "n": 2, "location": "mateo_office", "characters": ["Mateo"],
-          "scene_es": "Mateo, culpable, revisa las cámaras de seguridad del comedor y retrocede la grabación del almuerzo cuadro por cuadro.",
-          "visual_en": "Night. Mateo sits in his office lit only by the wall of security monitors, rewinding footage frame by frame, face tense with guilt.",
-          "dialogue": [{"speaker": "Mateo", "line": "Perdóname, Valentina... déjame encontrarlo."}]
+          "camera": "Medium shot lit by the monitors",
+          "scene_es": "Mateo, culpable, revisa las cámaras del comedor.",
+          "action_en": "Mateo sits at his desk lit only by the glowing monitors, rewinding footage, face tense with guilt",
+          "dialogue": { "speaker": "Mateo", "line": "Ella no lo tomó. Sé que no lo tomó." },
+          "reaction_en": "He leans closer to the screen and stops"
         },
         {
           "n": 3, "location": "mateo_office", "characters": ["Mateo"],
-          "scene_es": "En la pantalla, Fernanda, llorando, deja caer el broche en la bolsa de Valentina. Mateo golpea el escritorio: “Fernanda”.",
-          "visual_en": "Close-up on a monitor showing grainy footage of a woman with a black bob slipping a brooch into a handbag while wiping tears. Cut to Mateo slamming his palm on the desk, eyes burning.",
-          "dialogue": [{"speaker": "Mateo", "line": "Fernanda..."}]
+          "camera": "Close-up on Mateo, screen glow on his face",
+          "scene_es": "En la grabación, Fernanda mete el broche en la bolsa.",
+          "action_en": "Mateo stares at a monitor showing a woman with a black bob slipping a brooch into a handbag, and slams his palm on the desk",
+          "dialogue": { "speaker": "Mateo", "line": "Fernanda... fuiste tú." },
+          "reaction_en": "He stays still, eyes burning with anger",
+          "sfx": "a palm hitting a desk"
         },
         {
           "n": 4, "location": "fernanda_apartment", "characters": ["Mateo", "Fernanda"],
-          "scene_es": "Mateo la confronta en su departamento. Fernanda se derrumba: “Regina me obligó. Me tiene amenazada con algo de mi papá”.",
-          "visual_en": "Mateo stands firm in the apartment as Fernanda breaks down on the white sofa, mascara running, confessing. City lights glitter behind them.",
-          "dialogue": [{"speaker": "Fernanda", "line": "Regina me obligó. Me tiene amenazada con algo de mi papá."}]
+          "camera": "Medium two-shot by the windows",
+          "scene_es": "Mateo la confronta en su departamento.",
+          "action_en": "Mateo stands firm in the apartment as Fernanda sinks onto the white sofa",
+          "dialogue": { "speaker": "Mateo", "line": "Te vi en las cámaras, Fernanda. ¿Por qué lo hiciste?" },
+          "reaction_en": "Fernanda can't hold his gaze"
         },
         {
           "n": 5, "location": "fernanda_apartment", "characters": ["Fernanda", "Mateo"],
-          "scene_es": "Fernanda le da el sobre del laboratorio: “Y hay algo más, Mateo. Valentina es mi hermana”.",
-          "visual_en": "Fernanda hands Mateo a crumpled lab envelope. He reads the report and his expression shifts from anger to astonishment. Close-up on his face.",
-          "dialogue": [{"speaker": "Fernanda", "line": "Hay algo más, Mateo. Valentina es mi hermana."}]
+          "camera": "Close-up on Fernanda",
+          "scene_es": "Fernanda se derrumba: Regina la tiene amenazada.",
+          "action_en": "Fernanda breaks down, mascara smudged with tears, confessing",
+          "dialogue": { "speaker": "Fernanda", "line": "Regina me obligó. Me tiene amenazada con algo de mi papá." },
+          "reaction_en": "She covers her face with her hands"
         },
         {
-          "n": 6, "location": "street_bakery", "characters": ["Valentina"],
-          "scene_es": "Amanecer en Coyoacán. Valentina sube la cortina de la panadería y escucha un rugido de motores: una excavadora se detiene frente a Dulce Ríos.",
-          "visual_en": "Dawn on the cobblestone street. Valentina, in her apron, lifts the shutter and turns at the roar of engines: a large yellow excavator rumbles to a stop in front of the blue bakery, with workers in hard hats beside it. Wide shot.",
-          "dialogue": []
+          "n": 6, "location": "fernanda_apartment", "characters": ["Fernanda", "Mateo"],
+          "camera": "Close-up on Mateo reading, Fernanda soft beside him",
+          "scene_es": "Le da el sobre del laboratorio: Valentina es su hermana.",
+          "action_en": "Fernanda hands Mateo a crumpled lab envelope; he reads the report",
+          "dialogue": { "speaker": "Fernanda", "line": "Y hay algo más, Mateo. Valentina es mi hermana." },
+          "reaction_en": "Mateo's expression shifts from anger to astonishment"
         },
         {
-          "n": 7, "location": "street_bakery", "characters": ["Valentina", "Regina"],
-          "scene_es": "El capataz le enseña una orden firmada. Detrás, desde un auto negro, Regina observa satisfecha.",
-          "visual_en": "A foreman in a hard hat holds up an official paper to Valentina. In the background, the rear window of a black car lowers, revealing Regina watching with satisfaction behind dark sunglasses.",
-          "dialogue": [{"speaker": "Capataz", "line": "Orden de demolición, señorita. Tiene diez minutos."}]
+          "n": 7, "location": "fernanda_apartment", "characters": ["Mateo", "Fernanda"],
+          "camera": "Medium two-shot",
+          "scene_es": "Mateo le pide que se lo diga ella misma antes que Regina.",
+          "action_en": "Mateo folds the report and gives it back to Fernanda, speaking firmly",
+          "dialogue": { "speaker": "Mateo", "line": "Mañana se lo dices tú. Antes de que Regina lo use." },
+          "reaction_en": "Fernanda nods slowly, terrified"
         },
         {
           "n": 8, "location": "street_bakery", "characters": ["Valentina"],
-          "scene_es": "Valentina se planta frente a la excavadora con los brazos abiertos: “Tendrán que pasar sobre mí”.",
-          "visual_en": "Valentina steps in front of the stopped excavator and spreads her arms wide, standing her ground, hair blowing, eyes fierce with tears. The giant machine looms over her. Low-angle heroic shot. Hard cut to black.",
-          "dialogue": [{"speaker": "Valentina", "line": "Tendrán que pasar sobre mí."}]
+          "camera": "Wide shot at dawn",
+          "scene_es": "Amanecer. Valentina sube la cortina y escucha motores: llega una excavadora.",
+          "action_en": "At dawn, Valentina, in her apron, lifts the shutter and turns as a large yellow excavator rumbles to a stop in front of the bakery",
+          "dialogue": { "speaker": "Valentina", "line": "¿Qué es esto? ¿Qué hacen aquí?" },
+          "reaction_en": "She stares up at the giant machine, frozen",
+          "sfx": "a heavy diesel engine rumbling"
+        },
+        {
+          "n": 9, "location": "street_bakery", "characters": ["Valentina"],
+          "camera": "Medium two-shot with the foreman",
+          "scene_es": "El capataz le muestra una orden de demolición.",
+          "action_en": "The foreman in a hard hat holds up an official paper in front of Valentina",
+          "dialogue": { "speaker": "Capataz", "line": "Orden de demolición, señorita. Tiene diez minutos para sacar sus cosas." },
+          "reaction_en": "Valentina's face goes pale"
+        },
+        {
+          "n": 10, "location": "street_bakery", "characters": ["Regina"],
+          "camera": "Close-up on the rear car window",
+          "scene_es": "Desde un auto negro, Regina observa satisfecha.",
+          "action_en": "The rear window of a parked black car lowers, revealing Regina in dark sunglasses",
+          "dialogue": { "speaker": "Regina", "line": "Te dije que esto no era un cuento de hadas, panadera." },
+          "reaction_en": "The window slowly rises again, hiding her smile"
+        },
+        {
+          "n": 11, "location": "street_bakery", "characters": ["Valentina"],
+          "camera": "Medium close-up, slight low angle",
+          "scene_es": "Valentina no se va a ir: esa panadería es lo único que le queda.",
+          "action_en": "Valentina drops her bag and steps forward toward the machine",
+          "dialogue": { "speaker": "Valentina", "line": "No. Esta panadería es lo único que me queda de mi mamá." },
+          "reaction_en": "She plants her feet on the cobblestones"
+        },
+        {
+          "n": 12, "location": "street_bakery", "characters": ["Valentina"],
+          "camera": "Low-angle heroic wide shot",
+          "scene_es": "Se planta frente a la excavadora con los brazos abiertos.",
+          "action_en": "Valentina stands in front of the stopped excavator and spreads her arms wide, hair blowing, eyes fierce with tears",
+          "dialogue": { "speaker": "Valentina", "line": "Si la quieren tirar, tendrán que pasar sobre mí." },
+          "reaction_en": "She holds her ground, completely still, as the machine looms over her"
         }
       ]
     },
@@ -778,58 +1351,107 @@
         "Regina": "a black tailored suit"
       },
       "continuity": {
-        "summary": "Mateo llega y detiene la demolición como presidente. Le pide perdón a Valentina por dudar. Fernanda confiesa lo del broche y le revela que son hermanas: mismo padre, Ernesto Lazo. Valentina nota el mismo lunar y se abrazan. Esa tarde, Regina le ofrece a Valentina el edificio y su deuda pagada a cambio del divorcio. Valentina firma, mientras graba en secreto a Regina presumiendo que falsificó la firma de Mateo.",
-        "last_cliffhanger": "Regina le muestra a Mateo los papeles: su esposa acaba de venderlo. Mateo pregunta si firmó y Valentina asiente.",
+        "summary": "Mateo llega, detiene la demolición y le pide perdón a Valentina. Fernanda confiesa lo del broche y le revela que son hermanas: mismo padre, Ernesto Lazo. Valentina nota el mismo lunar y se abrazan. Esa tarde, Regina le ofrece el edificio y su deuda pagada a cambio del divorcio. Valentina firma mientras graba en secreto a Regina presumiendo que falsificó la firma de Mateo.",
+        "last_cliffhanger": "Regina le muestra a Mateo los papeles: su esposa acaba de venderlo.",
         "pending_state": "Mateo no sabe que Valentina tiene la grabación. Mañana es la votación final."
       },
       "shots": [
         {
-          "n": 1, "location": "street_bakery", "characters": ["Valentina", "Mateo"],
-          "scene_es": "Un auto negro frena entre Valentina y la excavadora. Mateo baja: “Como presidente de Grupo Alcázar, esta obra queda cancelada. ¡Retírense!”.",
-          "visual_en": "A black car screeches to a stop between Valentina and the excavator. Mateo jumps out and raises his hand toward the foreman, commanding. The excavator engine cuts off. Dynamic wide shot.",
-          "dialogue": [{"speaker": "Mateo", "line": "Como presidente, esta obra queda cancelada. ¡Retírense!"}]
+          "n": 1, "location": "street_bakery", "characters": ["Mateo", "Valentina"],
+          "camera": "Dynamic wide shot",
+          "scene_es": "Un auto negro frena frente a la excavadora. Mateo baja y la detiene.",
+          "action_en": "A black car brakes hard between Valentina and the excavator; Mateo steps out and raises his hand toward the machine",
+          "dialogue": { "speaker": "Mateo", "line": "¡Alto! Como presidente de Grupo Alcázar, esta obra queda cancelada." },
+          "reaction_en": "The excavator engine cuts off; silence falls",
+          "sfx": "tires screeching, then an engine shutting off"
         },
         {
-          "n": 2, "location": "street_bakery", "characters": ["Mateo", "Valentina"],
-          "scene_es": "Los trabajadores se retiran. Mateo voltea hacia ella: “Dudé de ti un segundo. No me lo voy a perdonar”.",
-          "visual_en": "Workers back away and the excavator reverses down the street. Mateo turns to Valentina, guilty and earnest. She looks at him, still guarded, arms crossed.",
-          "dialogue": [{"speaker": "Mateo", "line": "Dudé de ti un segundo. No me lo voy a perdonar."}]
+          "n": 2, "location": "street_bakery", "characters": ["Mateo"],
+          "camera": "Medium shot of Mateo facing the workers",
+          "scene_es": "Mateo ordena a los trabajadores retirarse: la orden es falsa.",
+          "action_en": "Mateo turns toward the workers in hard hats and points down the street",
+          "dialogue": { "speaker": "Mateo", "line": "Retírense. Esa orden es falsa, y lo voy a probar." },
+          "reaction_en": "He watches as the excavator slowly reverses away"
         },
         {
-          "n": 3, "location": "street_bakery", "characters": ["Fernanda", "Valentina"],
-          "scene_es": "Fernanda baja del auto con el sobre en la mano: “Fui yo, Valentina. Lo del broche. Y tienes que saber por qué”.",
-          "visual_en": "Fernanda steps out of the car's back seat holding a crumpled envelope, eyes red from crying. She approaches Valentina slowly. Valentina stiffens. Medium two-shot on the street.",
-          "dialogue": [{"speaker": "Fernanda", "line": "Fui yo, Valentina. Lo del broche. Y tienes que saber por qué."}]
+          "n": 3, "location": "street_bakery", "characters": ["Mateo", "Valentina"],
+          "camera": "Close-up on Mateo, Valentina soft in the foreground",
+          "scene_es": "Mateo le pide perdón: dudó de ella un segundo.",
+          "action_en": "Mateo turns to Valentina, guilty and earnest",
+          "dialogue": { "speaker": "Mateo", "line": "Dudé de ti un segundo. Y no me lo voy a perdonar nunca." },
+          "reaction_en": "Valentina looks at him, still guarded, arms crossed"
         },
         {
-          "n": 4, "location": "bakery", "characters": ["Fernanda", "Valentina"],
-          "scene_es": "Adentro, Fernanda le da el resultado de ADN: “Tenemos el mismo padre, Ernesto Lazo. Abandonó a tu mamá. Encontré sus fotos entre las cosas de mi papá”.",
-          "visual_en": "Inside the bakery, Fernanda hands the lab report to Valentina, who reads it, stunned, and sinks into a chair. Fernanda kneels beside her. Soft morning light.",
-          "dialogue": [{"speaker": "Fernanda", "line": "Tenemos el mismo padre, Ernesto Lazo. Abandonó a tu mamá."}]
+          "n": 4, "location": "street_bakery", "characters": ["Fernanda", "Valentina"],
+          "camera": "Medium two-shot on the street",
+          "scene_es": "Fernanda baja del auto y confiesa: lo del broche fue ella.",
+          "action_en": "Fernanda steps out of the car holding a crumpled envelope, eyes red, and walks slowly toward Valentina",
+          "dialogue": { "speaker": "Fernanda", "line": "Fui yo, Valentina. Lo del broche fui yo." },
+          "reaction_en": "Valentina stiffens"
         },
         {
-          "n": 5, "location": "bakery", "characters": ["Valentina", "Fernanda"],
-          "scene_es": "Valentina lo nota por primera vez: el mismo lunar bajo el ojo izquierdo. “Toda mi vida quise una hermana”. Se abrazan llorando.",
-          "visual_en": "Close-up: Valentina notices the identical small beauty mark under Fernanda's left eye, matching her own. Tears fall. She pulls Fernanda into a trembling embrace and both cry. Slow push-in.",
-          "dialogue": [{"speaker": "Valentina", "line": "Toda mi vida quise una hermana."}]
+          "n": 5, "location": "bakery", "characters": ["Fernanda", "Valentina"],
+          "camera": "Medium two-shot inside the bakery",
+          "scene_es": "Adentro, Fernanda le dice que hay algo que tiene que saber.",
+          "action_en": "Inside the bakery, Fernanda holds out the envelope to Valentina",
+          "dialogue": { "speaker": "Fernanda", "line": "Regina me obligó. Pero hay algo que tienes que saber." },
+          "reaction_en": "Valentina slowly takes the envelope"
         },
         {
-          "n": 6, "location": "bakery", "characters": ["Regina", "Valentina"],
-          "scene_es": "Esa tarde, Regina aparece con unos papeles: “Divórciate hoy. A cambio, el edificio es tuyo y tu deuda desaparece”. Valentina guarda su celular en el mandil.",
-          "visual_en": "Afternoon. Regina sets legal documents and a property deed on the bakery counter, tapping them with a manicured finger. Behind the counter, Valentina discreetly slides her phone into her apron pocket; a tiny red light glows.",
-          "dialogue": [{"speaker": "Regina", "line": "Divórciate hoy. El edificio es tuyo y tu deuda desaparece."}]
+          "n": 6, "location": "bakery", "characters": ["Fernanda", "Valentina"],
+          "camera": "Medium shot, soft morning light",
+          "scene_es": "Tienen el mismo padre: Ernesto Lazo, que abandonó a Rosa.",
+          "action_en": "Valentina reads the report and sinks into a chair; Fernanda kneels beside her",
+          "dialogue": { "speaker": "Fernanda", "line": "Tenemos el mismo padre: Ernesto Lazo. Abandonó a tu mamá." },
+          "reaction_en": "Valentina stares at the paper, stunned"
         },
         {
-          "n": 7, "location": "bakery", "characters": ["Valentina", "Regina"],
-          "scene_es": "Valentina firma. Regina recoge los papeles y se ríe, confiada: “Qué fácil. Falsificar la firma de Mateo me costó más”.",
-          "visual_en": "Valentina signs the documents slowly. Regina gathers them with a gloating laugh, leaning on the counter, careless and triumphant. Close-up on Valentina's apron pocket with the faint red recording light.",
-          "dialogue": [{"speaker": "Regina", "line": "Qué fácil. Falsificar la firma de Mateo me costó más."}]
+          "n": 7, "location": "bakery", "characters": ["Valentina", "Fernanda"],
+          "camera": "Close-up on both faces",
+          "scene_es": "Valentina lo nota por primera vez: el mismo lunar bajo el ojo.",
+          "action_en": "Valentina looks up at Fernanda and notices the identical small beauty mark under her left eye",
+          "dialogue": { "speaker": "Valentina", "line": "Tienes... tienes el mismo lunar que yo." },
+          "reaction_en": "Tears fill both their eyes"
         },
         {
-          "n": 8, "location": "street_bakery", "characters": ["Regina", "Mateo", "Valentina"],
-          "scene_es": "En la puerta, Regina se cruza con Mateo y le agita los papeles: “Tu esposa acaba de venderte”. Mateo mira a Valentina: “¿Firmaste?”. Ella asiente.",
-          "visual_en": "At the bakery door, Regina passes Mateo and waves the signed papers in his face with a cruel smile. Mateo looks past her at Valentina, heartbroken. Valentina holds his gaze and slowly nods. Hard cut to black.",
-          "dialogue": [{"speaker": "Regina", "line": "Tu esposa acaba de venderte."}, {"speaker": "Mateo", "line": "¿Firmaste?"}]
+          "n": 8, "location": "bakery", "characters": ["Valentina", "Fernanda"],
+          "camera": "Slow push-in on the embrace",
+          "scene_es": "Se abrazan llorando. Toda la vida quiso una hermana.",
+          "action_en": "Valentina pulls Fernanda into a trembling embrace",
+          "dialogue": { "speaker": "Valentina", "line": "Toda mi vida quise una hermana. Toda mi vida." },
+          "reaction_en": "They stay holding each other, both crying quietly"
+        },
+        {
+          "n": 9, "location": "bakery", "characters": ["Regina", "Valentina"],
+          "camera": "Medium two-shot across the counter",
+          "scene_es": "Esa tarde, Regina llega con papeles. Valentina guarda su celular en el mandil.",
+          "action_en": "Regina sets legal documents on the counter while Valentina discreetly slides her phone into her apron pocket",
+          "dialogue": { "speaker": "Regina", "line": "Divórciate hoy. El edificio es tuyo y tu deuda desaparece." },
+          "reaction_en": "Regina taps the papers with one manicured nail; a tiny red light glows in Valentina's pocket"
+        },
+        {
+          "n": 10, "location": "bakery", "characters": ["Valentina", "Regina"],
+          "camera": "Close-up on Valentina",
+          "scene_es": "Valentina firma despacio.",
+          "action_en": "Valentina picks up the pen and signs slowly, without looking up",
+          "dialogue": { "speaker": "Valentina", "line": "Si firmo... ¿me deja en paz para siempre?" },
+          "reaction_en": "She slides the papers back across the counter"
+        },
+        {
+          "n": 11, "location": "bakery", "characters": ["Regina", "Valentina"],
+          "camera": "Medium two-shot, then close-up on the apron pocket",
+          "scene_es": "Regina, confiada, presume: falsificar la firma de Mateo le costó más.",
+          "action_en": "Regina gathers the papers with a gloating laugh, leaning on the counter",
+          "dialogue": { "speaker": "Regina", "line": "Qué fácil. Falsificar la firma de Mateo me costó más." },
+          "reaction_en": "The faint red light keeps glowing inside Valentina's apron pocket"
+        },
+        {
+          "n": 12, "location": "street_bakery", "characters": ["Regina", "Mateo"],
+          "camera": "Close two-shot at the bakery door",
+          "scene_es": "En la puerta, Regina se cruza con Mateo y le agita los papeles: su esposa lo vendió.",
+          "action_en": "At the bakery door, Regina passes Mateo and waves the signed papers in front of his face",
+          "dialogue": { "speaker": "Regina", "line": "Tu esposa acaba de venderte, querido. Aquí está su firma." },
+          "reaction_en": "Mateo stares past her toward the bakery, heartbroken, frozen"
         }
       ]
     },
@@ -841,64 +1463,115 @@
         "Regina": "a black tailored suit"
       },
       "continuity": {
-        "summary": "En la votación final, Regina presenta el divorcio firmado. Valentina y Fernanda entran juntas y reproducen la grabación de Regina admitiendo la falsificación; Fernanda declara lo del broche. El consejo saca a Regina. Valentina rompe los papeles: un divorcio necesita dos firmas. Mateo le pide quedarse sin contrato y se besan. Un mes después, Dulce Ríos reabre con Fernanda y Mateo ayudando.",
+        "summary": "En la votación final, Regina presenta el divorcio firmado. Valentina y Fernanda entran juntas y reproducen la grabación de Regina; Fernanda declara lo del broche. El consejo saca a Regina. Valentina rompe los papeles: un divorcio necesita dos firmas. Mateo le pide quedarse sin contrato y se besan. Un mes después, Dulce Ríos reabre con Fernanda ayudando.",
         "last_cliffhanger": "Un hombre canoso con una foto vieja de Rosa entra a la panadería: “Valentina... soy tu padre”.",
         "pending_state": "Temporada 2: llega Ernesto Lazo y el secreto de las cuentas del esposo de Regina."
       },
       "shots": [
         {
           "n": 1, "location": "boardroom", "characters": ["Regina", "Mateo"],
-          "scene_es": "Votación final. Regina deja los papeles del divorcio sobre la mesa: “Sin matrimonio, no hay herencia. La presidencia es mía”.",
-          "visual_en": "Regina drops the signed divorce papers onto the glass table in front of the board with a confident smile. Mateo sits silently, staring at the papers. Tense wide shot.",
-          "dialogue": [{"speaker": "Regina", "line": "Sin matrimonio, no hay herencia. La presidencia es mía."}]
+          "camera": "Tense wide shot down the table",
+          "scene_es": "Votación final. Regina deja los papeles del divorcio sobre la mesa.",
+          "action_en": "Regina drops the signed divorce papers onto the glass table in front of Mateo",
+          "dialogue": { "speaker": "Regina", "line": "Sin matrimonio, no hay herencia. La presidencia es mía." },
+          "reaction_en": "Mateo stares at the papers in silence"
         },
         {
-          "n": 2, "location": "boardroom", "characters": ["Valentina", "Fernanda"],
-          "scene_es": "Las puertas se abren. Entran Valentina y Fernanda, juntas. “Antes de votar, escuchen esto”.",
-          "visual_en": "The tall boardroom doors swing open. Valentina and Fernanda walk in side by side, heads high, in step. Valentina raises her phone. Heroic slow-motion entrance.",
-          "dialogue": [{"speaker": "Valentina", "line": "Antes de votar, escuchen esto."}]
+          "n": 2, "location": "boardroom", "characters": ["Mateo"],
+          "camera": "Medium shot of Mateo, board soft behind him",
+          "scene_es": "El consejero está a punto de abrir la votación.",
+          "action_en": "The gray-haired board member speaks while Mateo lowers his head",
+          "dialogue": { "speaker": "Consejero", "line": "Si no hay más objeciones, procedemos a votar." },
+          "reaction_en": "Mateo closes his eyes"
         },
         {
-          "n": 3, "location": "boardroom", "characters": ["Valentina", "Regina"],
-          "scene_es": "Valentina reproduce el audio. La voz de Regina llena la sala: “Qué fácil. Falsificar la firma de Mateo me costó más”. Regina palidece.",
-          "visual_en": "Valentina places her phone on the glass table and an audio recording plays. Board members lean in, shocked. Regina freezes as the color drains from her face. Close-up on the phone, then on Regina.",
-          "dialogue": [{"speaker": "Regina", "line": "Qué fácil. Falsificar la firma de Mateo me costó más."}]
+          "n": 3, "location": "boardroom", "characters": ["Valentina", "Fernanda"],
+          "camera": "Heroic slow-motion shot toward the doors",
+          "scene_es": "Las puertas se abren. Entran Valentina y Fernanda, juntas.",
+          "action_en": "The tall boardroom doors swing open; Valentina and Fernanda walk in side by side and Valentina raises her phone",
+          "dialogue": { "speaker": "Valentina", "line": "Sí hay objeciones. Antes de votar, escuchen esto." },
+          "reaction_en": "They stop at the end of the table, heads high"
         },
         {
-          "n": 4, "location": "boardroom", "characters": ["Fernanda", "Regina"],
-          "scene_es": "Fernanda da un paso al frente: “Y yo declaro que Regina me obligó a poner el broche”. El consejo vota: Regina queda fuera.",
-          "visual_en": "Fernanda steps forward and speaks firmly to the board. One by one, board members raise their hands. Regina stands rigid, then slowly sinks into her chair, defeated. Wide shot.",
-          "dialogue": [{"speaker": "Fernanda", "line": "Y yo declaro que Regina me obligó a poner el broche."}]
+          "n": 4, "location": "boardroom", "characters": ["Valentina", "Regina"],
+          "camera": "Close-up on the phone, then on Regina",
+          "scene_es": "Valentina pone la grabación. La voz de Regina llena la sala.",
+          "action_en": "Valentina places her phone on the glass table and a recording plays from its speaker",
+          "dialogue": { "speaker": "Regina", "line": "Qué fácil. Falsificar la firma de Mateo me costó más." },
+          "reaction_en": "Regina freezes as the color drains from her face"
         },
         {
-          "n": 5, "location": "boardroom", "characters": ["Valentina", "Mateo"],
-          "scene_es": "Valentina rompe los papeles frente a Mateo: “Un divorcio necesita dos firmas. Solo firmé para atraparla”.",
-          "visual_en": "Valentina picks up the divorce papers and tears them in half, then in half again, the pieces falling like confetti. She looks at Mateo with a teary smile. Mateo rises, overwhelmed.",
-          "dialogue": [{"speaker": "Valentina", "line": "Un divorcio necesita dos firmas. Solo firmé para atraparla."}]
+          "n": 5, "location": "boardroom", "characters": ["Fernanda", "Regina"],
+          "camera": "Medium shot of Fernanda",
+          "scene_es": "Fernanda da un paso al frente y declara lo del broche.",
+          "action_en": "Fernanda steps forward and speaks firmly to the board",
+          "dialogue": { "speaker": "Fernanda", "line": "Y yo declaro que Regina me obligó a poner el broche." },
+          "reaction_en": "Regina turns to her in disbelief"
         },
         {
-          "n": 6, "location": "boardroom", "characters": ["Mateo", "Valentina"],
-          "scene_es": "Mateo se arrodilla con el anillo: “¿Te quedas conmigo... sin contrato?”. “Sin contrato”. Se besan mientras el consejo aplaude.",
-          "visual_en": "Mateo kneels on one knee holding out the wedding ring. Valentina laughs through tears and nods; he slides it onto her finger, rises, and they kiss as the board applauds. Romantic orbit shot.",
-          "dialogue": [{"speaker": "Mateo", "line": "¿Te quedas conmigo... sin contrato?"}, {"speaker": "Valentina", "line": "Sin contrato."}]
+          "n": 6, "location": "boardroom", "characters": ["Regina"],
+          "camera": "Medium close-up on Regina",
+          "scene_es": "El consejo vota por unanimidad: Regina queda fuera.",
+          "action_en": "Board members raise their hands one by one as Regina stands rigid",
+          "dialogue": { "speaker": "Consejero", "line": "Por unanimidad, la señora Regina queda fuera del consejo." },
+          "reaction_en": "Regina slowly sinks into her chair, defeated"
         },
         {
-          "n": 7, "location": "bakery", "characters": ["Valentina", "Mateo", "Fernanda"],
+          "n": 7, "location": "boardroom", "characters": ["Valentina", "Mateo"],
+          "camera": "Medium two-shot",
+          "scene_es": "Valentina rompe los papeles: un divorcio necesita dos firmas.",
+          "action_en": "Valentina picks up the divorce papers and tears them in half, then in half again",
+          "dialogue": { "speaker": "Valentina", "line": "Un divorcio necesita dos firmas. Y yo solo firmé para atraparla." },
+          "reaction_en": "The torn pieces fall to the floor as Mateo rises, overwhelmed",
+          "sfx": "paper tearing"
+        },
+        {
+          "n": 8, "location": "boardroom", "characters": ["Mateo", "Valentina"],
+          "camera": "Low angle on Mateo kneeling",
+          "scene_es": "Mateo se arrodilla con el anillo: esta vez, sin contrato.",
+          "action_en": "Mateo kneels on one knee holding out the wedding ring",
+          "dialogue": { "speaker": "Mateo", "line": "¿Te quedas conmigo, Valentina? Esta vez sin contrato." },
+          "reaction_en": "Valentina laughs through her tears"
+        },
+        {
+          "n": 9, "location": "boardroom", "characters": ["Valentina", "Mateo"],
+          "camera": "Romantic slow orbit",
+          "scene_es": "“Sin contrato”. Se besan mientras el consejo aplaude.",
+          "action_en": "Valentina nods; Mateo slides the ring onto her finger, rises and kisses her",
+          "dialogue": { "speaker": "Valentina", "line": "Sin contrato. Y sin cláusulas, señor Alcázar." },
+          "reaction_en": "They hold the kiss as applause fills the room",
+          "sfx": "warm applause"
+        },
+        {
+          "n": 10, "location": "bakery", "characters": ["Fernanda", "Valentina"],
+          "camera": "Warm wide shot of the busy bakery",
           "wardrobe": {
             "Valentina": "a mustard-yellow cardigan over a white t-shirt, a light-blue apron dusted with flour, and jeans",
-            "Mateo": "a white shirt with rolled-up sleeves and a light-blue apron",
             "Fernanda": "a casual white blouse and a light-blue apron"
           },
-          "scene_es": "Un mes después, Dulce Ríos reabre renovada. Fernanda atiende el mostrador, Mateo carga charolas y Valentina le sonríe a la foto de su mamá.",
-          "visual_en": "Golden afternoon. The renovated blue bakery is full of happy customers. Fernanda serves at the counter, Mateo clumsily carries a tray of conchas, and Valentina smiles up at the framed photo of her mother. Warm, joyful wide shot.",
-          "dialogue": [{"speaker": "Valentina", "line": "Lo logramos, mamá. El horno sigue prendido."}]
+          "scene_es": "Un mes después, Dulce Ríos reabre. Fernanda atiende el mostrador.",
+          "action_en": "One month later, the renovated bakery is busy and bright; Fernanda serves at the counter and calls out an order",
+          "dialogue": { "speaker": "Fernanda", "line": "Dos conchas y un café para la mesa del fondo." },
+          "reaction_en": "Valentina laughs and hands her a tray of fresh bread"
         },
         {
-          "n": 8, "location": "bakery", "characters": ["Valentina", "Ernesto"],
-          "wardrobe": {"Valentina": "a mustard-yellow cardigan over a white t-shirt, a light-blue apron dusted with flour, and jeans"},
-          "scene_es": "Suena la campanita. Un hombre canoso, con una foto vieja de Rosa en la mano, se queda en la puerta: “Valentina... soy tu padre”.",
-          "visual_en": "The door bell chimes. Valentina turns. A gray-haired man stands in the doorway holding an old faded photo of a young smiling woman, his eyes wet. Valentina's smile freezes. Slow push-in on her face. Hard cut to black.",
-          "dialogue": [{"speaker": "Ernesto", "line": "Valentina... soy tu padre."}]
+          "n": 11, "location": "bakery", "characters": ["Valentina"],
+          "camera": "Medium close-up, golden afternoon light",
+          "wardrobe": { "Valentina": "a mustard-yellow cardigan over a white t-shirt, a light-blue apron dusted with flour, and jeans" },
+          "scene_es": "Valentina le sonríe a la foto de su madre: lo lograron.",
+          "action_en": "Valentina looks up at the framed photo of her mother and smiles",
+          "dialogue": { "speaker": "Valentina", "line": "Lo logramos, mamá. El horno sigue prendido." },
+          "reaction_en": "She keeps smiling softly at the photo, eyes shining"
+        },
+        {
+          "n": 12, "location": "bakery", "characters": ["Valentina", "Ernesto"],
+          "camera": "Slow push-in on Valentina's face",
+          "wardrobe": { "Valentina": "a mustard-yellow cardigan over a white t-shirt, a light-blue apron dusted with flour, and jeans" },
+          "scene_es": "Suena la campanita. Un hombre canoso con una foto vieja de Rosa: “Valentina… soy tu padre”.",
+          "action_en": "The door bell chimes; Valentina turns as a gray-haired man stands in the doorway holding an old faded photo, eyes wet",
+          "dialogue": { "speaker": "Ernesto", "line": "Valentina... soy tu padre." },
+          "reaction_en": "Valentina's smile freezes; she stands completely still",
+          "sfx": "a small door bell chimes"
         }
       ]
     }

@@ -171,6 +171,11 @@
                 </div>
             </div>
 
+            <!-- Crear novela nueva pegando el JSON que escribe Claude -->
+            <button onclick="openNovelModal()" class="px-4 py-2 rounded-lg border border-cyber-violet/50 bg-cyber-violet/15 hover:bg-cyber-violet/25 text-white font-display font-semibold text-xs tracking-wider transition-all">
+                <i class="fa-solid fa-wand-magic-sparkles text-cyber-violet mr-1.5"></i>PROMPT
+            </button>
+
             <!-- Quick Trigger Run Button -->
             <button onclick="triggerPipelineRun()" class="relative group overflow-hidden px-4 py-2 rounded-lg bg-gradient-to-r from-cyber-cyan via-cyber-violet to-cyber-pink p-[1px] shadow-neon-pink hover:scale-105 transition-all">
                 <div class="bg-cyber-darker group-hover:bg-opacity-80 transition-all px-3 py-1.5 rounded-[7px] flex items-center space-x-2">
@@ -1415,26 +1420,51 @@
           list.innerHTML = '<p class="text-xs font-mono text-slate-500">Todavía no hay episodios escritos para esta serie.</p>';
           return;
         }
+        const openEps = new Set([...list.querySelectorAll('details[data-ep-id][open]')].map(d => d.getAttribute('data-ep-id')));
         list.innerHTML = eps.map(e => {
           const st = STATUS_LABELS[e.status] || [e.status, 'text-slate-400 border-slate-600'];
+          const canGenerateShots = e.status === 'guion_generado';
+          const m = seriesModels(data.series);
           const shots = e.shots || [];
           const clips = (e.assets || []).filter(a => a.kind === 'video_clip').length;
           const words = e.validator_report && e.validator_report.words;
           const cont = e.continuity || {};
           const shotsHtml = shots.length
             ? shots.map(sh =>
-                '<div class="border-l-2 ' + (sh.n === shots.length ? 'border-cyber-pink' : 'border-cyber-border') + ' pl-3 py-1">' +
-                  '<p class="text-[10px] font-mono text-slate-500">TOMA ' + String(sh.n).padStart(2, '0') + (sh.n === shots.length ? ' · CLIFFHANGER (Veo Fast)' : '') + ' · ' + esc(sh.location) + ' · ' + esc((sh.characters || []).join(', ')) + '</p>' +
-                  '<p class="text-[12px] text-slate-200">' + esc(sh.scene_es) + '</p>' +
-                  (sh.dialogue || []).map(d => '<p class="text-[11px] text-cyber-cyan font-mono">— ' + esc(d.speaker) + ': ' + esc(d.line) + '</p>').join('') +
-                '</div>'
+                (() => {
+                  const isCliff = sh.n === shots.length;
+                  const model = isCliff ? m.cliff : m.shot;
+                  const clip = (e.assets || []).find(a => a.kind === 'video_clip' && a.shot_number === sh.n);
+                  const shotCost = (m.secs * VEO_PRICE_PER_SEC[model]).toFixed(2);
+                  return (
+                    '<div class="border-l-2 ' + (isCliff ? 'border-cyber-pink' : 'border-cyber-border') + ' pl-3 py-1.5" data-shot="' + e.id + '-' + sh.n + '">' +
+                      '<p class="text-[10px] font-mono text-slate-500">TOMA ' + String(sh.n).padStart(2, '0') + (isCliff ? ' · CLIFFHANGER' : '') + ' · Veo ' + VEO_LABEL[model] + ' · ' + esc(sh.location) + ' · ' + esc((sh.characters || []).join(', ')) + (sh.camera ? ' · ' + esc(sh.camera) : '') + '</p>' +
+                      '<p class="text-[12px] text-slate-200">' + esc(sh.scene_es) + '</p>' +
+                      (sh.dialogue || []).map(d => '<p class="text-[11px] text-cyber-cyan font-mono">— ' + esc(d.speaker) + ': ' + esc(d.line) + '</p>').join('') +
+                      '<div class="flex flex-wrap items-center gap-2 mt-1.5">' +
+                        (sh.prompt_preview
+                          ? '<details class="w-full"><summary class="cursor-pointer text-[10px] font-mono text-cyber-violet hover:underline list-none inline-block"><i class="fa-solid fa-terminal mr-1"></i>Ver prompt de Veo</summary>' +
+                              '<div class="mt-1 bg-slate-950 border border-slate-800 rounded p-2">' +
+                                '<div class="flex justify-end"><button onclick="copyTag(this, event)" data-tag="' + esc(sh.prompt_preview) + '" class="text-[10px] font-mono text-cyber-violet hover:underline"><i class="fa-regular fa-copy mr-1"></i>Copiar</button></div>' +
+                                '<p class="text-[10px] font-mono text-slate-300 whitespace-pre-wrap">' + esc(sh.prompt_preview) + '</p>' +
+                              '</div></details>'
+                          : '') +
+                        (clip
+                          ? '<a href="' + esc(clip.storage_path) + '" target="_blank" class="text-[10px] font-mono text-cyber-emerald hover:underline"><i class="fa-solid fa-film mr-1"></i>Ver toma generada (' + (clip.approved ? 'aprobada' : 'pendiente de revisión') + ')</a>'
+                          : (canGenerateShots
+                              ? '<button onclick="generateShot(\'' + e.id + '\', ' + sh.n + ', ' + shotCost + ')" class="text-[10px] font-mono px-2 py-0.5 rounded border border-cyber-gold/40 text-cyber-gold bg-cyber-gold/10 hover:bg-cyber-gold/20"><i class="fa-solid fa-flask mr-1"></i>Generar solo esta toma (~$' + shotCost + ')</button>'
+                              : '')) +
+                      '</div>' +
+                    '</div>'
+                  );
+                })()
               ).join('')
             : '<pre class="text-[11px] text-slate-300 whitespace-pre-wrap">' + esc(e.script || 'Sin guion todavía.') + '</pre>';
           const produceBtn = (nextToProduce && nextToProduce.id === e.id)
             ? '<button onclick="produceEpisode(\'' + e.id + '\')" class="px-3 py-1.5 rounded-lg bg-cyber-pink/20 border border-cyber-pink/50 text-cyber-pink text-xs font-mono hover:bg-cyber-pink/30"><i class="fa-solid fa-bolt mr-1"></i>Producir este episodio (~$' + estimateEpisodeCost(e).toFixed(2) + ')</button>'
             : '';
           return (
-            '<details class="bg-cyber-darker rounded-lg border border-cyber-border open:border-cyber-cyan/50">' +
+            '<details data-ep-id="' + e.id + '"' + (openEps.has(String(e.id)) ? ' open' : '') + ' class="bg-cyber-darker rounded-lg border border-cyber-border open:border-cyber-cyan/50">' +
               '<summary class="cursor-pointer list-none p-3 flex items-center justify-between gap-2">' +
                 '<span class="text-sm text-white font-display font-semibold truncate"><span class="font-mono text-cyber-cyan mr-2">EP ' + String(e.episode_number).padStart(2, '0') + '</span>' + esc(e.title || 'Sin título') + '</span>' +
                 '<span class="flex items-center gap-2 flex-shrink-0">' +
@@ -1550,6 +1580,172 @@
         }
         await loadDashboard();
         alert('La producción sigue corriendo después de 45 min. Revisa los logs de la función en Netlify.');
+      };
+
+      // Toma de prueba: genera UNA sola toma (cargo real ~$0.34 en Lite) para revisar el
+      // formato del prompt antes de gastar el episodio completo. Queda guardada como parte
+      // del episodio; si sale bien, "Producir" ya no la vuelve a generar.
+      window.generateShot = async function(episodeId, shotNumber, cost) {
+        const ep = lastLoadedData && (lastLoadedData.episodes || []).find(x => x.id === episodeId);
+        if (!ep) return alert('No encontré el episodio. Recarga la página.');
+        if (!confirm('Generar SOLO la toma ' + shotNumber + ' del EP ' + ep.episode_number + ' con Veo.\n\nCosto: ~$' + Number(cost).toFixed(2) + ' USD (cargo real en Google Cloud). Tarda de 1 a 6 minutos. ¿Continuar?')) return;
+        const box = document.querySelector('[data-shot="' + episodeId + '-' + shotNumber + '"]');
+        const btn = box && box.querySelector('button[onclick^="generateShot"]');
+        if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>Generando con Veo... (1–6 min)'; }
+        try {
+          const res = await fetch('/.netlify/functions/generate-media-background', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ series: DEFAULT_SERIES, episode_id: episodeId, shot: shotNumber })
+          });
+          if (!res.ok && res.status !== 202) throw new Error('HTTP ' + res.status);
+        } catch (err) {
+          if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-flask mr-1"></i>Generar solo esta toma'; }
+          return alert('No se pudo arrancar: ' + err.message);
+        }
+        const start = Date.now();
+        while (Date.now() - start < 9 * 60 * 1000) {
+          await new Promise(r => setTimeout(r, 15000));
+          try {
+            const r = await fetch('/.netlify/functions/get-episodes?series=' + encodeURIComponent(DEFAULT_SERIES));
+            if (!r.ok) continue;
+            const d = await r.json();
+            const cur = (d.episodes || []).find(x => x.id === episodeId);
+            const clip = cur && (cur.assets || []).find(a => a.kind === 'video_clip' && a.shot_number === shotNumber);
+            if (clip) { await loadDashboard(); return; }
+            if (cur && cur.status === 'guion_generado' && Date.now() - start > 60000 && btn) {
+              btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>Generando... (' + Math.round((Date.now() - start) / 60000) + ' min)';
+            }
+          } catch (_) {}
+        }
+        await loadDashboard();
+        alert('La toma todavía no aparece después de 9 minutos. Revisa la terminal de netlify dev: puede que haya fallado.');
+      };
+
+      // ── Modal PROMPT: crear una novela nueva pegando el JSON de Claude ──────
+      let validatedNovel = null;
+
+      async function prefetchMasterPrompt() {
+        const btn = document.getElementById('copyMasterBtn');
+        if (btn.getAttribute('data-tag')) return;
+        try {
+          const res = await fetch('/.netlify/functions/import-series?master=1');
+          if (res.ok) btn.setAttribute('data-tag', await res.text());
+        } catch (_) {}
+      }
+
+      window.openNovelModal = function() {
+        document.getElementById('novelModal').classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+        prefetchMasterPrompt();
+      };
+      window.closeNovelModal = function() {
+        document.getElementById('novelModal').classList.add('hidden');
+        document.body.style.overflow = '';
+      };
+      document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') window.closeNovelModal(); });
+
+      window.copyMasterPrompt = async function(btn) {
+        if (btn.getAttribute('data-tag')) return window.copyTag(btn);
+        try {
+          const res = await fetch('/.netlify/functions/import-series?master=1');
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          const text = await res.text();
+          btn.setAttribute('data-tag', text);
+          window.copyTag(btn);
+        } catch (err) {
+          alert('No se pudo obtener el prompt maestro: ' + err.message);
+        }
+      };
+
+      window.loadNovelFile = function(file) {
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => { document.getElementById('novelInput').value = reader.result; window.validateNovel(); };
+        reader.readAsText(file);
+      };
+
+      // Acepta el JSON tal cual o envuelto en ```json ... ``` / texto alrededor.
+      function parseNovelText(raw) {
+        let t = String(raw || '').trim();
+        t = t.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
+        const first = t.indexOf('{');
+        const last = t.lastIndexOf('}');
+        if (first === -1 || last === -1) throw new Error('No encontré un objeto JSON ({ ... }) en el texto pegado.');
+        return JSON.parse(t.slice(first, last + 1));
+      }
+
+      function setCreateEnabled(on) {
+        const b = document.getElementById('createNovelBtn');
+        b.disabled = !on;
+        b.className = 'px-3 py-1.5 rounded-lg text-xs font-mono border ' + (on
+          ? 'border-cyber-emerald/50 bg-cyber-emerald/15 text-cyber-emerald hover:bg-cyber-emerald/25'
+          : 'border-slate-700 bg-slate-800 text-slate-500 cursor-not-allowed');
+      }
+
+      function renderNovelResult(r) {
+        const box = document.getElementById('novelResult');
+        const errs = r.errors || [];
+        const warns = r.warnings || [];
+        const totalShots = (r.episodes || []).reduce((n, e) => n + (e.shots || 0), 0);
+        box.innerHTML =
+          '<div class="bg-cyber-darker border ' + (errs.length ? 'border-cyber-pink/50' : 'border-cyber-emerald/40') + ' rounded-xl p-4 space-y-3">' +
+            '<div class="flex items-center justify-between gap-2">' +
+              '<p class="font-display font-bold text-white">' + esc(r.title || 'Sin título') + ' <span class="text-[11px] font-mono text-slate-500">(' + esc(r.slug || '—') + ')</span></p>' +
+              '<span class="text-[10px] font-mono px-2 py-0.5 rounded border ' + (errs.length ? 'text-cyber-pink border-cyber-pink/40' : 'text-cyber-emerald border-cyber-emerald/40') + '">' + (errs.length ? errs.length + ' ERROR(ES)' : 'VÁLIDA') + '</span>' +
+            '</div>' +
+            (r.exists ? '<p class="text-[11px] font-mono text-cyber-gold"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Ya existe una serie con este slug: se ACTUALIZARÁ (los episodios ya producidos no se tocan).</p>' : '') +
+            '<p class="text-[11px] font-mono text-slate-400">' + (r.characters || []).length + ' personajes · ' + (r.episodes || []).length + ' episodios · ' + totalShots + ' tomas</p>' +
+            '<div class="flex flex-wrap gap-1.5">' + (r.characters || []).map(c => '<span class="text-[10px] font-mono px-2 py-0.5 rounded border border-cyber-border text-slate-300">' + esc(c.name) + ' · ' + esc(c.role || '') + '</span>').join('') + '</div>' +
+            (errs.length ? '<div><p class="text-[11px] font-mono text-cyber-pink font-bold mb-1">Errores (corrígelos o pídele a Claude que los corrija):</p><ul class="text-[11px] font-mono text-cyber-pink/90 list-disc pl-5 space-y-0.5 max-h-48 overflow-y-auto">' + errs.map(x => '<li>' + esc(x) + '</li>').join('') + '</ul></div>' : '') +
+            (warns.length ? '<div><p class="text-[11px] font-mono text-cyber-gold font-bold mb-1">Avisos (no bloquean, pero conviene revisarlos):</p><ul class="text-[11px] font-mono text-cyber-gold/90 list-disc pl-5 space-y-0.5 max-h-40 overflow-y-auto">' + warns.map(x => '<li>' + esc(x) + '</li>').join('') + '</ul></div>' : '') +
+          '</div>';
+      }
+
+      window.validateNovel = async function() {
+        validatedNovel = null;
+        setCreateEnabled(false);
+        const box = document.getElementById('novelResult');
+        let data;
+        try {
+          data = parseNovelText(document.getElementById('novelInput').value);
+        } catch (err) {
+          box.innerHTML = '<p class="text-[12px] font-mono text-cyber-pink"><i class="fa-solid fa-circle-xmark mr-1"></i>JSON inválido: ' + esc(err.message) + '</p>';
+          return;
+        }
+        box.innerHTML = '<p class="text-[12px] font-mono text-cyber-gold"><i class="fa-solid fa-spinner fa-spin mr-1"></i>Validando...</p>';
+        try {
+          const res = await fetch('/.netlify/functions/import-series', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ series: data, dry_run: true })
+          });
+          const out = await res.json().catch(() => ({}));
+          if (res.status !== 200 && res.status !== 422) throw new Error(out.error || ('HTTP ' + res.status));
+          renderNovelResult(out);
+          if (res.status === 200 && out.ok) { validatedNovel = data; setCreateEnabled(true); }
+        } catch (err) {
+          box.innerHTML = '<p class="text-[12px] font-mono text-cyber-pink">No se pudo validar: ' + esc(err.message) + '</p>';
+        }
+      };
+
+      window.createNovel = async function() {
+        if (!validatedNovel) return;
+        const btn = document.getElementById('createNovelBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>Creando...';
+        try {
+          const res = await fetch('/.netlify/functions/import-series', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ series: validatedNovel })
+          });
+          const out = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error((out.error || ('HTTP ' + res.status)) + (out.errors ? '\n- ' + out.errors.join('\n- ') : ''));
+          try { localStorage.setItem('vyrales_series', validatedNovel.slug); } catch (_) {}
+          location.search = '?series=' + encodeURIComponent(validatedNovel.slug);
+        } catch (err) {
+          alert('No se pudo crear la novela:\n' + err.message);
+          btn.innerHTML = '<i class="fa-solid fa-rocket mr-1"></i>Crear novela';
+          setCreateEnabled(true);
+        }
       };
 
       // El botón "EJECUTAR PIPELINE" del header ya no es una simulación: produce el
@@ -1730,5 +1926,41 @@
     })();
     </script>
 
+
+    <!-- MODAL: crear novela nueva desde el JSON que escribe Claude con el prompt maestro -->
+    <div id="novelModal" class="hidden fixed inset-0 z-[100] bg-black/75 backdrop-blur-sm flex items-start justify-center overflow-y-auto p-4">
+        <div class="w-full max-w-3xl bg-cyber-card border border-cyber-border rounded-2xl shadow-neon-cyan my-8">
+            <div class="flex items-center justify-between px-6 py-4 border-b border-cyber-border">
+                <div>
+                    <h3 class="font-display font-bold text-white text-lg"><i class="fa-solid fa-wand-magic-sparkles text-cyber-violet mr-2"></i>CREAR NOVELA DESDE PROMPT</h3>
+                    <p class="text-[11px] font-mono text-slate-400">Serie, personajes, prompts de foto, episodios y tomas: todo se crea solo al pegar.</p>
+                </div>
+                <button onclick="closeNovelModal()" class="text-slate-400 hover:text-white text-lg" title="Cerrar"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="p-6 space-y-5">
+                <div class="bg-cyber-darker border border-cyber-border rounded-xl p-4">
+                    <p class="text-xs font-mono text-cyber-cyan font-bold mb-1">PASO 1 · Pídele la novela a Claude</p>
+                    <p class="text-[12px] text-slate-300 mb-3">Copia el prompt maestro, pégalo en Claude y completa la parte <span class="font-mono text-cyber-gold">MI IDEA</span> (nicho, premisa, episodios, estilo). Claude te devuelve la novela completa en el formato exacto.</p>
+                    <button id="copyMasterBtn" onclick="copyMasterPrompt(this)" class="px-3 py-1.5 rounded-lg text-xs font-mono border border-cyber-violet/50 bg-cyber-violet/15 text-white hover:bg-cyber-violet/25"><i class="fa-regular fa-copy mr-1"></i>Copiar prompt maestro</button>
+                </div>
+                <div class="bg-cyber-darker border border-cyber-border rounded-xl p-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <p class="text-xs font-mono text-cyber-cyan font-bold">PASO 2 · Pega aquí lo que te dio Claude</p>
+                        <label class="text-[11px] font-mono text-slate-400 hover:text-cyber-cyan cursor-pointer"><i class="fa-solid fa-file-import mr-1"></i>o subir archivo .json
+                            <input type="file" accept=".json,application/json,text/plain" class="hidden" onchange="loadNovelFile(this.files[0])">
+                        </label>
+                    </div>
+                    <textarea id="novelInput" rows="10" spellcheck="false" placeholder='{ "format_version": 2, "slug": "...", "title": "...", ... }'
+                        class="w-full bg-slate-950 border border-slate-800 focus:border-cyber-cyan/60 rounded-lg p-3 text-[11px] font-mono text-slate-200 outline-none"></textarea>
+                    <div class="flex items-center gap-2 mt-3">
+                        <button onclick="validateNovel()" class="px-3 py-1.5 rounded-lg text-xs font-mono border border-cyber-cyan/40 bg-cyber-cyan/10 text-cyber-cyan hover:bg-cyber-cyan/20"><i class="fa-solid fa-list-check mr-1"></i>Validar</button>
+                        <button id="createNovelBtn" onclick="createNovel()" disabled class="px-3 py-1.5 rounded-lg text-xs font-mono border border-slate-700 bg-slate-800 text-slate-500 cursor-not-allowed"><i class="fa-solid fa-rocket mr-1"></i>Crear novela</button>
+                        <span class="text-[10px] font-mono text-slate-500">No cuesta dinero: solo guarda en Supabase.</span>
+                    </div>
+                </div>
+                <div id="novelResult"></div>
+            </div>
+        </div>
+    </div>
 </body>
 </html>
