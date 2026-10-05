@@ -17,7 +17,7 @@
 //     guion_rechazado.
 //   - No llama a Veo ni a ninguna API de pago.
 const { getSupabaseClient } = require('./_supabase');
-const { validateSeries, toEpisodeRows } = require('./_series');
+const { validateSeries, toEpisodeRows, buildImagePrompt } = require('./_series');
 
 // esbuild necesita require() estáticos para empaquetar los JSON: para agregar una novela
 // nueva, crea series/<slug>.json y agrégala aquí.
@@ -106,7 +106,9 @@ exports.handler = async (event) => {
       role: c.role || null,
       description: c.description || null,
       fixed_prompt_tag: c.fixed_prompt_tag,
-      profile: Object.assign({ key: c.key }, c.profile || {}),
+      profile: Object.assign({ key: c.key }, c.profile || {}, {
+        image_prompt: (c.profile && c.profile.image_prompt) || buildImagePrompt(c, data.story_bible)
+      }),
       sort_order: c.sort_order || 0
     }));
     const { error: charsError } = await supabase

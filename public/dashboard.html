@@ -1207,6 +1207,11 @@
                     (c.reference_image_url ? 'border-slate-700 text-slate-400 hover:text-cyber-cyan hover:border-cyber-cyan/40' : 'border-cyber-cyan/40 text-cyber-cyan bg-cyber-cyan/10 hover:bg-cyber-cyan/20') + '">' +
                     '<i class="fa-solid fa-upload mr-1"></i>' + (c.reference_image_url ? 'Cambiar' : 'Subir foto') +
                   '</button>' +
+                  (pr.image_prompt
+                    ? '<button type="button" onclick="copyTag(this, event)" data-tag="' + esc(pr.image_prompt) + '" title="Copia el prompt para generar la foto en Gemini" ' +
+                        'class="text-[10px] font-mono px-2 py-0.5 rounded border border-cyber-violet/40 text-cyber-violet bg-cyber-violet/10 hover:bg-cyber-violet/20">' +
+                        '<i class="fa-regular fa-copy mr-1"></i>Prompt foto</button>'
+                    : '') +
                 '</div>' +
                 '<div class="min-w-0 flex-1">' +
                   '<div class="flex items-center justify-between gap-2">' +
@@ -1231,6 +1236,15 @@
               '<p class="text-[11px] text-slate-300">' + esc(c.description || '') + '</p>' +
               '<div class="text-[11px] text-slate-400 space-y-1">' +
                 row('Personalidad', pr.personality) + row('Quiere', pr.wants) + row('Miedo', pr.fear) + row('Arco', pr.arc) + row('Vestuario base', pr.default_outfit) +
+              '</div>' +
+              '<div class="text-[10px] font-mono">' +
+                '<div class="flex items-center justify-between"><strong class="text-slate-300">Prompt para la foto (pegar en Gemini)</strong>' +
+                  (pr.image_prompt ? '<button onclick="copyTag(this, event)" data-tag="' + esc(pr.image_prompt) + '" class="text-cyber-violet hover:underline"><i class="fa-regular fa-copy mr-1"></i>Copiar</button>' : '') +
+                '</div>' +
+                '<p class="text-cyber-violet/90 bg-slate-900 p-2 rounded mt-1 border border-slate-800">' +
+                  (pr.image_prompt ? esc(pr.image_prompt) : '— Vuelve a importar/actualizar la novela para generar este prompt —') +
+                '</p>' +
+                '<p class="text-[10px] text-slate-500 mt-1">Solo cara y peinado normal, con ropa neutra: la ropa de cada episodio la pone el guion.</p>' +
               '</div>' +
               '<div class="text-[10px] font-mono">' +
                 '<div class="flex items-center justify-between"><strong class="text-slate-300">Prompt tag fijo (Veo)</strong>' +
@@ -1327,12 +1341,35 @@
           : '<i class="fa-solid fa-up-right-and-down-left-from-center mr-1"></i>Abrir todas';
       };
 
-      window.copyTag = function(btn) {
+      window.copyTag = function(btn, ev) {
+        if (ev) { ev.preventDefault(); ev.stopPropagation(); }
         const text = btn.getAttribute('data-tag') || '';
-        (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject())
-          .then(() => { btn.innerHTML = '<i class="fa-solid fa-check mr-1"></i>Copiado'; setTimeout(() => (btn.innerHTML = '<i class="fa-regular fa-copy mr-1"></i>Copiar'), 1500); })
-          .catch(() => prompt('Copia el tag:', text));
+        const original = btn.innerHTML;
+        const done = () => {
+          btn.innerHTML = '<i class="fa-solid fa-check mr-1"></i>Copiado';
+          setTimeout(() => (btn.innerHTML = original), 1500);
+        };
+        if (navigator.clipboard && window.isSecureContext) {
+          navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, done));
+        } else {
+          fallbackCopy(text, done);
+        }
       };
+
+      // Respaldo para copiar cuando el navegador no permite navigator.clipboard.
+      function fallbackCopy(text, done) {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.setAttribute('readonly', '');
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        let ok = false;
+        try { ok = document.execCommand('copy'); } catch (_) {}
+        ta.remove();
+        if (ok) done(); else prompt('Copia el texto:', text);
+      }
 
       function estimateEpisodeCost(ep) {
         const n = (ep.shots && ep.shots.length) || 8;

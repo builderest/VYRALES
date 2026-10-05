@@ -198,4 +198,20 @@ function buildShotPrompt(shot, characterRows, storyBible) {
   return parts.join(' ');
 }
 
-module.exports = { validateSeries, toEpisodeRows, buildShotPrompt, countWords };
+// Prompt para generar la FOTO DE REFERENCIA de un personaje en Gemini (a mano, copiar y
+// pegar desde el dashboard). Solo cara y peinado normal, con ropa neutra lisa: la ropa de
+// cada episodio la pone el texto de la toma, así la foto no "contamina" el vestuario.
+// Se guarda en characters.profile.image_prompt al importar (si el JSON no trae uno propio).
+function buildImagePrompt(character, storyBible) {
+  const sb = storyBible || {};
+  const style = (sb.visual_style || 'High-end 3D animated feature film style').split(',')[0].trim();
+  const tag = String(character.fixed_prompt_tag || '').trim().replace(/\.$/, '');
+  return (
+    `${style} character face reference. ${tag}. ` +
+    'Close-up head and shoulders, facing the camera, neutral relaxed expression, ' +
+    'wearing a plain simple light-gray crew-neck top, soft even studio lighting, ' +
+    'plain light-gray background, vertical 9:16. No text, no logos, no jewelry.'
+  );
+}
+
+module.exports = { validateSeries, toEpisodeRows, buildShotPrompt, buildImagePrompt, countWords };
