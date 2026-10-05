@@ -879,6 +879,13 @@
           row('tiktok', 'TikTok', 'fa-brands fa-tiktok') + row('instagram', 'Instagram', 'fa-brands fa-instagram') +
           '<p class="text-[10px] text-slate-500 mt-3">Al conectar vas a la página de la red; cuando diga “conectado”, vuelves al panel con el botón. Si no lo ves aquí, dale <button onclick="openSocialModal()" class="underline text-cyber-cyan">actualizar</button>.</p></div>';
       };
+      // Al volver de TikTok/Instagram (?connected=tiktok): abre "Redes" para ver la cuenta conectada.
+      (function() {
+        const c = new URLSearchParams(location.search).get('connected');
+        if (!c) return;
+        const u = new URL(location.href); u.searchParams.delete('connected'); history.replaceState(null, '', u.pathname + u.search);
+        setTimeout(() => window.openSocialModal && window.openSocialModal(), 800);
+      })();
       window.disconnectSocial = async function(platform) {
         if (!await askConfirm('¿Desconectar ' + (platform === 'tiktok' ? 'TikTok' : 'Instagram') + ' de VYRALES?\n\nNo borra nada de tu cuenta; solo deja de poder publicar desde aquí hasta que la vuelvas a conectar.')) return;
         try {
