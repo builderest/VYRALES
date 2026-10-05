@@ -58,6 +58,14 @@ function extraOf(sb, key) {
 
 // Narrador en off (documentales): extra con voiceover:true o descrito como fuera de cámara.
 // Nadie en cuadro habla ni mueve la boca con esa voz.
+// Nombre corto y ÚNICO de un personaje para el prompt: usa profile.key (SapiensUno,
+// NeandertalDos…) y solo si no existe, la primera palabra. Antes se usaba siempre la primera
+// palabra: en el documental "Neandertal representativo A" y "B" quedaban ambos "Neandertal".
+function shortName(name, characterRows) {
+  const row = (characterRows || []).find((r) => r.name === name);
+  return (row && row.profile && row.profile.key) || String(name || '').split(' ')[0];
+}
+
 function isVoiceover(ex) {
   return !!ex && (ex.voiceover === true || /off-?screen|never visible|voice-?over|narrat|narrador/i.test(`${ex.who || ''}`));
 }
@@ -311,11 +319,11 @@ function buildShotPrompt(shot, characterRows, storyBible) {
       parts.push(cast[0].replace(/\.?$/, '.'));
     } else {
       parts.push(cast.map((c, i) => `Character ${i + 1}: ${c.replace(/\.?$/, '.')}`).join(' '));
-      const firstNames = (shot.characters || []).map((n) => n.split(' ')[0]);
+      const firstNames = (shot.characters || []).map((n) => shortName(n, characterRows));
       parts.push(`There are exactly ${cast.length} people in focus: ${firstNames.join(' and ')}. Each one wears only their own outfit described above; clothing and accessories are never shared between them.`);
     }
     if (isV2 && rules.reference_images) {
-      const firstNames = (shot.characters || []).map((n) => n.split(' ')[0]);
+      const firstNames = (shot.characters || []).map((n) => shortName(n, characterRows));
       parts.push(`Use the provided reference images for the exact faces and hair of ${firstNames.join(' and ')}; their clothing follows the text above.`);
     }
   }
@@ -375,7 +383,8 @@ function buildShotPrompt(shot, characterRows, storyBible) {
   if (isV2) {
     // Audio estricto: en una prueba real (Ep1 T6, elevador con 2 personas) Veo agregó risas
     // de fondo como de público. Se describe en positivo exactamente qué se oye.
-    const peopleInFrame = (shot.characters || []).map((n) => n.split(' ')[0]);
+    const peopleInFrame = (shot.characters || []).map((n) => shortName(n, characterRows));
+    const voExtra = lines.length && isVoiceover(extraOf(sb, lines[0].speaker));
     if (lines.length) {
       const who = extraOf(sb, lines[0].speaker) ? extraOf(sb, lines[0].speaker).who : lines[0].speaker;
       parts.push(`Audio: only ${who} speaks, in Spanish, clearly and at a natural pace, finishing the line by second ${speakEnd}.`);
@@ -383,8 +392,11 @@ function buildShotPrompt(shot, characterRows, storyBible) {
       parts.push('Audio: nobody speaks in this shot.');
     }
     parts.push(
-      `The only human sounds are the voices and breathing of ${peopleInFrame.join(' and ')}` +
-      (lines.length && extraOf(sb, lines[0].speaker) ? ` and ${extraOf(sb, lines[0].speaker).who}` : '') +
+      (voExtra
+        // Narrador en off: la única voz es la narración; los de cuadro no emiten sonidos de voz.
+        ? `The only human voice is the voice-over narration${peopleInFrame.length ? `; ${peopleInFrame.join(' and ')} make no vocal sounds at all` : ''}`
+        : `The only human sounds are the voices and breathing of ${peopleInFrame.join(' and ')}` +
+          (lines.length && extraOf(sb, lines[0].speaker) ? ` and ${extraOf(sb, lines[0].speaker).who}` : '')) +
       '; any smile or chuckle stays silent and subtle. The soundtrack is intimate and quiet: no audience, no laugh track, no background crowd voices, no music.'
     );
     const ambient = (loc && loc.ambient) || '';
@@ -453,6 +465,7 @@ function effectiveShotPrompt(shot, characterRows, storyBible) {
 }
 
 module.exports = {
+  shortName,
   effectiveShotPrompt,
   referenceUrlsForShot,
   validateSeries,

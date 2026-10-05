@@ -3,6 +3,7 @@
 //   2) el CUADRO INICIAL de cada toma (personajes con su foto + lugar con su imagen fija),
 //      que después Veo Lite anima. Así el video arranca con la cara, la ropa y el set
 //      correctos, aunque Lite no acepte fotos de referencia directamente.
+const { shortName } = require('./_series');
 const { loadReferenceImages } = require('./_veo');
 const { MAX_CHARACTER_REFS, generateImage } = require('./_image');
 const { ensureMediaBucket, uploadFile, removeByPublicUrl } = require('./_storage');
@@ -44,7 +45,7 @@ function buildKeyframePrompt(shot, characterRows, storyBible, hasLocationRef) {
   names.forEach((name, i) => {
     const row = (characterRows || []).find((r) => r.name === name);
     if (!row) throw new Error(`El personaje "${name}" no existe.`);
-    const first = name.split(' ')[0];
+    const first = shortName(name, characterRows);
     const outfit = (shot.wardrobe && shot.wardrobe[name]) || (row.profile && row.profile.default_outfit) || '';
     parts.push(
       `${names.length > 1 ? `Character ${i + 1}: ` : ''}${row.fixed_prompt_tag.replace(/\.?$/, '')}` +
@@ -54,7 +55,7 @@ function buildKeyframePrompt(shot, characterRows, storyBible, hasLocationRef) {
     );
   });
   if (names.length > 1) {
-    parts.push(`There are exactly ${names.length} people: ${names.map((n) => n.split(' ')[0]).join(' and ')}. Each one wears only their own outfit; clothing and accessories are never shared.`);
+    parts.push(`There are exactly ${names.length} people: ${names.map((n) => shortName(n, characterRows)).join(' and ')}. Each one wears only their own outfit; clothing and accessories are never shared.`);
   }
   if (loc) {
     parts.push(`Setting: ${loc.visual.replace(/\.?$/, '.')}` + (hasLocationRef ? ' ' + SET_REF_SENTENCE : ''));
@@ -67,7 +68,7 @@ function buildKeyframePrompt(shot, characterRows, storyBible, hasLocationRef) {
   // 3 paneles (EP1 T10), que Veo no puede animar como una sola toma.
   parts.push('This is ONE single continuous full-frame image taken from one camera angle, like a single movie frame: one scene, one moment, with no split screen, panels, collage, borders or inset pictures.');
   if (names.length > 1 && /close[- ]?up/i.test(shot.camera || '')) {
-    parts.push(`${names.map((n) => n.split(' ')[0]).slice(1).join(' and ')} stays inside the same frame, partly visible at the edge and softly out of focus.`);
+    parts.push(`${names.map((n) => shortName(n, characterRows)).slice(1).join(' and ')} stays inside the same frame, partly visible at the edge and softly out of focus.`);
   }
   parts.push(CLEAN_FRAME);
   return parts.filter(Boolean).join(' ');
@@ -90,7 +91,7 @@ async function keyframeReferences(shot, characterRows, visualMemory) {
   const images = await loadReferenceImages(urls);
   const refs = images.map((img, i) => ({
     ...img,
-    label: i < names.length ? `face reference of ${names[i].split(' ')[0]}` : `fixed set reference of ${shot.location}`
+    label: i < names.length ? `face reference of ${shortName(names[i], characterRows)}` : `fixed set reference of ${shot.location}`
   }));
   return { refs, hasLocationRef: !!(locRef && locRef.url) };
 }
