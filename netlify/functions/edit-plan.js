@@ -41,7 +41,8 @@ function sanitize(plan) {
       normalize: !(p.audio && p.audio.normalize === false),
       music_url: p.audio && typeof p.audio.music_url === 'string' && /^https:\/\//.test(p.audio.music_url) ? p.audio.music_url : null,
       music_name: txt(p.audio && p.audio.music_name, 120),
-      music_volume: num(p.audio && p.audio.music_volume, 0, 1, 0.12)
+      music_volume: num(p.audio && p.audio.music_volume, 0, 1, 0.12),
+      duck: !(p.audio && p.audio.duck === false)
     },
     title_card: card(p.title_card),
     end_card: card(p.end_card)

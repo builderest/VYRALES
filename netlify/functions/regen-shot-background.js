@@ -18,7 +18,7 @@ const { getSupabaseClient } = require('./_supabase');
 const { BUCKET, uploadClip, storagePathFromPublicUrl } = require('./_storage');
 
 const { generateVeoClip, loadReferenceImages } = require('./_veo');
-const { effectiveShotPrompt, referenceUrlsForShot } = require('./_series');
+const { effectiveShotPrompt, referenceUrlsForShot, videoGeneratesAudio } = require('./_series');
 const { createKeyframe, loadExistingKeyframe } = require('./_keyframe');
 const { logSpend } = require('./_spend');
 
@@ -88,7 +88,7 @@ exports.handler = async (event) => {
     let modelKey = ['veo_lite', 'veo_fast', 'veo_standard'].includes(asset.model) ? asset.model : 'veo_lite';
     if (referenceImages.length) modelKey = rules.shot_model === 'veo_standard' ? 'veo_standard' : 'veo_fast';
     console.log(LOG, 'generando con Veo (' + modelKey + ')... esto tarda un rato.');
-    const { videoBuffer, costUsd, model } = await generateVeoClip({ modelKey, prompt, referenceImages, startImage, provider, log: (...a) => console.log(LOG, ...a) });
+    const { videoBuffer, costUsd, model } = await generateVeoClip({ modelKey, prompt, referenceImages, startImage, provider, generateAudio: videoGeneratesAudio((episode.series && episode.series.story_bible) || {}), log: (...a) => console.log(LOG, ...a) });
     await logSpend(supabase, { seriesId: episode.series_id, episodeId: episode.id, shotNumber: asset.shot_number, kind: 'video', model: provider === 'fal' ? 'fal_' + modelKey : modelKey, costUsd, note: provider === 'fal' ? 'regenerada (fal.ai)' : 'regenerada' });
     console.log(LOG, 'Veo terminó, subiendo a Supabase Storage...');
 

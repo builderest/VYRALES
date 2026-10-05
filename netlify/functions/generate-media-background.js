@@ -18,7 +18,7 @@ const { getSupabaseClient } = require('./_supabase');
 const { ensureMediaBucket, uploadClip } = require('./_storage');
 const { generateVeoClip, loadReferenceImages } = require('./_veo');
 const { mergeEpisodeVideo } = require('./_merge');
-const { effectiveShotPrompt, referenceUrlsForShot } = require('./_series');
+const { effectiveShotPrompt, referenceUrlsForShot, videoGeneratesAudio } = require('./_series');
 const { createKeyframe, loadExistingKeyframe } = require('./_keyframe');
 const { logSpend } = require('./_spend');
 
@@ -253,6 +253,7 @@ exports.handler = async (event) => {
     const cliffhangerModel = modelOverride || rules.cliffhanger_model || 'veo_fast';
     if (modelOverride) console.log(LOG, 'modelo forzado para esta corrida:', modelOverride);
     console.log(LOG, 'proveedor de video:', provider === 'fal' ? 'fal.ai (sin cuota diaria)' : 'Google (API de Gemini)');
+    console.log(LOG, 'audio del video:', videoGeneratesAudio(series.story_bible) ? 'con audio de Veo' : 'SIN audio (narrador TTS + música en el render)');
     console.log(LOG, 'modelos:', shotModel, '(tomas) /', cliffhangerModel, '(cliffhanger)');
 
     const results = [];
@@ -277,7 +278,7 @@ exports.handler = async (event) => {
           startImage = frame.startImage;
           console.log(LOG, `toma ${scene.number}/${total}: ${existingFrame ? 'usando el cuadro inicial ya guardado' : 'cuadro inicial creado'}.`);
         }
-        const { videoBuffer, costUsd, model } = await generateVeoClip({ modelKey, prompt, referenceImages, startImage, provider, log: (...a) => console.log(LOG, ...a) });
+        const { videoBuffer, costUsd, model } = await generateVeoClip({ modelKey, prompt, referenceImages, startImage, provider, generateAudio: videoGeneratesAudio(series.story_bible), log: (...a) => console.log(LOG, ...a) });
         await logSpend(supabase, { seriesId: series.id, episodeId: episode.id, shotNumber: scene.number, kind: 'video', model: provider === 'fal' ? 'fal_' + modelKey : modelKey, costUsd, note: provider === 'fal' ? 'fal.ai' : undefined });
         console.log(LOG, `toma ${scene.number}/${total}: Veo terminó, subiendo a Supabase Storage...`);
 

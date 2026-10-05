@@ -81,7 +81,7 @@
             <div id="edSub" class="hidden absolute left-0 right-0 text-center px-5 leading-tight z-10 select-none" style="font-family:Montserrat,sans-serif;font-weight:800"></div>
             <div id="edLabel" class="absolute top-1 left-1 text-[10px] font-mono bg-black/60 text-white rounded px-1.5"></div>
           </div>
-          <audio id="edMusic" loop preload="auto"></audio>
+          <audio id="edMusic" loop preload="auto"></audio><audio id="edNarr" preload="auto"></audio>
           <div class="w-full flex items-center gap-2">
             <button id="edPlayBtn" onclick="vyEditor.togglePlay()" class="px-3 py-1.5 rounded-lg bg-cyber-cyan/20 border border-cyber-cyan/50 text-cyber-cyan text-xs font-mono"><i class="fa-solid fa-play mr-1"></i>Ver todo</button>
             <span id="edTime" class="text-[11px] font-mono text-slate-300">0:00 / 0:00</span>
@@ -141,6 +141,7 @@
             </div>
             <div data-pane="audio" class="ed-pane hidden bg-black/30 border border-cyber-border rounded-lg p-3 space-y-2">
               <label class="flex items-center gap-2"><input type="checkbox" id="edNorm"> Volumen parejo en todo el episodio (-14 LUFS)</label>
+              <label class="flex items-center gap-2"><input type="checkbox" id="edDuck"> Bajar la música cuando habla el narrador (estilo documental)</label>
               <div class="flex items-center gap-2"><button onclick="document.getElementById('edMusicFile').click()" class="${btn} border-cyber-border hover:text-white"><i class="fa-solid fa-music mr-1"></i>Subir música</button><input type="file" id="edMusicFile" accept="audio/*" class="hidden"><span id="edMusicName" class="truncate text-slate-400"></span><button id="edMusicDel" onclick="vyEditor.removeMusic()" class="hidden text-cyber-pink" title="Quitar música"><i class="fa-solid fa-trash"></i></button></div>
               <label class="flex items-center gap-2">Volumen música <input type="range" id="edMusicVol" min="0" max="0.5" step="0.01" class="flex-1"><span id="edMusicVolV"></span></label>
             </div>
@@ -210,6 +211,8 @@
     bind('edSubSize', (el) => { st.plan.subtitles.size = Number(el.value); $('edSubSizeV').textContent = el.value; previewSub(); });
     bind('edSubPos', (el) => { st.plan.subtitles.margin_v = Number(el.value); $('edSubPosV').textContent = posLabel(); previewSub(); });
     bind('edNorm', (el) => { st.plan.audio.normalize = el.checked; }, 'change');
+    bind('edDuck', (el) => { st.plan.audio.duck = el.checked; }, 'change');
+    $('edNarr').addEventListener('ended', () => duck(false));
     bind('edMusicVol', (el) => { st.plan.audio.music_volume = Number(el.value); $('edMusicVolV').textContent = Math.round(el.value * 100) + '%'; $('edMusic').volume = Number(el.value); });
     bind('edTitleOn', (el) => { st.plan.title_card.enabled = el.checked; renderTimeline(); }, 'change');
     bind('edTitleText', (el) => { st.plan.title_card.text = el.value; });
@@ -238,6 +241,24 @@
   // ================= Datos / helpers =================
   const clipAsset = (n) => (st.ep.assets || []).find((a) => a.kind === 'video_clip' && a.shot_number === n);
   const shotOf = (n) => (st.ep.shots || []).find((s) => s.n === n) || {};
+  // Narrador con voz fija (TTS): igual que en _render.js — empieza a 0.3 s de la toma, se acelera
+  // hasta 1.2x si no cabe, y silencia el audio de clips que traen la voz vieja de Veo.
+  const NARR_START = 0.3;
+  const ttsOn = () => { const d = window.vyCtx && window.vyCtx().data; const n = d && d.series && d.series.story_bible && d.series.story_bible.narration; return !!(n && n.engine === 'gemini_tts'); };
+  function narrOf(c, a, overlap) {
+    const n = shotOf(c.shot).narration;
+    if (!ttsOn() || !n || !n.url) return null;
+    const secs = Number(n.seconds) || 6;
+    const avail = Math.max(1, clipDur(c) - NARR_START - Math.max(0.15, overlap));
+    const tempo = Math.min(1.2, Math.max(1, secs / avail));
+    return { url: n.url, seconds: secs, tempo, mute: /Voice-over narration/i.test(a.prompt || '') };
+  }
+  function duck(on) {
+    const m = $('edMusic');
+    if (!st.plan || !st.plan.audio.music_url) return;
+    const base = Number(st.plan.audio.music_volume) || 0.12;
+    m.volume = on && st.plan.audio.duck !== false ? base * 0.33 : base;
+  }
   const dialogueList = (n) => { const d = shotOf(n).dialogue; return Array.isArray(d) ? d : d ? [d] : []; };
   const dialogueOf = (n) => dialogueList(n).map((x) => x && x.line).filter(Boolean).join(' ');
   const speakerOf = (n) => (dialogueList(n)[0] || {}).speaker || '';
@@ -269,8 +290,12 @@
     inc.forEach((c) => { const s = speakerOf(c.shot); if (s && !st.speakers.includes(s)) st.speakers.push(s); });
     inc.forEach((c, k) => {
       const a = clipAsset(c.shot);
-      push({ type: 'clip', shot: c.shot, url: a.storage_path, start: Number(c.trim_start) || 0, end: srcLen() - (Number(c.trim_end) || 0), speed: speedOf(c), zoom: !!c.zoom,
-        volume: c.volume == null ? 1 : Number(c.volume), subtitle: p.subtitles.enabled ? (c.subtitle || dialogueOf(c.shot)) : '', speaker: speakerOf(c.shot),
+      const tr = k < inc.length - 1 ? c.transition : 'cut';
+      const narr = narrOf(c, a, OVERLAP(tr) ? transS(c) : 0);
+      const start0 = Number(c.trim_start) || 0;
+      push({ type: 'clip', shot: c.shot, url: a.storage_path, start: start0, end: srcLen() - (Number(c.trim_end) || 0), speed: speedOf(c), zoom: !!c.zoom, narr,
+        subWin: narr ? [start0 + NARR_START * speedOf(c), start0 + (NARR_START + narr.seconds / narr.tempo) * speedOf(c)] : null,
+        volume: narr && narr.mute ? 0 : (c.volume == null ? 1 : Number(c.volume)), subtitle: p.subtitles.enabled ? (c.subtitle || dialogueOf(c.shot)) : '', speaker: speakerOf(c.shot),
         overlay: c.overlay || '', dur: clipDur(c), transition: k < inc.length - 1 ? c.transition : 'cut', transition_s: transS(c), label: 'TOMA ' + String(c.shot).padStart(2, '0') });
     });
     if (p.end_card.enabled && (p.end_card.text || p.end_card.subtext)) push({ type: 'card', key: 'end', lines: [p.end_card.text, p.end_card.subtext], dur: Number(p.end_card.seconds) || 2, label: 'Final' });
@@ -399,6 +424,7 @@
     $('edSubSize').value = p.subtitles.size || 38; $('edSubSizeV').textContent = $('edSubSize').value;
     $('edSubPos').value = p.subtitles.margin_v; $('edSubPosV').textContent = posLabel();
     $('edNorm').checked = p.audio.normalize !== false;
+    $('edDuck').checked = p.audio.duck !== false;
     $('edMusicVol').value = p.audio.music_volume == null ? 0.12 : p.audio.music_volume; $('edMusicVolV').textContent = Math.round($('edMusicVol').value * 100) + '%';
     $('edMusicName').textContent = p.audio.music_url ? (p.audio.music_name || 'música cargada') : 'sin música';
     $('edMusicDel').classList.toggle('hidden', !p.audio.music_url);
@@ -605,14 +631,15 @@
   function showOverlay(item, tSrc) {
     const sub = $('edSub'); const top = $('edTop');
     styleSub(item.speaker);
-    const inWin = tSrc >= SUB_WINDOW[0] && tSrc <= SUB_WINDOW[1];
+    const SW = item.subWin || SUB_WINDOW;
+    const inWin = tSrc >= SW[0] && tSrc <= SW[1];
     const showSub = item.subtitle && (inWin || st.dragging || !st.playing);
     sub.classList.toggle('hidden', !showSub);
     if (showSub) {
-      const prog = st.plan.subtitles.karaoke ? Math.min(1, Math.max(0, (tSrc - SUB_WINDOW[0]) / (SUB_WINDOW[1] - SUB_WINDOW[0]))) : null;
+      const prog = st.plan.subtitles.karaoke ? Math.min(1, Math.max(0, (tSrc - SW[0]) / (SW[1] - SW[0]))) : null;
       sub.innerHTML = subHtml(item.subtitle, prog);
       if (st.plan.subtitles.animation === 'pop' && st.playing) {
-        const age = (tSrc - Math.max(SUB_WINDOW[0], item.start)) / item.speed;
+        const age = (tSrc - Math.max(SW[0], item.start)) / item.speed;
         sub.style.transform = age >= 0 && age < 0.14 ? `scale(${0.7 + 0.3 * age / 0.14})` : 'scale(1)';
       } else sub.style.transform = 'scale(1)';
     }
@@ -638,6 +665,16 @@
     if (!item || item.type !== 'clip') return;
     const v = $('edVideo');
     showOverlay(item, v.currentTime);
+    if (item.narr && st.playing && !item._narrOn) {
+      const tOut = (v.currentTime - item.start) / item.speed;
+      if (tOut >= NARR_START && tOut < NARR_START + item.narr.seconds / item.narr.tempo) {
+        item._narrOn = true;
+        const na = $('edNarr');
+        if (na.getAttribute('src') !== item.narr.url) na.setAttribute('src', item.narr.url);
+        try { na.currentTime = Math.max(0, (tOut - NARR_START) * item.narr.tempo); } catch (_) {}
+        na.playbackRate = item.narr.tempo; na.play().catch(() => {}); duck(true);
+      }
+    }
     if (st.scrubShot !== item.shot) {
       st.scrubShot = item.shot; paintScrub();
       const si = st.plan.clips.findIndex((x) => x.shot === item.shot);
@@ -659,6 +696,8 @@
     clearTimeout(st.timer);
     st.idx = i;
     const item = st.seq[i];
+    $('edNarr').pause(); duck(false);
+    if (item) item._narrOn = false;
     const v = $('edVideo'); const card = $('edCard');
     if (!item) { stop(); return; }
     $('edLabel').textContent = item.label;
@@ -679,7 +718,7 @@
   }
   function stop() {
     st.playing = false; clearTimeout(st.timer);
-    $('edVideo').pause(); $('edMusic').pause(); $('edFade').style.opacity = 0;
+    $('edVideo').pause(); $('edMusic').pause(); $('edNarr').pause(); duck(false); $('edFade').style.opacity = 0;
     $('edPlayBtn').innerHTML = '<i class="fa-solid fa-play mr-1"></i>Ver todo';
   }
   function start(fromIdx) {
@@ -858,7 +897,7 @@
       const it = st.seq[st.idx];
       const v = $('edVideo');
       if (it && it.type === 'clip' && v.currentTime > it.start + 0.05 && v.currentTime < it.end - 0.1) {
-        st.playing = true; $('edPlayBtn').innerHTML = '<i class="fa-solid fa-pause mr-1"></i>Pausa';
+        st.playing = true; it._narrOn = false; $('edPlayBtn').innerHTML = '<i class="fa-solid fa-pause mr-1"></i>Pausa';
         v.playbackRate = it.speed; v.volume = Math.min(1, it.volume); v.play().catch(() => {});
         if (st.plan.audio.music_url) $('edMusic').play().catch(() => {});
       } else start(st.idx < st.seq.length - 1 ? st.idx : 0);

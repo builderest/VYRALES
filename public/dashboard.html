@@ -672,7 +672,72 @@
       }
       const DEFAULT_SERIES = readSeriesParam();
       // Mismos precios calibrados que netlify/functions/_veo.js (VEO_PRICE_PER_SECOND_USD).
-      const VEO_PRICE_PER_SEC = { veo_lite: 0.05, veo_fast: 0.10, veo_standard: 0.40 }; // 720p, precio oficial de Google
+      const GOOGLE_PRICE_PER_SEC = { veo_lite: 0.05, veo_fast: 0.10, veo_standard: 0.40 }; // 720p, precio oficial de Google
+      // fal.ai cobra distinto y según si el video lleva audio (verificado oct-2026): Fast con audio $0.15/s.
+      const FAL_PRICE_PER_SEC = { veo_lite: { audio: 0.05, silent: 0.03 }, veo_fast: { audio: 0.15, silent: 0.10 }, veo_standard: { audio: 0.40, silent: 0.20 } };
+      function silentVideo() { const n = narrationCfg(lastLoadedData && lastLoadedData.series); return !!(n && n.video_audio === 'none'); }
+      // Precio por segundo según el proveedor elegido (y audio sí/no en fal). Mismo uso que antes: VEO_PRICE_PER_SEC[modelo].
+      const VEO_PRICE_PER_SEC = new Proxy({}, { get: (_, k) => videoProvider === 'fal' ? ((FAL_PRICE_PER_SEC[k] || {})[silentVideo() ? 'silent' : 'audio'] || 0) : (GOOGLE_PRICE_PER_SEC[k] || 0) });
+      // ---------- Narrador con voz fija (Gemini TTS) ----------
+      const TTS_LINE_USD = 0.004; // ~8 s de audio a 25 tokens/s, $18 por 1M tokens
+      const TTS_VOICES = [['Algenib', 'grave, rasposa'], ['Charon', 'informativa'], ['Orus', 'firme'], ['Iapetus', 'clara'], ['Rasalgethi', 'informativa'], ['Sadaltager', 'experta'], ['Gacrux', 'madura']];
+      function narrationCfg(series) { const n = series && series.story_bible && series.story_bible.narration; return n && n.engine === 'gemini_tts' ? n : null; }
+      function narratorText(series, sh) {
+        const ex = (series && series.story_bible && series.story_bible.extras) || {};
+        return (sh.dialogue || []).filter(d => { const e = ex[d.speaker]; const who = typeof e === 'string' ? e : (e && e.who) || ''; return e && ((e.voiceover === true) || /off-?screen|never visible|voice-?over|narrat|narrador/i.test(who)); }).map(d => d.line).join(' ').trim();
+      }
+      function narrationState(series, sh) {
+        const cfg = narrationCfg(series); if (!cfg) return null;
+        const text = narratorText(series, sh); if (!text) return null;
+        const n = sh.narration;
+        return { text, n, ok: !!(n && n.url && n.text === text && n.voice === (cfg.voice || 'Charon')) };
+      }
+      function narrationRunning(ep) {
+        const r = (ep.validator_report || {}).last_narration_run;
+        return r && r.status === 'running' && (Date.now() - new Date(r.at).getTime() < 5 * 60000) ? r : null;
+      }
+      function narratorPanelHtml(data) {
+        const cfg = narrationCfg(data.series);
+        const hasNarrator = Object.values((data.series.story_bible || {}).extras || {}).some(e => e && /narrat|narrador|off-?screen|voice-?over/i.test(typeof e === 'string' ? e : (e.who || '')));
+        if (!cfg && !hasNarrator) return '';
+        const voiceBtn = ([v, d]) => '<span class="inline-flex items-center rounded-lg border ' + (cfg && cfg.voice === v ? 'border-cyber-emerald bg-cyber-emerald/15 text-cyber-emerald' : 'border-cyber-border text-slate-400') + ' text-[10px] font-mono">' +
+          '<button type="button" onclick="playVoiceSample(\'' + v + '\')" class="px-1.5 py-1 hover:text-white" title="Escuchar"><i class="fa-solid fa-play"></i></button>' +
+          '<button type="button" onclick="setNarration({ voice: \'' + v + '\' })" class="px-1.5 py-1 hover:text-white">' + v + ' <span class="opacity-60">' + d + '</span></button></span>';
+        const audBtn = (k, label, sub) => '<button type="button" onclick="setNarration({ video_audio: \'' + k + '\' })" class="flex-1 px-2 py-1.5 rounded-lg border text-[10px] font-mono leading-tight ' + (cfg && (cfg.video_audio || 'ambient') === k ? 'border-cyber-emerald bg-cyber-emerald/15 text-cyber-emerald' : 'border-cyber-border text-slate-400 hover:text-white') + '"><span class="block font-bold">' + label + '</span><span class="block">' + sub + '</span></button>';
+        return '<div class="w-full mt-3"><p class="text-[10px] font-mono text-slate-500 mb-1">NARRADOR ' + (cfg ? '· VOZ FIJA (Gemini TTS, ~$' + TTS_LINE_USD + '/frase)' : '· lo hace Veo (la voz cambia en cada toma)') + '</p>' +
+          (cfg
+            ? '<div class="flex flex-wrap gap-1.5 mb-2">' + TTS_VOICES.map(voiceBtn).join('') + '</div>' +
+              '<div class="flex gap-2">' + audBtn('ambient', 'Video con sonido ambiente', 'viento, fuego… (audio de Veo)') + audBtn('none', 'Video sin audio', 'más barato · solo voz + música') + '</div>'
+            : '<button type="button" onclick="setNarration({ enabled: true })" class="px-2 py-1.5 rounded-lg border border-cyber-emerald/50 text-cyber-emerald text-[10px] font-mono">Activar narrador con voz fija</button>') +
+          '</div>';
+      }
+      window.playVoiceSample = function(v) { const a = window.__voiceSample || (window.__voiceSample = new Audio()); a.src = 'voces/voz_' + v + '.mp3'; a.play().catch(() => {}); };
+      window.setNarration = async function(patch) {
+        const cfg = narrationCfg(lastLoadedData && lastLoadedData.series);
+        const done = (lastLoadedData.episodes || []).reduce((n, e) => n + (e.shots || []).filter(sh => sh.narration && sh.narration.url).length, 0);
+        if (patch.voice && cfg && patch.voice !== cfg.voice && done && !await askConfirm('Cambiar la voz a ' + patch.voice + '.\n\nLas ' + done + ' narraciones ya hechas quedan marcadas para rehacer (~$' + (done * TTS_LINE_USD).toFixed(2) + ' si las rehaces todas). No se cobra nada ahora. ¿Continuar?')) return;
+        try {
+          const res = await fetch('/.netlify/functions/narration-settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.assign({ series: DEFAULT_SERIES }, patch)) });
+          const j = await res.json();
+          if (!res.ok) throw new Error(j.error || ('HTTP ' + res.status));
+          loadDashboard();
+        } catch (err) { alert('No se pudo guardar el narrador: ' + err.message); }
+      };
+      window.genNarration = async function(btn) {
+        const epId = btn.getAttribute('data-ep');
+        const n = btn.getAttribute('data-n');
+        const ep = (lastLoadedData.episodes || []).find(x => x.id === epId);
+        if (!ep) return;
+        const count = n ? 1 : (ep.shots || []).filter(sh => { const ns = narrationState(lastLoadedData.series, sh); return ns && !ns.ok; }).length;
+        const voice = (narrationCfg(lastLoadedData.series) || {}).voice || 'Charon';
+        if (!await askConfirm((n ? 'Generar la voz del narrador de la TOMA ' + String(n).padStart(2, '0') : 'Generar la voz del narrador de ' + count + ' tomas del EP ' + ep.episode_number) + ' con la voz ' + voice + '.\n\nCosto: ~$' + (count * TTS_LINE_USD).toFixed(3) + ' (Gemini TTS). No toca los videos. ¿Continuar?')) return;
+        btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>Generando voz...';
+        try {
+          const res = await fetch('/.netlify/functions/narration-background', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(n ? { episode_id: epId, shot: Number(n) } : { episode_id: epId }) });
+          if (!res.ok && res.status !== 202) throw new Error('HTTP ' + res.status);
+        } catch (err) { alert('No se pudo iniciar la narración: ' + err.message); }
+        setTimeout(loadDashboard, n ? 8000 : 4000);
+      };
       const IMAGE_PRICE_USD = 0.067; // cuadro inicial / imagen de lugar (gemini-3.1-flash-image, 1K)
       function usesKeyframes(series) { return !!(series && series.story_bible && series.story_bible.rules && series.story_bible.rules.keyframes); }
       function frameFor(ep, n) { return (ep.assets || []).find(a => a.kind === 'image' && a.shot_number === n) || null; }
@@ -1752,6 +1817,17 @@
                       '<p class="text-[10px] font-mono text-slate-500">TOMA ' + String(sh.n).padStart(2, '0') + (isCliff ? ' · CLIFFHANGER' : '') + ' · Veo ' + VEO_LABEL[model] + ' · ' + esc(sh.location) + ' · ' + esc((sh.characters || []).join(', ')) + (sh.camera ? ' · ' + esc(sh.camera) : '') + '</p>' +
                       '<p class="text-[12px] text-slate-200">' + esc(sh.scene_es) + '</p>' +
                       (sh.dialogue || []).map(d => '<p class="text-[11px] text-cyber-cyan font-mono">— ' + esc(d.speaker) + ': ' + esc(d.line) + '</p>').join('') +
+                      (function() {
+                        const ns = narrationState(data.series, sh);
+                        if (!ns) return '';
+                        const has = ns.n && ns.n.url;
+                        return '<div class="flex flex-wrap items-center gap-2 mt-1">' +
+                          (has ? '<audio controls preload="none" src="' + esc(ns.n.url) + '" class="h-7 max-w-[230px]"></audio>' +
+                            '<span class="text-[10px] font-mono ' + (ns.ok ? (ns.n.seconds > 7.4 ? 'text-cyber-gold' : 'text-slate-500') : 'text-cyber-gold') + '">' +
+                            (ns.ok ? (ns.n.seconds || '?') + ' s · ' + esc(ns.n.voice) + (ns.n.seconds > 7.4 ? ' · larga: el render la acelera' : '') : '⚠ el texto o la voz cambió: rehacer') + '</span>' : '') +
+                          (narrationRunning(e) ? '' : '<button onclick="genNarration(this)" data-ep="' + e.id + '" data-n="' + sh.n + '" class="text-[10px] font-mono px-2 py-0.5 rounded border border-cyber-emerald/40 text-cyber-emerald bg-cyber-emerald/10 hover:bg-cyber-emerald/20"><i class="fa-solid fa-microphone mr-1"></i>' + (has ? 'Rehacer voz' : 'Generar voz') + ' · TOMA ' + String(sh.n).padStart(2, '0') + ' (~$' + TTS_LINE_USD.toFixed(3) + ')</button>') +
+                        '</div>';
+                      })() +
                       '<div class="flex flex-wrap items-center gap-2 mt-1.5">' +
                         (sh.prompt_override ? '<span class="text-[10px] font-mono px-1.5 py-0.5 rounded border border-cyber-violet/40 text-cyber-violet"><i class="fa-solid fa-pen mr-1"></i>prompt editado</span>' : '') +
                         (effectivePrompt
@@ -1789,6 +1865,13 @@
           const framesBtn = (e.status === 'guion_generado' && missingFrames)
             ? '<button onclick="generateAllFrames(this)" data-ep="' + e.id + '" class="mr-2 mb-1 px-3 py-1.5 rounded-lg bg-cyber-violet/15 border border-cyber-violet/50 text-cyber-violet text-xs font-mono hover:bg-cyber-violet/25"><i class="fa-solid fa-images mr-1"></i>Generar los ' + missingFrames + ' cuadros que faltan' + (missingLocationsFor(e).length ? ' + ' + missingLocationsFor(e).length + ' lugares' : '') + ' (~$' + ((missingFrames + missingLocationsFor(e).length) * IMAGE_PRICE_USD).toFixed(2) + ') para revisarlos</button>'
             : '';
+          const narrMissing = narrationCfg(data.series) ? shots.filter(sh => { const ns = narrationState(data.series, sh); return ns && !ns.ok; }).length : 0;
+          const narrRun = narrationRunning(e);
+          const lastNarr = (e.validator_report || {}).last_narration_run;
+          const narrBtn = narrRun
+            ? '<span class="mr-2 mb-1 px-3 py-1.5 rounded-lg border border-cyber-emerald/50 text-cyber-emerald text-xs font-mono"><i class="fa-solid fa-spinner fa-spin mr-1"></i>Generando narración ' + (narrRun.done || 0) + '/' + (narrRun.total || '?') + '</span>'
+            : (narrMissing ? '<button onclick="genNarration(this)" data-ep="' + e.id + '" class="mr-2 mb-1 px-3 py-1.5 rounded-lg bg-cyber-emerald/15 border border-cyber-emerald/50 text-cyber-emerald text-xs font-mono hover:bg-cyber-emerald/25"><i class="fa-solid fa-microphone mr-1"></i>Generar narración: ' + narrMissing + ' toma' + (narrMissing === 1 ? '' : 's') + ' (~$' + (narrMissing * TTS_LINE_USD).toFixed(2) + ')</button>' : '') +
+              (lastNarr && lastNarr.status !== 'running' && ((lastNarr.failed || []).length || lastNarr.error) ? '<span class="text-[10px] font-mono text-cyber-pink">Narración con errores: ' + esc(lastNarr.error || (lastNarr.failed || []).map(f => 'T' + f.shot + ' ' + f.error).join(' · ')) + '</span>' : '');
           const produceBtn = (nextToProduce && nextToProduce.id === e.id)
             ? '<button onclick="produceEpisode(\'' + e.id + '\')" class="px-3 py-1.5 rounded-lg bg-cyber-pink/20 border border-cyber-pink/50 text-cyber-pink text-xs font-mono hover:bg-cyber-pink/30"><i class="fa-solid fa-bolt mr-1"></i>Producir este episodio con ' + seriesModels(lastLoadedData.series).shot.replace('veo_', 'Veo ') + ' (~$' + estimateEpisodeCost(e).toFixed(2) + ')</button>'
             : '';
@@ -1806,7 +1889,7 @@
                 (cont.summary ? '<p class="text-[11px] text-slate-400"><strong class="text-slate-300">Resumen:</strong> ' + esc(cont.summary) + '</p>' : '') +
                 shotsHtml +
                 (cont.last_cliffhanger ? '<p class="text-[11px] text-cyber-pink"><strong>Gancho:</strong> ' + esc(cont.last_cliffhanger) + '</p>' : '') +
-                '<div class="flex flex-wrap items-center gap-2 pt-1">' + framesBtn + produceBtn +
+                '<div class="flex flex-wrap items-center gap-2 pt-1">' + framesBtn + narrBtn + produceBtn +
                   ((e.assets || []).some(a => a.kind === 'video_clip') && e.status !== 'generando_media'
                     ? '<button onclick="vyEditor.open(\'' + e.id + '\')" class="px-3 py-1.5 rounded-lg bg-cyber-gold/10 border border-cyber-gold/40 text-cyber-gold text-xs font-mono hover:bg-cyber-gold/20"><i class="fa-solid fa-scissors mr-1"></i>Editar episodio</button>'
                     : '') + '</div>' +
@@ -1908,6 +1991,8 @@
         clearTimeout(genRefreshTimer);
         if ((data.episodes || []).some(e => e.status === 'generando_media')) {
           genRefreshTimer = setTimeout(() => { loadDashboard(); }, 20000);
+        } else if ((data.episodes || []).some(e => narrationRunning(e))) {
+          genRefreshTimer = setTimeout(() => { loadDashboard(); }, 6000);
         }
       }
 
@@ -1934,7 +2019,7 @@
             (quotaStopOf(next) ? '<br><span class="text-cyber-gold">⏸ Se detuvo por cuota de Google en la toma ' + quotaStopOf(next).quota_stop.shot + '</span>' : '');
           btn.textContent = 'Producir EP ' + next.episode_number;
           btn.classList.remove('hidden');
-          desc.insertAdjacentHTML('beforeend', veoPickerHtml(data));
+          desc.insertAdjacentHTML('beforeend', veoPickerHtml(data) + narratorPanelHtml(data));
         } else {
           title.textContent = eps.length ? 'No hay episodios pendientes' : 'Sin episodios';
           desc.textContent = eps.length ? 'Todos los episodios ya se produjeron.' : 'Crea una novela con el botón PROMPT.';
@@ -2573,6 +2658,6 @@
             </div>
         </div>
     </div>
-    <script src="editor.js?v=9"></script>
+    <script src="editor.js?v=10"></script>
 </body>
 </html>

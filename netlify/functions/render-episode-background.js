@@ -22,7 +22,7 @@ exports.handler = async (event) => {
   };
   try {
     const body = JSON.parse(event.body || '{}');
-    const { data: series } = await supabase.from('series').select('id, slug').eq('slug', body.series || '').single();
+    const { data: series } = await supabase.from('series').select('id, slug, story_bible').eq('slug', body.series || '').single();
     if (!series) throw new Error('Serie no encontrada.');
     const { data: ep, error } = await supabase.from('episodes').select('*, assets(*)').eq('id', body.episode_id || '').eq('series_id', series.id).single();
     if (error || !ep) throw error || new Error('Episodio no encontrado.');

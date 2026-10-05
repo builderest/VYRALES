@@ -31,6 +31,17 @@ const VEO_PRICE_PER_SECOND_USD = {
   veo_fast: 0.10,
   veo_standard: 0.40
 };
+// fal.ai cobra DISTINTO que Google y distinto con/sin audio (720p, verificado oct-2026 en
+// fal.ai/models/fal-ai/veo3.1/*): Fast con audio es $0.15/s, no $0.10.
+const FAL_PRICE_PER_SECOND_USD = {
+  veo_lite: { audio: 0.05, silent: 0.03 },
+  veo_fast: { audio: 0.15, silent: 0.10 },
+  veo_standard: { audio: 0.40, silent: 0.20 }
+};
+function videoPricePerSecond(modelKey, provider = 'google', generateAudio = true) {
+  if (provider === 'fal') { const p = FAL_PRICE_PER_SECOND_USD[modelKey]; return p ? p[generateAudio === false ? 'silent' : 'audio'] : 0; }
+  return VEO_PRICE_PER_SECOND_USD[modelKey] || 0;
+}
 
 function getGenAIClient() {
   const apiKey = process.env.GOOGLE_AI_API_KEY;
@@ -89,13 +100,13 @@ const MODELS_WITH_REFERENCE_IMAGES = new Set(['veo_fast', 'veo_standard']);
 // los personajes de la toma para que Veo mantenga sus caras.
 // startImage: { imageBytes, mimeType } — CUADRO INICIAL (image-to-video). Veo 3.1 Lite sí lo
 // acepta: es como la memoria visual llega a Lite (la cara y el set ya vienen en el cuadro).
-async function generateVeoClip({ modelKey, prompt, aspectRatio = '9:16', durationSeconds = 8, referenceImages = [], startImage = null, provider = 'google', log = console.log }) {
+async function generateVeoClip({ modelKey, prompt, aspectRatio = '9:16', durationSeconds = 8, referenceImages = [], startImage = null, provider = 'google', generateAudio = true, log = console.log }) {
   // Proveedor fal.ai: mismo modelo y precio, sin cuota diaria (ver _fal.js).
   if (provider === 'fal') {
     if (referenceImages.length) throw new Error('Con fal.ai no se usan fotos de referencia directas; usa memoria visual (cuadro inicial).');
     const { falGenerateVideo } = require('./_fal');
-    const { videoBuffer } = await falGenerateVideo({ modelKey, prompt, startImage, aspectRatio, durationSeconds, log });
-    return { videoBuffer, costUsd: Number(durationSeconds) * (VEO_PRICE_PER_SECOND_USD[modelKey] || 0), model: 'fal:' + modelKey, provider: 'fal' };
+    const { videoBuffer } = await falGenerateVideo({ modelKey, prompt, startImage, aspectRatio, durationSeconds, generateAudio, log });
+    return { videoBuffer, costUsd: Number(durationSeconds) * videoPricePerSecond(modelKey, 'fal', generateAudio), model: 'fal:' + modelKey, provider: 'fal', generateAudio: generateAudio !== false };
   }
   const model = VEO_MODELS[modelKey];
   if (!model) throw new Error('Modelo de Veo desconocido: ' + modelKey);
@@ -172,4 +183,4 @@ async function loadReferenceImages(urls) {
   return out;
 }
 
-module.exports = { generateVeoClip, loadReferenceImages, VEO_MODELS, VEO_PRICE_PER_SECOND_USD, MODELS_WITH_REFERENCE_IMAGES };
+module.exports = { generateVeoClip, videoPricePerSecond, FAL_PRICE_PER_SECOND_USD, loadReferenceImages, VEO_MODELS, VEO_PRICE_PER_SECOND_USD, MODELS_WITH_REFERENCE_IMAGES };

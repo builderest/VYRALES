@@ -66,6 +66,23 @@ function shortName(name, characterRows) {
   return (row && row.profile && row.profile.key) || String(name || '').split(' ')[0];
 }
 
+// Narrador con voz fija (TTS): story_bible.narration = { engine: 'gemini_tts', voice, style,
+// model, video_audio: 'ambient' | 'none' }. Si está activo, la narración NO va en el prompt de
+// Veo (Veo cambiaba la voz en cada toma y se comía palabras: "cincuenta mil" sonó "cincuenta");
+// se genera aparte con Gemini TTS y se mezcla en el render.
+function narrationConfig(sb) {
+  const n = sb && sb.narration;
+  return n && n.engine === 'gemini_tts' ? n : null;
+}
+function narrationLines(shot, sb) {
+  return dialogueList(shot && shot.dialogue).filter((d) => isVoiceover(extraOf(sb || {}, d.speaker)));
+}
+// ¿El video de Veo lleva audio? Con narrador TTS se puede pedir sin audio (más barato en fal).
+function videoGeneratesAudio(sb) {
+  const n = narrationConfig(sb);
+  return !(n && n.video_audio === 'none');
+}
+
 function isVoiceover(ex) {
   return !!ex && (ex.voiceover === true || /off-?screen|never visible|voice-?over|narrat|narrador/i.test(`${ex.who || ''}`));
 }
@@ -330,7 +347,9 @@ function buildShotPrompt(shot, characterRows, storyBible) {
 
   // 3) Acción con marcas de tiempo: diálogo en 0–6 s, reacción quieta en 6–8 s (corte limpio)
   const extras = sb.extras || {};
-  const lines = dialogueList(shot.dialogue);
+  const tts = !!narrationConfig(sb);
+  // Con narrador TTS, las líneas del narrador no van a Veo (se mezclan después en el render).
+  const lines = dialogueList(shot.dialogue).filter((d) => !(tts && isVoiceover(extraOf(sb, d.speaker))));
   const voiceoverLine = lines.length && isVoiceover(extraOf(sb, lines[0].speaker));
   const speakerPhrase = (d) => {
     const vo = extraOf(sb, d.speaker);
@@ -389,7 +408,9 @@ function buildShotPrompt(shot, characterRows, storyBible) {
       const who = extraOf(sb, lines[0].speaker) ? extraOf(sb, lines[0].speaker).who : lines[0].speaker;
       parts.push(`Audio: only ${who} speaks, in Spanish, clearly and at a natural pace, finishing the line by second ${speakEnd}.`);
     } else {
-      parts.push('Audio: nobody speaks in this shot.');
+      parts.push(tts
+        ? 'Audio: nobody speaks in this shot: no narration, no voice-over, no dialogue, no singing; everyone on screen keeps their mouth closed. Only natural ambient sound.'
+        : 'Audio: nobody speaks in this shot.');
     }
     parts.push(
       (voExtra
@@ -466,6 +487,9 @@ function effectiveShotPrompt(shot, characterRows, storyBible) {
 
 module.exports = {
   shortName,
+  narrationConfig,
+  narrationLines,
+  videoGeneratesAudio,
   effectiveShotPrompt,
   referenceUrlsForShot,
   validateSeries,

@@ -12,6 +12,7 @@ const os = require('os');
 const path = require('path');
 const { execFile } = require('child_process');
 const ffmpegPath = require('ffmpeg-static');
+const { narrationConfig } = require('./_series');
 
 const W = 720;
 const H = 1280;
@@ -33,13 +34,15 @@ function run(args, cwd) {
 }
 
 // ffmpeg-static no trae ffprobe: la duración sale del encabezado que imprime "ffmpeg -i".
-async function probeDuration(file, cwd) {
+async function probeMedia(file, cwd) {
   let stderr = '';
   try { await run(['-hide_banner', '-i', file], cwd); } catch (err) { stderr = err.stderr || ''; }
   const m = stderr.match(/Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)/);
   if (!m) throw new Error('No pude leer la duración de ' + file);
-  return Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3]);
+  // Los videos de fal.ai pedidos SIN audio no traen pista de audio: hay que poner silencio.
+  return { duration: Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3]), hasAudio: /Stream #\d+:\d+.*Audio:/.test(stderr) };
 }
+async function probeDuration(file, cwd) { return (await probeMedia(file, cwd)).duration; }
 
 function findFont() {
   const candidates = [
@@ -120,17 +123,33 @@ const VIDEO_OUT = ['-c:v', 'libx264', '-preset', 'medium', '-crf', '20', '-pix_f
 const AUDIO_OUT = ['-c:a', 'aac', '-b:a', '160k', '-ar', '48000', '-ac', '2'];
 const NORMALIZE_V = `scale=${W}:${H}:force_original_aspect_ratio=decrease,pad=${W}:${H}:(ow-iw)/2:(oh-ih)/2,setsar=1`;
 
-async function renderClip({ cwd, input, out, c, subtitle, speakerColor, sub, fadeIn, fadeOut }) {
-  const full = await probeDuration(input, cwd);
+// Narración con voz fija (TTS): empieza a NARR_START s de la toma y debe terminar antes del
+// final (o antes del fundido cruzado). Si no cabe, se acelera hasta NARR_MAX_TEMPO.
+const NARR_START = 0.3;
+const NARR_MAX_TEMPO = 1.2;
+
+async function renderClip({ cwd, input, out, c, subtitle, speakerColor, sub, fadeIn, fadeOut, narration = null, muteOriginal = false, tailReserve = 0 }) {
+  const probe = await probeMedia(input, cwd);
+  const full = probe.duration;
   const ts = Math.max(0, Math.min(Number(c.trim_start) || 0, full - 1));
   const srcDur = Math.max(1, full - ts - Math.max(0, Number(c.trim_end) || 0));
   const speed = Math.min(2, Math.max(0.5, Number(c.speed) || 1));
   const dur = srcDur / speed;
 
+  // Narración: cuánto dura ya ajustada a la toma.
+  let narr = null;
+  if (narration && narration.file) {
+    const nSecs = Number(narration.seconds) || (await probeDuration(narration.file, cwd));
+    const avail = Math.max(1, dur - NARR_START - Math.max(0.15, tailReserve));
+    const tempo = Math.min(NARR_MAX_TEMPO, Math.max(1, nSecs / avail));
+    narr = { file: narration.file, tempo, seconds: nSecs / tempo };
+  }
+
   const events = [];
   if (subtitle) {
-    const st = Math.max(0, (SPEECH[0] - ts) / speed);
-    const en = Math.min(dur - 0.05, (SPEECH[1] - ts) / speed);
+    // Con narración TTS el subtítulo sigue a la voz real; si no, la ventana fija del prompt (0–6 s).
+    const st = narr ? NARR_START : Math.max(0, (SPEECH[0] - ts) / speed);
+    const en = narr ? Math.min(dur - 0.05, NARR_START + narr.seconds) : Math.min(dur - 0.05, (SPEECH[1] - ts) / speed);
     if (en > st + 0.3) events.push({ start: st, end: en, style: 'Sub', text: subtitleText(subtitle, en - st, sub, speakerColor) });
   }
   if (c.overlay) events.push({ start: 0, end: dur, style: 'Top', text: clean(c.overlay) });
@@ -153,12 +172,32 @@ async function renderClip({ cwd, input, out, c, subtitle, speakerColor, sub, fad
     vf.push(`ass=${assName}:fontsdir=fonts`);
   }
   const AF = 0.06;
-  const af = ['aresample=48000', 'aformat=channel_layouts=stereo'];
-  if (speed !== 1) af.push(`atempo=${speed}`);
-  af.push(`volume=${Number(c.volume == null ? 1 : c.volume).toFixed(2)}`);
-  af.push(`afade=t=in:st=0:d=${fadeIn || AF}`, `afade=t=out:st=${Math.max(0, dur - (fadeOut || AF)).toFixed(3)}:d=${fadeOut || AF}`);
-  await run(['-y', '-ss', ts.toFixed(3), '-t', srcDur.toFixed(3), '-i', input, '-vf', vf.join(','), '-af', af.join(','), '-t', dur.toFixed(3), ...VIDEO_OUT, ...AUDIO_OUT, out], cwd);
-  return dur;
+  const fades = `afade=t=in:st=0:d=${fadeIn || AF},afade=t=out:st=${Math.max(0, dur - (fadeOut || AF)).toFixed(3)}:d=${fadeOut || AF}`;
+  // Audio original de la toma (ambiente). Se silencia si trae la voz vieja de Veo y ahora
+  // narra el TTS (si no, se oirían dos narradores). Sin pista de audio → silencio.
+  const vol = muteOriginal ? 0 : Number(c.volume == null ? 1 : c.volume);
+  const inputs = ['-ss', ts.toFixed(3), '-t', srcDur.toFixed(3), '-i', input];
+  const fc = [`[0:v]${vf.join(',')}[v]`];
+  let origLabel = '0:a';
+  if (!probe.hasAudio) {
+    inputs.push('-f', 'lavfi', '-t', dur.toFixed(3), '-i', 'anullsrc=channel_layout=stereo:sample_rate=48000');
+    origLabel = (inputs.filter((x) => x === '-i').length - 1) + ':a';
+  }
+  const oa = ['aresample=48000', 'aformat=channel_layouts=stereo'];
+  if (speed !== 1 && probe.hasAudio) oa.push(`atempo=${speed}`);
+  oa.push(`volume=${vol.toFixed(2)}`);
+  if (narr) {
+    inputs.push('-i', narr.file);
+    const ni = inputs.filter((x) => x === '-i').length - 1;
+    const ms = Math.round(NARR_START * 1000);
+    fc.push(`[${origLabel}]${oa.join(',')}[ao]`);
+    fc.push(`[${ni}:a]aresample=48000,aformat=channel_layouts=stereo${narr.tempo > 1.001 ? `,atempo=${narr.tempo.toFixed(3)}` : ''},adelay=${ms}|${ms},apad[an]`);
+    fc.push(`[ao][an]amix=inputs=2:duration=first:dropout_transition=0:normalize=0,${fades}[a]`);
+  } else {
+    fc.push(`[${origLabel}]${oa.join(',')},${fades}[a]`);
+  }
+  await run(['-y', ...inputs, '-filter_complex', fc.join(';'), '-map', '[v]', '-map', '[a]', '-t', dur.toFixed(3), ...VIDEO_OUT, ...AUDIO_OUT, out], cwd);
+  return { dur, narr: narr ? { start: NARR_START, seconds: narr.seconds, file: narr.file, tempo: narr.tempo } : null };
 }
 
 async function renderCard({ cwd, out, lines, seconds, sub }) {
@@ -183,7 +222,7 @@ function defaultPlan(episode) {
     version: 2,
     clips: shots.map((s) => ({ shot: s.n, include: true, trim_start: 0, trim_end: 0, volume: 1, speed: 1, zoom: false, transition: 'cut', transition_s: 0.4, subtitle: null, overlay: '' })),
     subtitles: { enabled: true, size: 38, margin_v: 180, style: 'classic', karaoke: false, speaker_colors: false, animation: 'none' },
-    audio: { normalize: true, music_url: null, music_volume: 0.12 },
+    audio: { normalize: true, music_url: null, music_volume: 0.12, duck: true },
     title_card: { enabled: false, text: '', subtext: '', seconds: 2 },
     end_card: { enabled: false, text: '', subtext: '', seconds: 2 }
   };
@@ -240,6 +279,7 @@ async function renderEpisode({ episode, series, log = console.log, fetchFile = d
   const speakers = [];
   chosen.forEach((c) => { const s = speakerOf(shotsByN[c.shot]); if (s && !speakers.includes(s)) speakers.push(s); });
 
+  const ttsMode = !!narrationConfig(series && series.story_bible);
   const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'vyrales-render-'));
   const cleanup = () => fs.rmSync(cwd, { recursive: true, force: true });
   try {
@@ -266,8 +306,22 @@ async function renderEpisode({ episode, series, log = console.log, fetchFile = d
       const tSec = (x) => Math.min(1.5, Math.max(0.2, Number(x && x.transition_s) || 0.4));
       const fadeIn = prev && prev.transition === 'fade_black' ? tSec(prev) / 2 : 0;
       const fadeOut = c.transition === 'fade_black' && i < chosen.length ? tSec(c) / 2 : 0;
-      const dur = await renderClip({ cwd, input: src, out, c, subtitle, speakerColor: spk ? SPEAKER_COLORS[speakers.indexOf(spk) % SPEAKER_COLORS.length] : null, sub, fadeIn, fadeOut });
-      parts.push({ file: out, dur, xfade: XFADE[c.transition] && i < chosen.length ? Math.min(tSec(c), dur / 2) : 0, xname: XFADE[c.transition] || 'fade' });
+      // Narrador con voz fija: se baja la narración de la toma (si ya se generó).
+      let narration = null;
+      if (ttsMode && shot && shot.narration && shot.narration.url) {
+        const nf = `narr-${String(c.shot).padStart(2, '0')}.wav`;
+        await fetchFile(shot.narration.url, path.join(cwd, nf));
+        narration = { file: nf, seconds: shot.narration.seconds };
+      } else if (ttsMode) {
+        log(`toma ${c.shot}: AVISO — no tiene narración generada, va sin voz.`);
+      }
+      // Clips generados ANTES del narrador TTS traen la voz de Veo pegada: se silencia su audio.
+      const muteOriginal = !!(narration && /Voice-over narration/i.test(clipsByShot[c.shot].prompt || ''));
+      const tailReserve = XFADE[c.transition] && i < chosen.length ? tSec(c) : 0;
+      const r = await renderClip({ cwd, input: src, out, c, subtitle, speakerColor: spk ? SPEAKER_COLORS[speakers.indexOf(spk) % SPEAKER_COLORS.length] : null, sub, fadeIn, fadeOut, narration, muteOriginal, tailReserve });
+      const dur = r.dur;
+      if (r.narr && r.narr.tempo > 1.001) log(`toma ${c.shot}: narración acelerada ${r.narr.tempo.toFixed(2)}x para que quepa.`);
+      parts.push({ file: out, dur, narr: r.narr, xfade: XFADE[c.transition] && i < chosen.length ? Math.min(tSec(c), dur / 2) : 0, xname: XFADE[c.transition] || 'fade' });
     }
     if (plan.end_card.enabled && (plan.end_card.text || plan.end_card.subtext)) {
       log('tarjeta final...');
@@ -315,7 +369,26 @@ async function renderEpisode({ episode, series, log = console.log, fetchFile = d
       await fetchFile(music, path.join(cwd, 'music.audio'));
       args.push('-stream_loop', '-1', '-i', 'music.audio');
       const mv = Math.max(0, Math.min(1, Number(plan.audio.music_volume) || 0.12));
-      filters.push(`[1:a]aresample=48000,aformat=channel_layouts=stereo,volume=${mv.toFixed(2)},afade=t=out:st=${Math.max(0, total - 1.5).toFixed(2)}:d=1.5[m]`);
+      filters.push(`[1:a]aresample=48000,aformat=channel_layouts=stereo,volume=${mv.toFixed(2)},afade=t=in:st=0:d=1,afade=t=out:st=${Math.max(0, total - 1.5).toFixed(2)}:d=1.5[m0]`);
+      // Ducking estilo documental: la música baja sola mientras habla el narrador y sube en
+      // las pausas. La "llave" es la pista de narración puesta en su minuto exacto.
+      const windows = [];
+      let at = 0;
+      parts.forEach((p) => { if (p.narr) windows.push({ file: p.narr.file, start: at + p.narr.start, tempo: p.narr.tempo }); at += p.dur - p.xfade; });
+      if (plan.audio.duck !== false && windows.length) {
+        const keyLabels = [];
+        windows.forEach((w, k) => {
+          args.push('-i', w.file);
+          const ms = Math.round(w.start * 1000);
+          filters.push(`[${k + 2}:a]aresample=48000,aformat=channel_layouts=stereo${w.tempo > 1.001 ? `,atempo=${w.tempo.toFixed(3)}` : ''},adelay=${ms}|${ms}[k${k}]`);
+          keyLabels.push(`[k${k}]`);
+        });
+        filters.push(`${keyLabels.join('')}amix=inputs=${keyLabels.length}:duration=longest:dropout_transition=0:normalize=0,apad[key]`);
+        filters.push(`[m0][key]sidechaincompress=threshold=0.02:ratio=4:attack=120:release=1200:makeup=1[m]`);
+        log('música con ducking bajo', windows.length, 'narraciones.');
+      } else {
+        filters.push('[m0]anull[m]');
+      }
       filters.push(`[0:a][m]amix=inputs=2:duration=first:dropout_transition=0:normalize=0[mx]`);
     }
     const lastA = music ? '[mx]' : '[0:a]';
