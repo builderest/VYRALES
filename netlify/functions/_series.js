@@ -331,6 +331,18 @@ function buildShotPrompt(shot, characterRows, storyBible) {
   const loc = locationOf(sb, shot.location);
   if (loc) parts.push(`Setting: ${loc.visual.replace(/\.?$/, '.')}`);
 
+  // 4b) Reglas de actuación (EP1 T1 real: el retrato de la mamá en la pared parpadeó y
+  // Valentina le habló a la cámara en vez de a la foto).
+  if (isV2) {
+    const keyframes = !!(sb.rules && sb.rules.keyframes);
+    if (keyframes) parts.push('The video begins exactly on the provided first frame, keeping the same composition, set and outfits, and continues naturally from that pose.');
+    parts.push('Nobody looks into the camera or talks to the camera: every glance and every spoken line is directed at the person or object named in the action, and the eye line stays on that target while speaking.');
+    const setText = `${(loc && loc.visual) || ''} ${shot.action_en || ''} ${shot.reaction_en || ''}`;
+    if (/photo|portrait|painting|picture|poster|screen|monitor|television|\btv\b/i.test(setText)) {
+      parts.push('Any person shown in a framed photo, portrait, painting, poster or screen is a completely still printed image: their face never moves, blinks, talks or changes expression.');
+    }
+  }
+
   // 5) Estilo
   if (sb.visual_style) parts.push(sb.visual_style.trim().replace(/\.?$/, '.'));
 
