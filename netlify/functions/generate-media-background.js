@@ -94,6 +94,10 @@ exports.handler = async (event) => {
   // frames_only: genera SOLO los cuadros iniciales que falten (sin Veo), para revisarlos
   // todos antes de gastar en video. ~$0.067 por cuadro.
   const framesOnly = body.frames_only === true || qs.frames_only === '1';
+  // model: forzar el modelo de Veo SOLO en esta corrida (botón del dashboard), p. ej. usar
+  // Fast cuando la cuota diaria de Lite se acabó. No cambia la configuración de la serie.
+  const ALLOWED_MODELS = ['veo_lite', 'veo_fast', 'veo_standard'];
+  const modelOverride = ALLOWED_MODELS.includes(body.model || qs.model) ? (body.model || qs.model) : null;
 
   let markedGenerating = null; // id del episodio que ESTA corrida marcó como generando_media
   console.log(LOG, 'arrancó. series=', seriesSlug, 'episode_id=', episodeId || '(ninguno, toma el siguiente en guion_generado)', isContinuation ? '(continuación)' : '');
@@ -243,8 +247,9 @@ exports.handler = async (event) => {
     // Modelo por toma configurable por serie (story_bible.rules.shot_model /
     // cliffhanger_model). Sin configurar = híbrido de siempre: Lite + Fast en el cliffhanger.
     const rules = (series.story_bible && series.story_bible.rules) || {};
-    const shotModel = rules.shot_model || 'veo_lite';
-    const cliffhangerModel = rules.cliffhanger_model || 'veo_fast';
+    const shotModel = modelOverride || rules.shot_model || 'veo_lite';
+    const cliffhangerModel = modelOverride || rules.cliffhanger_model || 'veo_fast';
+    if (modelOverride) console.log(LOG, 'modelo forzado para esta corrida:', modelOverride);
     console.log(LOG, 'modelos:', shotModel, '(tomas) /', cliffhangerModel, '(cliffhanger)');
 
     const results = [];
@@ -252,7 +257,7 @@ exports.handler = async (event) => {
     for (const scene of scenes) {
       if (Date.now() - startedAt > TIME_BUDGET_MS) {
         console.warn(LOG, 'cerca del límite de 15 min de Netlify — me vuelvo a llamar para seguir con las tomas que faltan...');
-        await fetch(selfUrl(event, { series: seriesSlug, episode_id: episode.id, continue: '1' }), { method: 'POST' });
+        await fetch(selfUrl(event, Object.assign({ series: seriesSlug, episode_id: episode.id, continue: '1' }, modelOverride ? { model: modelOverride } : {})), { method: 'POST' });
         return { statusCode: 202, body: JSON.stringify({ episode_id: episode.id, continued: true, shots_ok_this_run: results.filter((r) => r.status === 'fulfilled').length }) };
       }
       const isCliffhanger = scene.number === total;

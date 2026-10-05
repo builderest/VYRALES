@@ -678,10 +678,39 @@
       function frameFor(ep, n) { return (ep.assets || []).find(a => a.kind === 'image' && a.shot_number === n) || null; }
       function clipFor(ep, n) { return (ep.assets || []).find(a => a.kind === 'video_clip' && a.shot_number === n) || null; }
       const VEO_LABEL = { veo_lite: 'Lite', veo_fast: 'Fast', veo_standard: 'Standard' };
+      // Modelo de Veo elegido en el dashboard SOLO para las próximas producciones de esta
+      // sesión (null = el de la serie). Sirve para usar Fast cuando la cuota de Lite se acabó.
+      let veoModelChoice = null;
       function seriesModels(series) {
         const r = (series && series.story_bible && series.story_bible.rules) || {};
+        if (veoModelChoice) return { shot: veoModelChoice, cliff: veoModelChoice, secs: r.shot_seconds || 8, forced: true };
         return { shot: r.shot_model || 'veo_lite', cliff: r.cliffhanger_model || 'veo_fast', secs: r.shot_seconds || 8 };
       }
+      function veoPickerHtml(data) {
+        const r = (data.series && data.series.story_bible && data.series.story_bible.rules) || {};
+        const base = r.shot_model || 'veo_lite';
+        const current = veoModelChoice || base;
+        const secs = r.shot_seconds || 8;
+        const opt = (key, label) => {
+          const q = veoQuotaInfo(data, key);
+          const on = current === key;
+          return '<button type="button" onclick="setVeoModel(\'' + key + '\')" class="flex-1 px-2 py-1.5 rounded-lg border text-[10px] font-mono leading-tight transition-all ' +
+            (on ? 'border-cyber-cyan bg-cyber-cyan/15 text-cyber-cyan' : 'border-cyber-border text-slate-400 hover:text-white') + '">' +
+            '<span class="block font-bold">' + label + (key === base ? ' · de la serie' : '') + '</span>' +
+            '<span class="block">$' + (secs * VEO_PRICE_PER_SEC[key]).toFixed(2) + '/toma</span>' +
+            (q ? '<span class="block ' + (q.left ? '' : 'text-cyber-pink') + '">hoy ' + q.used + '/' + q.limit + '</span>' : '') +
+          '</button>';
+        };
+        return '<div class="w-full mt-3"><p class="text-[10px] font-mono text-slate-500 mb-1">MODELO DE VIDEO PARA PRODUCIR</p>' +
+          '<div class="flex gap-2">' + opt('veo_lite', 'Veo Lite') + opt('veo_fast', 'Veo Fast') + '</div>' +
+          (veoModelChoice && veoModelChoice !== base ? '<p class="text-[10px] text-cyber-gold mt-1">Solo para esta sesión; la serie sigue en ' + esc(base.replace('veo_', 'Veo ')) + '.</p>' : '') +
+        '</div>';
+      }
+      window.setVeoModel = function(key) {
+        const r = (lastLoadedData && lastLoadedData.series && lastLoadedData.series.story_bible && lastLoadedData.series.story_bible.rules) || {};
+        veoModelChoice = key === (r.shot_model || 'veo_lite') ? null : key;
+        loadDashboard();
+      };
       const STATUS_LABELS = {
         guion_pendiente: ['GUION PENDIENTE', 'text-slate-400 border-slate-600'],
         guion_generado: ['LISTO PARA PRODUCIR', 'text-cyber-cyan border-cyber-cyan/40'],
@@ -1716,7 +1745,7 @@
             ? '<button onclick="generateAllFrames(this)" data-ep="' + e.id + '" class="mr-2 mb-1 px-3 py-1.5 rounded-lg bg-cyber-violet/15 border border-cyber-violet/50 text-cyber-violet text-xs font-mono hover:bg-cyber-violet/25"><i class="fa-solid fa-images mr-1"></i>Generar los ' + missingFrames + ' cuadros que faltan' + (missingLocationsFor(e).length ? ' + ' + missingLocationsFor(e).length + ' lugares' : '') + ' (~$' + ((missingFrames + missingLocationsFor(e).length) * IMAGE_PRICE_USD).toFixed(2) + ') para revisarlos</button>'
             : '';
           const produceBtn = (nextToProduce && nextToProduce.id === e.id)
-            ? '<button onclick="produceEpisode(\'' + e.id + '\')" class="px-3 py-1.5 rounded-lg bg-cyber-pink/20 border border-cyber-pink/50 text-cyber-pink text-xs font-mono hover:bg-cyber-pink/30"><i class="fa-solid fa-bolt mr-1"></i>Producir este episodio (~$' + estimateEpisodeCost(e).toFixed(2) + ')</button>'
+            ? '<button onclick="produceEpisode(\'' + e.id + '\')" class="px-3 py-1.5 rounded-lg bg-cyber-pink/20 border border-cyber-pink/50 text-cyber-pink text-xs font-mono hover:bg-cyber-pink/30"><i class="fa-solid fa-bolt mr-1"></i>Producir este episodio con ' + seriesModels(lastLoadedData.series).shot.replace('veo_', 'Veo ') + ' (~$' + estimateEpisodeCost(e).toFixed(2) + ')</button>'
             : '';
           return (
             '<details data-ep-id="' + e.id + '"' + (openEps.has(String(e.id)) ? ' open' : '') + ' class="bg-cyber-darker rounded-lg border border-cyber-border open:border-cyber-cyan/50">' +
@@ -1857,6 +1886,7 @@
             (quotaStopOf(next) ? '<br><span class="text-cyber-gold">⏸ Se detuvo por cuota de Google en la toma ' + quotaStopOf(next).quota_stop.shot + '</span>' : '');
           btn.textContent = 'Producir EP ' + next.episode_number;
           btn.classList.remove('hidden');
+          desc.insertAdjacentHTML('beforeend', veoPickerHtml(data));
         } else {
           title.textContent = eps.length ? 'No hay episodios pendientes' : 'Sin episodios';
           desc.textContent = eps.length ? 'Todos los episodios ya se produjeron.' : 'Crea una novela con el botón PROMPT.';
@@ -1972,12 +2002,13 @@
         const cost = estimateEpisodeCost(ep);
         if (!await askConfirm('Producir EP ' + ep.episode_number + ' "' + (ep.title || '') + '" con Veo.\n\n' +
           (doneClips ? 'Ya hay ' + doneClips + ' toma(s) hechas: NO se repiten. Se generan solo las ' + missingClips + ' que faltan.\n\n' : '') + quotaNote +
+          'Modelo: ' + seriesModels(lastLoadedData.series).shot.replace('veo_', 'Veo ').toUpperCase() + (veoModelChoice ? ' (elegido solo para esta producción)' : '') + '.\n' +
           'Costo estimado: ~$' + cost.toFixed(2) + ' USD (' + costBreakdownLabel(ep) + '). Es un cargo REAL en Google Cloud.\nTarda entre 10 y 30 minutos. ¿Continuar?')) return;
         const banner = document.getElementById('dataStatusBanner');
         try {
           const res = await fetch('/.netlify/functions/generate-media-background', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ series: DEFAULT_SERIES, episode_id: episodeId })
+            body: JSON.stringify(Object.assign({ series: DEFAULT_SERIES, episode_id: episodeId }, veoModelChoice ? { model: veoModelChoice } : {}))
           });
           if (!res.ok && res.status !== 202) throw new Error('HTTP ' + res.status);
         } catch (err) {
@@ -2033,7 +2064,7 @@
         try {
           const res = await fetch('/.netlify/functions/generate-media-background', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ series: DEFAULT_SERIES, episode_id: episodeId, shot: shotNumber })
+            body: JSON.stringify(Object.assign({ series: DEFAULT_SERIES, episode_id: episodeId, shot: shotNumber }, veoModelChoice ? { model: veoModelChoice } : {}))
           });
           if (!res.ok && res.status !== 202) throw new Error('HTTP ' + res.status);
         } catch (err) {

@@ -72,7 +72,7 @@ exports.handler = async (event) => {
     const dayStartUtc = new Date(Date.UTC(+parts.year, +parts.month - 1, +parts.day) - offsetMs);
     const { data: todayVideos } = await supabase
       .from('generation_log').select('model').eq('kind', 'video').gte('created_at', dayStartUtc.toISOString());
-    spend.veo_today = { by_model: {}, day_start: dayStartUtc.toISOString(), limits: { veo_lite: 10 } };
+    spend.veo_today = { by_model: {}, day_start: dayStartUtc.toISOString(), limits: { veo_lite: 10, veo_fast: 10 } };
     (todayVideos || []).forEach((r) => { spend.veo_today.by_model[r.model] = (spend.veo_today.by_model[r.model] || 0) + 1; });
 
     // Solo el conteo (head: true no trae filas, es barato) — para el panel de stats
