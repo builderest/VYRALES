@@ -35,11 +35,11 @@
         "ambient": "distant traffic, birds and a quiet neighborhood street"
       },
       "tower_lobby": {
-        "visual": "the lobby of the Grupo Alcázar headquarters, a towering modern glass skyscraper: white marble floors, gold accents, a long reception desk and glass entrance doors",
+        "visual": "the lobby of a towering modern glass skyscraper: white marble floors, gold accents, a long reception desk, glass entrance doors and blank smooth walls",
         "ambient": "a quiet echoing lobby with soft footsteps on marble"
       },
       "elevator": {
-        "visual": "a sleek modern elevator with plain brushed-steel doors, warm walnut wood-panel walls and soft overhead lighting inside the Grupo Alcázar tower",
+        "visual": "a sleek modern elevator seen from inside: seamless plain brushed-steel doors, a smooth blank steel wall above the doors, warm walnut wood-panel side walls and soft overhead lighting",
         "ambient": "the low steady hum of a moving elevator"
       },
       "boardroom": {

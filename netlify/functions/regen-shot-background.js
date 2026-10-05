@@ -15,7 +15,15 @@
 // `updated_at` de la toma (lo actualiza un trigger de Postgres automáticamente en cada
 // UPDATE, ver supabase/schema.sql).
 const { getSupabaseClient } = require('./_supabase');
-const { uploadClip } = require('./_storage');
+const { BUCKET, uploadClip } = require('./_storage');
+
+// De una URL pública de Supabase Storage saca la ruta interna dentro del bucket.
+// https://<proyecto>.supabase.co/storage/v1/object/public/media/<ruta> → <ruta>
+function storagePathFromPublicUrl(url) {
+  const marker = `/object/public/${BUCKET}/`;
+  const i = String(url || '').indexOf(marker);
+  return i === -1 ? null : decodeURIComponent(String(url).slice(i + marker.length).split('?')[0]);
+}
 const { generateVeoClip } = require('./_veo');
 const { buildShotPrompt } = require('./_series');
 
@@ -80,6 +88,15 @@ exports.handler = async (event) => {
       .select()
       .single();
     if (updateError) throw updateError;
+
+    // Recién AHORA (video nuevo subido y guardado en la base) se borra el archivo viejo de
+    // Storage, para no acumular clips sin uso. Si algo falló antes, el viejo sigue intacto.
+    const oldPath = storagePathFromPublicUrl(asset.storage_path);
+    if (oldPath && oldPath !== storagePath) {
+      const { error: removeError } = await supabase.storage.from(BUCKET).remove([oldPath]);
+      if (removeError) console.warn(LOG, 'no se pudo borrar el archivo viejo (no es grave):', oldPath, removeError.message);
+      else console.log(LOG, 'archivo viejo borrado de Storage:', oldPath);
+    }
 
     console.log(LOG, 'listo ✅. Toma', updated.shot_number, 'regenerada:', publicUrl);
     return { statusCode: 200, body: JSON.stringify({ asset: updated, model }) };
