@@ -17,7 +17,8 @@
   .txt { white-space:pre-wrap; word-break:break-word; font-size:15px; margin:0 0 12px; user-select:all; -webkit-user-select:all; }
   button, a.btn { display:block; width:100%; text-align:center; padding:14px; border-radius:12px; border:0; font-size:17px; font-weight:700; cursor:pointer; text-decoration:none; }
   .copy { background:var(--cyan); color:#001018; }
-  .copy.ok { background:var(--ok); }
+  .copy.ok, .save.ok { background:var(--ok); color:#001018; }
+  .save { background:var(--pink); color:#fff; margin-top:8px; font-size:15px; }
   a.btn { background:transparent; color:var(--gold); border:1px solid var(--gold); margin-top:8px; }
   .row { display:flex; gap:12px; align-items:flex-start; }
   .row img { width:110px; border-radius:10px; border:1px solid var(--line); }
@@ -47,6 +48,32 @@ async function copy(btn, text) {
   setTimeout(() => { btn.textContent = old; btn.classList.remove('ok'); }, 1800);
 }
 
+// Guardar en Fotos: iOS no deja guardar sin preguntar; abrimos la hoja de compartir con el
+// archivo y ahí el usuario toca «Guardar imagen/video» (2 toques). El archivo se descarga
+// antes (se guarda en memoria) porque Safari exige que share() salga directo del toque.
+const FILES = {};
+async function fetchFile(btn) {
+  const url = btn.dataset.url;
+  if (!FILES[url]) FILES[url] = fetch(url).then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.blob(); })
+    .then(b => new File([b], btn.dataset.name, { type: btn.dataset.type }));
+  return FILES[url];
+}
+async function saveToPhotos(btn) {
+  const url = btn.dataset.url;
+  const ready = FILES[url] && FILES[url].__done;
+  try {
+    if (!ready) {
+      const label = btn.textContent; btn.textContent = '⏳ Preparando…';
+      const f = await fetchFile(btn); FILES[url].__done = f;
+      if (!(navigator.canShare && navigator.canShare({ files: [f] }))) { btn.textContent = label; location.href = dl(url, btn.dataset.name); return; }
+      try { await navigator.share({ files: [f] }); btn.textContent = '✓ Listo'; btn.classList.add('ok'); return; }
+      catch (err) { if (err.name === 'AbortError') { btn.textContent = label; return; } btn.textContent = '👉 Toca otra vez para guardar'; return; }
+    }
+    await navigator.share({ files: [FILES[url].__done] });
+    btn.textContent = '✓ Listo'; btn.classList.add('ok');
+  } catch (err) { if (err.name !== 'AbortError') btn.textContent = 'Error: ' + err.message; }
+}
+
 function block(title, text) {
   if (!text) return '';
   const id = 'b' + Math.random().toString(36).slice(2);
@@ -63,8 +90,9 @@ function render() {
   document.getElementById('out').innerHTML =
     '<div class="card"><div class="row">' + (pk.cover_url ? '<img src="' + esc(pk.cover_url) + '" alt="portada">' : '') +
       '<div style="flex:1"><b>EP ' + e.episode_number + '</b><div class="mut">' + esc(e.title || '') + '</div>' +
-      (final ? '<a class="btn" href="' + esc(dl(final.storage_path, vname)) + '">⬇ Video</a>' : '') +
-      (pk.cover_url ? '<a class="btn" href="' + esc(dl(pk.cover_url, 'portada_EP' + e.episode_number + '.jpg')) + '">⬇ Portada</a>' : '') +
+      (pk.cover_url ? '<button class="save" data-url="' + esc(pk.cover_url) + '" data-name="portada_EP' + e.episode_number + '.jpg" data-type="image/jpeg" onclick="saveToPhotos(this)">📷 Guardar portada en Fotos</button>' : '') +
+      (final ? '<button class="save" data-url="' + esc(final.storage_path) + '" data-name="' + vname + '" data-type="video/mp4" onclick="saveToPhotos(this)">🎬 Guardar video en Fotos</button>' : '') +
+      (final ? '<a class="btn" href="' + esc(dl(final.storage_path, vname)) + '">⬇ Video (a Archivos)</a>' : '') +
     '</div></div></div>' +
     block('DESCRIPCIÓN TIKTOK', pk.tiktok) +
     block('DESCRIPCIÓN INSTAGRAM', pk.instagram) +
@@ -91,7 +119,8 @@ function render() {
     const sel = document.getElementById('ep');
     sel.innerHTML = EPS.map(e => '<option value="' + e.episode_number + '">EP ' + e.episode_number + ' · ' + esc(e.title || '') + '</option>').join('');
     const want = qs.get('ep'); sel.value = want && EPS.some(e => String(e.episode_number) === want) ? want : String(EPS[EPS.length - 1].episode_number);
-    sel.hidden = EPS.length < 2; sel.onchange = render; render();
+    const preload = () => document.querySelectorAll('.save[data-type="image/jpeg"]').forEach(b => fetchFile(b).then(f => { FILES[b.dataset.url].__done = f; }).catch(() => {}));
+    sel.hidden = EPS.length < 2; sel.onchange = () => { render(); preload(); }; render(); preload();
   } catch (err) { document.getElementById('out').innerHTML = '<div class="card">Error: ' + esc(err.message) + '</div>'; }
 })();
 </script>
