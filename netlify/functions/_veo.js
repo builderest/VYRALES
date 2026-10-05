@@ -59,10 +59,24 @@ async function callWithRetry(fn, { retries = 4, baseDelayMs = 20000 } = {}) {
   throw lastErr;
 }
 
+// Modelos que aceptan imágenes de referencia ("Ingredients to video"). Veo 3.1 Lite NO.
+// Fuente: https://ai.google.dev/gemini-api/docs/veo (hasta 3 imágenes, duración 8 s).
+const MODELS_WITH_REFERENCE_IMAGES = new Set(['veo_fast', 'veo_standard']);
+
 // modelKey: 'veo_lite' | 'veo_fast' | 'veo_standard'
-async function generateVeoClip({ modelKey, prompt, aspectRatio = '9:16', durationSeconds = 8 }) {
+// referenceImages: [{ imageBytes: <base64>, mimeType: 'image/jpeg' }] (máx. 3) — fotos de
+// los personajes de la toma para que Veo mantenga sus caras.
+async function generateVeoClip({ modelKey, prompt, aspectRatio = '9:16', durationSeconds = 8, referenceImages = [] }) {
   const model = VEO_MODELS[modelKey];
   if (!model) throw new Error('Modelo de Veo desconocido: ' + modelKey);
+  if (referenceImages.length) {
+    // Nunca se descartan en silencio: si el modelo no las acepta, se aborta antes de gastar.
+    if (!MODELS_WITH_REFERENCE_IMAGES.has(modelKey)) {
+      throw new Error(`El modelo ${modelKey} no acepta fotos de referencia. Usa veo_fast o veo_standard.`);
+    }
+    if (referenceImages.length > 3) throw new Error('Veo acepta máximo 3 fotos de referencia por toma.');
+    if (Number(durationSeconds) !== 8) throw new Error('Con fotos de referencia la toma debe durar 8 segundos.');
+  }
 
   // La API exige durationSeconds como número (no string) — "8" falla con 400 INVALID_ARGUMENT.
   const durationSecondsNum = Number(durationSeconds);
@@ -73,7 +87,17 @@ async function generateVeoClip({ modelKey, prompt, aspectRatio = '9:16', duratio
     ai.models.generateVideos({
       model,
       prompt,
-      config: { aspectRatio, durationSeconds: durationSecondsNum }
+      config: Object.assign(
+        { aspectRatio, durationSeconds: durationSecondsNum },
+        referenceImages.length
+          ? {
+              referenceImages: referenceImages.map((img) => ({
+                image: { imageBytes: img.imageBytes, mimeType: img.mimeType || 'image/jpeg' },
+                referenceType: 'ASSET'
+              }))
+            }
+          : {}
+      )
     })
   );
 
@@ -105,4 +129,16 @@ async function generateVeoClip({ modelKey, prompt, aspectRatio = '9:16', duratio
   return { videoBuffer, costUsd, model };
 }
 
-module.exports = { generateVeoClip, VEO_MODELS, VEO_PRICE_PER_SECOND_USD };
+// Descarga las fotos de referencia (URLs públicas de Supabase) y las deja en base64 para Veo.
+async function loadReferenceImages(urls) {
+  const out = [];
+  for (const url of urls) {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('No se pudo descargar la foto de referencia ' + url + ' (HTTP ' + res.status + ')');
+    const mimeType = (res.headers.get('content-type') || 'image/jpeg').split(';')[0];
+    out.push({ imageBytes: Buffer.from(await res.arrayBuffer()).toString('base64'), mimeType });
+  }
+  return out;
+}
+
+module.exports = { generateVeoClip, loadReferenceImages, VEO_MODELS, VEO_PRICE_PER_SECOND_USD, MODELS_WITH_REFERENCE_IMAGES };

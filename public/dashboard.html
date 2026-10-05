@@ -155,22 +155,6 @@
                      class="hidden absolute left-0 mt-2 w-80 bg-cyber-card border border-cyber-border rounded-xl shadow-neon-cyan p-1.5 z-50"></div>
             </div>
 
-            <!-- Infrastructure Status Pills -->
-            <div class="hidden xl:flex items-center space-x-3 font-mono text-xs">
-                <div class="flex items-center space-x-1.5 px-2.5 py-1 rounded-md bg-emerald-950/40 border border-emerald-500/30 text-emerald-400">
-                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-                    <span>NETLIFY: ONLINE</span>
-                </div>
-                <div class="flex items-center space-x-1.5 px-2.5 py-1 rounded-md bg-cyber-violet/20 border border-cyber-violet/40 text-cyber-violet">
-                    <i class="fa-solid fa-database text-[10px]"></i>
-                    <span>SUPABASE: READY</span>
-                </div>
-                <div class="flex items-center space-x-1.5 px-2.5 py-1 rounded-md bg-cyber-cyan/10 border border-cyber-cyan/30 text-cyber-cyan">
-                    <i class="fa-solid fa-brain text-[10px]"></i>
-                    <span>CLAUDE MAX: ACTIVE</span>
-                </div>
-            </div>
-
             <!-- Crear novela nueva pegando el JSON que escribe Claude -->
             <button onclick="openNovelModal()" class="px-4 py-2 rounded-lg border border-cyber-violet/50 bg-cyber-violet/15 hover:bg-cyber-violet/25 text-white font-display font-semibold text-xs tracking-wider transition-all">
                 <i class="fa-solid fa-wand-magic-sparkles text-cyber-violet mr-1.5"></i>PROMPT
@@ -242,7 +226,7 @@
             <div class="glass-panel rounded-xl p-4 border-l-4 border-l-cyber-pink">
                 <div class="flex justify-between items-start mb-2">
                     <div>
-                        <p class="text-xs font-mono text-slate-400 uppercase tracking-wider">Tasa de Aprobación Guion</p>
+                        <p class="text-xs font-mono text-slate-400 uppercase tracking-wider">Tomas aprobadas</p>
                         <h3 id="approvalRateLabel" class="text-2xl font-display font-bold text-white mt-1">—</h3>
                     </div>
                     <div class="w-8 h-8 rounded-lg bg-cyber-pink/10 border border-cyber-pink/30 flex items-center justify-center text-cyber-pink">
@@ -250,10 +234,10 @@
                     </div>
                 </div>
                 <p class="text-xs text-slate-300 mt-2 font-mono">
-                    <i class="fa-solid fa-check text-cyber-emerald mr-1"></i> Guiones no rechazados / total
+                    <i class="fa-solid fa-check text-cyber-emerald mr-1"></i> Aprobadas / generadas (serie activa)
                 </p>
                 <div class="mt-2 text-[11px] text-slate-400 font-mono">
-                    Guiones rechazados: <span id="rejectedCountLabel" class="text-cyber-pink font-bold">0</span>
+                    Por revisar: <span id="rejectedCountLabel" class="text-cyber-pink font-bold">0</span>
                 </div>
             </div>
 
@@ -269,7 +253,6 @@
                     </div>
                 </div>
                 <p id="veoModeDesc" class="text-xs text-slate-400 mt-1">7 tomas Lite (~$0.04/s) + 1 Fast Clip (~$0.16/s) en el Cliffhanger final. Precios calibrados contra gasto real.</p>
-                <span class="inline-block mt-2 text-[10px] font-mono bg-cyber-emerald/20 text-cyber-emerald border border-cyber-emerald/40 px-2 py-0.5 rounded">OPTIMIZADO DÍA DÍA</span>
             </div>
         </section>
 
@@ -285,128 +268,24 @@
                 </div>
                 <div class="flex flex-wrap items-center gap-2">
                     <button id="castToggleAll" onclick="toggleAllCast()" class="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 text-xs font-mono hover:bg-slate-700"><i class="fa-solid fa-up-right-and-down-left-from-center mr-1"></i>Abrir todas</button>
-                    <div id="importBar" class="flex flex-wrap items-center gap-2"></div>
+                    <button id="deleteSeriesBtn" onclick="deleteSeries()" class="hidden px-3 py-1.5 rounded-lg text-xs font-mono border border-cyber-pink/40 bg-cyber-pink/10 text-cyber-pink hover:bg-cyber-pink/20" title="Borra la serie completa: episodios, personajes, tomas y archivos"><i class="fa-solid fa-trash mr-1"></i>Eliminar serie</button>
                 </div>
             </div>
             <div id="castGrid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start"></div>
             <input type="file" id="charImageInput" accept="image/jpeg,image/png,image/webp" class="hidden" onchange="handleCharacterImage(this.files[0])">
         </section>
 
-        <!-- PIPELINE WORKFLOW VISUALIZER (INTERACTIVE NODES) -->
-        <section class="glass-panel rounded-2xl p-6 relative">
-            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+        <!-- PROGRESO REAL DE LA SERIE ACTIVA (calculado con los datos de Supabase).
+             Reemplaza la maqueta "Orquestación del pipeline", cuyos estados eran fijos. -->
+        <section class="glass-panel rounded-2xl p-6">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-2 mb-5">
                 <div>
-                    <div class="flex items-center space-x-2">
-                        <span class="w-3 h-3 rounded-full bg-cyber-cyan animate-pulse"></span>
-                        <h2 class="font-display font-bold text-lg text-white">ORQUESTACIÓN DEL PIPELINE // FLUJO AUTOMATIZADO</h2>
-                    </div>
-                    <p class="text-xs text-slate-400 font-mono mt-0.5">Haz clic en cualquier nodo para inspeccionar el payload de la API, prompts o logs de ejecución.</p>
-                </div>
-                <div class="flex items-center space-x-2">
-                    <span class="text-xs font-mono text-slate-400">Latencia en cola: <strong class="text-cyber-cyan">320ms</strong></span>
-                    <button onclick="resetNodeStatus()" class="px-3 py-1 rounded bg-slate-800 hover:bg-slate-700 text-xs font-mono text-slate-300 transition-all border border-slate-700">
-                        <i class="fa-solid fa-rotate-right mr-1"></i> Reiniciar Vista
-                    </button>
+                    <h2 class="font-display font-bold text-lg text-white flex items-center gap-2"><i class="fa-solid fa-route text-cyber-cyan"></i>PROGRESO DE LA SERIE</h2>
+                    <p class="text-xs text-slate-400 font-mono">Datos reales de la serie activa. Haz clic en un paso para ir a su sección.</p>
                 </div>
             </div>
-
-            <!-- Pipeline Node Map Grid -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 relative">
-                
-                <!-- Node 1: Claude Max Scripting -->
-                <div id="node-1" onclick="openNodeDetails('node1')" class="cursor-pointer glass-panel p-4 rounded-xl border border-cyber-cyan/40 hover:border-cyber-cyan transition-all hover:shadow-neon-cyan relative group">
-                    <div class="flex justify-between items-center mb-2">
-                        <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-cyber-cyan/20 text-cyber-cyan font-bold">PASO 01</span>
-                        <i class="fa-solid fa-pen-nib text-cyber-cyan"></i>
-                    </div>
-                    <h4 class="font-display font-semibold text-sm text-white">Claude Max</h4>
-                    <p class="text-[11px] text-slate-400 font-mono mt-1">Guion del Episodio</p>
-                    <div class="mt-3 flex items-center justify-between text-[10px] font-mono text-slate-400">
-                        <span>Estado:</span>
-                        <span class="text-emerald-400 font-bold flex items-center gap-1"><i class="fa-solid fa-circle text-[6px]"></i> COMPLETADO</span>
-                    </div>
-                </div>
-
-                <!-- Node 2: Story Bible & Validator -->
-                <div id="node-2" onclick="openNodeDetails('node2')" class="cursor-pointer glass-panel p-4 rounded-xl border border-cyber-pink/40 hover:border-cyber-pink transition-all hover:shadow-neon-pink relative group">
-                    <div class="flex justify-between items-center mb-2">
-                        <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-cyber-pink/20 text-cyber-pink font-bold">PASO 02</span>
-                        <i class="fa-solid fa-shield-virus text-cyber-pink"></i>
-                    </div>
-                    <h4 class="font-display font-semibold text-sm text-white">Validador Biblia</h4>
-                    <p class="text-[11px] text-slate-400 font-mono mt-1">Revisor + Cliffhanger</p>
-                    <div class="mt-3 flex items-center justify-between text-[10px] font-mono text-slate-400">
-                        <span>Estado:</span>
-                        <span class="text-emerald-400 font-bold flex items-center gap-1"><i class="fa-solid fa-circle text-[6px]"></i> APROBADO</span>
-                    </div>
-                </div>
-
-                <!-- Node 3: Supabase Asset Sync -->
-                <div id="node-3" onclick="openNodeDetails('node3')" class="cursor-pointer glass-panel p-4 rounded-xl border border-cyber-violet/40 hover:border-cyber-violet transition-all hover:shadow-neon-violet relative group">
-                    <div class="flex justify-between items-center mb-2">
-                        <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-cyber-violet/20 text-cyber-violet font-bold">PASO 03</span>
-                        <i class="fa-solid fa-database text-cyber-violet"></i>
-                    </div>
-                    <h4 class="font-display font-semibold text-sm text-white">Supabase Store</h4>
-                    <p class="text-[11px] text-slate-400 font-mono mt-1">Ref Visual + Metadatos</p>
-                    <div class="mt-3 flex items-center justify-between text-[10px] font-mono text-slate-400">
-                        <span>Estado:</span>
-                        <span class="text-emerald-400 font-bold flex items-center gap-1"><i class="fa-solid fa-circle text-[6px]"></i> SINCRONIZADO</span>
-                    </div>
-                </div>
-
-                <!-- Node 4: Veo API Video Gen Queue -->
-                <div id="node-4" onclick="openNodeDetails('node4')" class="cursor-pointer glass-panel p-4 rounded-xl border border-cyber-gold/40 hover:border-cyber-gold transition-all hover:shadow-neon-cyan relative group">
-                    <div class="flex justify-between items-center mb-2">
-                        <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-cyber-gold/20 text-cyber-gold font-bold">PASO 04</span>
-                        <i class="fa-solid fa-video text-cyber-gold animate-pulse"></i>
-                    </div>
-                    <h4 class="font-display font-semibold text-sm text-white">Cola Veo 3.1</h4>
-                    <p class="text-[11px] text-slate-400 font-mono mt-1">8 Clips x 8s (64s total)</p>
-                    <div class="mt-3 flex items-center justify-between text-[10px] font-mono text-slate-400">
-                        <span>Estado:</span>
-                        <span class="text-cyber-gold font-bold flex items-center gap-1"><i class="fa-solid fa-spinner animate-spin text-[10px]"></i> GENERANDO</span>
-                    </div>
-                </div>
-
-                <!-- Node 5: Human Review Panel -->
-                <div id="node-5" onclick="openNodeDetails('node5')" class="cursor-pointer glass-panel p-4 rounded-xl border border-slate-700 hover:border-cyber-cyan transition-all relative group">
-                    <div class="flex justify-between items-center mb-2">
-                        <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-bold">PASO 05</span>
-                        <i class="fa-solid fa-user-check text-slate-300"></i>
-                    </div>
-                    <h4 class="font-display font-semibold text-sm text-white">Filtro Humano</h4>
-                    <p class="text-[11px] text-slate-400 font-mono mt-1">Control Calidad (1-2 min)</p>
-                    <div class="mt-3 flex items-center justify-between text-[10px] font-mono text-slate-400">
-                        <span>Estado:</span>
-                        <span class="text-slate-400 font-bold">ESPERANDO</span>
-                    </div>
-                </div>
-
-                <!-- Node 6: Multi-Channel Publishing -->
-                <div id="node-6" onclick="openNodeDetails('node6')" class="cursor-pointer glass-panel p-4 rounded-xl border border-slate-700 hover:border-cyber-emerald transition-all relative group">
-                    <div class="flex justify-between items-center mb-2">
-                        <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-bold">PASO 06</span>
-                        <i class="fa-solid fa-share-nodes text-slate-300"></i>
-                    </div>
-                    <h4 class="font-display font-semibold text-sm text-white">Publicación</h4>
-                    <p class="text-[11px] text-slate-400 font-mono mt-1">TikTok / YT / Reels</p>
-                    <div class="mt-3 flex items-center justify-between text-[10px] font-mono text-slate-400">
-                        <span>Estado:</span>
-                        <span class="text-slate-400 font-bold">PENDIENTE</span>
-                    </div>
-                </div>
-
-            </div>
-
-            <!-- Simulated Terminal Output Bar -->
-            <div class="mt-4 bg-cyber-darker border border-cyber-border rounded-xl p-3 font-mono text-xs text-slate-300 flex items-center justify-between overflow-x-auto">
-                <div class="flex items-center space-x-3 min-w-max">
-                    <span class="text-cyber-cyan font-bold"><i class="fa-solid fa-terminal mr-1"></i> LIVE LOG:</span>
-                    <span id="terminalLiveLog" class="text-slate-300">[14:22:08] Netlify function initiated. Script validated against Story Bible rule #14 (Cliffhanger mandatory). Veo queue assigned 8 clips.</span>
-                </div>
-                <button onclick="toggleLogConsole()" class="text-[10px] text-cyber-cyan hover:underline ml-4 min-w-max">Ver consola completa &rarr;</button>
-            </div>
+            <div id="pipelineSteps" class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3"></div>
+            <div id="pipelineNext" class="mt-4 bg-cyber-darker border border-cyber-border rounded-xl px-4 py-3 text-xs font-mono text-slate-300"></div>
         </section>
 
         <!-- STORY BIBLE & CHARACTER CONSISTENCY CENTRAL -->
@@ -422,32 +301,8 @@
                     <span class="text-[10px] font-mono bg-cyber-pink/20 text-cyber-pink border border-cyber-pink/40 px-2 py-0.5 rounded">SUPABASE JSON</span>
                 </div>
 
-                <!-- Rules Toggles -->
-                <div class="space-y-3 font-mono text-xs">
-                    <div class="flex items-center justify-between p-2.5 rounded-lg bg-cyber-darker/60 border border-cyber-border">
-                        <div>
-                            <p class="text-white font-semibold">Gancho / Cliffhanger Obligatorio</p>
-                            <p class="text-[10px] text-slate-400">Rechazar si el guion resuelve el capítulo</p>
-                        </div>
-                        <input type="checkbox" checked class="accent-cyber-pink h-4 w-4 rounded cursor-pointer">
-                    </div>
-
-                    <div class="flex items-center justify-between p-2.5 rounded-lg bg-cyber-darker/60 border border-cyber-border">
-                        <div>
-                            <p class="text-white font-semibold">Verificación de Personalidad</p>
-                            <p class="text-[10px] text-slate-400">Comparar tono con arquetipo fijo</p>
-                        </div>
-                        <input type="checkbox" checked class="accent-cyber-pink h-4 w-4 rounded cursor-pointer">
-                    </div>
-
-                    <div class="flex items-center justify-between p-2.5 rounded-lg bg-cyber-darker/60 border border-cyber-border">
-                        <div>
-                            <p class="text-white font-semibold">Consistencia Visual de Personajes</p>
-                            <p class="text-[10px] text-slate-400">Inyectar tags fijos de Nano Banana Pro</p>
-                        </div>
-                        <input type="checkbox" checked class="accent-cyber-cyan h-4 w-4 rounded cursor-pointer">
-                    </div>
-                </div>
+                <!-- Reglas REALES de la serie activa (story_bible.rules), solo lectura -->
+                <div id="storyRules" class="space-y-2 font-mono text-xs"></div>
 
                 <!-- Episode Continuity Memory Log -->
                 <div class="mt-4 pt-3 border-t border-cyber-border">
@@ -467,7 +322,7 @@
                 <div class="flex items-center justify-between border-b border-cyber-border pb-3 mb-4">
                     <div class="flex items-center space-x-2">
                         <i class="fa-solid fa-scroll text-cyber-cyan"></i>
-                        <h3 class="font-display font-bold text-white text-base">ARCO COMPLETO // GUIONES</h3>
+                        <h3 id="arcSection" class="font-display font-bold text-white text-base">ARCO COMPLETO // GUIONES</h3>
                     </div>
                     <span id="arcCountLabel" class="text-xs font-mono text-slate-400"></span>
                 </div>
@@ -482,160 +337,27 @@
                 <div>
                     <h3 class="font-display font-bold text-lg text-white flex items-center gap-2">
                         <i class="fa-solid fa-sliders text-cyber-gold"></i>
-                        <span>PANEL DE REVISIÓN HUMANA Y COLA DE PRODUCCIÓN</span>
+                        <span id="reviewSection">PANEL DE REVISIÓN HUMANA Y COLA DE PRODUCCIÓN</span>
                     </h3>
                     <p class="text-xs text-slate-400 font-mono">Filtro humano rápido de 1-2 minutos para evitar "looks IA" o inconsistencias antes de publicar.</p>
                     <p id="dataStatusBanner" class="text-[11px] font-mono text-cyber-gold mt-1"></p>
                     <div id="finalRenderPanel" class="mt-3 hidden"></div>
                 </div>
 
-                <div class="flex items-center space-x-2">
-                    <button class="px-3 py-1.5 rounded-lg bg-cyber-cyan/10 border border-cyber-cyan/30 text-cyber-cyan text-xs font-mono hover:bg-cyber-cyan/20">
-                        <i class="fa-solid fa-filter mr-1"></i> Filtrar: Pendientes (2)
-                    </button>
-                    <button class="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 text-xs font-mono hover:bg-slate-700">
-                        Historial Publicados
-                    </button>
-                </div>
             </div>
 
             <!-- Vertical 9:16 Shot Breakdown & Scene Cards Grid -->
             <div id="shotCardsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 
-                <!-- Scene Shot Card 1 -->
-                <div class="demo-shot-card bg-cyber-darker rounded-xl border border-cyber-border overflow-hidden group hover:border-cyber-cyan transition-all flex flex-col justify-between">
-                    <div>
-                        <!-- Simulated 9:16 Vertical Shot Frame -->
-                        <div class="relative aspect-[9/16] bg-slate-950 overflow-hidden">
-                            <img src="https://images.unsplash.com/photo-1515260268569-9271009adfdb?auto=format&fit=crop&w=600&q=80" alt="Shot 1" class="w-full h-full object-cover group-hover:scale-105 transition-all duration-500">
-                            <div class="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/60"></div>
-                            
-                            <!-- Badges Top -->
-                            <div class="absolute top-3 left-3 right-3 flex justify-between items-center text-[10px] font-mono">
-                                <span class="bg-black/80 text-cyber-cyan border border-cyber-cyan/30 px-2 py-0.5 rounded">TOMA 01 / 08</span>
-                                <span class="bg-cyber-emerald/90 text-black font-bold px-2 py-0.5 rounded">VEO LITE ($0.24)</span>
-                            </div>
-
-                            <!-- Shot Audio/Prompt Preview Overlay -->
-                            <div class="absolute bottom-3 left-3 right-3 text-xs text-white">
-                                <p class="font-display font-semibold text-cyber-cyan">Gancho Inicial - Entrada</p>
-                                <p class="text-[11px] text-slate-300 line-clamp-2 mt-0.5">Elena entra corriendo al callejón oscuro bajo la lluvia torrencial de neón.</p>
-                            </div>
-                        </div>
-
-                        <!-- Card Detail Metrics -->
-                        <div class="p-3 text-[11px] font-mono space-y-1.5 border-t border-cyber-border">
-                            <div class="flex justify-between text-slate-400">
-                                <span>Duración: <strong>8 seg</strong></span>
-                                <span>Calidad: <strong class="text-cyber-emerald">OK (98%)</strong></span>
-                            </div>
-                            <div class="text-[10px] text-slate-400 truncate">
-                                Modelo: <span class="text-white">google/veo-3.1-lite</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Action Controls -->
-                    <div class="p-3 bg-slate-900/80 border-t border-cyber-border flex items-center justify-between gap-2">
-                        <button onclick="approveShot(1)" class="flex-1 py-1.5 rounded bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/40 text-xs font-mono font-semibold transition-all">
-                            <i class="fa-solid fa-check mr-1"></i> Aprobar
-                        </button>
-                        <button onclick="regenShot(1)" class="px-2.5 py-1.5 rounded bg-cyber-pink/20 hover:bg-cyber-pink/30 text-cyber-pink border border-cyber-pink/40 text-xs font-mono transition-all" title="Regenerar Toma Punctual ($0.20)">
-                            <i class="fa-solid fa-rotate"></i>
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Scene Shot Card 2 -->
-                <div class="demo-shot-card bg-cyber-darker rounded-xl border border-cyber-border overflow-hidden group hover:border-cyber-cyan transition-all flex flex-col justify-between">
-                    <div>
-                        <div class="relative aspect-[9/16] bg-slate-950 overflow-hidden">
-                            <img src="https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=600&q=80" alt="Shot 2" class="w-full h-full object-cover group-hover:scale-105 transition-all duration-500">
-                            <div class="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/60"></div>
-                            
-                            <div class="absolute top-3 left-3 right-3 flex justify-between items-center text-[10px] font-mono">
-                                <span class="bg-black/80 text-cyber-cyan border border-cyber-cyan/30 px-2 py-0.5 rounded">TOMA 02 / 08</span>
-                                <span class="bg-cyber-emerald/90 text-black font-bold px-2 py-0.5 rounded">VEO LITE ($0.24)</span>
-                            </div>
-
-                            <div class="absolute bottom-3 left-3 right-3 text-xs text-white">
-                                <p class="font-display font-semibold text-cyber-cyan">Plano Detalle - Lente Ocular</p>
-                                <p class="text-[11px] text-slate-300 line-clamp-2 mt-0.5">El ojo cibernético de Elena brilla revelando el código encriptado.</p>
-                            </div>
-                        </div>
-
-                        <div class="p-3 text-[11px] font-mono space-y-1.5 border-t border-cyber-border">
-                            <div class="flex justify-between text-slate-400">
-                                <span>Duración: <strong>8 seg</strong></span>
-                                <span>Calidad: <strong class="text-cyber-emerald">OK (95%)</strong></span>
-                            </div>
-                            <div class="text-[10px] text-slate-400 truncate">
-                                Modelo: <span class="text-white">google/veo-3.1-lite</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="p-3 bg-slate-900/80 border-t border-cyber-border flex items-center justify-between gap-2">
-                        <button onclick="approveShot(2)" class="flex-1 py-1.5 rounded bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/40 text-xs font-mono font-semibold transition-all">
-                            <i class="fa-solid fa-check mr-1"></i> Aprobar
-                        </button>
-                        <button onclick="regenShot(2)" class="px-2.5 py-1.5 rounded bg-cyber-pink/20 hover:bg-cyber-pink/30 text-cyber-pink border border-cyber-pink/40 text-xs font-mono transition-all" title="Regenerar Toma Punctual ($0.20)">
-                            <i class="fa-solid fa-rotate"></i>
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Scene Shot Card 3 (Cliffhanger Scene - Fast Mode) -->
-                <div id="demo-cliffhanger-card" class="demo-shot-card bg-cyber-darker rounded-xl border-2 border-cyber-pink/60 overflow-hidden group hover:border-cyber-pink transition-all flex flex-col justify-between shadow-neon-pink">
-                    <div>
-                        <div class="relative aspect-[9/16] bg-slate-950 overflow-hidden">
-                            <img src="https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=600&q=80" alt="Shot 8" class="w-full h-full object-cover group-hover:scale-105 transition-all duration-500">
-                            <div class="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/60"></div>
-                            
-                            <div class="absolute top-3 left-3 right-3 flex justify-between items-center text-[10px] font-mono">
-                                <span class="bg-cyber-pink text-white font-bold px-2 py-0.5 rounded animate-pulse">CLIFFHANGER #08</span>
-                                <span class="bg-cyber-pink/90 text-white font-bold px-2 py-0.5 rounded">VEO FAST ($1.20)</span>
-                            </div>
-
-                            <div class="absolute bottom-3 left-3 right-3 text-xs text-white">
-                                <p class="font-display font-semibold text-cyber-pink">Toma Final Clímax</p>
-                                <p class="text-[11px] text-slate-300 line-clamp-2 mt-0.5">Kenji apunta su arma. Fundido a negro repentino con disparo ensordecedor.</p>
-                            </div>
-                        </div>
-
-                        <div class="p-3 text-[11px] font-mono space-y-1.5 border-t border-cyber-border">
-                            <div class="flex justify-between text-slate-400">
-                                <span>Duración: <strong>8 seg</strong></span>
-                                <span>Calidad: <strong class="text-cyber-pink">MÁXIMA (99%)</strong></span>
-                            </div>
-                            <div class="text-[10px] text-slate-400 truncate">
-                                Modelo: <span class="text-cyber-pink font-semibold">google/veo-3.1-fast</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="p-3 bg-slate-900/80 border-t border-cyber-border flex items-center justify-between gap-2">
-                        <button onclick="approveShot(3)" class="flex-1 py-1.5 rounded bg-cyber-pink/20 hover:bg-cyber-pink/40 text-cyber-pink border border-cyber-pink/50 text-xs font-mono font-bold transition-all">
-                            <i class="fa-solid fa-paper-plane mr-1"></i> Publicar Capítulo
-                        </button>
-                        <button onclick="regenShot(3)" class="px-2.5 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-mono transition-all">
-                            <i class="fa-solid fa-rotate"></i>
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Scene Shot Card 4 (Add / Pending Generator Slot) -->
+                <!-- Siguiente episodio a producir (datos reales) -->
                 <div id="addChapterCard" class="bg-cyber-darker/40 rounded-xl border border-dashed border-cyber-border flex flex-col items-center justify-center p-6 text-center hover:border-cyber-cyan transition-all">
                     <div class="w-12 h-12 rounded-full bg-cyber-cyan/10 border border-cyber-cyan/30 flex items-center justify-center text-cyber-cyan mb-3">
-                        <i class="fa-solid fa-plus text-lg"></i>
+                        <i class="fa-solid fa-clapperboard text-lg"></i>
                     </div>
-                    <h4 class="font-display font-bold text-white text-sm">Nuevo Capítulo en Cola</h4>
-                    <p class="text-xs text-slate-400 font-mono mt-1">Capítulo #16 listo para renderizado en batch.</p>
-                    <button onclick="triggerPipelineRun()" class="mt-4 px-4 py-2 rounded-lg bg-cyber-cyan/20 text-cyber-cyan border border-cyber-cyan/40 text-xs font-mono hover:bg-cyber-cyan/30 transition-all">
-                        Iniciar Render Episodio #16
-                    </button>
+                    <h4 id="nextEpTitle" class="font-display font-bold text-white text-sm">Siguiente episodio</h4>
+                    <p id="nextEpDesc" class="text-xs text-slate-400 font-mono mt-1">—</p>
+                    <button id="nextEpBtn" onclick="triggerPipelineRun()" class="hidden mt-4 px-4 py-2 rounded-lg bg-cyber-cyan/20 text-cyber-cyan border border-cyber-cyan/40 text-xs font-mono hover:bg-cyber-cyan/30 transition-all"></button>
                 </div>
-
             </div>
         </section>
 
@@ -1038,12 +760,10 @@
         document.getElementById('episodesRevision').textContent = counts.revision;
         document.getElementById('episodesCola').textContent = counts.cola;
 
-        const approvalBase = episodes.length;
-        const approvalRateLabel = document.getElementById('approvalRateLabel');
-        approvalRateLabel.textContent = approvalBase
-          ? (((approvalBase - counts.rechazados) / approvalBase) * 100).toFixed(1) + '%'
-          : '—';
-        document.getElementById('rejectedCountLabel').textContent = counts.rechazados;
+        const clipsAll = allClips.length;
+        const clipsOk = allClips.filter(a => a.approved).length;
+        document.getElementById('approvalRateLabel').textContent = clipsAll ? clipsOk + ' / ' + clipsAll : '—';
+        document.getElementById('rejectedCountLabel').textContent = clipsAll - clipsOk;
 
         const approvedClips = allClips.filter(a => a.approved).length;
         document.getElementById('clipsCountLabel').textContent = allClips.length;
@@ -1192,8 +912,13 @@
         const chars = data.characters || [];
         const openIds = new Set([...grid.querySelectorAll('details.cast-card[open]')].map(d => d.getAttribute('data-char-id')));
         const episodes = data.episodes || [];
-        document.getElementById('castSubtitle').textContent = chars.length
-          ? chars.length + ' personajes de "' + data.series.title + '" — el tag fijo en inglés se inyecta en cada toma de Veo donde aparecen.'
+        const rules = (data.series.story_bible && data.series.story_bible.rules) || {};
+        document.getElementById('deleteSeriesBtn').classList.remove('hidden');
+        document.getElementById('castSubtitle').innerHTML = chars.length
+          ? esc(chars.length + ' personajes de "' + data.series.title + '". ') +
+            (rules.reference_images
+              ? '<span class="text-cyber-emerald"><i class="fa-solid fa-check mr-1"></i>Las fotos SÍ se envían a Veo en cada toma (modelo ' + esc((rules.shot_model || '').replace('veo_', 'Veo ')) + ').</span>'
+              : '<span class="text-cyber-gold"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Las fotos NO se envían a Veo: esta serie usa ' + esc((rules.shot_model || 'veo_lite').replace('veo_', 'Veo ')) + ', que no acepta referencias. La cara se mantiene solo por el texto.</span>')
           : 'Esta serie todavía no tiene personajes guardados.';
         grid.innerHTML = chars.map(c => {
           const pr = c.profile || {};
@@ -1406,6 +1131,37 @@
         }
       };
 
+      window.deleteSeries = async function() {
+        const series = lastLoadedData && lastLoadedData.series;
+        if (!series) return;
+        const typed = prompt(
+          'ELIMINAR "' + series.title + '" PARA SIEMPRE.\n\n' +
+          'Se borran todos sus episodios, personajes, fotos, tomas y videos (también los archivos en Supabase). No se puede deshacer.\n\n' +
+          'Para confirmar, escribe exactamente: ' + series.slug
+        );
+        if (typed === null) return;
+        if (typed.trim() !== series.slug) return alert('No coincide. No se borró nada.');
+        const btn = document.getElementById('deleteSeriesBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>Eliminando...';
+        try {
+          const res = await fetch('/.netlify/functions/delete-series', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ slug: series.slug, confirm_slug: typed.trim() })
+          });
+          const out = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(out.error || ('HTTP ' + res.status));
+          alert('"' + out.title + '" eliminada. Archivos borrados: ' + out.files_removed + '.');
+          try { localStorage.removeItem('vyrales_series'); } catch (_) {}
+          const others = (lastLoadedData.all_series || []).filter(x => x.slug !== series.slug);
+          location.search = others.length ? '?series=' + encodeURIComponent(others[0].slug) : '?series=nueva';
+        } catch (err) {
+          alert('No se pudo eliminar: ' + err.message);
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fa-solid fa-trash mr-1"></i>Eliminar serie';
+        }
+      };
+
       window.toggleAllCast = function() {
         const cards = [...document.querySelectorAll('#castGrid details.cast-card')];
         const open = !cards.every(d => d.open);
@@ -1548,6 +1304,104 @@
         }).join('');
       }
 
+      // Pasos reales de la serie activa: nada fijo, todo sale de get-episodes.
+      function renderPipeline(data) {
+        const eps = (data.episodes || []).filter(e => e.status !== 'archivado').sort((a, b) => a.episode_number - b.episode_number);
+        const chars = data.characters || [];
+        const rules = (data.series.story_bible && data.series.story_bible.rules) || {};
+        const totalShots = eps.reduce((n, e) => n + ((e.shots || []).length || 0), 0);
+        const clips = eps.flatMap(e => (e.assets || []).filter(a => a.kind === 'video_clip'));
+        const approved = clips.filter(a => a.approved).length;
+        const warnings = eps.reduce((n, e) => n + (((e.validator_report || {}).warnings) || []).length, 0);
+        const withPhoto = chars.filter(c => c.reference_image_url).length;
+        const generating = eps.find(e => e.status === 'generando_media');
+        const finals = eps.filter(e => (e.assets || []).some(a => a.kind === 'final_render')).length;
+
+        const step = (n, icon, title, value, detail, state, target) => {
+          const styles = {
+            ok: 'border-cyber-emerald/40 text-cyber-emerald',
+            work: 'border-cyber-gold/50 text-cyber-gold',
+            todo: 'border-cyber-border text-slate-400',
+            warn: 'border-cyber-pink/50 text-cyber-pink',
+            off: 'border-slate-800 text-slate-600'
+          }[state];
+          const label = { ok: 'LISTO', work: 'EN CURSO', todo: 'PENDIENTE', warn: 'REVISAR', off: 'NO DISPONIBLE' }[state];
+          return (
+            '<button type="button" ' + (target ? 'onclick="document.getElementById(\'' + target + '\').scrollIntoView({behavior:\'smooth\',block:\'start\'})"' : 'disabled') +
+              ' class="text-left bg-cyber-darker rounded-xl border p-3 hover:bg-white/5 transition-all ' + styles + '">' +
+              '<div class="flex items-center justify-between text-[10px] font-mono"><span>PASO ' + n + '</span><i class="fa-solid ' + icon + '"></i></div>' +
+              '<p class="font-display font-bold text-white text-sm mt-1">' + title + '</p>' +
+              '<p class="text-lg font-display font-bold mt-1">' + value + '</p>' +
+              '<p class="text-[10px] font-mono text-slate-500 mt-0.5 leading-snug">' + detail + '</p>' +
+              '<p class="text-[10px] font-mono mt-2">' + label + '</p>' +
+            '</button>'
+          );
+        };
+
+        const photoState = !chars.length ? 'todo' : (withPhoto === chars.length ? 'ok' : (rules.reference_images ? 'warn' : 'todo'));
+        document.getElementById('pipelineSteps').innerHTML = [
+          step(1, 'fa-feather', 'Novela escrita', eps.length + ' eps', totalShots + ' tomas · creada con PROMPT', eps.length ? 'ok' : 'todo', 'arcSection'),
+          step(2, 'fa-shield-halved', 'Validación', '0 errores', warnings ? warnings + ' avisos de riesgo visual' : 'sin avisos', eps.length ? (warnings ? 'warn' : 'ok') : 'todo', 'arcSection'),
+          step(3, 'fa-masks-theater', 'Personajes y fotos', withPhoto + '/' + chars.length, rules.reference_images ? 'las fotos se envían a Veo' : 'fotos solo de referencia (Veo Lite no las usa)', photoState, 'castSection'),
+          step(4, 'fa-video', 'Tomas en Veo', clips.length + '/' + totalShots, generating ? 'generando EP ' + generating.episode_number + '…' : (finals + ' episodio(s) unido(s)'), generating ? 'work' : (totalShots && clips.length >= totalShots ? 'ok' : 'todo'), 'arcSection'),
+          step(5, 'fa-user-check', 'Revisión humana', approved + '/' + clips.length, 'tomas aprobadas', clips.length && approved === clips.length ? 'ok' : (clips.length ? 'work' : 'todo'), 'reviewSection'),
+          step(6, 'fa-share-nodes', 'Publicación', '—', 'TikTok / YT / Reels: todavía no está construido', 'off', null)
+        ].join('');
+
+        // Siguiente paso real
+        let next;
+        const nextEp = eps.find(e => e.status === 'guion_generado');
+        const inReview = eps.find(e => e.status === 'en_revision');
+        if (!eps.length) next = 'Crea una novela con el botón <b>PROMPT</b>.';
+        else if (rules.reference_images && withPhoto < chars.length) next = 'Sube la foto de los ' + (chars.length - withPhoto) + ' personaje(s) que faltan en <b>Elenco</b>: esta serie las envía a Veo y no se puede producir sin ellas.';
+        else if (generating) next = 'Veo está generando el EP ' + generating.episode_number + '. Espera a que termine.';
+        else if (inReview) next = 'Revisa el <b>EP ' + inReview.episode_number + '</b> en el panel de revisión: aprueba o regenera cada toma.';
+        else if (nextEp) next = 'Siguiente: produce el <b>EP ' + nextEp.episode_number + ' — ' + esc(nextEp.title || '') + '</b> desde Arco completo (~$' + estimateEpisodeCost(nextEp).toFixed(2) + ').';
+        else next = 'Todos los episodios están producidos.';
+        document.getElementById('pipelineNext').innerHTML = '<i class="fa-solid fa-arrow-right text-cyber-cyan mr-2"></i>' + next;
+      }
+
+      function renderRules(data) {
+        const sb = data.series.story_bible || {};
+        const r = sb.rules || {};
+        const row = (label, value, ok) =>
+          '<div class="flex items-center justify-between gap-3 p-2.5 rounded-lg bg-cyber-darker/60 border border-cyber-border">' +
+            '<span class="text-slate-300">' + label + '</span>' +
+            '<span class="font-bold ' + (ok === false ? 'text-cyber-gold' : 'text-white') + ' text-right">' + value + '</span>' +
+          '</div>';
+        const model = (k) => (r[k] || (k === 'shot_model' ? 'veo_lite' : 'veo_fast')).replace('veo_', 'Veo ');
+        document.getElementById('storyRules').innerHTML =
+          row('Cliffhanger obligatorio', r.cliffhanger_required === false ? 'No' : 'Sí (validado al crear)') +
+          row('Tomas por episodio', (r.shots_per_episode || 8) + ' × ' + (r.shot_seconds || 8) + ' s = ' + Math.round((r.shots_per_episode || 8) * (r.shot_seconds || 8)) + ' s') +
+          row('Personajes por toma', 'máx. ' + (r.max_characters_per_shot || 2)) +
+          row('Diálogo por toma', '1 hablante · máx. ' + (r.max_dialogue_words_per_shot || 15) + ' palabras') +
+          row('Modelo de video', model('shot_model') + (r.cliffhanger_model && r.cliffhanger_model !== r.shot_model ? ' (+ ' + model('cliffhanger_model') + ' en el gancho)' : '')) +
+          row('Fotos de referencia a Veo', r.reference_images ? 'Sí' : 'No', !!r.reference_images) +
+          '<p class="text-[10px] text-slate-500 leading-snug pt-1">Estas reglas vienen de la novela creada con PROMPT; el validador las hace cumplir al crearla.</p>';
+      }
+
+      function renderNextEpisodeCard(data) {
+        const eps = (data.episodes || []).slice().sort((a, b) => a.episode_number - b.episode_number);
+        const next = eps.find(e => e.status === 'guion_generado');
+        const generating = eps.find(e => e.status === 'generando_media');
+        const btn = document.getElementById('nextEpBtn');
+        const title = document.getElementById('nextEpTitle');
+        const desc = document.getElementById('nextEpDesc');
+        btn.classList.add('hidden');
+        if (generating) {
+          title.textContent = 'Generando EP ' + generating.episode_number;
+          desc.textContent = 'Veo está trabajando. Esta página se actualiza sola.';
+        } else if (next) {
+          title.textContent = 'Siguiente: EP ' + next.episode_number + ' — ' + (next.title || '');
+          desc.textContent = ((next.shots || []).length || 0) + ' tomas · ~$' + estimateEpisodeCost(next).toFixed(2) + ' en Veo';
+          btn.textContent = 'Producir EP ' + next.episode_number;
+          btn.classList.remove('hidden');
+        } else {
+          title.textContent = eps.length ? 'No hay episodios pendientes' : 'Sin episodios';
+          desc.textContent = eps.length ? 'Todos los episodios ya se produjeron.' : 'Crea una novela con el botón PROMPT.';
+        }
+      }
+
       function renderContinuity(data) {
         const eps = (data.episodes || []).slice().sort((a, b) => a.episode_number - b.episode_number);
         // El último episodio ya producido (con video) es el que marca la continuidad; si
@@ -1562,6 +1416,8 @@
         document.getElementById('continuityPending').textContent = (ref.continuity && ref.continuity.pending_state) || '—';
       }
 
+      // (Ya no se muestra en el dashboard: las novelas se crean con el botón PROMPT. Se deja
+      // la función por si se quiere reactivar la importación de series/*.json del repo.)
       async function loadImportBar() {
         const bar = document.getElementById('importBar');
         try {
@@ -1831,8 +1687,10 @@
             const nf = await res.json().catch(() => ({}));
             renderSeriesSelector(nf.all_series || [], null);
             const others = (nf.all_series || []).filter(x => x.slug !== DEFAULT_SERIES);
-            document.getElementById('castSubtitle').textContent = 'La serie "' + DEFAULT_SERIES + '" todavía no está en la base. Usa el botón de importar.';
-            banner.textContent = 'La serie "' + DEFAULT_SERIES + '" no existe todavía en Supabase.' + (others.length ? ' Elige otra arriba o impórtala.' : ' Impórtala con el botón de la sección Elenco.');
+            document.getElementById('castSubtitle').textContent = 'No hay ninguna serie "' + DEFAULT_SERIES + '". Crea una con el botón PROMPT.';
+            document.getElementById('castGrid').innerHTML = '';
+            document.getElementById('deleteSeriesBtn').classList.add('hidden');
+            banner.textContent = others.length ? 'Elige una serie arriba o crea una nueva con PROMPT.' : 'Crea tu primera novela con el botón PROMPT.';
             return;
           }
           if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -1844,6 +1702,9 @@
           renderCast(data);
           renderArc(data);
           renderContinuity(data);
+          renderPipeline(data);
+          renderRules(data);
+          renderNextEpisodeCard(data);
           const inReview =
             episodes.find(e => e.status === 'en_revision') ||
             episodes.find(e => e.status === 'generando_media') ||
@@ -1860,13 +1721,13 @@
             sorted.forEach((asset, i) => {
               addCard.insertAdjacentHTML('beforebegin', renderShotCard(asset, i, sorted.length));
             });
-            banner.textContent = 'Conectado a Supabase — mostrando episodio #' + inReview.episode_number + ' de "' + data.series.title + '".';
+            banner.textContent = 'Revisando EP ' + inReview.episode_number + ' de "' + data.series.title + '".';
           } else {
-            banner.textContent = 'Conectado a Supabase — todavía no hay episodios generados para esta serie. Corre el pipeline para crear el primero.';
+            banner.textContent = 'Todavía no hay tomas generadas en esta serie.';
           }
           lastLoadedData = data;
         } catch (err) {
-          banner.textContent = 'No se pudo conectar a Supabase todavía (' + err.message + '). Revisa las variables de entorno en Netlify.';
+          banner.textContent = 'No se pudo cargar la información (' + err.message + ').';
           banner.classList.remove('text-cyber-gold');
           banner.classList.add('text-cyber-pink');
         }
@@ -1983,10 +1844,7 @@
         }
       };
 
-      document.addEventListener('DOMContentLoaded', () => {
-        loadDashboard();
-        loadImportBar();
-      });
+      document.addEventListener('DOMContentLoaded', loadDashboard);
     })();
     </script>
 

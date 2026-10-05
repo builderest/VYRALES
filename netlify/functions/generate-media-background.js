@@ -16,9 +16,9 @@
 //   http://localhost:8888/.netlify/functions/generate-media-background?episode_id=<uuid>
 const { getSupabaseClient } = require('./_supabase');
 const { ensureMediaBucket, uploadClip } = require('./_storage');
-const { generateVeoClip } = require('./_veo');
+const { generateVeoClip, loadReferenceImages } = require('./_veo');
 const { mergeEpisodeVideo } = require('./_merge');
-const { buildShotPrompt } = require('./_series');
+const { buildShotPrompt, referenceUrlsForShot } = require('./_series');
 
 // Estilo por defecto SOLO para series viejas sin story_bible.visual_style (dragon_silicio).
 // Las novelas nuevas definen su estilo en story_bible.visual_style (ej. animación 3D).
@@ -90,6 +90,7 @@ exports.handler = async (event) => {
   // no se vuelve a generar cuando se produzca el resto).
   const onlyShot = Number(body.shot || qs.shot) || null;
 
+  let markedGenerating = null; // id del episodio que ESTA corrida marcó como generando_media
   console.log(LOG, 'arrancó. series=', seriesSlug, 'episode_id=', episodeId || '(ninguno, toma el siguiente en guion_generado)', isContinuation ? '(continuación)' : '');
 
   try {
@@ -124,7 +125,7 @@ exports.handler = async (event) => {
 
     const { data: characters, error: charactersError } = await supabase
       .from('characters')
-      .select('name, fixed_prompt_tag, profile')
+      .select('name, fixed_prompt_tag, profile, reference_image_url')
       .eq('series_id', series.id);
     if (charactersError) throw charactersError;
 
@@ -167,24 +168,32 @@ exports.handler = async (event) => {
       return { statusCode: 200, body: JSON.stringify({ episode_id: episode.id, shots_ok: [], shots_failed: [], note: 'ya estaban todas generadas' }) };
     }
 
+    // Se arman TODOS los prompts antes de llamar a Veo: si alguno falla (personaje sin
+    // tag, etc.) se aborta sin haber gastado nada.
+    const prompts = {};
+    const refUrls = {};
+    const useRefs = !!(series.story_bible && series.story_bible.rules && series.story_bible.rules.reference_images);
+    for (const scene of scenes) {
+      prompts[scene.number] = scene.shot
+        ? buildShotPrompt(scene.shot, characters, series.story_bible)
+        : buildPrompt(scene.text, characters, series.story_bible);
+      // Con fotos de referencia activadas, TODAS las tomas deben tener la foto de cada
+      // personaje: si falta una, se aborta aquí, antes de gastar en Veo.
+      if (useRefs && scene.shot) refUrls[scene.number] = referenceUrlsForShot(scene.shot, characters);
+    }
+    if (useRefs) console.log(LOG, 'fotos de referencia ACTIVADAS: cada toma lleva la foto de sus personajes.');
+
     await ensureMediaBucket(supabase);
     console.log(LOG, 'bucket "media" listo.');
 
     await supabase.from('episodes').update({ status: 'generando_media' }).eq('id', episode.id);
+    markedGenerating = episode.id;
     console.log(LOG, 'episodio marcado como generando_media. Arrancando', scenes.length, 'tomas con Veo (esto tarda varios minutos)...');
 
     const total = allScenes.length; // el total real del episodio, no solo lo que falta por generar
     // Secuencial a propósito (no Promise.all): 8 solicitudes simultáneas chocan con la
     // cuota de "requests por minuto" que Google asigna a cuentas de facturación recién
     // activadas (ver 429 RESOURCE_EXHAUSTED). Una por una es más lento pero confiable.
-    // Se arman TODOS los prompts antes de llamar a Veo: si alguno falla (personaje sin
-    // tag, etc.) se aborta sin haber gastado nada.
-    const prompts = {};
-    for (const scene of scenes) {
-      prompts[scene.number] = scene.shot
-        ? buildShotPrompt(scene.shot, characters, series.story_bible)
-        : buildPrompt(scene.text, characters, series.story_bible);
-    }
 
     // Modelo por toma configurable por serie (story_bible.rules.shot_model /
     // cliffhanger_model). Sin configurar = híbrido de siempre: Lite + Fast en el cliffhanger.
@@ -206,7 +215,8 @@ exports.handler = async (event) => {
 
       console.log(LOG, `toma ${scene.number}/${total} (${modelKey}): arrancando generación con Veo...`);
       try {
-        const { videoBuffer, costUsd, model } = await generateVeoClip({ modelKey, prompt });
+        const referenceImages = refUrls[scene.number] ? await loadReferenceImages(refUrls[scene.number]) : [];
+        const { videoBuffer, costUsd, model } = await generateVeoClip({ modelKey, prompt, referenceImages });
         console.log(LOG, `toma ${scene.number}/${total}: Veo terminó, subiendo a Supabase Storage...`);
 
         const storagePath = `${series.slug}/ep${episode.episode_number}/shot-${String(scene.number).padStart(2, '0')}.mp4`;
@@ -300,6 +310,10 @@ exports.handler = async (event) => {
     };
   } catch (err) {
     console.error(LOG, 'ERROR GENERAL:', err);
+    // Nunca dejar el episodio trabado en "generando_media" por un error de esta corrida.
+    if (markedGenerating) {
+      await supabase.from('episodes').update({ status: 'guion_generado' }).eq('id', markedGenerating).then(() => {}, () => {});
+    }
     return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
   }
 };

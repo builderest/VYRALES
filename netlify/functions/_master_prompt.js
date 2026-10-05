@@ -48,6 +48,7 @@ function buildMasterPrompt(sample) {
 - Número de episodios: [12]
 - Tomas por episodio: [12] (cada toma dura 8 segundos)
 - Estilo visual: [ej. "High-end 3D animated feature film style…" o "Photorealistic cinematic…"]
+- ¿Usar fotos de referencia de los personajes? [sí / no] (sí = caras idénticas pero cuesta ~3.7× más: Veo Fast)
 - Idioma de los diálogos: español de México
 
 === QUÉ ENTREGAS ===
@@ -66,8 +67,11 @@ Un ÚNICO objeto JSON válido (nada de texto antes o después), con EXACTAMENTE 
    - profile: age, archetype, personality, wants, fear, arc.
 5. story_bible.locations: cada set con "visual" (descripción visual fija en inglés) y "ambient" (sonido ambiente en inglés). Reutiliza sets: 6 a 18 en total.
 6. story_bible.extras: personajes sin nombre que hablan (consejero, guardia, juez…): { "who": "…", "voice": "…" } en inglés. Los extras no van en "characters" de la toma; se describen en action_en.
-7. story_bible.rules: shots_per_episode = número de tomas pedido; shot_seconds = 8; max_dialogue_words_per_shot = 15; max_characters_per_shot = 2; max_words_per_episode = 450; shot_model y cliffhanger_model = "veo_lite" salvo que yo pida otra cosa.
+7. story_bible.rules: shots_per_episode = número de tomas pedido; shot_seconds = 8; max_dialogue_words_per_shot = 15; max_characters_per_shot = 2; max_words_per_episode = 450.
+   - Si en MI IDEA pido "usar fotos de referencia" (caras idénticas en todas las tomas): reference_images = true, shot_model = "veo_fast", cliffhanger_model = "veo_fast" (Veo Lite NO acepta fotos).
+   - Si no lo pido: reference_images = false, shot_model = "veo_lite", cliffhanger_model = "veo_lite".
 8. Cada episodio tiene EXACTAMENTE shots_per_episode tomas, numeradas n = 1, 2, 3… y episode_number consecutivo desde 1.
+8b. Audio: describe solo los sonidos de quienes están en cuadro. Nunca pidas risas, aplausos ni voces de fondo si no hay gente que las haga.
 9. Cada toma:
    - characters: máximo 2 personajes con nombre en cuadro (usa sus key).
    - dialogue: UN solo hablante por toma ({ "speaker": key o extra, "line": "…" }) o null. Máximo 15 palabras. El hablante debe estar en characters (o ser un extra).

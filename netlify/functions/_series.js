@@ -91,6 +91,13 @@ function validateSeries(data) {
     if (rules[k] !== undefined) req(VALID_MODELS.includes(rules[k]), `story_bible.rules.${k} inválido: "${rules[k]}" (usa ${VALID_MODELS.join(', ')}).`);
   });
   if (rules.shot_seconds !== undefined) req([4, 6, 8].includes(rules.shot_seconds), 'story_bible.rules.shot_seconds debe ser 4, 6 u 8.');
+  if (rules.reference_images) {
+    ['shot_model', 'cliffhanger_model'].forEach((k) => {
+      const m = rules[k] || (k === 'shot_model' ? 'veo_lite' : 'veo_fast');
+      req(m === 'veo_fast' || m === 'veo_standard', `story_bible.rules.reference_images=true exige ${k} = veo_fast o veo_standard (Veo Lite no acepta fotos de referencia).`);
+    });
+    req((rules.shot_seconds || 8) === 8, 'Con reference_images=true, shot_seconds debe ser 8.');
+  }
 
   Object.keys(sb.locations || {}).forEach((k) => {
     const loc = locationOf(sb, k);
@@ -292,6 +299,10 @@ function buildShotPrompt(shot, characterRows, storyBible) {
       const firstNames = (shot.characters || []).map((n) => n.split(' ')[0]);
       parts.push(`There are exactly ${cast.length} people in focus: ${firstNames.join(' and ')}. Each one wears only their own outfit described above; clothing and accessories are never shared between them.`);
     }
+    if (isV2 && rules.reference_images) {
+      const firstNames = (shot.characters || []).map((n) => n.split(' ')[0]);
+      parts.push(`Use the provided reference images for the exact faces and hair of ${firstNames.join(' and ')}; their clothing follows the text above.`);
+    }
   }
 
   // 3) Acción con marcas de tiempo: diálogo en 0–6 s, reacción quieta en 6–8 s (corte limpio)
@@ -324,12 +335,20 @@ function buildShotPrompt(shot, characterRows, storyBible) {
 
   // 6) Audio
   if (isV2) {
+    // Audio estricto: en una prueba real (Ep1 T6, elevador con 2 personas) Veo agregó risas
+    // de fondo como de público. Se describe en positivo exactamente qué se oye.
+    const peopleInFrame = (shot.characters || []).map((n) => n.split(' ')[0]);
     if (lines.length) {
       const who = extraOf(sb, lines[0].speaker) ? extraOf(sb, lines[0].speaker).who : lines[0].speaker;
       parts.push(`Audio: only ${who} speaks, in Spanish, clearly and at a natural pace, finishing the line by second ${speakEnd}.`);
     } else {
       parts.push('Audio: nobody speaks in this shot.');
     }
+    parts.push(
+      `The only human sounds are the voices and breathing of ${peopleInFrame.join(' and ')}` +
+      (lines.length && extraOf(sb, lines[0].speaker) ? ` and ${extraOf(sb, lines[0].speaker).who}` : '') +
+      '; any smile or chuckle stays silent and subtle. The soundtrack is intimate and quiet: no audience, no laugh track, no background crowd voices, no music.'
+    );
     const ambient = (loc && loc.ambient) || '';
     if (ambient) parts.push(`Ambient noise: ${ambient.replace(/\.?$/, '.')}`);
     if (shot.sfx) parts.push(`SFX: ${shot.sfx.replace(/\.?$/, '.')}`);
@@ -375,7 +394,22 @@ function buildImagePrompt(character, storyBible) {
   );
 }
 
+// Fotos de referencia de los personajes de una toma (máx. 3). Lanza error si falta alguna:
+// mejor no gastar que generar una toma sin la cara correcta.
+function referenceUrlsForShot(shot, characterRows) {
+  const urls = (shot.characters || []).map((name) => {
+    const row = (characterRows || []).find((r) => r.name === name);
+    if (!row || !row.reference_image_url) {
+      throw new Error(`Falta la foto de referencia de "${name}" (toma ${shot.n}). Súbela en el Elenco antes de producir.`);
+    }
+    return row.reference_image_url;
+  });
+  if (urls.length > 3) throw new Error(`La toma ${shot.n} tiene más de 3 personajes: Veo acepta máximo 3 fotos.`);
+  return urls;
+}
+
 module.exports = {
+  referenceUrlsForShot,
   validateSeries,
   toEpisodeRows,
   buildShotPrompt,

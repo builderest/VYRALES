@@ -24,8 +24,8 @@ function storagePathFromPublicUrl(url) {
   const i = String(url || '').indexOf(marker);
   return i === -1 ? null : decodeURIComponent(String(url).slice(i + marker.length).split('?')[0]);
 }
-const { generateVeoClip } = require('./_veo');
-const { buildShotPrompt } = require('./_series');
+const { generateVeoClip, loadReferenceImages } = require('./_veo');
+const { buildShotPrompt, referenceUrlsForShot } = require('./_series');
 
 const LOG = '[regen-shot]';
 
@@ -59,21 +59,30 @@ exports.handler = async (event) => {
     // personajes actuales, así cualquier corrección (vestuario, cámara, reglas del prompt)
     // se aplica al regenerar. Series viejas: se reusa el prompt guardado como antes.
     let prompt = asset.prompt;
+    let referenceImages = [];
     const shot = Array.isArray(episode.shots) ? episode.shots.find((x) => x.n === asset.shot_number) : null;
     if (shot) {
       const { data: characters, error: charsError } = await supabase
         .from('characters')
-        .select('name, fixed_prompt_tag, profile')
+        .select('name, fixed_prompt_tag, profile, reference_image_url')
         .eq('series_id', episode.series_id);
       if (charsError) throw charsError;
-      prompt = buildShotPrompt(shot, characters, episode.series && episode.series.story_bible);
+      const sb = (episode.series && episode.series.story_bible) || {};
+      prompt = buildShotPrompt(shot, characters, sb);
+      if (sb.rules && sb.rules.reference_images) {
+        referenceImages = await loadReferenceImages(referenceUrlsForShot(shot, characters));
+      }
       console.log(LOG, 'prompt reconstruido desde el guion actual (toma', asset.shot_number + ').');
     }
     if (!prompt) throw new Error('Esta toma no tiene un prompt para regenerar.');
 
-    const modelKey = ['veo_lite', 'veo_fast', 'veo_standard'].includes(asset.model) ? asset.model : 'veo_lite';
+    // Con fotos de referencia la toma necesita un modelo que las acepte (la regla de la serie
+    // manda sobre el modelo con el que se generó la versión anterior).
+    const rules = (episode.series && episode.series.story_bible && episode.series.story_bible.rules) || {};
+    let modelKey = ['veo_lite', 'veo_fast', 'veo_standard'].includes(asset.model) ? asset.model : 'veo_lite';
+    if (referenceImages.length) modelKey = rules.shot_model === 'veo_standard' ? 'veo_standard' : 'veo_fast';
     console.log(LOG, 'generando con Veo (' + modelKey + ')... esto tarda un rato.');
-    const { videoBuffer, costUsd, model } = await generateVeoClip({ modelKey, prompt });
+    const { videoBuffer, costUsd, model } = await generateVeoClip({ modelKey, prompt, referenceImages });
     console.log(LOG, 'Veo terminó, subiendo a Supabase Storage...');
 
     // Nombre con versión: si se reusara shot-NN.mp4, la caché del navegador/CDN podría
@@ -83,7 +92,7 @@ exports.handler = async (event) => {
 
     const { data: updated, error: updateError } = await supabase
       .from('assets')
-      .update({ storage_path: publicUrl, prompt, cost_usd: costUsd, approved: false, approved_at: null })
+      .update({ storage_path: publicUrl, prompt, model: modelKey, cost_usd: costUsd, approved: false, approved_at: null })
       .eq('id', assetId)
       .select()
       .single();
