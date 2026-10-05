@@ -61,6 +61,12 @@ function buildKeyframePrompt(shot, characterRows, storyBible, hasLocationRef) {
   }
   parts.push(`Moment: the instant this action begins, before anyone speaks — ${String(shot.action_en || '').replace(/\.?$/, '.')}`);
   parts.push('Natural anatomy and natural hands, expressive faces, cinematic composition.');
+  // Una sola imagen continua: con "close-up" + 2 personajes Gemini llegó a armar un collage de
+  // 3 paneles (EP1 T10), que Veo no puede animar como una sola toma.
+  parts.push('This is ONE single continuous full-frame image taken from one camera angle, like a single movie frame: one scene, one moment, with no split screen, panels, collage, borders or inset pictures.');
+  if (names.length > 1 && /close[- ]?up/i.test(shot.camera || '')) {
+    parts.push(`${names.map((n) => n.split(' ')[0]).slice(1).join(' and ')} stays inside the same frame, partly visible at the edge and softly out of focus.`);
+  }
   parts.push(CLEAN_FRAME);
   return parts.filter(Boolean).join(' ');
 }
@@ -95,12 +101,53 @@ function effectiveKeyframePrompt(shot, characterRows, storyBible, hasLocationRef
 // Genera y guarda el cuadro inicial de UNA toma. Si ya había uno, lo reemplaza (misma fila
 // de `assets`, archivo viejo borrado de Storage solo después de subir el nuevo).
 // Devuelve el asset y los bytes del cuadro (para pasárselo directo a Veo).
+// Imagen fija de un LUGAR (memoria visual): se genera una sola vez por lugar y se guarda en
+// series.visual_memory.locations[key]. La usan location-image-background (botón del dashboard)
+// y createKeyframe (automático: si una toma es de un lugar sin imagen, primero se crea).
+async function createLocationImage(supabase, { seriesId, slug, storyBible, key, prompt, log = console.log }) {
+  const { data: cur } = await supabase.from('series').select('visual_memory').eq('id', seriesId).single();
+  const old = cur && cur.visual_memory && cur.visual_memory.locations && cur.visual_memory.locations[key];
+  const finalPrompt = (prompt && String(prompt).trim()) || (old && old.prompt_override) || buildLocationPrompt(key, storyBible);
+  log('generando imagen fija del lugar', key, '...');
+  const img = await generateImage({ prompt: finalPrompt });
+  await logSpend(supabase, { seriesId, kind: 'location', model: img.model, costUsd: img.costUsd, note: key });
+  await ensureMediaBucket(supabase);
+  const ext = img.mimeType.includes('jpeg') ? 'jpg' : 'png';
+  const url = await uploadFile(supabase, { path: `${slug}/locations/${key}-v${Date.now()}.${ext}`, buffer: img.buffer, contentType: img.mimeType });
+  // Se relee justo antes de guardar (por si otro lugar se generó en paralelo).
+  const { data: fresh } = await supabase.from('series').select('visual_memory').eq('id', seriesId).single();
+  const vm = Object.assign({ locations: {} }, (fresh && fresh.visual_memory) || {});
+  const entry = {
+    url,
+    prompt: finalPrompt,
+    prompt_override: prompt ? String(prompt).trim() : (old && old.prompt_override) || undefined,
+    cost_usd: img.costUsd,
+    source: 'generated',
+    updated_at: new Date().toISOString()
+  };
+  vm.locations = Object.assign({}, vm.locations, { [key]: entry });
+  const { error } = await supabase.from('series').update({ visual_memory: vm }).eq('id', seriesId);
+  if (error) throw error;
+  if (old && old.url && old.url !== url) await removeByPublicUrl(supabase, old.url, log);
+  log('lugar listo ✅', key, url);
+  return { url, entry, visualMemory: vm };
+}
+
 async function createKeyframe(supabase, { series, episode, shot, characters, log = console.log }) {
+  // Memoria visual automática: si el lugar de esta toma no tiene imagen fija todavía, se crea
+  // primero (una sola vez por lugar) para que todas las tomas de ese lugar compartan el set.
+  const seriesId = series.id || episode.series_id;
+  const locs = (series.visual_memory && series.visual_memory.locations) || {};
+  const hasLocDef = !!(series.story_bible && series.story_bible.locations && series.story_bible.locations[shot.location]);
+  if (shot.location && hasLocDef && !(locs[shot.location] && locs[shot.location].url)) {
+    const { visualMemory } = await createLocationImage(supabase, { seriesId, slug: series.slug, storyBible: series.story_bible, key: shot.location, log });
+    series.visual_memory = visualMemory; // la misma corrida reutiliza el lugar en las siguientes tomas
+  }
   const { refs, hasLocationRef } = await keyframeReferences(shot, characters, series.visual_memory);
   const prompt = effectiveKeyframePrompt(shot, characters, series.story_bible, hasLocationRef);
   log('generando cuadro inicial de la toma', shot.n, 'con', refs.length, 'imagen(es) de referencia...');
   const img = await generateImage({ prompt, references: refs });
-  await logSpend(supabase, { seriesId: series.id || episode.series_id, episodeId: episode.id, shotNumber: shot.n, kind: 'keyframe', model: img.model, costUsd: img.costUsd });
+  await logSpend(supabase, { seriesId, episodeId: episode.id, shotNumber: shot.n, kind: 'keyframe', model: img.model, costUsd: img.costUsd });
 
   await ensureMediaBucket(supabase);
   const ext = img.mimeType.includes('jpeg') ? 'jpg' : 'png';
@@ -159,5 +206,4 @@ module.exports = {
   effectiveKeyframePrompt,
   keyframeReferences,
   createKeyframe,
-  loadExistingKeyframe
-};
+  loadExistingKeyframe, createLocationImage };

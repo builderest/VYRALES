@@ -1311,7 +1311,10 @@
         const ep = lastLoadedData && (lastLoadedData.episodes || []).find(x => x.id === episodeId);
         if (!ep) return;
         const missing = (ep.shots || []).filter(sh => !frameFor(ep, sh.n) && !clipFor(ep, sh.n)).length;
-        if (!await askConfirm('Generar ' + missing + ' cuadros iniciales del EP ' + ep.episode_number + ' (sin video).\n\nCosto: ' + missing + ' × $' + IMAGE_PRICE_USD.toFixed(3) + ' = ~$' + (missing * IMAGE_PRICE_USD).toFixed(2) + ' USD.\nDespués revisas cada cuadro y regeneras solo los que salgan mal, antes de gastar en video. ¿Continuar?')) return;
+        const newLocs = missingLocationsFor(ep);
+        if (!await askConfirm('Generar ' + missing + ' cuadros iniciales del EP ' + ep.episode_number + ' (sin video).\n\n' +
+          (newLocs.length ? 'Antes se crea la imagen fija de ' + newLocs.length + ' lugar(es) que aún no tienen (' + newLocs.join(', ') + '), una sola vez, para que todas las tomas de cada lugar compartan el mismo set.\n\n' : '') +
+          'Costo: (' + missing + ' cuadros + ' + newLocs.length + ' lugares) × $' + IMAGE_PRICE_USD.toFixed(3) + ' = ~$' + ((missing + newLocs.length) * IMAGE_PRICE_USD).toFixed(2) + ' USD.\nDespués revisas cada cuadro y regeneras solo los que salgan mal, antes de gastar en video. ¿Continuar?')) return;
         btn.disabled = true;
         btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>Generando cuadros...';
         try {
@@ -1566,7 +1569,20 @@
         if (ok) done(); else prompt('Copia el texto:', text);
       }
 
-      // Solo cuenta lo que FALTA: tomas sin video y, con memoria visual, cuadros sin generar.
+      // Lugares sin imagen fija que se crearían automáticamente al hacer los cuadros que faltan.
+      function missingLocationsFor(ep) {
+        const series = lastLoadedData && lastLoadedData.series;
+        if (!usesKeyframes(series)) return [];
+        const defs = (series.story_bible && series.story_bible.locations) || {};
+        const mem = (series.visual_memory && series.visual_memory.locations) || {};
+        const set = new Set();
+        (ep.shots || []).forEach(sh => {
+          if (sh.location && defs[sh.location] && !(mem[sh.location] && mem[sh.location].url) && !frameFor(ep, sh.n) && !clipFor(ep, sh.n)) set.add(sh.location);
+        });
+        return [...set];
+      }
+
+      // Solo cuenta lo que FALTA: tomas sin video y, con memoria visual, cuadros y lugares sin generar.
       function estimateEpisodeCost(ep) {
         const series = lastLoadedData && lastLoadedData.series;
         const m = seriesModels(series);
@@ -1576,7 +1592,7 @@
           if (clipFor(ep, sh.n)) return sum;
           const model = sh.n === total ? m.cliff : m.shot;
           return sum + m.secs * VEO_PRICE_PER_SEC[model] + (usesKeyframes(series) && !frameFor(ep, sh.n) ? IMAGE_PRICE_USD : 0);
-        }, 0);
+        }, 0) + missingLocationsFor(ep).length * IMAGE_PRICE_USD;
       }
 
       function costBreakdownLabel(ep) {
@@ -1585,7 +1601,7 @@
         const base = m.shot === m.cliff
           ? n + ' tomas ' + VEO_LABEL[m.shot]
           : (n - 1) + ' tomas ' + VEO_LABEL[m.shot] + ' + 1 ' + VEO_LABEL[m.cliff];
-        return base + (usesKeyframes(lastLoadedData && lastLoadedData.series) ? ' + cuadros iniciales que falten' : '') + '; solo lo que falta';
+        return base + (usesKeyframes(lastLoadedData && lastLoadedData.series) ? ' + cuadros iniciales que falten' + (missingLocationsFor(ep).length ? ' + ' + missingLocationsFor(ep).length + ' lugar(es) nuevos' : '') : '') + '; solo lo que falta';
       }
 
       function renderVeoMode(series) {
@@ -1631,7 +1647,8 @@
                   const clip = clipFor(e, sh.n);
                   const frame = frameFor(e, sh.n);
                   const kf = usesKeyframes(data.series);
-                  const shotCost = (m.secs * VEO_PRICE_PER_SEC[model] + (kf && !frame ? IMAGE_PRICE_USD : 0)).toFixed(2);
+                  const locMissing = kf && sh.location && ((lastLoadedData.series.story_bible || {}).locations || {})[sh.location] && !(((lastLoadedData.series.visual_memory || {}).locations || {})[sh.location] || {}).url;
+                  const shotCost = (m.secs * VEO_PRICE_PER_SEC[model] + (kf && !frame ? IMAGE_PRICE_USD : 0) + (kf && !frame && locMissing ? IMAGE_PRICE_USD : 0)).toFixed(2);
                   const effectivePrompt = sh.prompt_override || sh.prompt_preview || '';
                   return (
                     '<div class="border-l-2 ' + (isCliff ? 'border-cyber-pink' : 'border-cyber-border') + ' pl-3 py-1.5" data-shot="' + e.id + '-' + sh.n + '">' +
@@ -1656,7 +1673,7 @@
                                 ? '<button type="button" onclick="openMedia(this)" data-src="' + esc(frame.storage_path) + '" data-kind="image" data-title="EP ' + e.episode_number + ' · Toma ' + sh.n + ' · cuadro inicial" class="relative" title="Ver cuadro inicial"><img src="' + esc(frame.storage_path) + '" class="h-16 w-9 object-cover rounded border border-cyber-border hover:border-cyber-cyan"></button>'
                                 : '') +
                               (canGenerateShots && !clip
-                                ? '<button onclick="openPromptEditor(this)" data-kind="keyframe" data-ep="' + e.id + '" data-n="' + sh.n + '" data-mode="generate" class="text-[10px] font-mono px-2 py-0.5 rounded border border-cyber-violet/40 text-cyber-violet bg-cyber-violet/10 hover:bg-cyber-violet/20"><i class="fa-solid fa-image mr-1"></i>' + (frame ? 'Regenerar cuadro' : '1 · Generar cuadro') + ' (~$' + IMAGE_PRICE_USD.toFixed(2) + ')</button>'
+                                ? '<button onclick="openPromptEditor(this)" data-kind="keyframe" data-ep="' + e.id + '" data-n="' + sh.n + '" data-mode="generate" class="text-[10px] font-mono px-2 py-0.5 rounded border border-cyber-violet/40 text-cyber-violet bg-cyber-violet/10 hover:bg-cyber-violet/20"><i class="fa-solid fa-image mr-1"></i>' + (frame ? 'Regenerar cuadro' : '1 · Generar cuadro') + ' (~$' + (IMAGE_PRICE_USD * (locMissing ? 2 : 1)).toFixed(2) + (locMissing ? ', incluye lugar' : '') + ')</button>'
                                 : '') +
                             '</div>'
                           : '') +
@@ -1673,7 +1690,7 @@
             : '<pre class="text-[11px] text-slate-300 whitespace-pre-wrap">' + esc(e.script || 'Sin guion todavía.') + '</pre>';
           const missingFrames = usesKeyframes(data.series) ? shots.filter(sh => !frameFor(e, sh.n) && !clipFor(e, sh.n)).length : 0;
           const framesBtn = (e.status === 'guion_generado' && missingFrames)
-            ? '<button onclick="generateAllFrames(this)" data-ep="' + e.id + '" class="mr-2 mb-1 px-3 py-1.5 rounded-lg bg-cyber-violet/15 border border-cyber-violet/50 text-cyber-violet text-xs font-mono hover:bg-cyber-violet/25"><i class="fa-solid fa-images mr-1"></i>Generar los ' + missingFrames + ' cuadros que faltan (~$' + (missingFrames * IMAGE_PRICE_USD).toFixed(2) + ') para revisarlos</button>'
+            ? '<button onclick="generateAllFrames(this)" data-ep="' + e.id + '" class="mr-2 mb-1 px-3 py-1.5 rounded-lg bg-cyber-violet/15 border border-cyber-violet/50 text-cyber-violet text-xs font-mono hover:bg-cyber-violet/25"><i class="fa-solid fa-images mr-1"></i>Generar los ' + missingFrames + ' cuadros que faltan' + (missingLocationsFor(e).length ? ' + ' + missingLocationsFor(e).length + ' lugares' : '') + ' (~$' + ((missingFrames + missingLocationsFor(e).length) * IMAGE_PRICE_USD).toFixed(2) + ') para revisarlos</button>'
             : '';
           const produceBtn = (nextToProduce && nextToProduce.id === e.id)
             ? '<button onclick="produceEpisode(\'' + e.id + '\')" class="px-3 py-1.5 rounded-lg bg-cyber-pink/20 border border-cyber-pink/50 text-cyber-pink text-xs font-mono hover:bg-cyber-pink/30"><i class="fa-solid fa-bolt mr-1"></i>Producir este episodio (~$' + estimateEpisodeCost(e).toFixed(2) + ')</button>'
