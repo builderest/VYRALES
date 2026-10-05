@@ -81,7 +81,7 @@
             <div id="edSub" class="hidden absolute left-0 right-0 text-center px-5 leading-tight z-10 select-none" style="font-family:Montserrat,sans-serif;font-weight:800"></div>
             <div id="edLabel" class="absolute top-1 left-1 text-[10px] font-mono bg-black/60 text-white rounded px-1.5"></div>
           </div>
-          <audio id="edMusic" loop preload="auto"></audio><audio id="edNarr" preload="auto"></audio>
+          <audio id="edMusic" loop preload="auto"></audio><audio id="edNarr" preload="auto"></audio><video id="edPre" muted preload="auto" playsinline class="hidden"></video>
           <div class="w-full flex items-center gap-2">
             <button id="edPlayBtn" onclick="vyEditor.togglePlay()" class="px-3 py-1.5 rounded-lg bg-cyber-cyan/20 border border-cyber-cyan/50 text-cyber-cyan text-xs font-mono"><i class="fa-solid fa-play mr-1"></i>Ver todo</button>
             <span id="edTime" class="text-[11px] font-mono text-slate-300">0:00 / 0:00</span>
@@ -208,6 +208,17 @@
     const v = $('edVideo');
     v.addEventListener('timeupdate', onTime);
     v.addEventListener('ended', () => next());
+    // La voz va en un archivo aparte: si el video se queda cargando (buffering), la voz y la
+    // música esperan; cuando el video sigue, la voz se vuelve a alinear con el video.
+    v.addEventListener('waiting', () => { $('edNarr').pause(); $('edMusic').pause(); st.buffering = true; });
+    v.addEventListener('playing', () => {
+      if (!st.buffering) return;
+      st.buffering = false;
+      if (!st.playing) return;
+      if (st.plan.audio.music_url) $('edMusic').play().catch(() => {});
+      const it = st.seq[st.idx];
+      if (it && it._narrOn) { it._narrOn = false; onTime(); }
+    });
     $('edMusicFile').addEventListener('change', (e) => uploadMusic(e.target.files[0]));
     $('edScrub').addEventListener('input', (e) => { if (st.scrubShot != null) showFrame(st.scrubShot, Number(e.target.value)); });
 
@@ -684,6 +695,11 @@
         try { na.currentTime = Math.max(0, (tOut - NARR_START) * item.narr.tempo); } catch (_) {}
         na.playbackRate = item.narr.tempo; na.play().catch(() => {}); duck(true);
       }
+    } else if (item.narr && st.playing && item._narrOn) {
+      // Corrección de desfase: si la voz se adelantó/atrasó más de 0.25 s, se realinea.
+      const na = $('edNarr');
+      const want = ((v.currentTime - item.start) / item.speed - NARR_START) * item.narr.tempo;
+      if (!na.paused && want >= 0 && want < na.duration && Math.abs(na.currentTime - want) > 0.25) { try { na.currentTime = want; } catch (_) {} }
     }
     if (st.scrubShot !== item.shot) {
       st.scrubShot = item.shot; paintScrub();
@@ -719,6 +735,10 @@
       return;
     }
     card.classList.add('hidden'); v.classList.remove('invisible');
+    // Precarga la SIGUIENTE toma para que no se congele al cambiar (cada clip pesa ~6 MB).
+    const nextClip = st.seq.slice(i + 1).find((x) => x.type === 'clip');
+    if (nextClip && $('edPre').getAttribute('src') !== nextClip.url) { $('edPre').setAttribute('src', nextClip.url); $('edPre').load(); }
+    if (item.narr) { const na = $('edNarr'); if (na.getAttribute('src') !== item.narr.url) { na.setAttribute('src', item.narr.url); na.load(); } }
     const go = () => { v.currentTime = item.start; v.volume = Math.min(1, item.volume); v.playbackRate = item.speed; if (st.playing) v.play().catch(() => {}); };
     if (v.getAttribute('src') !== item.url) { v.setAttribute('src', item.url); v.addEventListener('loadedmetadata', go, { once: true }); v.load(); } else go();
   }
