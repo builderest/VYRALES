@@ -249,7 +249,13 @@
     $('edSpeed').addEventListener('change', (e) => { setClip('speed', e.target.value); });
     $('edZoom').addEventListener('change', (e) => { setClip('zoom', e.target.checked); });
     $('edTrans').addEventListener('change', (e) => { setClip('transition', e.target.value); });
-    $('edTransS').addEventListener('input', (e) => { setClip('transition_s', e.target.value); });
+    $('edTransS').addEventListener('input', (e) => {
+      // Mover la duración en una toma con "Corte directo" la pasa a fundido cruzado (antes el
+      // control quedaba bloqueado sin explicar por qué).
+      const c = st.plan.clips[st.sel];
+      if (c && (c.transition || 'cut') === 'cut') { c.transition = 'crossfade'; renderTimeline(); }
+      setClip('transition_s', e.target.value);
+    });
     $('edSubText').addEventListener('input', (e) => { setClip('subtitle', e.target.value); previewSub(); });
     $('edOverlay').addEventListener('input', (e) => { setClip('overlay', e.target.value); const it = st.seq[st.idx]; if (it && it.shot === (cur() || {}).shot) { it.overlay = e.target.value; showOverlay(it, $('edVideo').currentTime || 0); } });
 
@@ -423,7 +429,9 @@
     $('edZoom').checked = !!c.zoom;
     $('edTrans').value = c.transition || 'cut';
     $('edTransS').value = transS(c); $('edTransSV').textContent = transS(c).toFixed(1) + 's';
-    $('edTransS').disabled = (c.transition || 'cut') === 'cut';
+    $('edTransS').disabled = false;
+    $('edTransSV').title = (c.transition || 'cut') === 'cut' ? 'Esta toma tiene corte directo: al mover la duración se pone fundido cruzado' : '';
+    if ((c.transition || 'cut') === 'cut') $('edTransSV').textContent = 'corte';
     if (document.activeElement !== $('edSubText')) $('edSubText').value = c.subtitle || '';
     $('edSubText').placeholder = dialogueOf(c.shot) || '(sin diálogo)';
     if (document.activeElement !== $('edOverlay')) $('edOverlay').value = c.overlay || '';
