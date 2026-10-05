@@ -54,7 +54,9 @@ async function jsonFetch(url, opts) {
 }
 
 // ---------------- TikTok ----------------
-const TIKTOK_SCOPES = 'user.info.basic,video.upload,video.publish';
+// Solo lo que tiene la app en TikTok: borrador (video.upload). video.publish aparece al activar
+// "Direct Post"; para pedirlo, poner TIKTOK_SCOPES=user.info.basic,video.upload,video.publish.
+const TIKTOK_SCOPES = process.env.TIKTOK_SCOPES || 'user.info.basic,video.upload';
 function tiktokAuthUrl() {
   const q = new URLSearchParams({ client_key: need('TIKTOK_CLIENT_KEY'), scope: TIKTOK_SCOPES, response_type: 'code', redirect_uri: REDIRECT('tiktok'), state: makeState('tiktok') });
   return `https://www.tiktok.com/v2/auth/authorize/?${q}`;
