@@ -42,6 +42,11 @@ function validateSeries(data) {
   const maxWords = rules.max_words_per_episode || 400;
   const maxDialogueWords = rules.max_dialogue_words_per_shot || 16;
 
+  const VALID_MODELS = ['veo_lite', 'veo_fast', 'veo_standard'];
+  ['shot_model', 'cliffhanger_model'].forEach((k) => {
+    if (rules[k] !== undefined) req(VALID_MODELS.includes(rules[k]), `story_bible.rules.${k} inválido: "${rules[k]}" (usa ${VALID_MODELS.join(', ')}).`);
+  });
+
   const characters = data.characters || [];
   req(characters.length > 0, 'La serie no tiene personajes.');
   const byKey = {};

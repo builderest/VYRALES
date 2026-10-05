@@ -175,6 +175,13 @@ exports.handler = async (event) => {
         : buildPrompt(scene.text, characters, series.story_bible);
     }
 
+    // Modelo por toma configurable por serie (story_bible.rules.shot_model /
+    // cliffhanger_model). Sin configurar = híbrido de siempre: Lite + Fast en el cliffhanger.
+    const rules = (series.story_bible && series.story_bible.rules) || {};
+    const shotModel = rules.shot_model || 'veo_lite';
+    const cliffhangerModel = rules.cliffhanger_model || 'veo_fast';
+    console.log(LOG, 'modelos:', shotModel, '(tomas) /', cliffhangerModel, '(cliffhanger)');
+
     const results = [];
     for (const scene of scenes) {
       if (Date.now() - startedAt > TIME_BUDGET_MS) {
@@ -183,7 +190,7 @@ exports.handler = async (event) => {
         return { statusCode: 202, body: JSON.stringify({ episode_id: episode.id, continued: true, shots_ok_this_run: results.filter((r) => r.status === 'fulfilled').length }) };
       }
       const isCliffhanger = scene.number === total;
-      const modelKey = isCliffhanger ? 'veo_fast' : 'veo_lite';
+      const modelKey = isCliffhanger ? cliffhangerModel : shotModel;
       const prompt = prompts[scene.number];
 
       console.log(LOG, `toma ${scene.number}/${total} (${modelKey}): arrancando generación con Veo...`);

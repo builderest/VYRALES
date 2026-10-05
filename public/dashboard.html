@@ -257,13 +257,13 @@
                 <div class="flex justify-between items-start mb-2">
                     <div>
                         <p class="text-xs font-mono text-slate-400 uppercase tracking-wider">Modo Veo API</p>
-                        <h3 class="text-lg font-display font-bold text-cyber-emerald mt-1">HÍBRIDO LITE/FAST</h3>
+                        <h3 id="veoModeTitle" class="text-lg font-display font-bold text-cyber-emerald mt-1">HÍBRIDO LITE/FAST</h3>
                     </div>
                     <div class="w-8 h-8 rounded-lg bg-cyber-emerald/10 border border-cyber-emerald/30 flex items-center justify-center text-cyber-emerald">
                         <i class="fa-solid fa-wand-magic-sparkles"></i>
                     </div>
                 </div>
-                <p class="text-xs text-slate-400 mt-1">7 tomas Lite (~$0.04/s) + 1 Fast Clip (~$0.16/s) en el Cliffhanger final. Precios calibrados contra gasto real.</p>
+                <p id="veoModeDesc" class="text-xs text-slate-400 mt-1">7 tomas Lite (~$0.04/s) + 1 Fast Clip (~$0.16/s) en el Cliffhanger final. Precios calibrados contra gasto real.</p>
                 <span class="inline-block mt-2 text-[10px] font-mono bg-cyber-emerald/20 text-cyber-emerald border border-cyber-emerald/40 px-2 py-0.5 rounded">OPTIMIZADO DÍA DÍA</span>
             </div>
         </section>
@@ -927,8 +927,13 @@
         try { return localStorage.getItem('vyrales_series') || 'dulce_engano'; } catch (_) { return 'dulce_engano'; }
       }
       const DEFAULT_SERIES = readSeriesParam();
-      const VEO_LITE_PER_SEC = 0.042;
-      const VEO_FAST_PER_SEC = 0.157;
+      // Mismos precios calibrados que netlify/functions/_veo.js (VEO_PRICE_PER_SECOND_USD).
+      const VEO_PRICE_PER_SEC = { veo_lite: 0.042, veo_fast: 0.157, veo_standard: 0.419 };
+      const VEO_LABEL = { veo_lite: 'Lite', veo_fast: 'Fast', veo_standard: 'Standard' };
+      function seriesModels(series) {
+        const r = (series && series.story_bible && series.story_bible.rules) || {};
+        return { shot: r.shot_model || 'veo_lite', cliff: r.cliffhanger_model || 'veo_fast', secs: r.shot_seconds || 8 };
+      }
       const STATUS_LABELS = {
         guion_pendiente: ['GUION PENDIENTE', 'text-slate-400 border-slate-600'],
         guion_generado: ['LISTO PARA PRODUCIR', 'text-cyber-cyan border-cyber-cyan/40'],
@@ -1373,7 +1378,31 @@
 
       function estimateEpisodeCost(ep) {
         const n = (ep.shots && ep.shots.length) || 8;
-        return (n - 1) * 8 * VEO_LITE_PER_SEC + 8 * VEO_FAST_PER_SEC;
+        const m = seriesModels(lastLoadedData && lastLoadedData.series);
+        return (n - 1) * m.secs * VEO_PRICE_PER_SEC[m.shot] + m.secs * VEO_PRICE_PER_SEC[m.cliff];
+      }
+
+      function costBreakdownLabel(ep) {
+        const n = (ep.shots && ep.shots.length) || 8;
+        const m = seriesModels(lastLoadedData && lastLoadedData.series);
+        return m.shot === m.cliff
+          ? n + ' tomas ' + VEO_LABEL[m.shot]
+          : (n - 1) + ' tomas ' + VEO_LABEL[m.shot] + ' + 1 ' + VEO_LABEL[m.cliff];
+      }
+
+      function renderVeoMode(series) {
+        const m = seriesModels(series);
+        const t = document.getElementById('veoModeTitle');
+        const d = document.getElementById('veoModeDesc');
+        if (!t || !d) return;
+        const perShot = (k) => '$' + (m.secs * VEO_PRICE_PER_SEC[k]).toFixed(2);
+        if (m.shot === m.cliff) {
+          t.textContent = 'TODO ' + VEO_LABEL[m.shot].toUpperCase();
+          d.textContent = 'Las 8 tomas en Veo ' + VEO_LABEL[m.shot] + ' (' + perShot(m.shot) + ' c/u, ~$' + (8 * m.secs * VEO_PRICE_PER_SEC[m.shot]).toFixed(2) + ' por episodio). Precios calibrados contra gasto real.';
+        } else {
+          t.textContent = 'HÍBRIDO ' + VEO_LABEL[m.shot].toUpperCase() + '/' + VEO_LABEL[m.cliff].toUpperCase();
+          d.textContent = '7 tomas ' + VEO_LABEL[m.shot] + ' (' + perShot(m.shot) + ' c/u) + 1 ' + VEO_LABEL[m.cliff] + ' (' + perShot(m.cliff) + ') en el cliffhanger. Precios calibrados contra gasto real.';
+        }
       }
 
       function renderArc(data) {
@@ -1484,7 +1513,7 @@
         const ep = lastLoadedData && (lastLoadedData.episodes || []).find(e => e.id === episodeId);
         if (!ep) return alert('No encontré el episodio. Recarga la página.');
         const cost = estimateEpisodeCost(ep);
-        if (!confirm('Producir EP ' + ep.episode_number + ' "' + (ep.title || '') + '" con Veo.\n\nCosto estimado: ~$' + cost.toFixed(2) + ' USD (7 tomas Lite + 1 Fast). Es un cargo REAL en Google Cloud.\nTarda entre 10 y 30 minutos. ¿Continuar?')) return;
+        if (!confirm('Producir EP ' + ep.episode_number + ' "' + (ep.title || '') + '" con Veo.\n\nCosto estimado: ~$' + cost.toFixed(2) + ' USD (' + costBreakdownLabel(ep) + '). Es un cargo REAL en Google Cloud.\nTarda entre 10 y 30 minutos. ¿Continuar?')) return;
         const banner = document.getElementById('dataStatusBanner');
         try {
           const res = await fetch('/.netlify/functions/generate-media-background', {
@@ -1549,7 +1578,9 @@
           if (!res.ok) throw new Error('HTTP ' + res.status);
           const data = await res.json();
           const episodes = data.episodes || [];
+          lastLoadedData = data; // las funciones de costo leen la serie activa de aquí
           renderSeriesSelector(data.all_series || [], data.series);
+          renderVeoMode(data.series);
           renderCast(data);
           renderArc(data);
           renderContinuity(data);

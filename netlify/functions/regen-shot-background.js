@@ -48,7 +48,7 @@ exports.handler = async (event) => {
       .single();
     if (episodeError || !episode) throw episodeError || new Error('Episodio no encontrado');
 
-    const modelKey = asset.model === 'veo_fast' ? 'veo_fast' : 'veo_lite';
+    const modelKey = ['veo_lite', 'veo_fast', 'veo_standard'].includes(asset.model) ? asset.model : 'veo_lite';
     console.log(LOG, 'generando con Veo (' + modelKey + ')... esto tarda un rato.');
     const { videoBuffer, costUsd, model } = await generateVeoClip({ modelKey, prompt: asset.prompt });
     console.log(LOG, 'Veo terminó, subiendo a Supabase Storage...');

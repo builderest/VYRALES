@@ -15,7 +15,9 @@
       "shots_per_episode": 8,
       "shot_seconds": 8,
       "max_words_per_episode": 400,
-      "max_dialogue_words_per_shot": 16
+      "max_dialogue_words_per_shot": 16,
+      "shot_model": "veo_lite",
+      "cliffhanger_model": "veo_lite"
     },
     "locations": {
       "bakery": "Dulce Ríos, a small cozy family bakery in Coyoacán, Mexico City: cobalt-blue walls, hand-painted Talavera tiles, wooden shelves full of conchas and pan dulce, an old brick oven, a vintage brass cash register, warm yellow lights, and a framed photo of a smiling middle-aged woman on the wall behind the counter",

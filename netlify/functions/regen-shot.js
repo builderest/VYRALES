@@ -38,7 +38,7 @@ exports.handler = async (event) => {
       .single();
     if (episodeError || !episode) throw episodeError || new Error('Episodio no encontrado');
 
-    const modelKey = asset.model === 'veo_fast' ? 'veo_fast' : 'veo_lite';
+    const modelKey = ['veo_lite', 'veo_fast', 'veo_standard'].includes(asset.model) ? asset.model : 'veo_lite';
     const { videoBuffer, costUsd, model } = await generateVeoClip({ modelKey, prompt: asset.prompt });
 
     const storagePath = `${episode.series.slug}/ep${episode.episode_number}/shot-${String(asset.shot_number).padStart(2, '0')}.mp4`;
