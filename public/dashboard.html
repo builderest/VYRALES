@@ -1157,8 +1157,11 @@
         document.querySelectorAll('video').forEach(o => { if (o !== v && !o.paused && o.id !== 'edVideo' && o.id !== 'edPre') o.pause(); });
       }, true);
 
+      // index/total: posición en el episodio. Se muestra el NÚMERO REAL de la toma (antes salía
+      // la posición entre los clips existentes: con la 13 faltando, la 20 aparecía como "19 / 19").
       function renderShotCard(asset, index, total) {
-        const isCliff = index === total - 1;
+        const shotNo = asset.shot_number || (index + 1);
+        const isCliff = shotNo === total;
         const modelLabel = asset.model === 'veo_fast' ? 'VEO FAST' : asset.model === 'veo_lite' ? 'VEO LITE' : String(asset.model || '').toUpperCase();
         const cost = asset.cost_usd != null ? ('$' + Number(asset.cost_usd).toFixed(2)) : '—';
         const approveBtn = asset.approved
@@ -1170,7 +1173,7 @@
               '<div class="relative aspect-[9/16] bg-slate-950 overflow-hidden flex items-center justify-center text-slate-600 text-xs font-mono text-center p-4">' +
                 (asset.storage_path ? ('<video src="' + esc(asset.storage_path) + '" controls preload="metadata" playsinline class="w-full h-full object-cover absolute inset-0 bg-black"' + narrAttrsFor(asset) + '></video>') : 'Sin preview aún') +
                 '<div class="absolute top-3 left-3 right-3 flex justify-between items-center text-[10px] font-mono">' +
-                  '<span class="bg-black/80 text-cyber-cyan border border-cyber-cyan/30 px-2 py-0.5 rounded">TOMA ' + String(index + 1).padStart(2, '0') + ' / ' + total + '</span>' +
+                  '<span class="bg-black/80 text-cyber-cyan border border-cyber-cyan/30 px-2 py-0.5 rounded">TOMA ' + String(shotNo).padStart(2, '0') + ' / ' + total + '</span>' +
                   '<span class="bg-cyber-emerald/90 text-black font-bold px-2 py-0.5 rounded">' + modelLabel + ' (' + cost + ')</span>' +
                 '</div>' +
               '</div>' +
@@ -2880,9 +2883,20 @@
           if (inReview && inReview.assets && inReview.assets.length) {
             const sorted = inReview.assets.filter(a => a.kind === 'video_clip').sort((a, b) => (a.shot_number || 0) - (b.shot_number || 0));
             const inner = document.getElementById('shotCardsInner');
-            sorted.forEach((asset, i) => {
-              inner.insertAdjacentHTML('beforeend', renderShotCard(asset, i, sorted.length));
-            });
+            const totalShots = Math.max((inReview.shots || []).length, sorted.length);
+            const failedMsgs = ((inReview.validator_report || {}).last_video_run || {}).failed || [];
+            for (let n = 1; n <= totalShots; n++) {
+              const asset = sorted.find(a => a.shot_number === n);
+              if (asset) { inner.insertAdjacentHTML('beforeend', renderShotCard(asset, n - 1, totalShots)); continue; }
+              // Toma que falta: tarjeta que lo dice (y por qué, si la última corrida falló).
+              const why = failedMsgs.length ? failedMsgs[0] : '';
+              const filtro = /content checker|content_policy|unsafe content|did not generate the expected output/i.test(why);
+              inner.insertAdjacentHTML('beforeend',
+                '<div class="demo-shot-card bg-cyber-darker rounded-xl border-2 border-dashed border-cyber-pink/60 flex flex-col items-center justify-center p-4 text-center aspect-[9/16]">' +
+                  '<p class="text-xs font-mono text-cyber-pink font-bold mb-2">TOMA ' + String(n).padStart(2, '0') + ' / ' + totalShots + ' · FALTA</p>' +
+                  '<p class="text-[11px] text-slate-300">' + (filtro ? 'El filtro de contenido de fal.ai rechazó esta toma (no cobra). Hay que reescribir la escena o generarla con Google.' : (why ? esc(why.slice(0, 160)) : 'Todavía no se ha generado.')) + '</p>' +
+                '</div>');
+            }
             const pending = sorted.filter(a => !a.approved).length;
             shotBox.classList.toggle('hidden', !sorted.length);
             document.getElementById('shotCardsSummary').innerHTML = '<i class="fa-solid fa-film mr-2"></i>TOMAS DEL EP ' + inReview.episode_number + ' · ' + (sorted.length - pending) + '/' + sorted.length + ' aprobadas' +
