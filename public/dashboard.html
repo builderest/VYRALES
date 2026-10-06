@@ -2221,7 +2221,10 @@
                   const frame = frameFor(e, sh.n);
                   const kf = usesKeyframes(data.series);
                   const locMissing = kf && sh.location && ((lastLoadedData.series.story_bible || {}).locations || {})[sh.location] && !(((lastLoadedData.series.visual_memory || {}).locations || {})[sh.location] || {}).url;
-                  const shotCost = (m.secs * VEO_PRICE_PER_SEC[model] + (kf && !frame ? IMAGE_PRICE_USD : 0) + (kf && !frame && locMissing ? IMAGE_PRICE_USD : 0)).toFixed(2);
+                  // Lo que cuesta de verdad animar esta toma: video + cuadro/lugar si faltan + su voz (modo voces fijas).
+                  const nsCost = narrationState(data.series, sh);
+                  const voiceCost = nsCost && !nsCost.ok ? TTS_LINE_USD * 1.5 * Math.max(1, dlgList(sh.dialogue).length) : 0;
+                  const shotCost = (m.secs * VEO_PRICE_PER_SEC[model] + (kf && !frame ? IMAGE_PRICE_USD : 0) + (kf && !frame && locMissing ? IMAGE_PRICE_USD : 0) + voiceCost).toFixed(2);
                   const effectivePrompt = sh.prompt_override || sh.prompt_preview || '';
                   return (
                     '<div class="border-l-2 ' + (isCliff ? 'border-cyber-pink' : 'border-cyber-border') + ' pl-3 py-1.5" data-shot="' + e.id + '-' + sh.n + '">' +

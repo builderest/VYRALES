@@ -71,13 +71,14 @@ exports.handler = async (event) => {
 
     const only = body.shot ? Number(body.shot) : null;
     const targets = (ep.shots || []).filter((s) => {
-      if (only) return s.n === only;
+      if (only && s.n !== only) return false;
+      if (only && !body.if_stale) return true;
       const text = lineKey(s);
       if (!text) return false;
       const n = s.narration;
       return !(n && n.url && n.text === text && n.voice === voiceKey(s));
     });
-    if (only && !targets.length) throw new Error(`El episodio no tiene la toma ${only}.`);
+    if (only && !targets.length && !body.if_stale) throw new Error(`El episodio no tiene la toma ${only}.`);
     console.log(LOG, `EP${ep.episode_number}: ${targets.length} narraciones por generar (voz ${voice}).`);
     await report({ status: 'running', total: targets.length, done: 0, voice });
     await ensureMediaBucket(supabase);

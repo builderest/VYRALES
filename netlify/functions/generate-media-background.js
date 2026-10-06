@@ -18,7 +18,7 @@ const { getSupabaseClient } = require('./_supabase');
 const { ensureMediaBucket, uploadClip } = require('./_storage');
 const { generateVeoClip, loadReferenceImages } = require('./_veo');
 const { mergeEpisodeVideo } = require('./_merge');
-const { effectiveShotPrompt, referenceUrlsForShot, videoGeneratesAudio } = require('./_series');
+const { effectiveShotPrompt, referenceUrlsForShot, videoGeneratesAudio, narrationConfig } = require('./_series');
 const { createKeyframe, loadExistingKeyframe } = require('./_keyframe');
 const { logSpend } = require('./_spend');
 
@@ -338,6 +338,17 @@ exports.handler = async (event) => {
     // anteriores + las de esta). Si falta alguna (fallo o toma de prueba suelta), vuelve a
     // "guion_generado" y el botón Producir solo genera las que faltan.
     const allDone = doneShots.size + succeeded.length >= total;
+    // Toma suelta / corrida parcial con voces fijas: la voz de esas tomas se genera ya
+    // (~$0.004 c/u) para que la vista previa suene sincronizada sin esperar a unir.
+    if (!allDone && succeeded.length && narrationConfig(series.story_bible)) {
+      const { handler: narrate } = require('./narration-background');
+      for (const v of succeeded) {
+        try {
+          const nr = await narrate({ httpMethod: 'POST', body: JSON.stringify({ episode_id: episode.id, shot: v.shot, if_stale: true }) });
+          console.log(LOG, 'voz de la toma', v.shot, nr.statusCode === 200 ? 'lista ✅' : nr.body);
+        } catch (err) { console.error(LOG, 'voz de la toma', v.shot, 'falló:', err.message); }
+      }
+    }
     // Resultado de la corrida guardado en el episodio para que el dashboard lo muestre.
     const lastRun = {
       at: new Date().toISOString(),
