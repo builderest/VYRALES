@@ -294,7 +294,21 @@ exports.handler = async (event) => {
           startImage = frame.startImage;
           console.log(LOG, `toma ${scene.number}/${total}: ${existingFrame ? 'usando el cuadro inicial ya guardado' : 'cuadro inicial creado'}.`);
         }
-        const { videoBuffer, costUsd, model } = await generateVeoClip({ modelKey, prompt, referenceImages, startImage, provider, generateAudio: videoGeneratesAudio(series.story_bible), log: (...a) => console.log(LOG, ...a) });
+        let veo;
+        try {
+          veo = await generateVeoClip({ modelKey, prompt, referenceImages, startImage, provider, generateAudio: videoGeneratesAudio(series.story_bible), log: (...a) => console.log(LOG, ...a) });
+        } catch (vErr) {
+          // Filtro de contenido de fal (Job T13: rechazó 5 veces el mismo cuadro; con un cuadro
+          // nuevo de otra composición pasó a la primera). Se rehace el cuadro UNA vez (~$0.067,
+          // los rechazos no cobran) con encuadre más abierto y se reintenta.
+          const flagged = /content checker|content_policy|did not generate the expected output|unsafe/i.test(String(vErr.message || ''));
+          if (!(flagged && useKeyframes && scene.shot)) throw vErr;
+          console.warn(LOG, `toma ${scene.number}/${total}: el filtro de contenido rechazó la toma; rehago el cuadro inicial con otra composición y reintento una vez...`);
+          const alt = Object.assign({}, scene.shot, { start_en: String(scene.shot.start_en || '').replace(/\.?\s*$/, '.') + ' Alternate composition: a slightly wider, calm framing with the characters a little farther from the camera, modest relaxed poses, clothing neat and covering the body.' });
+          const frame2 = await createKeyframe(supabase, { series, episode, shot: alt, characters, log: (...a) => console.log(LOG, ...a) });
+          veo = await generateVeoClip({ modelKey, prompt, referenceImages, startImage: frame2.startImage, provider, generateAudio: videoGeneratesAudio(series.story_bible), log: (...a) => console.log(LOG, ...a) });
+        }
+        const { videoBuffer, costUsd, model } = veo;
         await logSpend(supabase, { seriesId: series.id, episodeId: episode.id, shotNumber: scene.number, kind: 'video', model: provider === 'fal' ? 'fal_' + modelKey : modelKey, costUsd, note: provider === 'fal' ? 'fal.ai' : undefined });
         console.log(LOG, `toma ${scene.number}/${total}: Veo terminó, subiendo a Supabase Storage...`);
 
