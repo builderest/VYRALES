@@ -185,6 +185,7 @@
         <span class="flex items-center gap-1 flex-wrap justify-end">
           <span class="text-cyber-violet">Transiciones automáticas:</span>
           <select id="edAutoType" class="bg-black border border-cyber-border rounded px-1 py-0.5 text-slate-200">${Object.entries(TRANSITIONS).filter(([k]) => k !== 'cut').map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select>
+          <button onclick="vyEditor.autoTransitions('smart')" class="${btn} border-cyber-emerald/60 text-cyber-emerald hover:bg-cyber-emerald/10" title="Fundido cruzado 0.35 s dentro de la misma escena y fundido a negro 0.7 s al cambiar de lugar (lo que trae cada episodio por defecto)">Recomendado</button>
           <button onclick="vyEditor.autoTransitions('scene')" class="${btn} border-cyber-violet/60 text-cyber-violet hover:bg-cyber-violet/10" title="Pone la transición solo donde cambia el lugar; dentro de la misma escena deja corte directo">Al cambiar de escena</button>
           <button onclick="vyEditor.autoTransitions('all')" class="${btn} border-cyber-border" title="Entre todas las tomas">En todas</button>
           <button onclick="vyEditor.autoTransitions('none')" class="${btn} border-cyber-border" title="Todo con corte directo">Quitar</button>
@@ -1031,13 +1032,19 @@
       inc.forEach((c, k) => {
         const nxt = inc[k + 1];
         let t = 'cut';
+        if (mode === 'smart') {
+          const sm = !nxt ? 'cut' : ((shotOf(c.shot).location || '') && (shotOf(nxt.shot).location || '') && shotOf(c.shot).location !== shotOf(nxt.shot).location) ? 'fade_black' : 'crossfade';
+          if (c.transition !== sm) changed++;
+          c.transition = sm; c.transition_s = sm === 'fade_black' ? 0.7 : sm === 'crossfade' ? 0.35 : 0.4;
+          return;
+        }
         if (nxt && mode === 'all') t = type;
         if (nxt && mode === 'scene' && (shotOf(c.shot).location || '') !== (shotOf(nxt.shot).location || '')) t = type;
         if (c.transition !== t) { c.transition = t; changed++; }
         if (t !== 'cut' && !c.transition_s) c.transition_s = 0.5;
       });
       markDirty(); renderClips();
-      $('edStatus').textContent = mode === 'none' ? 'Todas las transiciones quitadas.' : changed + ' transición(es) puestas (' + TRANSITIONS[type] + (mode === 'scene' ? ', solo al cambiar de lugar' : '') + '). Ctrl+Z para deshacer.';
+      $('edStatus').textContent = mode === 'none' ? 'Todas las transiciones quitadas.' : mode === 'smart' ? changed + ' transición(es) cambiadas: fundido cruzado dentro de cada escena, fundido a negro al cambiar de lugar. Ctrl+Z para deshacer.' : changed + ' transición(es) puestas (' + TRANSITIONS[type] + (mode === 'scene' ? ', solo al cambiar de lugar' : '') + '). Ctrl+Z para deshacer.';
     },
     subStyle: (k) => { st.plan.subtitles.style = k; fillGlobals(); markDirty(); previewSub(); },
     zoomTl: (d) => { st.pxs = Math.min(60, Math.max(6, st.pxs * (d > 0 ? 1.4 : 1 / 1.4))); renderTimeline(); },

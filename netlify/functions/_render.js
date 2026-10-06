@@ -219,11 +219,20 @@ async function renderCard({ cwd, out, lines, seconds, sub }) {
 }
 
 // ---------- Plan ----------
+// Transición recomendada por defecto (el corte directo se veía brusco entre tomas de IA):
+// misma escena (mismo lugar) → fundido cruzado corto; cambio de lugar → fundido a negro; última toma → corte.
+// Solo aplica a tomas SIN plan guardado: lo que se elija a mano en el editor se respeta.
+function autoTransition(shot, next) {
+  if (!next) return { transition: 'cut', transition_s: 0.4 };
+  const a = (shot && shot.location) || '', b = (next && next.location) || '';
+  if (a && b && a !== b) return { transition: 'fade_black', transition_s: 0.7 };
+  return { transition: 'crossfade', transition_s: 0.35 };
+}
 function defaultPlan(episode) {
   const shots = (Array.isArray(episode.shots) ? episode.shots : []).slice().sort((a, b) => a.n - b.n);
   return {
     version: 2,
-    clips: shots.map((s) => ({ shot: s.n, include: true, trim_start: 0, trim_end: 0, volume: 1, speed: 1, zoom: false, transition: 'cut', transition_s: 0.4, subtitle: null, overlay: '' })),
+    clips: shots.map((s, i) => Object.assign({ shot: s.n, include: true, trim_start: 0, trim_end: 0, volume: 1, speed: 1, zoom: false, subtitle: null, overlay: '' }, autoTransition(s, shots[i + 1]))),
     subtitles: { enabled: true, size: 38, margin_v: 180, style: 'classic', karaoke: false, speaker_colors: false, animation: 'none' },
     audio: { normalize: true, music_url: null, music_volume: 0.12, duck: true },
     title_card: { enabled: false, text: '', subtext: '', seconds: 2 },
@@ -432,4 +441,4 @@ async function renderEpisode({ episode, series, log = console.log, fetchFile = d
   }
 }
 
-module.exports = { renderEpisode, resolvePlan, defaultPlan, dialogueOf, findFont, FONT_FILE, FONT_NAME };
+module.exports = { renderEpisode, resolvePlan, defaultPlan, autoTransition, dialogueOf, findFont, FONT_FILE, FONT_NAME };
