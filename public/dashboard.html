@@ -388,13 +388,20 @@
             <div id="shotCardsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 
                 <!-- Siguiente episodio a producir (datos reales) -->
-                <div id="addChapterCard" class="bg-cyber-darker/40 rounded-xl border border-dashed border-cyber-border flex flex-col items-center justify-center p-6 text-center hover:border-cyber-cyan transition-all">
-                    <div class="w-12 h-12 rounded-full bg-cyber-cyan/10 border border-cyber-cyan/30 flex items-center justify-center text-cyber-cyan mb-3">
-                        <i class="fa-solid fa-clapperboard text-lg"></i>
+                <div id="addChapterCard" class="md:col-span-2 lg:col-span-4 bg-cyber-darker/40 rounded-xl border border-dashed border-cyber-border p-5 hover:border-cyber-cyan transition-all">
+                    <!-- Fila 1: icono + episodio + costo/cuota  ·  botón Producir a la derecha -->
+                    <div class="flex flex-col sm:flex-row sm:items-center gap-4">
+                        <div class="w-12 h-12 shrink-0 rounded-full bg-cyber-cyan/10 border border-cyber-cyan/30 flex items-center justify-center text-cyber-cyan">
+                            <i class="fa-solid fa-clapperboard text-lg"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h4 id="nextEpTitle" class="font-display font-bold text-white text-base">Siguiente episodio</h4>
+                            <p id="nextEpDesc" class="text-xs text-slate-400 font-mono mt-1">—</p>
+                        </div>
+                        <button id="nextEpBtn" onclick="triggerPipelineRun()" class="hidden shrink-0 px-6 py-3 rounded-lg bg-cyber-cyan/20 text-cyber-cyan border border-cyber-cyan/40 text-sm font-mono font-bold hover:bg-cyber-cyan/30 transition-all"></button>
                     </div>
-                    <h4 id="nextEpTitle" class="font-display font-bold text-white text-sm">Siguiente episodio</h4>
-                    <p id="nextEpDesc" class="text-xs text-slate-400 font-mono mt-1">—</p>
-                    <button id="nextEpBtn" onclick="triggerPipelineRun()" class="hidden mt-4 px-4 py-2 rounded-lg bg-cyber-cyan/20 text-cyber-cyan border border-cyber-cyan/40 text-xs font-mono hover:bg-cyber-cyan/30 transition-all"></button>
+                    <!-- Fila 2: opciones de producción a lo ancho (proveedor/modelo · narrador) -->
+                    <div id="nextEpOptions" class="hidden grid grid-cols-1 lg:grid-cols-3 gap-6 mt-4 pt-4 border-t border-cyber-border"></div>
                 </div>
             </div>
         </section>
@@ -2366,6 +2373,8 @@
         const title = document.getElementById('nextEpTitle');
         const desc = document.getElementById('nextEpDesc');
         btn.classList.add('hidden');
+        const opts = document.getElementById('nextEpOptions');
+        opts.classList.add('hidden'); opts.innerHTML = '';
         if (generating) {
           const total = (generating.shots || []).length || 0;
           const done = (generating.assets || []).filter(a => a.kind === 'video_clip').length;
@@ -2384,7 +2393,10 @@
             (quotaStopOf(next) ? '<br><span class="text-cyber-gold">⏸ Se detuvo por cuota de Google en la toma ' + quotaStopOf(next).quota_stop.shot + '</span>' : '');
           btn.textContent = 'Producir EP ' + next.episode_number;
           btn.classList.remove('hidden');
-          desc.insertAdjacentHTML('beforeend', veoPickerHtml(data) + narratorPanelHtml(data));
+          const narr = narratorPanelHtml(data);
+          opts.innerHTML = '<div>' + veoPickerHtml(data).replace('w-full mt-3', 'w-full') + '</div>' +
+            (narr ? '<div class="lg:col-span-2">' + narr.replace('w-full mt-3', 'w-full') + '</div>' : '');
+          opts.classList.remove('hidden');
         } else {
           title.textContent = eps.length ? 'No hay episodios pendientes' : 'Sin episodios';
           desc.textContent = eps.length ? 'Todos los episodios ya se produjeron.' : 'Crea una novela con el botón PROMPT.';
