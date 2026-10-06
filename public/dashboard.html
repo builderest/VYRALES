@@ -2933,6 +2933,7 @@
           const data = await res.json();
           const episodes = data.episodes || [];
           lastLoadedData = data; // las funciones de costo leen la serie activa de aquí
+          lastDataSig = dataSig(data);
           window.__social = await socialP; // cuentas conectadas (sin tokens) para el panel PUBLICAR
           renderSeriesSelector(data.all_series || [], data.series);
           renderVeoMode(data.series);
@@ -3123,6 +3124,44 @@
       };
 
       document.addEventListener('DOMContentLoaded', loadDashboard);
+
+      // ---------- Auto-actualización (la página instalada como app en el iPhone no tiene botón de recargar) ----------
+      // Cada 15 s (solo con la página visible) revisa si algo cambió en el servidor: video final listo,
+      // toma generada, aprobación, estado del episodio. Si cambió, repinta. No repinta mientras estás
+      // en el editor, en un diálogo, escribiendo o viendo un video, para no interrumpirte.
+      // Al volver a la app (desde otra app o la pantalla de inicio) revisa en el momento.
+      let lastDataSig = null;
+      function dataSig(d) {
+        return (d.episodes || []).map((e) => e.id + ':' + e.status + ':' + (e.assets || [])
+          .map((a) => a.id + '@' + (a.updated_at || '') + (a.approved ? '+' : '')).sort().join(',')).join('|');
+      }
+      function uiBusy() {
+        const open = (id) => { const el = document.getElementById(id); return el && !el.classList.contains('hidden'); };
+        if (open('edModal') || open('confirmModal') || open('mediaModal') || document.getElementById('termModal') || document.getElementById('socialModal')) return true;
+        const ae = document.activeElement;
+        if (ae && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName)) return true;
+        return Array.from(document.querySelectorAll('video,audio')).some((v) => !v.paused && !v.ended);
+      }
+      let autoBusy = false;
+      async function autoRefresh() {
+        if (document.hidden || autoBusy || uiBusy()) return;
+        autoBusy = true;
+        try {
+          const res = await fetch('/.netlify/functions/get-episodes?series=' + encodeURIComponent(DEFAULT_SERIES));
+          if (!res.ok) return;
+          const sig = dataSig(await res.json());
+          if (lastDataSig !== null && sig !== lastDataSig) {
+            const openDet = Array.from(document.querySelectorAll('details[id][open]')).map((d) => d.id);
+            const y = window.scrollY;
+            await loadDashboard();
+            openDet.forEach((id) => { const d = document.getElementById(id); if (d) d.open = true; });
+            window.scrollTo(0, y);
+          }
+        } catch (_) { /* sin red un momento: reintenta en la próxima vuelta */ } finally { autoBusy = false; }
+      }
+      setInterval(autoRefresh, 15000);
+      document.addEventListener('visibilitychange', () => { if (!document.hidden) autoRefresh(); });
+      window.addEventListener('pageshow', (e) => { if (e.persisted) autoRefresh(); });
     })();
     </script>
 
