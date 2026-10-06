@@ -16,13 +16,15 @@ process.env.VYRALES_X264_PRESET = process.env.VYRALES_X264_PRESET || 'medium';
 process.env.VYRALES_CRF = process.env.VYRALES_CRF || '18';
 
 const FINALES = path.join(ROOT, 'finales');
+// Versión de la receta de calidad: si sube, el agente rehace los finales que tenía (2 = 1080x1920).
+const QUALITY_V = 2;
 const fileNameFor = (slug, n) => `${slug}_ep${n}.mp4`;
 
 async function main() {
   const episodeId = process.argv[2];
   if (!/^[0-9a-f-]{36}$/i.test(episodeId || '')) throw new Error('Uso: node agente/render_local.js <episode_id>');
   const { getSupabaseClient } = require(path.join(ROOT, 'netlify', 'functions', '_supabase'));
-  const { renderEpisode } = require(path.join(ROOT, 'netlify', 'functions', '_render'));
+  const { renderEpisode, run } = require(path.join(ROOT, 'netlify', 'functions', '_render'));
   const supabase = getSupabaseClient();
 
   const { data: ep, error } = await supabase.from('episodes').select('*, assets(*)').eq('id', episodeId).single();
@@ -45,13 +47,19 @@ async function main() {
     fs.mkdirSync(FINALES, { recursive: true });
     const name = fileNameFor(series.slug, ep.episode_number);
     const dest = path.join(FINALES, name);
-    const tmp = dest + '.part';
-    fs.copyFileSync(result.file, tmp);
+    const tmp = dest + '.part.mp4';
+    // Subida a 1080x1920: las tomas de Veo vienen en 720x1280 y YouTube/TikTok comprimen MUCHO
+    // más fuerte los videos de 720p (un Short en 720p se ve borroso). Escalado lanczos + nitidez
+    // suave, calidad alta (crf 18). El audio se copia tal cual.
+    console.log('subiendo a 1080x1920 para las redes...');
+    await run(['-y', '-i', result.file, '-vf', 'scale=1080:1920:flags=lanczos,unsharp=5:5:0.4:5:5:0.0',
+      '-c:v', 'libx264', '-preset', process.env.VYRALES_X264_PRESET, '-crf', '18', '-profile:v', 'high', '-pix_fmt', 'yuv420p',
+      '-c:a', 'copy', '-movflags', '+faststart', tmp], path.dirname(result.file));
     fs.renameSync(tmp, dest); // el archivo aparece completo de una vez (nunca a medias)
     // Marca de qué versión del video final es (si se vuelve a unir en Netlify, la PC lo rehace).
     fs.writeFileSync(dest.replace(/\.mp4$/, '.json'), JSON.stringify({
       episode_id: ep.id, series: series.slug, episode_number: ep.episode_number,
-      source: fin ? fin.storage_path : null, seconds: result.seconds, rendered_at: new Date().toISOString()
+      source: fin ? fin.storage_path : null, quality_v: QUALITY_V, seconds: result.seconds, rendered_at: new Date().toISOString()
     }, null, 1));
     const mb = fs.statSync(dest).size / 1048576;
     console.log(`LISTO: finales/${name} · ${mb.toFixed(1)} MB · ${result.seconds.toFixed(1)} s · ${((Date.now() - t0) / 60000).toFixed(1)} min`);

@@ -445,4 +445,4 @@ async function renderEpisode({ episode, series, log = console.log, fetchFile = d
   }
 }
 
-module.exports = { renderEpisode, resolvePlan, defaultPlan, autoTransition, dialogueOf, findFont, FONT_FILE, FONT_NAME };
+module.exports = { run, renderEpisode, resolvePlan, defaultPlan, autoTransition, dialogueOf, findFont, FONT_FILE, FONT_NAME };

@@ -180,7 +180,7 @@ function filesInfo() {
       const st = fs.statSync(path.join(FINALES, f));
       let meta = {};
       try { meta = JSON.parse(fs.readFileSync(path.join(FINALES, f.replace(/\.mp4$/, '.json')), 'utf8')); } catch (_) {}
-      return { name: f, mb: Math.round(st.size / 104857.6) / 10, episode_id: meta.episode_id || null, source: meta.source || null };
+      return { name: f, mb: Math.round(st.size / 104857.6) / 10, episode_id: meta.episode_id || null, source: meta.source || null, quality_v: meta.quality_v || 1 };
     });
   } catch (_) {}
   return { base: fileServerIp ? 'http://' + fileServerIp + ':' + FILE_PORT : null, token: FILE_TOKEN, error: fileServerErr, finales };
@@ -188,6 +188,7 @@ function filesInfo() {
 // Encola "render_full" para los videos finales (últimos 10 días) que todavía no están en calidad
 // completa en la PC o que cambiaron desde entonces. Uno a la vez; revisa cada minuto.
 let lastScan = 0;
+const QUALITY_V = 2; // igual que en render_local.js
 const failedRenders = {}; // source → veces que falló (no reintentar en bucle)
 async function queueFullRenders() {
   if (Date.now() - lastScan < 60000) return;
@@ -195,7 +196,8 @@ async function queueFullRenders() {
   const since = new Date(Date.now() - 10 * 86400000).toISOString();
   const { data: fins } = await sb.from('assets').select('episode_id, storage_path, updated_at').eq('kind', 'final_render').gt('updated_at', since).order('updated_at', { ascending: false }).limit(20);
   const have = {};
-  filesInfo().finales.forEach((f) => { if (f.episode_id) have[f.episode_id] = f.source; });
+  // Si la receta de calidad cambió (QUALITY_V en render_local.js), también se rehace.
+  filesInfo().finales.forEach((f) => { if (f.episode_id && f.quality_v >= QUALITY_V) have[f.episode_id] = f.source; });
   const todo = (fins || []).find((a) => have[a.episode_id] !== a.storage_path && (failedRenders[a.storage_path] || 0) < 2);
   if (!todo) return;
   const { data: open } = await sb.from('agent_jobs').select('id').in('status', ['pending', 'running']).limit(1);
