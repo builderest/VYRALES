@@ -139,6 +139,7 @@
                         <h1 class="font-display font-bold text-xl tracking-wider text-white">VYRALES</h1>
                         <span class="text-xs font-mono bg-cyber-violet/30 text-cyber-cyan border border-cyber-cyan/30 px-2 py-0.5 rounded-full font-semibold">v3.1 ORCHESTRATOR</span>
                         <button type="button" onclick="openSocialModal()" class="text-[10px] font-mono px-2 py-0.5 rounded-full border border-cyber-pink/50 text-cyber-pink hover:bg-cyber-pink/10 ml-1" title="Conectar TikTok / Facebook / Instagram / YouTube"><i class="fa-solid fa-share-nodes mr-1"></i>Redes</button>
+                        <button type="button" onclick="openTerminal()" class="text-[10px] font-mono px-2 py-0.5 rounded-full border border-cyber-emerald/50 text-cyber-emerald hover:bg-cyber-emerald/10 ml-1" title="Comandos en tu PC"><i class="fa-solid fa-terminal mr-1"></i>Terminal</button>
                         <a href="/.netlify/functions/login?logout=1" class="text-[10px] font-mono text-slate-500 hover:text-cyber-pink ml-1" title="Cerrar sesión"><i class="fa-solid fa-right-from-bracket mr-1"></i>Salir</a>
                     </div>
                     <p class="text-xs text-slate-400 font-mono">Arquitectura de Automatización de Microdramas con IA</p>
@@ -924,13 +925,14 @@
         }
         return k;
       }
-      async function keyedFetch(url, body) {
+      async function keyedFetch(url, body, method) {
         // Con sesión iniciada (cookie del login) no hace falta la llave; solo se pide si el servidor dice 401.
         for (let attempt = 0; attempt < 3; attempt++) {
           let k = null;
           try { k = localStorage.getItem('vyrales_key'); } catch (_) {}
           if (attempt > 0) { k = await dashKey(true); if (!k) throw new Error('Sin llave del dashboard.'); }
-          const res = await fetch(url, { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, k ? { 'x-vyrales-key': k } : {}), body: JSON.stringify(body) });
+          const m = method || 'POST';
+          const res = await fetch(url, { method: m, cache: 'no-store', headers: Object.assign({ 'Content-Type': 'application/json' }, k ? { 'x-vyrales-key': k } : {}), body: m === 'GET' ? undefined : JSON.stringify(body) });
           if (res.status !== 401) return res;
           const j = await res.json().catch(() => ({}));
           if (/Falta DASHBOARD_KEY/.test(j.error || '')) throw new Error(j.error);
@@ -938,6 +940,60 @@
         }
         throw new Error('Llave del dashboard incorrecta.');
       }
+      // ---------- Ventana "Terminal": comandos PRE-REGISTRADOS que ejecuta el agente de tu PC ----------
+      // La página solo manda el NOMBRE del comando (lista blanca en agente/comandos.js); el agente
+      // (node agente/agente.js en tu PC) lo ejecuta en la carpeta VYRALE y devuelve la salida.
+      let termPoll = null;
+      window.openTerminal = async function(jobId) {
+        let m = document.getElementById('termModal');
+        if (!m) {
+          m = document.createElement('div');
+          m.id = 'termModal';
+          m.className = 'fixed inset-0 z-[90] bg-black/70 flex items-center justify-center p-3';
+          m.addEventListener('click', (e) => { if (e.target === m) { clearTimeout(termPoll); m.remove(); } });
+          document.body.appendChild(m);
+        }
+        let st = null;
+        try { st = await (await keyedFetch('/.netlify/functions/agent', null, 'GET')).json(); } catch (_) {}
+        const head = !st ? '<span class="text-cyber-pink">No se pudo revisar el agente.</span>'
+          : st.table_missing ? '<span class="text-cyber-gold">Falta crear las tablas (migración 007_agente.sql en Supabase).</span>'
+          : st.online ? '<span class="text-cyber-emerald">● Agente en línea · ' + esc(st.host || 'PC') + (st.dev_running ? ' · servidor local corriendo' : '') + '</span>'
+          : '<span class="text-cyber-pink">● Agente apagado</span> <span class="text-slate-500">— en tu PC abre <b>INICIAR_AGENTE.bat</b> (carpeta VYRALE).</span>';
+        const cmds = (st && st.commands) || [];
+        const btns = cmds.map(c => '<button type="button" onclick="runAgentCommand(\'' + c.key + '\')" ' + (st && st.online ? '' : 'disabled') + ' title="' + esc(c.help || '') + '" class="text-[11px] font-mono px-2 py-1.5 rounded border border-cyber-emerald/40 text-cyber-emerald hover:bg-cyber-emerald/10 disabled:opacity-40 text-left">' + esc(c.label) + '</button>').join('');
+        const hist = ((st && st.jobs) || []).map(j => '<button type="button" onclick="openTerminal(\'' + j.id + '\')" class="block w-full text-left text-[10px] font-mono hover:text-white ' + (j.status === 'done' ? 'text-cyber-emerald' : j.status === 'error' ? 'text-cyber-pink' : 'text-slate-400') + '">' + new Date(j.created_at).toLocaleTimeString() + ' · ' + esc(j.command) + ' · ' + esc(j.status) + '</button>').join('');
+        m.innerHTML = '<div class="bg-cyber-darker border border-cyber-border rounded-xl p-4 w-full max-w-2xl max-h-[90vh] overflow-auto">' +
+          '<div class="flex justify-between items-center mb-1"><h3 class="text-white font-display font-bold"><i class="fa-solid fa-terminal mr-2 text-cyber-emerald"></i>Terminal de tu PC</h3><button onclick="clearTimeout(termPoll);document.getElementById(\'termModal\').remove()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button></div>' +
+          '<p class="text-[11px] font-mono mb-3">' + head + '</p>' +
+          '<div class="grid grid-cols-2 sm:grid-cols-3 gap-1.5 mb-3">' + btns + '</div>' +
+          '<pre id="termOut" class="bg-black border border-slate-800 rounded p-2 text-[11px] text-slate-200 font-mono whitespace-pre-wrap min-h-[140px] max-h-[45vh] overflow-auto">' + (jobId ? 'Cargando…' : 'Elige un comando. Solo se pueden ejecutar los de esta lista (se editan en agente/comandos.js de tu PC).') + '</pre>' +
+          (hist ? '<details class="mt-2"><summary class="text-[10px] font-mono text-slate-500 cursor-pointer">Historial</summary><div class="mt-1 space-y-0.5">' + hist + '</div></details>' : '') +
+        '</div>';
+        if (jobId) followJob(jobId);
+      };
+      window.runAgentCommand = async function(command) {
+        const out = document.getElementById('termOut');
+        if (out) out.textContent = '$ ' + command + '\n(enviando al agente…)';
+        try {
+          const res = await keyedFetch('/.netlify/functions/agent', { command });
+          const j = await res.json();
+          if (!res.ok) throw new Error(j.error || res.status);
+          followJob(j.job.id);
+        } catch (err) { if (out) out.textContent = 'No se pudo enviar: ' + err.message; }
+      };
+      async function followJob(id) {
+        clearTimeout(termPoll);
+        const out = document.getElementById('termOut');
+        if (!out) return;
+        try {
+          const j = (await (await keyedFetch('/.netlify/functions/agent?job=' + encodeURIComponent(id), null, 'GET')).json()).job;
+          const tag = j.status === 'pending' ? '⏳ esperando al agente…' : j.status === 'running' ? '⚙ ejecutando…' : j.status === 'done' ? '✔ terminado' : j.status === 'expired' ? '✖ vencido: el agente no respondió en 2 min (¿está encendido?)' : '✖ error (código ' + j.exit_code + ')';
+          out.textContent = '[' + j.command + '] ' + tag + '\n\n' + (j.output || '');
+          out.scrollTop = out.scrollHeight;
+          if (j.status === 'pending' || j.status === 'running') termPoll = setTimeout(() => followJob(id), 1500);
+        } catch (err) { out.textContent = 'Error leyendo la salida: ' + err.message; }
+      }
+
       // ---------- Ventana "Redes": conectar / desconectar cuentas (arriba, junto a VYRALES) ----------
       window.openSocialModal = async function() {
         let m = document.getElementById('socialModal');
