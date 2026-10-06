@@ -144,4 +144,12 @@ function actingStyle({ info, shot, override }) {
   return `${base}${scene} Habla en español latino neutro, con la emoción de la escena, natural y creíble, sin sobreactuar. Pronuncia cada palabra con claridad. La frase completa dura como máximo 5 segundos y medio.`;
 }
 
-module.exports = { CATALOG, ALL_VOICES, assignVoices, seriesSpeakers, speakerInfo, actingStyle };
+// Efecto automático según quién es: demonios → 'demon', Dios/voz divina → 'divine'.
+function fxFor(key, info) {
+  const t = `${key} ${(info && info.description) || ''}`;
+  if (/sat[aá]n|devil|demon|diablo|lucifer|acusador|serpent|serpiente/i.test(t)) return 'demon';
+  if (/\bdios\b|\bgod\b|divine|divin|se[ñn]or\b.*trono|whirlwind|torbellino|ángel|angel/i.test(t)) return 'divine';
+  return '';
+}
+
+module.exports = { fxFor, CATALOG, ALL_VOICES, assignVoices, seriesSpeakers, speakerInfo, actingStyle };

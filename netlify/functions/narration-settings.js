@@ -8,7 +8,7 @@
 // No llama a ninguna API de pago (cambiar la voz deja las narraciones viejas marcadas para rehacer).
 const { getSupabaseClient } = require('./_supabase');
 const { VOICES, TTS_MODEL_DEFAULT, DEFAULT_VOICE } = require('./_tts');
-const { assignVoices, seriesSpeakers } = require('./_voices');
+const { assignVoices, seriesSpeakers, speakerInfo, fxFor } = require('./_voices');
 
 const json = (statusCode, body) => ({ statusCode, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 
@@ -36,9 +36,13 @@ exports.handler = async (event) => {
       if (cur.cast) { cur.engine = 'gemini_tts'; cur.video_audio = 'none'; }
     }
     const vc = Object.assign({}, sb.voice_cast || {});
-    if (body.speaker) {
+    if (body.speaker && body.speaker_voice != null) {
       if (!VOICES.includes(body.speaker_voice)) return json(400, { error: 'Voz no válida: ' + body.speaker_voice });
       vc[body.speaker] = Object.assign({}, vc[body.speaker] || {}, { voice: body.speaker_voice, auto: false });
+    }
+    if (body.speaker && body.speaker_fx != null) {
+      if (!['', 'none', 'demon', 'divine', 'echo'].includes(body.speaker_fx)) return json(400, { error: 'Efecto no válido.' });
+      vc[body.speaker] = Object.assign({}, vc[body.speaker] || {}, { fx: body.speaker_fx === 'none' ? '' : body.speaker_fx, fx_manual: true });
     }
     if (cur.cast && (body.cast || body.reassign || body.speaker)) {
       // Asignación automática (gratis): cada hablante de la serie recibe una voz distinta.
@@ -50,7 +54,9 @@ exports.handler = async (event) => {
       const keep = {};
       Object.entries(vc).forEach(([k, v]) => { if (v && (!body.reassign || v.auto === false)) keep[k] = v; });
       const assigned = assignVoices(speakers, keep);
-      speakers.forEach((x) => { if (!keep[x.key]) vc[x.key] = { voice: assigned[x.key], auto: true }; });
+      speakers.forEach((x) => { if (!keep[x.key]) vc[x.key] = Object.assign({}, vc[x.key] && vc[x.key].fx_manual ? { fx: vc[x.key].fx, fx_manual: true } : {}, { voice: assigned[x.key], auto: true }); });
+      // Efecto automático (demonio / divino) para quien no tenga uno elegido a mano.
+      speakers.forEach((x) => { const cur = vc[x.key]; if (cur && !cur.fx_manual && cur.fx == null) cur.fx = fxFor(x.key, x); });
     }
     sb.voice_cast = vc;
     sb.narration = cur;

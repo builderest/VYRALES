@@ -140,4 +140,38 @@ function tightenSpeech(wav, log = console.log) {
   return wav;
 }
 
-module.exports = { tightenSpeech, concatWavs, synthesize, wavSeconds, TTS_MODEL_DEFAULT, DEFAULT_VOICE, DEFAULT_STYLE, VOICES, TTS_PRICE_PER_M };
+// Efectos de voz por personaje (gratis, ffmpeg local). La duración no cambia (el tono baja
+// con asetrate y atempo devuelve el ritmo). Presets:
+//   demon  → Satanás/demonios: capa una octava-y-algo más grave + la voz original + eco corto
+//   divine → Dios: reverberación amplia y cuerpo grave, voz limpia
+//   echo   → eco suave (voces "desde lejos", sueños, recuerdos)
+const VOICE_FX = {
+  demon: '[0:a]aresample=24000,asplit=2[o][l];[l]asetrate=24000*0.72,aresample=24000,atempo=1.3889,volume=1.15[low];[o]volume=0.55[hi];[low][hi]amix=inputs=2:normalize=0,highpass=f=55,aecho=0.8:0.6:45|95:0.35|0.22,acompressor=threshold=0.2:ratio=3,volume=1.4',
+  divine: '[0:a]aresample=24000,bass=g=4:f=120,aecho=0.85:0.85:60|130|240:0.38|0.28|0.18,acompressor=threshold=0.25:ratio=2.5,volume=1.25',
+  echo: '[0:a]aresample=24000,aecho=0.8:0.7:120|260:0.3|0.18'
+};
+function applyVoiceFx(wav, preset, log = console.log) {
+  const graph = VOICE_FX[preset];
+  if (!graph) return wav;
+  const fs = require('fs'); const os = require('os'); const path = require('path');
+  const { execFileSync } = require('child_process');
+  const bins = [];
+  try { bins.push(require('ffmpeg-static')); } catch (_) {}
+  bins.push('ffmpeg');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vfx-'));
+  const inF = path.join(dir, 'in.wav'); const outF = path.join(dir, 'out.wav');
+  fs.writeFileSync(inF, wav);
+  for (const bin of bins) {
+    try {
+      execFileSync(bin, ['-y', '-loglevel', 'error', '-i', inF, '-filter_complex', graph, '-ac', '1', '-ar', '24000', '-c:a', 'pcm_s16le', outF], { stdio: 'pipe' });
+      const out = fs.readFileSync(outF);
+      fs.rmSync(dir, { recursive: true, force: true });
+      return out;
+    } catch (_) { /* siguiente */ }
+  }
+  fs.rmSync(dir, { recursive: true, force: true });
+  log('[tts] no se pudo aplicar el efecto de voz "' + preset + '" (sin ffmpeg); queda la voz limpia.');
+  return wav;
+}
+
+module.exports = { applyVoiceFx, VOICE_FX, tightenSpeech, concatWavs, synthesize, wavSeconds, TTS_MODEL_DEFAULT, DEFAULT_VOICE, DEFAULT_STYLE, VOICES, TTS_PRICE_PER_M };

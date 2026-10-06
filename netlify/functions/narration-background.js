@@ -8,9 +8,9 @@
 //   { url, text, voice, model, seconds, at } y el resultado de la corrida en
 //   episodes.validator_report.last_narration_run (el dashboard hace polling).
 const { getSupabaseClient } = require('./_supabase');
-const { synthesize, concatWavs, tightenSpeech, wavSeconds, DEFAULT_VOICE, DEFAULT_STYLE, TTS_MODEL_DEFAULT } = require('./_tts');
+const { synthesize, concatWavs, tightenSpeech, applyVoiceFx, wavSeconds, DEFAULT_VOICE, DEFAULT_STYLE, TTS_MODEL_DEFAULT } = require('./_tts');
 const { narrationConfig, narrationLines, castMode } = require('./_series');
-const { assignVoices, seriesSpeakers, speakerInfo, actingStyle } = require('./_voices');
+const { assignVoices, seriesSpeakers, speakerInfo, actingStyle, fxFor } = require('./_voices');
 const { ensureMediaBucket, uploadFile, removeByPublicUrl } = require('./_storage');
 const { logSpend } = require('./_spend');
 
@@ -55,7 +55,7 @@ exports.handler = async (event) => {
       const missing = speakers.filter((x) => !vc[x.key]);
       if (missing.length) {
         const assigned = assignVoices(speakers, vc);
-        missing.forEach((x) => { vc[x.key] = { voice: assigned[x.key], auto: true }; });
+        missing.forEach((x) => { vc[x.key] = { voice: assigned[x.key], auto: true, fx: fxFor(x.key, x) }; });
         const { data: freshSeries } = await supabase.from('series').select('story_bible').eq('id', ep.series.id).single();
         const nsb = Object.assign({}, (freshSeries && freshSeries.story_bible) || sb, { voice_cast: vc });
         await supabase.from('series').update({ story_bible: nsb }).eq('id', ep.series.id);
@@ -66,7 +66,8 @@ exports.handler = async (event) => {
     // Voz de cada línea: la del personaje (modo doblaje) o la única del narrador.
     const voiceFor = (speaker) => (cast && sb.voice_cast && sb.voice_cast[speaker] && sb.voice_cast[speaker].voice) || voice;
     const lineKey = (s) => narrationLines(s, sb).map((d) => (cast ? d.speaker + ': ' : '') + d.line).join(' | ').trim();
-    const voiceKey = (s) => cast ? narrationLines(s, sb).map((d) => voiceFor(d.speaker)).join('+') : voice;
+    const fxOf = (speaker) => (cast && sb.voice_cast && sb.voice_cast[speaker] && sb.voice_cast[speaker].fx) || '';
+    const voiceKey = (s) => cast ? narrationLines(s, sb).map((d) => voiceFor(d.speaker) + (fxOf(d.speaker) ? ':' + fxOf(d.speaker) : '')).join('+') : voice;
 
     const only = body.shot ? Number(body.shot) : null;
     const targets = (ep.shots || []).filter((s) => {
@@ -114,7 +115,8 @@ exports.handler = async (event) => {
           parts.push(r1);
         }
         // Cada línea sin pausas largas (el TTS dramatiza con silencios de 0.5–0.7 s) y unidas.
-        const wav = concatWavs(parts.map((p) => tightenSpeech(p.wav, (...x) => console.log(LOG, ...x))));
+        const lineSpeakers = cast ? lines.map((d) => d.speaker) : [null];
+        const wav = concatWavs(parts.map((p, i) => applyVoiceFx(tightenSpeech(p.wav, (...x) => console.log(LOG, ...x)), fxOf(lineSpeakers[i]), (...x) => console.log(LOG, ...x))));
         let r = { wav, seconds: wavSeconds(wav) };
         const url = await uploadFile(supabase, {
           path: `${ep.series.slug}/ep${ep.episode_number}/narr-${String(shot.n).padStart(2, '0')}-v${Date.now()}.wav`,
