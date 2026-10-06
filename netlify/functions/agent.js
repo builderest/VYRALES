@@ -16,7 +16,10 @@ exports.handler = async (event) => {
   try {
     if (event.httpMethod === 'POST') {
       const { command } = JSON.parse(event.body || '{}');
-      if (!Object.prototype.hasOwnProperty.call(COMMANDS, command)) return json(400, { error: 'Comando no permitido.' });
+      // "nombre" o "nombre:argumento" (solo si el comando declara un argumento y este pasa su validación).
+      const [name, arg] = String(command || '').split(/:(.*)/s);
+      const def = Object.prototype.hasOwnProperty.call(COMMANDS, name) ? COMMANDS[name] : null;
+      if (!def || (def.arg ? !def.arg.test(arg || '') : arg !== undefined)) return json(400, { error: 'Comando no permitido.' });
       const { data: busy } = await sb.from('agent_jobs').select('id').in('status', ['pending', 'running']).limit(1);
       if (busy && busy.length) return json(409, { error: 'Ya hay una orden en curso; espera a que termine.' });
       const { data, error } = await sb.from('agent_jobs').insert({ command }).select().single();
@@ -35,9 +38,10 @@ exports.handler = async (event) => {
     ]);
     if (e1) return json(200, { table_missing: true, error: e1.message, commands: list() });
     const online = !!(st && st.last_seen && Date.now() - new Date(st.last_seen).getTime() < 15000);
-    return json(200, { online, host: st && st.host, last_seen: st && st.last_seen, dev_running: !!(st && st.info && st.info.dev_running), commands: list(), jobs: jobs || [] });
+    // files: videos en calidad completa guardados en la PC y la dirección (Tailscale) para bajarlos.
+    return json(200, { online, host: st && st.host, last_seen: st && st.last_seen, dev_running: !!(st && st.info && st.info.dev_running), files: (st && st.info && st.info.files) || null, commands: list(), jobs: jobs || [] });
   } catch (err) {
     return json(500, { error: err.message });
   }
 };
-function list() { return Object.entries(COMMANDS).map(([key, c]) => ({ key, label: c.label, help: c.help })); }
+function list() { return Object.entries(COMMANDS).filter(([, c]) => !c.hidden).map(([key, c]) => ({ key, label: c.label, help: c.help })); }

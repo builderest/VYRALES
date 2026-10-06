@@ -5,3 +5,5 @@ node_modules/
 _CONTRASENA_VYRALES.txt
 _prueba_job/
 agente/agente.log
+agente/.llave_descargas
+finales/

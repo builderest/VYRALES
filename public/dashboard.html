@@ -1422,6 +1422,41 @@
         box.classList.remove('hidden');
       }
 
+      // ---------- Calidad completa desde la PC (agente + Tailscale) ----------
+      // El video final de Supabase va recomprimido (límite de 50 MB del plan gratis). El agente de la PC
+      // lo vuelve a armar sin recomprimir en VYRALE/finales y lo sirve solo dentro de Tailscale.
+      async function fetchAgentInfo() {
+        try {
+          const r = await fetch('/.netlify/functions/agent', { cache: 'no-store', headers: (() => { let k = null; try { k = localStorage.getItem('vyrales_key'); } catch (_) {} return k ? { 'x-vyrales-key': k } : {}; })() });
+          return r.ok ? await r.json() : null;
+        } catch (_) { return null; }
+      }
+      let lastAgentSig = null;
+      const agentSig = (a) => !a ? '' : (a.online ? '1' : '0') + JSON.stringify(((a.files && a.files.finales) || []).map((f) => f.name + f.source)) + ((a.jobs || []).map((j) => j.status).join(''));
+      function fullQualityLine(episode, finalRender) {
+        const a = window.__agent;
+        if (!a || !a.files) return '';
+        const slug = (lastLoadedData && lastLoadedData.series && lastLoadedData.series.slug) || DEFAULT_SERIES;
+        const f = (a.files.finales || []).find((x) => x.episode_id === episode.id) || (a.files.finales || []).find((x) => x.name === slug + '_ep' + episode.episode_number + '.mp4');
+        const fresh = f && f.source === finalRender.storage_path;
+        const busy = (a.jobs || []).some((j) => /^render_full:/.test(j.command) && j.command.endsWith(episode.id) && (j.status === 'pending' || j.status === 'running'));
+        let html = '<div class="mt-1 text-[11px]">';
+        if (fresh && a.files.base) {
+          const url = a.files.base + '/f/' + encodeURIComponent(f.name) + '?k=' + encodeURIComponent(a.files.token);
+          html += '<a href="' + esc(url) + '" target="_blank" rel="noopener" class="text-cyber-emerald hover:underline font-bold"><i class="fa-solid fa-gem mr-1"></i>Calidad completa (' + f.mb + ' MB, desde tu PC)</a>' +
+            ' <span class="text-slate-500">· en el iPhone: ábrelo → compartir → Guardar video. Necesita Tailscale encendido y la PC prendida.</span>';
+        } else if (busy) {
+          html += '<span class="text-cyber-gold"><i class="fa-solid fa-spinner fa-spin mr-1"></i>Tu PC está armando la versión en calidad completa…</span>';
+        } else if (!a.online) {
+          html += '<span class="text-slate-500"><i class="fa-solid fa-gem mr-1"></i>Calidad completa: tu PC está apagada (se prepara sola cuando vuelva).</span>';
+        } else if (!a.files.base) {
+          html += '<span class="text-cyber-pink"><i class="fa-solid fa-gem mr-1"></i>Calidad completa: ' + esc(a.files.error || 'Tailscale no está conectado en la PC') + '.</span>';
+        } else {
+          html += '<span class="text-slate-500"><i class="fa-solid fa-gem mr-1"></i>Calidad completa: en cola en tu PC (empieza en menos de 1 min).</span>';
+        }
+        return html + '</div>';
+      }
+
       function renderFinalRenderPanel(episode) {
         renderCopyTexts(episode);
         renderPublishBox(episode);
@@ -1445,6 +1480,7 @@
                 ' · <button onclick="vyEditor.open(\'' + episode.id + '\')" class="text-cyber-gold hover:underline"><i class="fa-solid fa-scissors mr-1"></i>Editar episodio</button>' +
                 ' · <button onclick="goPublish(\'' + episode.id + '\')" class="text-cyber-pink hover:underline font-bold"><i class="fa-solid fa-bullhorn mr-1"></i>Publicar</button>' +
                 ' · <button onclick="mergeEpisode(\'' + episode.id + '\')" class="text-slate-400 hover:text-cyber-cyan underline">Unir sin editar</button>' +
+                fullQualityLine(episode, finalRender) +
               '</div>' +
             '</div>';
         } else if (clips.length > 0) {
@@ -2918,6 +2954,7 @@
         const banner = document.getElementById('dataStatusBanner');
         try {
           const socialP = fetch('/.netlify/functions/social-status').then(r => r.json()).catch(() => null);
+          const agentP = fetchAgentInfo();
           const res = await fetch('/.netlify/functions/get-episodes?series=' + encodeURIComponent(DEFAULT_SERIES));
           if (res.status === 404) {
             const nf = await res.json().catch(() => ({}));
@@ -2935,6 +2972,8 @@
           lastLoadedData = data; // las funciones de costo leen la serie activa de aquí
           lastDataSig = dataSig(data);
           window.__social = await socialP; // cuentas conectadas (sin tokens) para el panel PUBLICAR
+          window.__agent = await agentP;   // videos en calidad completa en la PC (Tailscale)
+          lastAgentSig = agentSig(window.__agent);
           renderSeriesSelector(data.all_series || [], data.series);
           renderVeoMode(data.series);
           renderCast(data);
@@ -3150,7 +3189,8 @@
           const res = await fetch('/.netlify/functions/get-episodes?series=' + encodeURIComponent(DEFAULT_SERIES));
           if (!res.ok) return;
           const sig = dataSig(await res.json());
-          if (lastDataSig !== null && sig !== lastDataSig) {
+          const aSig = agentSig(await fetchAgentInfo());
+          if ((lastDataSig !== null && sig !== lastDataSig) || (lastAgentSig !== null && aSig !== lastAgentSig)) {
             const openDet = Array.from(document.querySelectorAll('details[id][open]')).map((d) => d.id);
             const y = window.scrollY;
             await loadDashboard();

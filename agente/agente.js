@@ -8,6 +8,8 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const http = require('http');
+const crypto = require('crypto');
 const { spawn, execFileSync } = require('child_process');
 
 const ROOT = path.resolve(__dirname, '..');
@@ -52,7 +54,10 @@ function devStop() {
 
 // --- ejecución de una orden ---
 async function runJob(job) {
-  const def = COMMANDS[job.command];
+  // "nombre" o "nombre:argumento" (el argumento solo si el comando lo declara y pasa su validación).
+  const [name, arg] = String(job.command).split(/:(.*)/s);
+  const def0 = Object.prototype.hasOwnProperty.call(COMMANDS, name) ? COMMANDS[name] : null;
+  const def = def0 && (def0.arg ? def0.arg.test(arg || '') : arg === undefined) ? def0 : null;
   let out = '';
   let flushT = 0;
   const flush = async (force) => {
@@ -69,6 +74,17 @@ async function runJob(job) {
     if (def.special === 'dev_start') add(devStart() + '\n');
     else if (def.special === 'dev_stop') add(devStop() + '\n');
     else if (def.special === 'dev_restart') { add(devStop() + '\n'); await new Promise((r) => setTimeout(r, 1500)); add(devStart() + '\n'); }
+    else if (def.special === 'render_full') {
+      // Proceso aparte (siempre con el código más nuevo del render) y hasta 30 min.
+      code = await new Promise((resolve) => {
+        const p = spawn(process.execPath, [path.join(__dirname, 'render_local.js'), arg], { cwd: ROOT, shell: false });
+        const timer = setTimeout(() => { add('\n[se canceló: tardó más de 30 minutos]\n'); p.kill(); }, 30 * 60000);
+        p.stdout.on('data', (d) => add(String(d)));
+        p.stderr.on('data', (d) => add(String(d)));
+        p.on('error', (e) => { add('ERROR: ' + e.message + '\n'); resolve(1); });
+        p.on('close', (c) => { clearTimeout(timer); resolve(c == null ? 1 : c); });
+      });
+    }
     else if (def.special === 'dev_log') add((devLog.length ? devLog.slice(-120).join('\n') : '(sin log: el servidor local no lo inició el agente)') + '\n');
     else {
       for (const [cmd, args] of def.steps) {
@@ -93,13 +109,114 @@ async function runJob(job) {
   log(code === 0 ? '✔' : '✖', job.command, '(código ' + code + ')');
 }
 
+// --- videos finales en CALIDAD COMPLETA (VYRALE/finales) y descarga desde el teléfono por Tailscale ---
+// Cada vez que hay un video final nuevo en Supabase (que va recomprimido por el límite de 50 MB),
+// el agente lo vuelve a armar aquí sin recomprimir (render_local.js) y lo sirve SOLO dentro de tu
+// red de Tailscale (escucha en la IP 100.x de este PC, no en internet ni en tu Wi-Fi), con llave.
+const FINALES = path.join(ROOT, 'finales');
+const FILE_PORT = 8787;
+const TOKEN_FILE = path.join(__dirname, '.llave_descargas');
+const FILE_TOKEN = (() => {
+  try { const t = fs.readFileSync(TOKEN_FILE, 'utf8').trim(); if (/^[0-9a-f]{40}$/.test(t)) return t; } catch (_) {}
+  const t = crypto.randomBytes(20).toString('hex');
+  fs.writeFileSync(TOKEN_FILE, t);
+  return t;
+})();
+function tailscaleIp() {
+  for (const list of Object.values(os.networkInterfaces())) {
+    for (const a of list || []) {
+      if (a.family !== 'IPv4' && a.family !== 4) continue;
+      const [p1, p2] = a.address.split('.').map(Number);
+      if (p1 === 100 && p2 >= 64 && p2 <= 127) return a.address; // 100.64.0.0/10 = Tailscale
+    }
+  }
+  return null;
+}
+let fileServer = null;
+let fileServerIp = null;
+let fileServerErr = null;
+function ensureFileServer() {
+  const ip = tailscaleIp();
+  if (fileServer && ip === fileServerIp) return;
+  if (fileServer) { try { fileServer.close(); } catch (_) {} fileServer = null; fileServerIp = null; }
+  if (!ip) { fileServerErr = 'Tailscale no está conectado en este PC'; return; }
+  const srv = http.createServer(serveFile);
+  srv.on('error', (e) => { fileServerErr = e.message; fileServer = null; fileServerIp = null; log('descargas: ' + e.message); });
+  srv.listen(FILE_PORT, ip, () => { fileServerErr = null; log('descargas en calidad completa: http://' + ip + ':' + FILE_PORT + ' (solo Tailscale)'); });
+  fileServer = srv; fileServerIp = ip;
+}
+function serveFile(req, res) {
+  try {
+    const u = new URL(req.url, 'http://x');
+    const m = /^\/f\/([A-Za-z0-9_\-]+\.mp4)$/.exec(u.pathname);
+    const okKey = u.searchParams.get('k') || '';
+    if (!m || okKey.length !== FILE_TOKEN.length || !crypto.timingSafeEqual(Buffer.from(okKey), Buffer.from(FILE_TOKEN))) { res.writeHead(404); return res.end('No encontrado'); }
+    const file = path.join(FINALES, m[1]);
+    if (!fs.existsSync(file)) { res.writeHead(404); return res.end('No encontrado'); }
+    const size = fs.statSync(file).size;
+    const head = { 'Content-Type': 'video/mp4', 'Accept-Ranges': 'bytes', 'Cache-Control': 'no-store' };
+    if (u.searchParams.get('dl')) head['Content-Disposition'] = 'attachment; filename="' + m[1] + '"';
+    // Safari (iPhone) pide el video por pedazos (Range): sin esto no lo reproduce.
+    const r = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range || '');
+    if (r) {
+      let start = r[1] === '' ? Math.max(0, size - Number(r[2])) : Number(r[1]);
+      let end = r[1] !== '' && r[2] !== '' ? Math.min(Number(r[2]), size - 1) : size - 1;
+      if (start > end || start >= size) { res.writeHead(416, { 'Content-Range': 'bytes */' + size }); return res.end(); }
+      res.writeHead(206, Object.assign(head, { 'Content-Range': `bytes ${start}-${end}/${size}`, 'Content-Length': end - start + 1 }));
+      if (req.method === 'HEAD') return res.end();
+      return fs.createReadStream(file, { start, end }).pipe(res);
+    }
+    res.writeHead(200, Object.assign(head, { 'Content-Length': size }));
+    if (req.method === 'HEAD') return res.end();
+    fs.createReadStream(file).pipe(res);
+  } catch (err) { res.writeHead(500); res.end('Error'); }
+}
+function filesInfo() {
+  ensureFileServer();
+  let finales = [];
+  try {
+    finales = fs.readdirSync(FINALES).filter((f) => /\.mp4$/.test(f)).map((f) => {
+      const st = fs.statSync(path.join(FINALES, f));
+      let meta = {};
+      try { meta = JSON.parse(fs.readFileSync(path.join(FINALES, f.replace(/\.mp4$/, '.json')), 'utf8')); } catch (_) {}
+      return { name: f, mb: Math.round(st.size / 104857.6) / 10, episode_id: meta.episode_id || null, source: meta.source || null };
+    });
+  } catch (_) {}
+  return { base: fileServerIp ? 'http://' + fileServerIp + ':' + FILE_PORT : null, token: FILE_TOKEN, error: fileServerErr, finales };
+}
+// Encola "render_full" para los videos finales (últimos 10 días) que todavía no están en calidad
+// completa en la PC o que cambiaron desde entonces. Uno a la vez; revisa cada minuto.
+let lastScan = 0;
+const failedRenders = {}; // source → veces que falló (no reintentar en bucle)
+async function queueFullRenders() {
+  if (Date.now() - lastScan < 60000) return;
+  lastScan = Date.now();
+  const since = new Date(Date.now() - 10 * 86400000).toISOString();
+  const { data: fins } = await sb.from('assets').select('episode_id, storage_path, updated_at').eq('kind', 'final_render').gt('updated_at', since).order('updated_at', { ascending: false }).limit(20);
+  const have = {};
+  filesInfo().finales.forEach((f) => { if (f.episode_id) have[f.episode_id] = f.source; });
+  const todo = (fins || []).find((a) => have[a.episode_id] !== a.storage_path && (failedRenders[a.storage_path] || 0) < 2);
+  if (!todo) return;
+  const { data: open } = await sb.from('agent_jobs').select('id').in('status', ['pending', 'running']).limit(1);
+  if (open && open.length) return;
+  failedRenders[todo.storage_path] = (failedRenders[todo.storage_path] || 0) + 1;
+  await sb.from('agent_jobs').insert({ command: 'render_full:' + todo.episode_id });
+  log('nuevo video final: preparando calidad completa (episodio ' + todo.episode_id + ')');
+}
+// Si cambian los archivos del agente, se reinicia solo (el bucle de agente_bucle.bat lo vuelve a abrir).
+const WATCH = ['agente.js', 'comandos.js'].map((f) => path.join(__dirname, f));
+const startMtimes = WATCH.map((f) => { try { return fs.statSync(f).mtimeMs; } catch (_) { return 0; } });
+function codeChanged() { return WATCH.some((f, i) => { try { return fs.statSync(f).mtimeMs !== startMtimes[i]; } catch (_) { return false; } }); }
+
 // --- bucle principal ---
 let busy = false;
 async function tick() {
   let mine = false;
   try {
-    await sb.from('agent_state').upsert({ id: 1, last_seen: new Date().toISOString(), host: os.hostname(), info: { commands: Object.keys(COMMANDS), dev_running: !!dev, platform: process.platform } });
+    await sb.from('agent_state').upsert({ id: 1, last_seen: new Date().toISOString(), host: os.hostname(), info: { commands: Object.keys(COMMANDS), dev_running: !!dev, platform: process.platform, files: filesInfo() } });
     if (busy) return;
+    if (codeChanged()) { log('el código del agente cambió: reiniciando para cargarlo...'); devStop(); process.exit(0); }
+    await queueFullRenders();
     // Órdenes viejas (más de 2 min sin atender) no se ejecutan: se marcan vencidas.
     await sb.from('agent_jobs').update({ status: 'expired', finished_at: new Date().toISOString() }).eq('status', 'pending').lt('created_at', new Date(Date.now() - 120000).toISOString());
     const { data } = await sb.from('agent_jobs').select('*').eq('status', 'pending').order('created_at').limit(1);

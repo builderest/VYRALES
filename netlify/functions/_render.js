@@ -123,7 +123,8 @@ function subtitleText(text, seconds, sub, color) {
 // 'veryfast': 2.6x más rápido que 'medium' con casi el mismo peso (medido: 7.5 s vs 19.7 s por 30 s de video).
 // Con 'medium' el render de 20 tomas + transiciones + recompresión tardaba ~6.5 min con 2 CPU y en
 // Netlify (menos CPU, límite de 15 min) se cortaba sin avisar.
-const VIDEO_OUT = ['-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-pix_fmt', 'yuv420p', '-r', String(FPS)];
+// En la PC (agente/render_local.js) se usa VYRALES_X264_PRESET=medium y VYRALES_CRF=18: calidad completa sin apuro.
+const VIDEO_OUT = ['-c:v', 'libx264', '-preset', process.env.VYRALES_X264_PRESET || 'veryfast', '-crf', process.env.VYRALES_CRF || '20', '-pix_fmt', 'yuv420p', '-r', String(FPS)];
 const AUDIO_OUT = ['-c:a', 'aac', '-b:a', '160k', '-ar', '48000', '-ac', '2'];
 const NORMALIZE_V = `scale=${W}:${H}:force_original_aspect_ratio=decrease,pad=${W}:${H}:(ow-iw)/2:(oh-ih)/2,setsar=1`;
 
@@ -292,7 +293,7 @@ async function download(url, dest) {
 }
 
 // ---------- Episodio ----------
-async function renderEpisode({ episode, series, log = console.log, fetchFile = download }) {
+async function renderEpisode({ episode, series, log = console.log, fetchFile = download, maxMb = MAX_UPLOAD_MB }) {
   const plan = resolvePlan(episode);
   const sub = Object.assign({}, plan.subtitles, { margin_v: Math.min(1150, Math.max(20, Number(plan.subtitles.margin_v) || 180)) });
   const clipsByShot = {};
@@ -429,7 +430,7 @@ async function renderEpisode({ episode, series, log = console.log, fetchFile = d
     // recomprime al bitrate justo para quedar debajo (en 720p vertical no se nota).
     let finalName = 'final.mp4';
     const sizeMb = fs.statSync(path.join(cwd, finalName)).size / 1048576;
-    if (sizeMb > MAX_UPLOAD_MB) {
+    if (sizeMb > maxMb) { // maxMb = Infinity en la PC: se guarda sin recomprimir
       const audioK = 160;
       const videoK = Math.max(600, Math.floor((MAX_UPLOAD_MB * 0.94 * 8 * 1024) / total - audioK));
       log(`el video final pesa ${sizeMb.toFixed(0)} MB (límite ${MAX_UPLOAD_MB}); recomprimiendo a ${videoK} kb/s...`);
