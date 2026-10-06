@@ -959,8 +959,9 @@
           : st.table_missing ? '<span class="text-cyber-gold">Falta crear las tablas (migración 007_agente.sql en Supabase).</span>'
           : st.online ? '<span class="text-cyber-emerald">● Agente en línea · ' + esc(st.host || 'PC') + (st.dev_running ? ' · servidor local corriendo' : '') + '</span>'
           : '<span class="text-cyber-pink">● Agente apagado</span> <span class="text-slate-500">— en tu PC abre <b>INICIAR_AGENTE.bat</b> (carpeta VYRALE).</span>';
+        window.__termState = st;
         const cmds = (st && st.commands) || [];
-        const btns = cmds.map(c => '<button type="button" onclick="runAgentCommand(\'' + c.key + '\')" ' + (st && st.online ? '' : 'disabled') + ' title="' + esc(c.help || '') + '" class="text-[11px] font-mono px-2 py-1.5 rounded border border-cyber-emerald/40 text-cyber-emerald hover:bg-cyber-emerald/10 disabled:opacity-40 text-left">' + esc(c.label) + '</button>').join('');
+        const btns = cmds.map(c => '<button type="button" onclick="runAgentCommand(\'' + c.key + '\')" ' + (st && st.online ? '' : 'style="opacity:.4"') + ' title="' + esc(c.help || '') + '" class="text-[11px] font-mono px-2 py-1.5 rounded border border-cyber-emerald/40 text-cyber-emerald hover:bg-cyber-emerald/10 disabled:opacity-40 text-left">' + esc(c.label) + '</button>').join('');
         const hist = ((st && st.jobs) || []).map(j => '<button type="button" onclick="openTerminal(\'' + j.id + '\')" class="block w-full text-left text-[10px] font-mono hover:text-white ' + (j.status === 'done' ? 'text-cyber-emerald' : j.status === 'error' ? 'text-cyber-pink' : 'text-slate-400') + '">' + new Date(j.created_at).toLocaleTimeString() + ' · ' + esc(j.command) + ' · ' + esc(j.status) + '</button>').join('');
         m.innerHTML = '<div class="bg-cyber-darker border border-cyber-border rounded-xl p-4 w-full max-w-2xl max-h-[90vh] overflow-auto">' +
           '<div class="flex justify-between items-center mb-1"><h3 class="text-white font-display font-bold"><i class="fa-solid fa-terminal mr-2 text-cyber-emerald"></i>Terminal de tu PC</h3><button type="button" onclick="closeTerminal()" class="text-slate-400 hover:text-white p-2 -m-2" title="Cerrar"><i class="fa-solid fa-xmark text-lg"></i></button></div>' +
@@ -975,6 +976,15 @@
       window.closeTerminal = function() { clearTimeout(termPoll); const m = document.getElementById('termModal'); if (m) m.remove(); };
       window.runAgentCommand = async function(command) {
         const out = document.getElementById('termOut');
+        const ts = window.__termState;
+        // Antes los botones quedaban desactivados sin explicación: al tocarlos "no pasaba nada".
+        if (!ts || ts.table_missing || !ts.online) {
+          if (out) out.textContent = '✖ No se puede ejecutar "' + command + '" todavía.\n\n' + (ts && ts.table_missing
+            ? 'Faltan las tablas del agente. Pasos (una sola vez):\n1) Supabase → SQL Editor → pega el contenido de supabase/migrations/007_agente.sql → Run.\n2) En tu PC: doble clic en INSTALAR_AGENTE_AUTOMATICO.bat (carpeta VYRALE).\n3) Vuelve a abrir esta Terminal: debe decir "● Agente en línea".'
+            : ts ? 'El agente de tu PC está apagado. En tu PC: doble clic en INSTALAR_AGENTE_AUTOMATICO.bat (o INICIAR_AGENTE.bat) en la carpeta VYRALE.'
+            : 'No se pudo revisar el agente. Cierra y vuelve a abrir la Terminal.');
+          return;
+        }
         if (out) out.textContent = '$ ' + command + '\n(enviando al agente…)';
         try {
           const res = await keyedFetch('/.netlify/functions/agent', { command });
