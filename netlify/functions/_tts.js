@@ -146,7 +146,8 @@ function tightenSpeech(wav, log = console.log) {
 //   divine → Dios: reverberación amplia y cuerpo grave, voz limpia
 //   echo   → eco suave (voces "desde lejos", sueños, recuerdos)
 const VOICE_FX = {
-  demon: '[0:a]aresample=24000,asplit=2[o][l];[l]asetrate=24000*0.72,aresample=24000,atempo=1.3889,volume=1.15[low];[o]volume=0.55[hi];[low][hi]amix=inputs=2:normalize=0,highpass=f=55,aecho=0.8:0.6:45|95:0.35|0.22,acompressor=threshold=0.2:ratio=3,volume=1.4',
+  // Versión A elegida (oct-2026): voz principal clara (realce 3 kHz) + capa grave sin agudos + eco corto.
+  demon: '[0:a]aresample=24000,asplit=2[o][l];[l]asetrate=24000*0.72,aresample=24000,atempo=1.3889,lowpass=f=1400,volume=0.6[low];[o]highpass=f=90,equalizer=f=3000:t=q:w=1.2:g=5,volume=1.0[hi];[hi][low]amix=inputs=2:normalize=0,aecho=0.9:0.5:35|70:0.18|0.09,acompressor=threshold=0.25:ratio=2.5:makeup=1.5,alimiter=limit=0.95',
   divine: '[0:a]aresample=24000,bass=g=4:f=120,aecho=0.85:0.85:60|130|240:0.38|0.28|0.18,acompressor=threshold=0.25:ratio=2.5,volume=1.25',
   echo: '[0:a]aresample=24000,aecho=0.8:0.7:120|260:0.3|0.18'
 };
