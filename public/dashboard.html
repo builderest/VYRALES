@@ -1072,7 +1072,7 @@
           return '<button type="button" onclick="setVeoModel(\'' + key + '\')" class="flex-1 px-2 py-1.5 rounded-lg border text-[10px] font-mono leading-tight transition-all ' +
             (on ? 'border-cyber-cyan bg-cyber-cyan/15 text-cyber-cyan' : 'border-cyber-border text-slate-400 hover:text-white') + '">' +
             '<span class="block font-bold">' + label + (key === base ? ' · de la serie' : '') + '</span>' +
-            '<span class="block">$' + (secs * VEO_PRICE_PER_SEC[key]).toFixed(2) + '/toma</span>' +
+            '<span class="block">$' + (secs * VEO_PRICE_PER_SEC[key]).toFixed(2) + ' video/toma</span>' +
             (q && videoProvider === 'google' ? '<span class="block ' + (q.left ? '' : 'text-cyber-pink') + '">hoy ' + q.used + '/' + q.limit + '</span>' : (videoProvider === 'fal' ? '<span class="block">sin límite</span>' : '')) +
           '</button>';
         };
@@ -2143,17 +2143,28 @@
       }
 
       // Solo cuenta lo que FALTA: tomas sin video y, con memoria visual, cuadros y lugares sin generar.
-      function estimateEpisodeCost(ep) {
+      // Costo REAL estimado de lo que falta del episodio (todo lo que se paga en automático).
+      function episodeCostParts(ep) {
         const series = lastLoadedData && lastLoadedData.series;
         const m = seriesModels(series);
         const shots = (ep.shots && ep.shots.length) ? ep.shots : Array.from({ length: 8 }, (_, i) => ({ n: i + 1 }));
         const total = shots.length;
-        return shots.reduce((sum, sh) => {
-          if (clipFor(ep, sh.n)) return sum;
-          const model = sh.n === total ? m.cliff : m.shot;
-          return sum + m.secs * VEO_PRICE_PER_SEC[model] + (usesKeyframes(series) && !frameFor(ep, sh.n) ? IMAGE_PRICE_USD : 0);
-        }, 0) + missingLocationsFor(ep).length * IMAGE_PRICE_USD;
+        const p = { video: 0, frames: 0, locations: missingLocationsFor(ep).length * IMAGE_PRICE_USD, photos: 0, voices: 0, music: 0, texts: 0.001 };
+        shots.forEach((sh) => {
+          if (!clipFor(ep, sh.n)) p.video += m.secs * VEO_PRICE_PER_SEC[sh.n === total ? m.cliff : m.shot];
+          if (usesKeyframes(series) && !clipFor(ep, sh.n) && !frameFor(ep, sh.n)) p.frames += IMAGE_PRICE_USD;
+          const ns = narrationState(series, sh);
+          if (ns && !ns.ok) p.voices += TTS_LINE_USD * 1.5 * Math.max(1, dlgList(sh.dialogue).length); // 1.5: a veces reintenta por ritmo
+        });
+        const chars = (lastLoadedData && lastLoadedData.characters) || [];
+        const used = new Set(); shots.forEach((sh) => (sh.characters || []).forEach((n) => used.add(n)));
+        p.photos = chars.filter((c) => used.has(c.name) && !c.reference_image_url).length * IMAGE_PRICE_USD;
+        const lib = (series && series.story_bible && series.story_bible.music_tracks) || [];
+        if (narrationCfg(series) && !lib.length && !(ep.edit_plan && ep.edit_plan.audio && ep.edit_plan.audio.music_url)) p.music = 0.08;
+        p.total = p.video + p.frames + p.locations + p.photos + p.voices + p.music + p.texts;
+        return p;
       }
+      function estimateEpisodeCost(ep) { return episodeCostParts(ep).total; }
 
       function costBreakdownLabel(ep) {
         const n = (ep.shots && ep.shots.length) || 8;
@@ -2434,7 +2445,10 @@
           title.textContent = 'Siguiente: EP ' + next.episode_number + ' — ' + (next.title || '');
           const doneN = (next.assets || []).filter(a => a.kind === 'video_clip').length;
           const q = videoProvider === 'google' ? veoQuotaInfo(data, seriesModels(data.series).shot) : null;
-          desc.innerHTML = esc(((next.shots || []).length || 0) + ' tomas' + (doneN ? ' (' + doneN + ' ya hechas)' : '') + ' · ~$' + estimateEpisodeCost(next).toFixed(2) + ' en Veo') +
+          const cp = episodeCostParts(next);
+          const part = (l, v) => v > 0.0005 ? l + ' $' + v.toFixed(2) : '';
+          desc.innerHTML = esc(((next.shots || []).length || 0) + ' tomas' + (doneN ? ' (' + doneN + ' ya hechas)' : '') + ' · total estimado ~$' + cp.total.toFixed(2)) +
+            '<br><span class="text-slate-500">' + esc([part('video', cp.video), part('cuadros', cp.frames), part('lugares', cp.locations), part('fotos de cara', cp.photos), part('voces', cp.voices), part('música', cp.music)].filter(Boolean).join(' · ')) + '</span>' +
             (q ? '<br><span class="' + (q.left ? 'text-slate-400' : 'text-cyber-pink') + '">Cuota Veo hoy: ' + q.used + '/' + q.limit + (q.left ? '' : ' · se reinicia ' + esc(q.resetLabel)) + '</span>' : '') +
             (quotaStopOf(next) ? '<br><span class="text-cyber-gold">⏸ Se detuvo por cuota de Google en la toma ' + quotaStopOf(next).quota_stop.shot + '</span>' : '');
           btn.textContent = 'Producir EP ' + next.episode_number;
