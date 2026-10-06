@@ -74,13 +74,23 @@ function narrationConfig(sb) {
   const n = sb && sb.narration;
   return n && n.engine === 'gemini_tts' ? n : null;
 }
+// Con narration.cast = true ("voces fijas para todos"): TODAS las líneas (personajes,
+// extras y narrador) se doblan con Gemini TTS, cada quien con su voz de story_bible.voice_cast.
+// Si no, solo las del narrador en off.
+function castMode(sb) {
+  const n = narrationConfig(sb);
+  return !!(n && n.cast);
+}
 function narrationLines(shot, sb) {
-  return dialogueList(shot && shot.dialogue).filter((d) => isVoiceover(extraOf(sb || {}, d.speaker)));
+  const all = dialogueList(shot && shot.dialogue).filter((d) => d && d.line);
+  return castMode(sb) ? all : all.filter((d) => isVoiceover(extraOf(sb || {}, d.speaker)));
 }
 // ¿El video de Veo lleva audio? Con narrador TTS se puede pedir sin audio (más barato en fal).
 function videoGeneratesAudio(sb) {
   const n = narrationConfig(sb);
-  return !(n && n.video_audio === 'none');
+  // Con voces fijas para todos, el video va SIEMPRE sin audio (si no, Veo diría las líneas
+  // con otra voz encima de la nuestra).
+  return !(n && (n.video_audio === 'none' || n.cast));
 }
 
 function isVoiceover(ex) {
@@ -496,6 +506,7 @@ function effectiveShotPrompt(shot, characterRows, storyBible) {
 }
 
 module.exports = {
+  castMode,
   shortName,
   onScreenExtras,
   narrationConfig,

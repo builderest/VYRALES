@@ -276,7 +276,8 @@
     const secs = Number(n.seconds) || 6;
     const avail = Math.max(1, clipDur(c) - NARR_START - Math.max(0.15, overlap));
     const tempo = Math.min(1.2, Math.max(1, secs / avail));
-    return { url: n.url, seconds: secs, tempo, mute: /Voice-over narration/i.test(a.prompt || '') };
+    const castOn = (() => { const d = window.vyCtx && window.vyCtx().data; const nn = d && d.series && d.series.story_bible && d.series.story_bible.narration; return !!(nn && nn.cast); })();
+    return { url: n.url, seconds: secs, tempo, mute: castOn || /Voice-over narration/i.test(a.prompt || '') };
   }
   function duck(on) {
     const m = $('edMusic');

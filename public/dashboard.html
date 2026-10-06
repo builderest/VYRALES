@@ -703,22 +703,33 @@
       const GOOGLE_PRICE_PER_SEC = { veo_lite: 0.05, veo_fast: 0.10, veo_standard: 0.40 }; // 720p, precio oficial de Google
       // fal.ai cobra distinto y según si el video lleva audio (verificado oct-2026): Fast con audio $0.15/s.
       const FAL_PRICE_PER_SEC = { veo_lite: { audio: 0.05, silent: 0.03 }, veo_fast: { audio: 0.15, silent: 0.10 }, veo_standard: { audio: 0.40, silent: 0.20 } };
-      function silentVideo() { const n = narrationCfg(lastLoadedData && lastLoadedData.series); return !!(n && n.video_audio === 'none'); }
+      function silentVideo() { const n = narrationCfg(lastLoadedData && lastLoadedData.series); return !!(n && (n.video_audio === 'none' || n.cast)); }
       // Precio por segundo según el proveedor elegido (y audio sí/no en fal). Mismo uso que antes: VEO_PRICE_PER_SEC[modelo].
       const VEO_PRICE_PER_SEC = new Proxy({}, { get: (_, k) => videoProvider === 'fal' ? ((FAL_PRICE_PER_SEC[k] || {})[silentVideo() ? 'silent' : 'audio'] || 0) : (GOOGLE_PRICE_PER_SEC[k] || 0) });
       // ---------- Narrador con voz fija (Gemini TTS) ----------
       const TTS_LINE_USD = 0.004; // ~8 s de audio a 25 tokens/s, $18 por 1M tokens
       const TTS_VOICES = [['Algenib', 'grave, rasposa'], ['Charon', 'informativa'], ['Orus', 'firme'], ['Iapetus', 'clara'], ['Rasalgethi', 'informativa'], ['Sadaltager', 'experta'], ['Gacrux', 'madura']];
       function narrationCfg(series) { const n = series && series.story_bible && series.story_bible.narration; return n && n.engine === 'gemini_tts' ? n : null; }
-      function narratorText(series, sh) {
+      const dlgList = (d) => !d ? [] : (Array.isArray(d) ? d : [d]).filter(x => x && x.line);
+      // Mismo criterio que narration-background (lineKey / voiceKey) para saber si la voz está al día.
+      function narratorLines(series, sh) {
+        const cfg = narrationCfg(series);
         const ex = (series && series.story_bible && series.story_bible.extras) || {};
-        return (sh.dialogue || []).filter(d => { const e = ex[d.speaker]; const who = typeof e === 'string' ? e : (e && e.who) || ''; return e && ((e.voiceover === true) || /off-?screen|never visible|voice-?over|narrat|narrador/i.test(who)); }).map(d => d.line).join(' ').trim();
+        const all = dlgList(sh.dialogue);
+        if (cfg && cfg.cast) return all;
+        return all.filter(d => { const e = ex[d.speaker]; const who = typeof e === 'string' ? e : (e && e.who) || ''; return e && ((e.voiceover === true) || /off-?screen|never visible|voice-?over|narrat|narrador/i.test(who)); });
+      }
+      function narratorText(series, sh) {
+        const cfg = narrationCfg(series);
+        return narratorLines(series, sh).map(d => (cfg && cfg.cast ? d.speaker + ': ' : '') + d.line).join(cfg && cfg.cast ? ' | ' : ' ').trim();
       }
       function narrationState(series, sh) {
         const cfg = narrationCfg(series); if (!cfg) return null;
         const text = narratorText(series, sh); if (!text) return null;
+        const vc = (series.story_bible && series.story_bible.voice_cast) || {};
+        const want = cfg.cast ? narratorLines(series, sh).map(d => (vc[d.speaker] && vc[d.speaker].voice) || cfg.voice || 'Charon').join('+') : (cfg.voice || 'Charon');
         const n = sh.narration;
-        return { text, n, ok: !!(n && n.url && n.text === text && n.voice === (cfg.voice || 'Charon')) };
+        return { text, n, ok: !!(n && n.url && n.text === text && n.voice === want) };
       }
       function narrationRunning(ep) {
         const r = (ep.validator_report || {}).last_narration_run;
@@ -727,18 +738,50 @@
       function narratorPanelHtml(data) {
         const cfg = narrationCfg(data.series);
         const hasNarrator = Object.values((data.series.story_bible || {}).extras || {}).some(e => e && /narrat|narrador|off-?screen|voice-?over/i.test(typeof e === 'string' ? e : (e.who || '')));
-        if (!cfg && !hasNarrator) return '';
+        const anyDialogue = (data.episodes || []).some(e => (e.shots || []).some(sh => dlgList(sh.dialogue).length));
+        if (!cfg && !hasNarrator && !anyDialogue) return '';
         const voiceBtn = ([v, d]) => '<span class="inline-flex items-center rounded-lg border ' + (cfg && cfg.voice === v ? 'border-cyber-emerald bg-cyber-emerald/15 text-cyber-emerald' : 'border-cyber-border text-slate-400') + ' text-[10px] font-mono">' +
           '<button type="button" onclick="playVoiceSample(\'' + v + '\')" class="px-1.5 py-1 hover:text-white" title="Escuchar"><i class="fa-solid fa-play"></i></button>' +
           '<button type="button" onclick="setNarration({ voice: \'' + v + '\' })" class="px-1.5 py-1 hover:text-white">' + v + ' <span class="opacity-60">' + d + '</span></button></span>';
         const audBtn = (k, label, sub) => '<button type="button" onclick="setNarration({ video_audio: \'' + k + '\' })" class="flex-1 px-2 py-1.5 rounded-lg border text-[10px] font-mono leading-tight ' + (cfg && (cfg.video_audio || 'ambient') === k ? 'border-cyber-emerald bg-cyber-emerald/15 text-cyber-emerald' : 'border-cyber-border text-slate-400 hover:text-white') + '"><span class="block font-bold">' + label + '</span><span class="block">' + sub + '</span></button>';
+        const castOn = !!(cfg && cfg.cast);
+        const castToggle = '<div class="flex gap-2 mb-2">' +
+          '<button type="button" onclick="setNarration({ cast: false })" class="flex-1 px-2 py-1.5 rounded-lg border text-[10px] font-mono leading-tight ' + (!castOn ? 'border-cyber-emerald bg-cyber-emerald/15 text-cyber-emerald' : 'border-cyber-border text-slate-400 hover:text-white') + '"><span class="block font-bold">Solo narrador con voz fija</span><span class="block">los personajes los habla Veo</span></button>' +
+          '<button type="button" onclick="setNarration({ cast: true })" class="flex-1 px-2 py-1.5 rounded-lg border text-[10px] font-mono leading-tight ' + (castOn ? 'border-cyber-emerald bg-cyber-emerald/15 text-cyber-emerald' : 'border-cyber-border text-slate-400 hover:text-white') + '"><span class="block font-bold">Voz única para cada personaje</span><span class="block">video sin audio · todas las voces TTS</span></button></div>';
+        if (castOn) {
+          return '<div class="w-full mt-3"><p class="text-[10px] font-mono text-slate-500 mb-1">VOCES · CADA PERSONAJE CON SU VOZ FIJA (Gemini TTS, ~$' + TTS_LINE_USD + '/frase)</p>' + castToggle + voiceCastHtml(data) + '</div>';
+        }
         return '<div class="w-full mt-3"><p class="text-[10px] font-mono text-slate-500 mb-1">NARRADOR ' + (cfg ? '· VOZ FIJA (Gemini TTS, ~$' + TTS_LINE_USD + '/frase)' : '· lo hace Veo (la voz cambia en cada toma)') + '</p>' +
           (cfg
-            ? '<div class="flex flex-wrap gap-1.5 mb-2">' + TTS_VOICES.map(voiceBtn).join('') + '</div>' +
+            ? castToggle + '<div class="flex flex-wrap gap-1.5 mb-2">' + TTS_VOICES.map(voiceBtn).join('') + '</div>' +
               '<div class="flex gap-2">' + audBtn('ambient', 'Video con sonido ambiente', 'viento, fuego… (audio de Veo)') + audBtn('none', 'Video sin audio', 'más barato · solo voz + música') + '</div>'
-            : '<button type="button" onclick="setNarration({ enabled: true })" class="px-2 py-1.5 rounded-lg border border-cyber-emerald/50 text-cyber-emerald text-[10px] font-mono">Activar narrador con voz fija</button>') +
+            : '<div class="flex gap-2"><button type="button" onclick="setNarration({ enabled: true })" class="px-2 py-1.5 rounded-lg border border-cyber-emerald/50 text-cyber-emerald text-[10px] font-mono">Activar narrador con voz fija</button>' +
+              '<button type="button" onclick="setNarration({ cast: true })" class="px-2 py-1.5 rounded-lg border border-cyber-emerald/50 text-cyber-emerald text-[10px] font-mono">Voz única para cada personaje</button></div>') +
           '</div>';
       }
+      // Reparto de voces: cada hablante de la serie con su voz (▶ escuchar · cambiar).
+      const ALL_TTS_VOICES = { Zephyr: 'f', Puck: 'm', Charon: 'm', Kore: 'f', Fenrir: 'm', Leda: 'f', Orus: 'm', Aoede: 'f', Callirrhoe: 'f', Autonoe: 'f', Enceladus: 'm', Iapetus: 'm', Umbriel: 'm', Algieba: 'm', Despina: 'f', Erinome: 'f', Algenib: 'm', Rasalgethi: 'm', Laomedeia: 'f', Achernar: 'f', Alnilam: 'm', Schedar: 'm', Gacrux: 'm', Pulcherrima: 'm', Achird: 'm', Zubenelgenubi: 'm', Vindemiatrix: 'f', Sadachbia: 'm', Sadaltager: 'm', Sulafat: 'f' };
+      function voiceCastHtml(data) {
+        const vc = (data.series.story_bible && data.series.story_bible.voice_cast) || {};
+        const count = {};
+        (data.episodes || []).forEach(e => (e.shots || []).forEach(sh => dlgList(sh.dialogue).forEach(d => { count[d.speaker] = (count[d.speaker] || 0) + 1; })));
+        const keys = Object.keys(count).sort((a, b) => count[b] - count[a]);
+        if (!keys.length) return '<p class="text-[10px] text-slate-500">Todavía no hay diálogos.</p>';
+        const missing = keys.filter(k => !vc[k]).length;
+        const opts = (cur) => Object.keys(ALL_TTS_VOICES).map(v => '<option value="' + v + '"' + (v === cur ? ' selected' : '') + '>' + v + ' (' + (ALL_TTS_VOICES[v] === 'f' ? '♀' : '♂') + ')</option>').join('');
+        return (missing ? '<p class="text-[10px] text-cyber-gold mb-1">' + missing + ' sin voz todavía: se asignan solas al generar las voces, o pulsa <button type="button" onclick="setNarration({ reassign: true })" class="underline">asignar ahora</button>.</p>' : '') +
+          '<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-1.5">' + keys.map(k => {
+            const v = vc[k] && vc[k].voice;
+            return '<div class="flex items-center gap-1.5 rounded-lg border border-cyber-border px-2 py-1 text-[10px] font-mono">' +
+              '<button type="button" onclick="playVoiceSample(\'' + esc(v || '') + '\')" ' + (v ? '' : 'disabled') + ' class="text-cyber-emerald hover:text-white" title="Escuchar"><i class="fa-solid fa-play"></i></button>' +
+              '<span class="text-white truncate flex-1" title="' + esc(k) + ' · ' + count[k] + ' línea(s)">' + esc(k) + ' <span class="text-slate-500">×' + count[k] + '</span></span>' +
+              '<select onchange="setSpeakerVoice(\'' + esc(k).replace(/'/g, '') + '\', this.value)" class="bg-slate-950 border border-slate-700 rounded px-1 py-0.5 text-[10px] text-slate-200">' + (v ? '' : '<option value="">— auto —</option>') + opts(v) + '</select>' +
+              (vc[k] && vc[k].auto === false ? '<span class="text-cyber-gold" title="Elegida a mano">✋</span>' : '') +
+            '</div>';
+          }).join('') + '</div>' +
+          '<p class="text-[10px] text-slate-500 mt-1">Se asignan solas según cómo está descrita cada voz (edad, sexo, tono). Si cambias una, las tomas de ese personaje quedan marcadas para rehacer la voz (~$' + TTS_LINE_USD + ' c/u). <button type="button" onclick="setNarration({ reassign: true })" class="underline text-cyber-cyan">Reasignar automáticas</button></p>';
+      }
+      window.setSpeakerVoice = function(speaker, voice) { if (voice) setNarration({ speaker, speaker_voice: voice }); };
       window.playVoiceSample = function(v) { const a = window.__voiceSample || (window.__voiceSample = new Audio()); a.src = 'voces/voz_' + v + '.mp3'; a.play().catch(() => {}); };
       window.setNarration = async function(patch) {
         const cfg = narrationCfg(lastLoadedData && lastLoadedData.series);

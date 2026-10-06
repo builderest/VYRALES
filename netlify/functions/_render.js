@@ -12,7 +12,7 @@ const os = require('os');
 const path = require('path');
 const { execFile } = require('child_process');
 const ffmpegPath = require('ffmpeg-static');
-const { narrationConfig } = require('./_series');
+const { narrationConfig, castMode } = require('./_series');
 
 const W = 720;
 const H = 1280;
@@ -141,7 +141,9 @@ async function renderClip({ cwd, input, out, c, subtitle, speakerColor, sub, fad
   let narr = null;
   if (narration && narration.file) {
     const nSecs = Number(narration.seconds) || (await probeDuration(narration.file, cwd));
-    const avail = Math.max(1, dur - NARR_START - Math.max(0.15, tailReserve));
+    let avail = Math.max(1, dur - NARR_START - Math.max(0.15, tailReserve));
+    // Diálogo doblado: la boca se mueve en 0–6 s (prompt), así que la voz se ajusta a esa ventana.
+    if (narration.window) avail = Math.min(avail, Math.max(1, narration.window - NARR_START));
     const tempo = Math.min(NARR_MAX_TEMPO, Math.max(1, nSecs / avail));
     narr = { file: narration.file, tempo, seconds: nSecs / tempo };
   }
@@ -312,12 +314,13 @@ async function renderEpisode({ episode, series, log = console.log, fetchFile = d
       if (ttsMode && shot && shot.narration && shot.narration.url) {
         const nf = `narr-${String(c.shot).padStart(2, '0')}.wav`;
         await fetchFile(shot.narration.url, path.join(cwd, nf));
-        narration = { file: nf, seconds: shot.narration.seconds };
+        narration = { file: nf, seconds: shot.narration.seconds, window: castMode(series && series.story_bible) ? 6.6 : 0 };
       } else if (ttsMode) {
         log(`toma ${c.shot}: AVISO — no tiene narración generada, va sin voz.`);
       }
       // Clips generados ANTES del narrador TTS traen la voz de Veo pegada: se silencia su audio.
-      const muteOriginal = !!(narration && /Voice-over narration/i.test(clipsByShot[c.shot].prompt || ''));
+      // Voces fijas para todos: se calla cualquier voz que traiga el clip (por si se generó con audio).
+      const muteOriginal = !!(narration && (castMode(series && series.story_bible) || /Voice-over narration/i.test(clipsByShot[c.shot].prompt || '')));
       const tailReserve = XFADE[c.transition] && i < chosen.length ? tSec(c) : 0;
       const r = await renderClip({ cwd, input: src, out, c, subtitle, speakerColor: spk ? SPEAKER_COLORS[speakers.indexOf(spk) % SPEAKER_COLORS.length] : null, sub, fadeIn, fadeOut, narration, muteOriginal, tailReserve });
       const dur = r.dur;
