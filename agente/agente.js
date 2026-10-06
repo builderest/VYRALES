@@ -74,10 +74,11 @@ async function runJob(job) {
     if (def.special === 'dev_start') add(devStart() + '\n');
     else if (def.special === 'dev_stop') add(devStop() + '\n');
     else if (def.special === 'dev_restart') { add(devStop() + '\n'); await new Promise((r) => setTimeout(r, 1500)); add(devStart() + '\n'); }
-    else if (def.special === 'render_full') {
-      // Proceso aparte (siempre con el código más nuevo del render) y hasta 30 min.
+    else if (def.special === 'render_full' || def.special === 'publish_local') {
+      // Proceso aparte (siempre con el código más nuevo) y hasta 30 min. Los argumentos ya pasaron la lista blanca.
+      const script = def.special === 'render_full' ? 'render_local.js' : 'publish_local.js';
       code = await new Promise((resolve) => {
-        const p = spawn(process.execPath, [path.join(__dirname, 'render_local.js'), arg], { cwd: ROOT, shell: false });
+        const p = spawn(process.execPath, [path.join(__dirname, script)].concat(arg.split(':')), { cwd: ROOT, shell: false });
         const timer = setTimeout(() => { add('\n[se canceló: tardó más de 30 minutos]\n'); p.kill(); }, 30 * 60000);
         p.stdout.on('data', (d) => add(String(d)));
         p.stderr.on('data', (d) => add(String(d)));
@@ -218,7 +219,9 @@ async function tick() {
     if (codeChanged()) { log('el código del agente cambió: reiniciando para cargarlo...'); devStop(); process.exit(0); }
     await queueFullRenders();
     // Órdenes viejas (más de 2 min sin atender) no se ejecutan: se marcan vencidas.
-    await sb.from('agent_jobs').update({ status: 'expired', finished_at: new Date().toISOString() }).eq('status', 'pending').lt('created_at', new Date(Date.now() - 120000).toISOString());
+    // (Publicar espera hasta 15 min: puede tocarle detrás de un video en calidad completa.)
+    await sb.from('agent_jobs').update({ status: 'expired', finished_at: new Date().toISOString() }).eq('status', 'pending').not('command', 'like', 'publish:%').lt('created_at', new Date(Date.now() - 120000).toISOString());
+    await sb.from('agent_jobs').update({ status: 'expired', finished_at: new Date().toISOString() }).eq('status', 'pending').like('command', 'publish:%').lt('created_at', new Date(Date.now() - 15 * 60000).toISOString());
     const { data } = await sb.from('agent_jobs').select('*').eq('status', 'pending').order('created_at').limit(1);
     const job = data && data[0];
     if (!job) return;

@@ -101,16 +101,25 @@ async function tiktokAccessToken(supabase) {
 async function tiktokSendDraft(supabase, { videoBuffer, log = console.log }) {
   const token = await tiktokAccessToken(supabase);
   const size = videoBuffer.length;
-  if (size > 64 * 1024 * 1024) throw new Error('El video pesa más de 64 MB (TikTok exigiría varios pedazos).');
+  // TikTok: un solo pedazo hasta 64 MB; más grande (calidad completa desde la PC) va en pedazos de
+  // 10 MB: total = floor(tamaño / pedazo) y el último pedazo se lleva el resto (regla de la API).
+  const MB = 1024 * 1024;
+  const chunk = size <= 64 * MB ? size : 10 * MB;
+  const count = size <= 64 * MB ? 1 : Math.floor(size / chunk);
   const { res, body } = await jsonFetch('https://open.tiktokapis.com/v2/post/publish/inbox/video/init/', {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json; charset=UTF-8' },
-    body: JSON.stringify({ source_info: { source: 'FILE_UPLOAD', video_size: size, chunk_size: size, total_chunk_count: 1 } })
+    body: JSON.stringify({ source_info: { source: 'FILE_UPLOAD', video_size: size, chunk_size: chunk, total_chunk_count: count } })
   });
   if (!res.ok || !body.data || !body.data.upload_url) throw new Error('TikTok rechazó el inicio de la subida: ' + JSON.stringify(body.error || body).slice(0, 300));
-  log('[tiktok] subiendo', (size / 1048576).toFixed(1), 'MB...');
-  const up = await fetch(body.data.upload_url, { method: 'PUT', headers: { 'Content-Type': 'video/mp4', 'Content-Length': String(size), 'Content-Range': `bytes 0-${size - 1}/${size}` }, body: videoBuffer });
-  if (!up.ok) throw new Error('TikTok rechazó el archivo (HTTP ' + up.status + '): ' + (await up.text()).slice(0, 200));
+  log('[tiktok] subiendo', (size / MB).toFixed(1), 'MB en', count, count === 1 ? 'pedazo...' : 'pedazos...');
+  for (let k = 0; k < count; k++) {
+    const start = k * chunk;
+    const end = k === count - 1 ? size - 1 : start + chunk - 1;
+    const part = videoBuffer.subarray(start, end + 1);
+    const up = await fetch(body.data.upload_url, { method: 'PUT', headers: { 'Content-Type': 'video/mp4', 'Content-Length': String(part.length), 'Content-Range': `bytes ${start}-${end}/${size}` }, body: part });
+    if (!up.ok) throw new Error('TikTok rechazó el pedazo ' + (k + 1) + '/' + count + ' (HTTP ' + up.status + '): ' + (await up.text()).slice(0, 200));
+  }
   const publishId = body.data.publish_id;
   for (let i = 0; i < 24; i++) {
     await new Promise((r) => setTimeout(r, 5000));

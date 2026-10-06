@@ -26,5 +26,11 @@ module.exports = {
   render_full: {
     label: 'Video final en calidad completa', help: 'Arma el video final sin recomprimir y lo guarda en VYRALE/finales',
     special: 'render_full', arg: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, hidden: true
+  },
+  // "publish:<episode_id>:<tiktok|youtube>[:private]" — lo encola el botón Publicar cuando la PC tiene
+  // la versión en calidad completa; sube ESE archivo con las cuentas conectadas.
+  publish: {
+    label: 'Publicar en calidad completa', help: 'Sube el video de VYRALE/finales a TikTok o YouTube',
+    special: 'publish_local', arg: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}:(tiktok|youtube)(:private)?$/i, hidden: true
   }
 };
