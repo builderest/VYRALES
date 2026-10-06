@@ -79,7 +79,7 @@ async function mergeEpisodeVideo(supabase, { episode, series, log = console.log 
         '-y', ...inputs,
         '-filter_complex', filter,
         '-map', '[v]', '-map', '[a]',
-        '-c:v', 'libx264', '-preset', 'medium', '-crf', '20', '-pix_fmt', 'yuv420p',
+        '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-pix_fmt', 'yuv420p',
         '-c:a', 'aac', '-b:a', '160k',
         '-movflags', '+faststart',
         outputPath
