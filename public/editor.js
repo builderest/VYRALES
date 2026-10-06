@@ -37,7 +37,7 @@
       #edTimeline .tl-block{position:absolute;top:22px;height:64px;border-radius:6px;overflow:hidden;background:#0f172a;border:2px solid #1e293b;cursor:grab;user-select:none}
       #edTimeline .tl-block.sel{border-color:#06b6d4;box-shadow:0 0 0 1px #06b6d4}
       #edTimeline .tl-block.off{opacity:.35}
-      #edTimeline .tl-block video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;pointer-events:none;opacity:.55}
+      #edTimeline .tl-block video,#edTimeline .tl-block img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;pointer-events:none;opacity:.55}
       #edTimeline .tl-block .tl-name{position:absolute;left:6px;top:3px;font:700 10px monospace;color:#fff;text-shadow:0 0 3px #000;pointer-events:none}
       #edTimeline .tl-block .tl-dur{position:absolute;right:6px;bottom:3px;font:10px monospace;color:#cbd5e1;text-shadow:0 0 3px #000;pointer-events:none}
       #edTimeline .tl-h{position:absolute;top:0;bottom:0;width:9px;background:rgba(251,191,36,.85);cursor:ew-resize;z-index:2}
@@ -265,10 +265,18 @@
 
   // ================= Datos / helpers =================
   const clipAsset = (n) => (st.ep.assets || []).find((a) => a.kind === 'video_clip' && a.shot_number === n);
+  // Miniaturas con la IMAGEN del cuadro inicial (jpg), no con un <video>: 40 videos de miniatura
+  // (lista + línea de tiempo) recreados en cada cambio de toma trababan la reproducción en el celular.
+  const thumbFor = (n) => {
+    const imgs = (st.ep.assets || []).filter((a) => a.kind === 'image' && a.shot_number === n && a.storage_path);
+    imgs.sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
+    return imgs[0] ? imgs[0].storage_path : null;
+  };
   const shotOf = (n) => (st.ep.shots || []).find((s) => s.n === n) || {};
   // Narrador con voz fija (TTS): igual que en _render.js — empieza a 0.3 s de la toma, se acelera
   // hasta 1.2x si no cabe, y silencia el audio de clips que traen la voz vieja de Veo.
   const NARR_START = 0.3;
+  const IS_TOUCH = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
   const ttsOn = () => { const d = window.vyCtx && window.vyCtx().data; const n = d && d.series && d.series.story_bible && d.series.story_bible.narration; return !!(n && n.engine === 'gemini_tts'); };
   function narrOf(c, a, overlap) {
     const n = shotOf(c.shot).narration;
@@ -395,7 +403,7 @@
     const tags = [cut ? '<span class="text-cyber-gold" title="recortada">✂</span>' : '', speedOf(c) !== 1 ? `<span class="text-cyber-cyan">${speedOf(c)}×</span>` : '', c.zoom ? '<span class="text-cyber-violet" title="zoom">🔍</span>' : '',
       c.transition && c.transition !== 'cut' ? `<span class="text-cyber-violet" title="transición: ${TRANSITIONS[c.transition]}">${TR_ICON[c.transition] || '◐'}</span>` : '', c.overlay ? '<span class="text-yellow-300" title="texto arriba">T</span>' : '', c.include === false ? '<span class="text-cyber-pink">quitada</span>' : ''].filter(Boolean).join(' ');
     return `<div id="edItem${i}" onclick="vyEditor.select(${i})" class="flex items-center gap-2 rounded-lg p-1.5 cursor-pointer border ${on ? 'border-cyber-cyan bg-cyber-cyan/10' : 'border-cyber-border hover:border-slate-500'} ${c.include === false ? 'opacity-40' : ''}">
-      ${a ? `<video src="${esc(a.storage_path)}#t=1" preload="metadata" muted class="w-9 h-16 object-cover rounded bg-black flex-shrink-0 pointer-events-none"></video>` : '<div class="w-9 h-16 rounded bg-slate-900 flex-shrink-0"></div>'}
+      ${thumbFor(c.shot) ? `<img src="${esc(thumbFor(c.shot))}" loading="lazy" decoding="async" alt="" class="w-9 h-16 object-cover rounded bg-black flex-shrink-0 pointer-events-none">` : a ? `<video src="${esc(a.storage_path)}#t=1" preload="metadata" muted class="w-9 h-16 object-cover rounded bg-black flex-shrink-0 pointer-events-none"></video>` : '<div class="w-9 h-16 rounded bg-slate-900 flex-shrink-0"></div>'}
       <div class="flex-1 min-w-0 text-[11px] font-mono">
         <p class="${on ? 'text-cyber-cyan' : 'text-white'} font-bold">${String(i + 1).padStart(2, '0')} · TOMA ${String(c.shot).padStart(2, '0')}</p>
         <p class="text-slate-500 truncate">${esc((shotOf(c.shot).characters || []).map((n) => n.split(' ')[0]).join(' + '))}</p>
@@ -410,6 +418,15 @@
   function updateListItem(i) {
     const el = $('edItem' + i);
     if (el) el.outerHTML = listItemHtml(st.plan.clips[i], i);
+  }
+  // Mientras reproduce: solo se mueve el resaltado (sin volver a pintar lista y línea de tiempo).
+  function markSelected() {
+    document.querySelectorAll('[id^="edItem"]').forEach((el) => {
+      const on = el.id === 'edItem' + st.sel;
+      el.classList.toggle('border-cyber-cyan', on); el.classList.toggle('bg-cyber-cyan/10', on); el.classList.toggle('border-cyber-border', !on);
+    });
+    document.querySelectorAll('.tl-block').forEach((el) => el.classList.toggle('sel', Number(el.dataset.i) === st.sel));
+    fillClipPanel();
   }
   function renderClips() {
     if (st.sel == null || st.sel >= st.plan.clips.length) st.sel = 0;
@@ -486,7 +503,7 @@
       const i = st.plan.clips.findIndex((c) => c.shot === it.shot);
       const c = st.plan.clips[i];
       html += `<div class="tl-block ${i === st.sel ? 'sel' : ''}" data-i="${i}" style="left:${left}px;width:${w}px">
-        <video src="${esc(it.url)}#t=${(it.start + 1).toFixed(1)}" preload="metadata" muted></video>
+        ${thumbFor(it.shot) ? `<img src="${esc(thumbFor(it.shot))}" loading="lazy" decoding="async" alt="">` : `<video src="${esc(it.url)}#t=${(it.start + 1).toFixed(1)}" preload="metadata" muted></video>`}
         <div class="tl-h l" data-h="l" title="Arrastra para cortar el inicio"></div><div class="tl-h r" data-h="r" title="Arrastra para cortar el final"></div>
         <span class="tl-name">${String(c.shot).padStart(2, '0')}${speedOf(c) !== 1 ? ' · ' + speedOf(c) + '×' : ''}${c.zoom ? ' 🔍' : ''}</span><span class="tl-dur">${it.dur.toFixed(1)}s</span>
       </div>`;
@@ -708,12 +725,12 @@
       // Corrección de desfase: si la voz se adelantó/atrasó más de 0.25 s, se realinea.
       const na = $('edNarr');
       const want = ((v.currentTime - item.start) / item.speed - NARR_START) * item.narr.tempo;
-      if (!na.paused && want >= 0 && want < na.duration && Math.abs(na.currentTime - want) > 0.25) { try { na.currentTime = want; } catch (_) {} }
+      if (!na.paused && want >= 0 && want < na.duration && Math.abs(na.currentTime - want) > (IS_TOUCH ? 0.45 : 0.25)) { try { na.currentTime = want; } catch (_) {} }
     }
     if (st.scrubShot !== item.shot) {
       st.scrubShot = item.shot; paintScrub();
       const si = st.plan.clips.findIndex((x) => x.shot === item.shot);
-      if (si >= 0 && si !== st.sel) { st.sel = si; renderClips(); }
+      if (si >= 0 && si !== st.sel) { st.sel = si; if (st.playing) markSelected(); else renderClips(); }
     }
     $('edScrub').value = v.currentTime; $('edScrubTime').textContent = v.currentTime.toFixed(2) + 's / 8.00s';
     movePlayhead();
