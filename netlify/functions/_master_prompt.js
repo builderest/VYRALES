@@ -59,23 +59,26 @@ Con un solo JSON el sistema produce TODO, sin que nadie escriba más prompts:
 - FOTO DE CADA PERSONAJE (retrato de cara, ropa neutra, en el estilo visual): sale de fixed_prompt_tag + visual_style. Describe la cara con detalle (forma, piel, ojos, cejas, pelo con color y largo, rasgos únicos como lunares o cicatrices, edad, complexión). Dos personajes nunca deben poder confundirse.
 - IMAGEN FIJA DE CADA LUGAR (el set vacío que se reutiliza en todas sus tomas): sale de locations.<lugar>.visual. Describe paredes, colores, muebles, objetos fijos y luz; superficies lisas, sin letreros ni texto.
 - CUADRO INICIAL DE CADA TOMA (la imagen desde la que arranca el video): sale de start_en + las fotos de los personajes + la imagen del lugar + el vestuario.
-- VIDEO DE CADA TOMA (Veo): sale de camera + start_en + action_en + dialogue (con la voz fija del personaje) + reaction_en + ambient + sfx.
-- AUDIO: voz de cada personaje = profile.voice; sonido del lugar = locations.<lugar>.ambient.
+- VIDEO DE CADA TOMA (Veo, sin audio): sale de camera + start_en + action_en + dialogue + reaction_en. El personaje que habla mueve la boca en los segundos 0–6.
+- VOCES (automático): cada personaje, extra y narrador recibe UNA voz fija y distinta (Gemini TTS) que conserva en toda la novela. El sistema la elige leyendo profile.voice / extras.voice: escribe SIEMPRE sexo (male/female), edad aproximada y timbre (deep, raspy, warm, sharp, whispering…). Cada línea se dobla con la emoción de action_en, y encima va la música.
+- EFECTO DE VOZ (opcional): profile.voice_fx o extras.<x>.voice_fx = "demon" (demonios, Satanás, monstruos: voz grave doble con eco), "divine" (Dios, ángeles, voces celestiales: reverberación amplia), "echo" (voces lejanas, sueños, recuerdos) o "none". Si no lo pones, se elige solo según quién es.
 Si algo no está escrito en el JSON, la IA lo inventa distinto en cada toma. Escríbelo.
 
 === REGLAS OBLIGATORIAS (si rompes una, el sistema rechaza la novela) ===
 1. slug: solo minúsculas, números y guion bajo (3–60 caracteres). Único para esta novela.
 2. Todos los textos para la IA de video van en INGLÉS: visual_style, negative, locations, extras, fixed_prompt_tag, default_outfit, voice, wardrobe, camera, start_en, action_en, reaction_en, sfx. Los textos para personas van en ESPAÑOL: title, synopsis, tone, description, personality, wants, fear, arc, scene_es, continuity, dialogue.line.
 3. NUNCA uses comillas dobles (") dentro de ningún texto. En español usa comillas tipográficas “ ” o ninguna.
-4. Personajes (máx. 6):
+4. Personajes: TODOS los que aparecen con nombre en cuadro, sin límite (cada uno recibe su foto de cara automáticamente; uno que se ve en cuadro y no está aquí NO se puede generar).
    - key: un solo nombre (ej. "Valentina"). name: nombre completo.
+   - Seres sobrenaturales, míticos o religiosos: descríbelos como el público los imagina, para que se reconozcan al instante (un demonio con cuernos, piel roja, ojos de fuego y alas de murciélago; un ángel con alas blancas y luz; una figura divina luminosa). Si un ser solo se oye y nunca se ve, va como extra con "voiceover": true, no como personaje.
    - role: "protagonista", "antagonista" o "secundario".
    - fixed_prompt_tag: EMPIEZA con "<key>," y describe SOLO identidad física fija (edad, piel, pelo, ojos, rasgos únicos, complexión). NUNCA ropa.
    - profile.default_outfit: ropa habitual en inglés.
-   - profile.voice: voz en inglés, siempre la misma (ej. "a warm, slightly husky young female voice with a soft Mexican accent").
+   - profile.voice: voz en inglés, siempre la misma, con sexo + edad + timbre (ej. "a warm, slightly husky young female voice in her 20s with a soft Mexican accent"). Dos personajes nunca con la misma descripción de voz.
+   - profile.voice_fx (opcional): "demon", "divine", "echo" o "none".
    - profile: age, archetype, personality, wants, fear, arc.
 5. story_bible.locations: cada set con "visual" (descripción visual fija en inglés) y "ambient" (sonido ambiente en inglés). Reutiliza sets: 6 a 18 en total.
-6. story_bible.extras: personajes sin nombre que hablan (consejero, guardia, juez…): { "who": "…", "voice": "…" } en inglés. Los extras no van en "characters" de la toma; se describen en action_en.
+6. story_bible.extras: personajes sin nombre que hablan (consejero, guardia, juez…): { "who": "…", "voice": "…" } en inglés (voice con sexo + edad + timbre; voice_fx opcional). Los extras no van en "characters" de la toma; se describen en action_en.
 7. story_bible.rules: shots_per_episode = número de tomas pedido; shot_seconds = 8; max_dialogue_words_per_shot = 15; max_characters_per_shot = 2; max_words_per_episode = 450.
    - Si en MI IDEA pido "usar fotos de referencia" (caras idénticas en todas las tomas): reference_images = true, shot_model = "veo_fast", cliffhanger_model = "veo_fast" (Veo Lite NO acepta fotos).
    - Si no lo pido: reference_images = false, shot_model = "veo_lite", cliffhanger_model = "veo_lite".
@@ -85,7 +88,7 @@ Si algo no está escrito en el JSON, la IA lo inventa distinto en cada toma. Esc
 8b. Audio: describe solo los sonidos de quienes están en cuadro. Nunca pidas risas, aplausos ni voces de fondo si no hay gente que las haga.
 9. Cada toma:
    - characters: máximo 2 personajes con nombre en cuadro (usa sus key).
-   - dialogue: UN solo hablante por toma ({ "speaker": key o extra, "line": "…" }) o null. Máximo 15 palabras. El hablante debe estar en characters (o ser un extra).
+   - dialogue: UN solo hablante por toma ({ "speaker": key o extra, "line": "…" }) o null. Máximo 15 palabras, IDEAL 8 a 12 (la voz debe caber en ~6 segundos aunque el personaje hable lento y grave). El hablante debe estar en characters (o ser un extra).
    - camera: encuadre + movimiento simple (ej. "Close-up, static camera", "Medium two-shot, slow push-in").
    - start_en (OBLIGATORIO): el CUADRO INICIAL congelado, exacto, en inglés (máx. ~60 palabras). Con él se genera la imagen y desde ella arranca el video. Debe decir: dónde está cada personaje en el cuadro (izquierda / derecha / centro / primer plano; enfocado o desenfocado), hacia dónde mira cada uno, qué tiene cada uno en las manos (o "hands empty"), y la luz/hora si el lugar se repite en tomas seguidas (la luz debe ser la misma).
    - action_en: lo que pasa de 0 a 6 s DESPUÉS del cuadro inicial, UNA acción principal. NUNCA repitas algo que start_en ya muestra hecho (si start_en tiene la charola fuera del horno, action_en no puede decir "saca la charola"; si alguien ya está dentro, no "entra"). Si hay diálogo, action_en DEBE decir a quién le habla y a dónde mira el que habla ("speaks to Mateo, her eyes on him", "speaks into the phone", "speaks to herself, eyes on the letter"). Nadie le habla ni mira a la cámara.

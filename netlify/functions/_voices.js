@@ -152,4 +152,33 @@ function fxFor(key, info) {
   return '';
 }
 
-module.exports = { fxFor, CATALOG, ALL_VOICES, assignVoices, seriesSpeakers, speakerInfo, actingStyle };
+// Reparto completo para una serie nueva o reimportada (lo usa import-series): voz distinta
+// por hablante + efecto (el que pida el JSON en profile.voice_fx / extras.voice_fx, o el
+// automático). Respeta lo elegido a mano en el dashboard (auto === false / fx_manual).
+function buildVoiceCast({ episodes = [], characters = [], storyBible = {}, existing = {} }) {
+  const speakers = seriesSpeakers({ episodes, characters, storyBible });
+  const keep = {};
+  Object.entries(existing || {}).forEach(([k, v]) => { if (v && v.auto === false) keep[k] = v; });
+  const assigned = assignVoices(speakers, keep);
+  const vc = {};
+  for (const x of speakers) {
+    const old = existing && existing[x.key];
+    const explicitFx = explicitFxOf(x.key, characters, storyBible);
+    vc[x.key] = {
+      voice: keep[x.key] ? keep[x.key].voice : assigned[x.key],
+      auto: !keep[x.key],
+      fx: old && old.fx_manual ? old.fx : (explicitFx != null ? explicitFx : fxFor(x.key, x)),
+      ...(old && old.fx_manual ? { fx_manual: true } : {})
+    };
+  }
+  return vc;
+}
+function explicitFxOf(key, characters, storyBible) {
+  const ex = storyBible.extras && storyBible.extras[key];
+  if (ex && typeof ex === 'object' && ex.voice_fx != null) return ex.voice_fx === 'none' ? '' : String(ex.voice_fx);
+  const row = characters.find((r) => (r.profile && r.profile.key) === key || r.name === key);
+  if (row && row.profile && row.profile.voice_fx != null) return row.profile.voice_fx === 'none' ? '' : String(row.profile.voice_fx);
+  return null;
+}
+
+module.exports = { buildVoiceCast, fxFor, CATALOG, ALL_VOICES, assignVoices, seriesSpeakers, speakerInfo, actingStyle };

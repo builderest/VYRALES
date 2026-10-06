@@ -18,6 +18,8 @@
 //   - Un episodio que ya pasó a producción (generando_media, en_revision, publicado,
 //     archivado) NUNCA se sobreescribe.
 //   - No llama a Veo ni a ninguna API de pago.
+const { buildVoiceCast } = require('./_voices');
+const { TTS_MODEL_DEFAULT } = require('./_tts');
 const { getSupabaseClient } = require('./_supabase');
 const { validateSeries, toEpisodeRows, buildImagePrompt } = require('./_series');
 const { buildMasterPrompt } = require('./_master_prompt');
@@ -103,13 +105,23 @@ exports.handler = async (event) => {
     }
 
     const validation = validateSeries(data);
-    const { data: existingSeries } = await supabase.from('series').select('id').eq('slug', data.slug || '').maybeSingle();
+    const { data: existingSeries } = await supabase.from('series').select('id, story_bible').eq('slug', data.slug || '').maybeSingle();
 
     if (!validation.ok) {
       return json(422, { error: 'La novela no pasó la validación. No se importó nada.', ...summarize(data, validation, existingSeries) });
     }
 
     const rows = toEpisodeRows(data);
+    // Voces: por defecto CADA personaje con su voz fija (Gemini TTS) y video sin audio; el
+    // reparto se asigna solo. Al reimportar se conserva lo elegido a mano en el dashboard.
+    function storyBibleWithVoices(d, existing) {
+      const prev = (existing && existing.story_bible) || {};
+      const sb = Object.assign({}, d.story_bible);
+      sb.narration = sb.narration || prev.narration || { engine: 'gemini_tts', cast: true, video_audio: 'none', voice: 'Algenib', model: TTS_MODEL_DEFAULT };
+      const chars = (d.characters || []).map((c) => ({ name: c.name, role: c.role, fixed_prompt_tag: c.fixed_prompt_tag, profile: Object.assign({ key: c.key }, c.profile || {}) }));
+      sb.voice_cast = buildVoiceCast({ episodes: d.episodes || [], characters: chars, storyBible: sb, existing: sb.voice_cast || prev.voice_cast || {} });
+      return sb;
+    }
     if (body.dry_run) {
       return json(200, { dry_run: true, ...summarize(data, validation, existingSeries) });
     }
@@ -124,7 +136,7 @@ exports.handler = async (event) => {
           genre: data.genre || null,
           language: data.language || 'es',
           synopsis: data.synopsis || null,
-          story_bible: data.story_bible,
+          story_bible: storyBibleWithVoices(data, existingSeries),
           is_active: true,
           updated_at: new Date().toISOString()
         },
