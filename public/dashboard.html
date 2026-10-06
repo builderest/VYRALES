@@ -1083,7 +1083,7 @@
           '<span class="block font-bold">' + label + '</span><span class="block">' + sub + '</span></button>';
         return '<div class="w-full mt-3"><p class="text-[10px] font-mono text-slate-500 mb-1">PROVEEDOR</p>' +
           '<div class="flex gap-2 mb-2">' + provBtn('google', 'Google directo', 'cuota 10/día por modelo') + provBtn('fal', 'fal.ai', hasFal ? 'sin límite diario' : 'sin FAL_KEY') + '</div>' +
-          '<p class="text-[10px] font-mono text-slate-500 mb-1">MODELO DE VIDEO PARA PRODUCIR</p>' +
+          '<p class="text-[10px] font-mono text-slate-500 mb-1">MODELO DE VIDEO PARA PRODUCIR · ' + (silentVideo() ? '<span class="text-cyber-emerald">SIN AUDIO (las voces van aparte)</span>' : '<span class="text-cyber-gold">CON AUDIO DE VEO</span>') + '</p>' +
           '<div class="flex gap-2">' + opt('veo_lite', 'Veo Lite') + opt('veo_fast', 'Veo Fast') + '</div>' +
           (veoModelChoice && veoModelChoice !== base ? '<p class="text-[10px] text-cyber-gold mt-1">Solo para esta sesión; la serie sigue en ' + esc(base.replace('veo_', 'Veo ')) + '.</p>' : '') +
         '</div>';
