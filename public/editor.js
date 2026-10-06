@@ -211,8 +211,15 @@
     v.addEventListener('ended', () => next());
     // La voz va en un archivo aparte: si el video se queda cargando (buffering), la voz y la
     // música esperan; cuando el video sigue, la voz se vuelve a alinear con el video.
-    v.addEventListener('waiting', () => { $('edNarr').pause(); $('edMusic').pause(); st.buffering = true; });
+    // En el celular cada cambio de toma dispara un 'waiting' corto mientras carga el clip: pausar
+    // la música y la voz ahí mismo hacía que el audio se cortara en cada corte. Ahora solo se
+    // pausan si la carga dura más de 0.8 s (buffering de verdad).
+    v.addEventListener('waiting', () => {
+      clearTimeout(st.waitT);
+      st.waitT = setTimeout(() => { $('edNarr').pause(); $('edMusic').pause(); st.buffering = true; }, 800);
+    });
     v.addEventListener('playing', () => {
+      clearTimeout(st.waitT);
       if (!st.buffering) return;
       st.buffering = false;
       if (!st.playing) return;
@@ -766,7 +773,8 @@
     const nextClip = st.seq.slice(i + 1).find((x) => x.type === 'clip');
     if (nextClip && $('edPre').getAttribute('src') !== nextClip.url) { $('edPre').setAttribute('src', nextClip.url); $('edPre').load(); }
     if (item.narr) { const na = $('edNarr'); if (na.getAttribute('src') !== item.narr.url) { na.setAttribute('src', item.narr.url); na.load(); } }
-    const go = () => { v.currentTime = item.start; v.volume = Math.min(1, item.volume); v.playbackRate = item.speed; if (st.playing) v.play().catch(() => {}); };
+    // iPhone ignora .volume (siempre suena a 1): las tomas que deben ir sin su audio se silencian con .muted.
+    const go = () => { v.currentTime = item.start; v.muted = !(item.volume > 0.01); v.volume = Math.min(1, item.volume); v.playbackRate = item.speed; if (st.playing) v.play().catch(() => {}); };
     if (v.getAttribute('src') !== item.url) { v.setAttribute('src', item.url); v.addEventListener('loadedmetadata', go, { once: true }); v.load(); } else go();
   }
   function next() {
@@ -774,7 +782,7 @@
     playItem(st.idx + 1);
   }
   function stop() {
-    st.playing = false; clearTimeout(st.timer);
+    st.playing = false; clearTimeout(st.timer); clearTimeout(st.waitT);
     $('edVideo').pause(); $('edMusic').pause(); $('edNarr').pause(); duck(false); $('edFade').style.opacity = 0;
     $('edPlayBtn').innerHTML = '<i class="fa-solid fa-play mr-1"></i>Ver todo';
   }
@@ -994,7 +1002,7 @@
       const v = $('edVideo');
       if (it && it.type === 'clip' && v.currentTime > it.start + 0.05 && v.currentTime < it.end - 0.1) {
         st.playing = true; it._narrOn = false; $('edPlayBtn').innerHTML = '<i class="fa-solid fa-pause mr-1"></i>Pausa';
-        v.playbackRate = it.speed; v.volume = Math.min(1, it.volume); v.play().catch(() => {});
+        v.playbackRate = it.speed; v.muted = !(it.volume > 0.01); v.volume = Math.min(1, it.volume); v.play().catch(() => {});
         if (st.plan.audio.music_url) $('edMusic').play().catch(() => {});
       } else start(st.idx < st.seq.length - 1 ? st.idx : 0);
     },
