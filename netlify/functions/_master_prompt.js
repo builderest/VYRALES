@@ -46,7 +46,7 @@ function buildMasterPrompt(sample) {
 - Nicho / género: [ESCRIBE AQUÍ]
 - Idea o premisa (opcional): [ESCRIBE AQUÍ o deja "inventa tú"]
 - Número de episodios: [12]
-- Tomas por episodio: [10] (cada toma dura 8 segundos; recomendado 8 a 11 = episodios de 60–90 s, que retienen mucho mejor que los de 2–3 min)
+- Tomas por episodio: [12] (cada toma dura 8 segundos; 12 ≈ 95 s. Menos tomas = más retención en Facebook; YouTube aguanta episodios más largos)
 - Estilo visual: [ej. "High-end 3D animated feature film style…" o "Photorealistic cinematic…"]
 - ¿Usar fotos de referencia de los personajes? [sí / no] (sí = caras idénticas pero cuesta ~3.7× más: Veo Fast)
 - Idioma de los diálogos: español de México
