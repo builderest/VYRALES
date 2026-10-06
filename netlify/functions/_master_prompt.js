@@ -46,7 +46,7 @@ function buildMasterPrompt(sample) {
 - Nicho / género: [ESCRIBE AQUÍ]
 - Idea o premisa (opcional): [ESCRIBE AQUÍ o deja "inventa tú"]
 - Número de episodios: [12]
-- Tomas por episodio: [12] (cada toma dura 8 segundos)
+- Tomas por episodio: [10] (cada toma dura 8 segundos; recomendado 8 a 11 = episodios de 60–90 s, que retienen mucho mejor que los de 2–3 min)
 - Estilo visual: [ej. "High-end 3D animated feature film style…" o "Photorealistic cinematic…"]
 - ¿Usar fotos de referencia de los personajes? [sí / no] (sí = caras idénticas pero cuesta ~3.7× más: Veo Fast)
 - Idioma de los diálogos: español de México
@@ -97,6 +97,12 @@ Si algo no está escrito en el JSON, la IA lo inventa distinto en cada toma. Esc
    - sfx (opcional): efecto de sonido puntual en inglés que ocurra DURANTE esta toma (no el de algo que ya pasó antes del cuadro inicial).
    - wardrobe (opcional): solo si la ropa cambia en ESA toma.
 10. Diálogo: al menos 80% de las tomas con diálogo. Conversaciones en plano/contraplano (alternar hablantes entre tomas). Frases naturales, con emoción, nada de explicar la trama.
+10a. GANCHO DE LOS PRIMEROS 3 SEGUNDOS (lo más importante para que el video se vea): en las redes la mayoría decide en 3 s si sigue mirando. La TOMA 1 de CADA episodio:
+   - Empieza en plena acción o con una imagen impactante e inesperada (nunca un paisaje vacío, una presentación lenta, un "érase una vez" ni un resumen del episodio anterior).
+   - Su dialogue es la frase más fuerte del episodio: una pregunta intrigante, un dato sorprendente o una tensión directa (máx. 12 palabras). En documentales, el narrador abre con el dato más asombroso, no con contexto.
+   - camera: plano cercano o medio, con un movimiento lento hacia el sujeto (push-in); el sujeto ya está en cuadro desde el segundo 0.
+   - Desde el episodio 2: retoma el cliffhanger anterior directamente en la toma 1 (la consecuencia, no una explicación).
+   - Las tomas 2–3 cumplen la promesa de la toma 1 enseguida (nada de rodeos); el contexto va después.
 11. Cada episodio termina en GANCHO (cliffhanger) sin resolver. El último episodio cierra el arco principal pero deja un gancho para temporada 2.
 12. continuity de cada episodio: summary, last_cliffhanger, pending_state (español). La historia completa debe ser coherente de principio a fin: nadie sabe algo antes de descubrirlo, los objetos y heridas persisten, la ropa coincide con el momento.
 12a. Documentales / narrador en off: el narrador va en story_bible.extras con "voiceover": true (ej. "Narrador": { "who": "an off-screen documentary narrator", "voice": "…", "voiceover": true }). En sus tomas dialogue.speaker = "Narrador" y action_en describe SOLO lo que se ve (nunca "the narrator speaks…"): nadie en cuadro habla ni mueve la boca.
@@ -109,7 +115,7 @@ Si algo no está escrito en el JSON, la IA lo inventa distinto en cada toma. Esc
 === EJEMPLO DE ESTRUCTURA (respeta nombres de campos y tipos; el contenido es solo ilustrativo) ===
 ${buildExample(sample)}
 
-Antes de entregar, revisa tú mismo cada regla toma por toma (número de tomas, 1 hablante, ≤15 palabras, ≤2 personajes, sin comillas dobles, campos completos, start_en con posición/mirada/manos, action_en que no repite el start_en y dice a quién se habla, reaction_en posible en el mismo plano) y corrige lo que falle. Entrega solo el JSON final.`;
+Antes de entregar, revisa tú mismo cada regla toma por toma (número de tomas, toma 1 con gancho fuerte, 1 hablante, ≤15 palabras, ≤2 personajes, sin comillas dobles, campos completos, start_en con posición/mirada/manos, action_en que no repite el start_en y dice a quién se habla, reaction_en posible en el mismo plano) y corrige lo que falle. Entrega solo el JSON final.`;
 }
 
 module.exports = { buildMasterPrompt };
