@@ -8,6 +8,8 @@ const TTS_PRICE_PER_M = { // USD por 1M tokens (se usa el precio más alto publi
   'gemini-3.8-flash-lite-tts': { input: 1.0, output: 12.0 }
 };
 const DEFAULT_VOICE = 'Charon';
+const FALLBACK_MODEL = 'gemini-3.8-flash-lite-tts';
+let dailyLimitHitAt = 0; // en esta misma ejecución, no volver a intentar el modelo agotado
 // Ritmo: con estilo "pausado" las frases de 13 palabras duraban 7.5–8.5 s y no caben en una
 // toma de 8 s; se pide que la frase completa dure unos 6 segundos.
 const DEFAULT_STYLE = 'Narrador de documental de naturaleza: voz grave, cálida y resonante, cautivadora, con énfasis suave en las palabras clave y un tono de asombro y misterio. Ritmo fluido, sin pausas largas: la frase completa dura unos 6 segundos. Pronuncia cada palabra con total claridad, en especial los números.';
@@ -48,7 +50,9 @@ async function callTts(body) {
 }
 
 // Devuelve { wav: Buffer, seconds, costUsd, model, voice }.
-async function synthesize({ text, voice = DEFAULT_VOICE, style = DEFAULT_STYLE, model = TTS_MODEL_DEFAULT, log = console.log }) {
+async function synthesize({ text, voice = DEFAULT_VOICE, style = DEFAULT_STYLE, model: requestedModel = TTS_MODEL_DEFAULT, log = console.log }) {
+  let model = requestedModel;
+  if (model !== FALLBACK_MODEL && Date.now() - dailyLimitHitAt < 6 * 3600000) model = FALLBACK_MODEL;
   const line = String(text || '').trim();
   if (!line) throw new Error('No hay texto para narrar.');
   const body = {
@@ -65,7 +69,17 @@ async function synthesize({ text, voice = DEFAULT_VOICE, style = DEFAULT_STYLE, 
       json = await callTts(body);
       break;
     } catch (err) {
-      if ((err.status !== 429 && !(err.status >= 500)) || attempt >= 5) throw err;
+      // Límite DIARIO del modelo (Nivel 1: 100 frases/día con gemini-3.8-flash-tts): esperar
+      // no sirve (pide ~20 h). Se cambia al modelo Lite, que tiene su propia cuota.
+      if (err.status === 429 && /per day/i.test(err.message) && body.model !== FALLBACK_MODEL) {
+        log(`[tts] ${body.model} llegó a su límite diario; sigo con ${FALLBACK_MODEL}.`);
+        dailyLimitHitAt = Date.now();
+        body.model = FALLBACK_MODEL;
+        model = FALLBACK_MODEL;
+        attempt = 0;
+        continue;
+      }
+      if ((err.status !== 429 && !(err.status >= 500)) || attempt >= 5 || /per day/i.test(err.message)) throw err;
       const m = /retry in (\d+(?:\.\d+)?)s/i.exec(err.message);
       const wait = Math.min(70, m ? Number(m[1]) + 2 : 20 * attempt);
       log(`[tts] límite/servidor ocupado, reintento ${attempt} en ${wait} s:`, err.message.slice(0, 120));
