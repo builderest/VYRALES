@@ -151,7 +151,21 @@ async function createKeyframe(supabase, { series, episode, shot, characters, log
   // Primero se revisan las fotos de cara (sin gastar nada): antes se creaba la imagen del
   // lugar y DESPUÉS fallaba por falta de foto.
   const sinFoto = (shot.characters || []).filter((name) => { const r = (characters || []).find((x) => x.name === name); return !r || !r.reference_image_url; });
-  if (sinFoto.length) throw new Error(`Falta la foto de cara de: ${sinFoto.join(', ')}. Genérala en el Elenco antes de crear el cuadro.`);
+  if (sinFoto.length) {
+    // Automático: si a un personaje le falta la foto de cara, se genera aquí (~$0.067) en vez
+    // de parar la producción (Job T2: Dios no tenía foto y todo se detenía).
+    const { createCharacterPhoto } = require('./_character_photo');
+    const { data: rows, error: rErr } = await supabase.from('characters').select('id, name, role, fixed_prompt_tag, profile, reference_image_url, sort_order').eq('series_id', seriesId);
+    if (rErr) throw rErr;
+    for (const name of sinFoto) {
+      const row = (rows || []).find((r) => r.name === name);
+      if (!row) throw new Error(`El personaje "${name}" no existe en el Elenco.`);
+      log('falta la foto de cara de', name, '— generándola automáticamente...');
+      const url = await createCharacterPhoto(supabase, { series: Object.assign({ id: seriesId }, series), character: row, allCharacters: rows, log });
+      row.reference_image_url = url;
+      (characters || []).forEach((c) => { if (c.name === name) c.reference_image_url = url; });
+    }
+  }
   const locs = (series.visual_memory && series.visual_memory.locations) || {};
   const hasLocDef = !!(series.story_bible && series.story_bible.locations && series.story_bible.locations[shot.location]);
   if (shot.location && hasLocDef && !(locs[shot.location] && locs[shot.location].url)) {

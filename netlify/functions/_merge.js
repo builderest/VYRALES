@@ -159,7 +159,22 @@ async function mergeWithNarration(supabase, { episode, series, log }) {
   if (error || !fresh) throw error || new Error('No se pudo releer el episodio.');
   // Sin música elegida en el editor → la última pista de la biblioteca de la serie (si hay).
   const plan = fresh.edit_plan || {};
-  const lib = (series.story_bible && series.story_bible.music_tracks) || [];
+  let lib = (series.story_bible && series.story_bible.music_tracks) || [];
+  if (!(plan.audio && plan.audio.music_url) && !lib.length) {
+    // Automático: la serie no tiene música → se genera una pista con Lyria (~$0.08) según el
+    // tono y el género, y queda en la biblioteca para los demás episodios.
+    try {
+      const sbx = series.story_bible || {};
+      const prompt = `Instrumental background score, no vocals, for a ${series.genre || 'dramatic'} vertical short series. Mood: ${String(sbx.tone || '').slice(0, 300)}. Cinematic and emotional, steady low intensity so a voice can speak over it, gradual build, no abrupt drops.`;
+      log('la serie no tiene música: generando una pista con Lyria...');
+      const { handler: makeMusic } = require('./music-generate-background');
+      const mr = await makeMusic({ httpMethod: 'POST', body: JSON.stringify({ series: series.slug, prompt, name: 'Tema de ' + (series.title || series.slug) }) });
+      if (mr.statusCode === 200) {
+        const { data: sNow } = await supabase.from('series').select('story_bible').eq('slug', series.slug).single();
+        lib = (sNow && sNow.story_bible && sNow.story_bible.music_tracks) || [];
+      } else log('no se pudo generar música (el video sale sin música):', mr.body);
+    } catch (err) { log('no se pudo generar música (el video sale sin música):', err.message); }
+  }
   if (!(plan.audio && plan.audio.music_url) && lib[0] && lib[0].url) {
     fresh.edit_plan = Object.assign({}, plan, { audio: Object.assign({ normalize: true, duck: true, music_volume: 0.2 }, plan.audio || {}, { music_url: lib[0].url, music_name: lib[0].name }) });
     log('música de la biblioteca de la serie:', lib[0].name);

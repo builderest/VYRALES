@@ -33,7 +33,7 @@ exports.handler = async (event) => {
   try {
     const { data: series, error: seriesError } = await supabase
       .from('series')
-      .select('id, slug, story_bible')
+      .select('id, slug, title, genre, story_bible')
       .eq('slug', seriesSlug)
       .single();
     if (seriesError || !series) throw seriesError || new Error('Serie no encontrada');

@@ -115,7 +115,7 @@ exports.handler = async (event) => {
   try {
     const { data: series, error: seriesError } = await supabase
       .from('series')
-      .select('id, slug, title, story_bible, visual_memory')
+      .select('id, slug, title, genre, story_bible, visual_memory')
       .eq('slug', seriesSlug)
       .single();
     if (seriesError || !series) throw seriesError || new Error('Serie no encontrada');
@@ -380,6 +380,13 @@ exports.handler = async (event) => {
         });
         finalRender = mergeResult.asset;
         console.log(LOG, 'video final automático listo ✅:', finalRender.storage_path);
+        // Automático: textos de publicación (descripciones, hashtags, título YouTube) y portada
+        // (~$0.001). Publicar en las redes sigue siendo un botón: es público y no se deshace.
+        try {
+          const { handler: makePackage } = require('./publish-package-background');
+          const pr = await makePackage({ httpMethod: 'POST', body: JSON.stringify({ episode_id: episode.id }) });
+          console.log(LOG, 'paquete de publicación:', pr.statusCode === 200 ? 'listo ✅' : pr.body);
+        } catch (err) { console.error(LOG, 'no se pudo preparar el paquete de publicación (usa el botón):', err.message); }
       } catch (err) {
         mergeError = err.message;
         console.error(LOG, 'la unión automática del video final falló (las tomas sí quedaron guardadas — usa el botón "Unir" del dashboard para reintentar):', err, err.stderr || '');
