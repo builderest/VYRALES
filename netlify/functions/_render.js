@@ -261,10 +261,22 @@ function resolvePlan(episode) {
   return plan;
 }
 
+// Con límite de tiempo y 3 intentos: una descarga que se quedaba colgada (sin error) dejaba
+// la unión "corriendo" para siempre (Job EP1: se trabó en la toma 15).
 async function download(url, dest) {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error('No se pudo descargar ' + url + ' (HTTP ' + res.status + ')');
-  fs.writeFileSync(dest, Buffer.from(await res.arrayBuffer()));
+  let lastErr;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(60000) });
+      if (!res.ok) throw new Error('No se pudo descargar ' + url + ' (HTTP ' + res.status + ')');
+      fs.writeFileSync(dest, Buffer.from(await res.arrayBuffer()));
+      return;
+    } catch (err) {
+      lastErr = err;
+      if (attempt < 3) await new Promise((r) => setTimeout(r, 2000 * attempt));
+    }
+  }
+  throw new Error('No se pudo descargar ' + url + ' tras 3 intentos: ' + (lastErr && lastErr.message));
 }
 
 // ---------- Episodio ----------
