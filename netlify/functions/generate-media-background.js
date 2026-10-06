@@ -319,6 +319,16 @@ exports.handler = async (event) => {
 
         console.log(LOG, `toma ${scene.number}/${total}: OK ✅ (asset ${asset.id})`);
         results.push({ status: 'fulfilled', value: { shot: scene.number, model, costUsd, assetId: asset.id } });
+        // Voces fijas: la voz de ESTA toma se genera junto con su video (~$0.004), así cada
+        // toma ya suena en la vista previa mientras avanza la producción. Un fallo de voz no
+        // detiene el video (al unir se reintenta).
+        if (narrationConfig(series.story_bible)) {
+          try {
+            const { handler: narrate } = require('./narration-background');
+            const nr = await narrate({ httpMethod: 'POST', body: JSON.stringify({ episode_id: episode.id, shot: scene.number, if_stale: true }) });
+            console.log(LOG, `toma ${scene.number}/${total}: voz`, nr.statusCode === 200 ? 'lista ✅' : nr.body);
+          } catch (err) { console.error(LOG, `toma ${scene.number}/${total}: la voz falló (se reintenta al unir):`, err.message); }
+        }
       } catch (shotErr) {
         console.error(LOG, `toma ${scene.number}/${total}: FALLÓ ❌`, shotErr.code === 'VEO_QUOTA' ? shotErr.message : shotErr);
         results.push({ status: 'rejected', reason: shotErr });
@@ -338,17 +348,6 @@ exports.handler = async (event) => {
     // anteriores + las de esta). Si falta alguna (fallo o toma de prueba suelta), vuelve a
     // "guion_generado" y el botón Producir solo genera las que faltan.
     const allDone = doneShots.size + succeeded.length >= total;
-    // Toma suelta / corrida parcial con voces fijas: la voz de esas tomas se genera ya
-    // (~$0.004 c/u) para que la vista previa suene sincronizada sin esperar a unir.
-    if (!allDone && succeeded.length && narrationConfig(series.story_bible)) {
-      const { handler: narrate } = require('./narration-background');
-      for (const v of succeeded) {
-        try {
-          const nr = await narrate({ httpMethod: 'POST', body: JSON.stringify({ episode_id: episode.id, shot: v.shot, if_stale: true }) });
-          console.log(LOG, 'voz de la toma', v.shot, nr.statusCode === 200 ? 'lista ✅' : nr.body);
-        } catch (err) { console.error(LOG, 'voz de la toma', v.shot, 'falló:', err.message); }
-      }
-    }
     // Resultado de la corrida guardado en el episodio para que el dashboard lo muestre.
     const lastRun = {
       at: new Date().toISOString(),
