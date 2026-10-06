@@ -2972,9 +2972,11 @@
                 '</div>');
             }
             const pending = sorted.filter(a => !a.approved).length;
+            window.__pendingShotIds = sorted.filter(a => !a.approved).map(a => a.id);
             shotBox.classList.toggle('hidden', !sorted.length);
             document.getElementById('shotCardsSummary').innerHTML = '<i class="fa-solid fa-film mr-2"></i>TOMAS DEL EP ' + inReview.episode_number + ' · ' + (sorted.length - pending) + '/' + sorted.length + ' aprobadas' +
-              (pending ? ' · <span class="text-cyber-gold">' + pending + ' por revisar</span>' : ' · <span class="text-cyber-emerald">todas aprobadas ✓</span>') + ' <span class="text-slate-500">▾ ver / ocultar</span>';
+              (pending ? ' · <span class="text-cyber-gold">' + pending + ' por revisar</span>' : ' · <span class="text-cyber-emerald">todas aprobadas ✓</span>') + ' <span class="text-slate-500">▾ ver / ocultar</span>' +
+              (pending ? ' <button type="button" onclick="event.preventDefault();event.stopPropagation();approveAllShots()" class="ml-2 mt-1 sm:mt-0 px-3 py-1 rounded bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/40 text-xs font-semibold"><i class="fa-solid fa-check-double mr-1"></i>Aprobar todas (' + pending + ')</button>' : '');
             // Desplegable normal: empieza cerrado y se abre/cierra con un clic (el refresco no lo toca).
             banner.innerHTML = inReview.status === 'generando_media'
               ? '<i class="fa-solid fa-spinner fa-spin mr-1"></i>Generando EP ' + inReview.episode_number + ' de "' + esc(data.series.title) + '": ' + sorted.length + ' de ' + ((inReview.shots || []).length || '?') + ' tomas listas. Puedes ir revisando las que ya salieron.'
@@ -3029,6 +3031,24 @@
           await loadDashboard();
         } catch (err) {
           alert('No se pudo aprobar: ' + err.message);
+        }
+      };
+
+      // Aprueba de una vez todas las tomas pendientes del episodio en revisión (no cuesta nada).
+      window.approveAllShots = async function() {
+        const ids = window.__pendingShotIds || [];
+        if (!ids.length) return;
+        if (!(await window.askConfirm('Aprobar las ' + ids.length + ' tomas pendientes de este episodio.\n\nNo cuesta nada; solo las marca como revisadas.'))) return;
+        try {
+          const res = await fetch('/.netlify/functions/approve-shot', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ assetIds: ids })
+          });
+          const j = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(j.error || ('HTTP ' + res.status));
+          await loadDashboard();
+        } catch (err) {
+          alert('No se pudieron aprobar: ' + err.message);
         }
       };
 
