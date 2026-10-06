@@ -89,6 +89,16 @@ function isVoiceover(ex) {
 
 // El JSON trae `dialogue` como objeto {speaker, line} o null (1 hablante por toma). Las
 // novelas viejas lo traían como array. Esto lo normaliza siempre a array de 0–1 elementos.
+// Extras que HABLAN EN CUADRO en esta toma (criados, Zofar…): no tienen foto ni fila en
+// characters, así que el cuadro inicial necesita su descripción para no inventarles la cara.
+function onScreenExtras(shot, sb) {
+  const seen = new Set();
+  return dialogueList(shot && shot.dialogue)
+    .map((d) => d.speaker)
+    .filter((k) => { const ex = extraOf(sb || {}, k); if (!ex || isVoiceover(ex) || seen.has(k)) return false; seen.add(k); return true; })
+    .map((k) => ({ key: k, who: extraOf(sb, k).who }));
+}
+
 function dialogueList(d) {
   if (!d) return [];
   return Array.isArray(d) ? d : [d];
@@ -415,7 +425,7 @@ function buildShotPrompt(shot, characterRows, storyBible) {
     parts.push(
       (voExtra
         // Narrador en off: la única voz es la narración; los de cuadro no emiten sonidos de voz.
-        ? `The only human voice is the voice-over narration${peopleInFrame.length ? `; ${peopleInFrame.join(' and ')} make no vocal sounds at all` : ''}`
+        ? `The only human voice is the voice-over narration${peopleInFrame.length ? `; ${peopleInFrame.join(' and ')} ${peopleInFrame.length === 1 ? 'makes' : 'make'} no vocal sounds at all` : ''}`
         : `The only human sounds are the voices and breathing of ${peopleInFrame.join(' and ')}` +
           (lines.length && extraOf(sb, lines[0].speaker) ? ` and ${extraOf(sb, lines[0].speaker).who}` : '')) +
       '; any smile or chuckle stays silent and subtle. The soundtrack is intimate and quiet: no audience, no laugh track, no background crowd voices, no music.'
@@ -487,6 +497,7 @@ function effectiveShotPrompt(shot, characterRows, storyBible) {
 
 module.exports = {
   shortName,
+  onScreenExtras,
   narrationConfig,
   narrationLines,
   videoGeneratesAudio,

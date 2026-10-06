@@ -3,7 +3,7 @@
 //   2) el CUADRO INICIAL de cada toma (personajes con su foto + lugar con su imagen fija),
 //      que después Veo Lite anima. Así el video arranca con la cara, la ropa y el set
 //      correctos, aunque Lite no acepte fotos de referencia directamente.
-const { shortName } = require('./_series');
+const { shortName, onScreenExtras } = require('./_series');
 const { loadReferenceImages } = require('./_veo');
 const { MAX_CHARACTER_REFS, generateImage } = require('./_image');
 const { ensureMediaBucket, uploadFile, removeByPublicUrl } = require('./_storage');
@@ -57,6 +57,8 @@ function buildKeyframePrompt(shot, characterRows, storyBible, hasLocationRef) {
   if (names.length > 1) {
     parts.push(`There are exactly ${names.length} people: ${names.map((n) => shortName(n, characterRows)).join(' and ')}. Each one wears only their own outfit; clothing and accessories are never shared.`);
   }
+  // Personas secundarias que hablan en esta toma (sin foto): su descripción fija.
+  onScreenExtras(shot, sb).forEach((ex) => parts.push(`Also in the frame: ${ex.who.replace(/\.?$/, '')}.`));
   if (loc) {
     parts.push(`Setting: ${loc.visual.replace(/\.?$/, '.')}` + (hasLocationRef ? ' ' + SET_REF_SENTENCE : ''));
   }
