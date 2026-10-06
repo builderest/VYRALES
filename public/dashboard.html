@@ -2827,12 +2827,18 @@
           const ok = () => done(o.input ? input.value : true);
           const no = () => done(o.input ? null : !!o.notice);
           const onKey = e => { if (e.key === 'Escape') no(); if (e.key === 'Enter' && o.input) ok(); };
-          okBtn.onclick = ok;
+          // Celular: un toque "fantasma" (el mismo dedo que abrió el diálogo, o un toque doble)
+          // caía sobre "Sí, continuar" y lanzaba gastos sin querer (EP2 documental: 18 cuadros).
+          // El botón de aceptar no responde durante el primer segundo.
+          const armedAt = Date.now() + (o.notice ? 300 : 1000);
+          okBtn.disabled = true; okBtn.style.opacity = '0.4';
+          setTimeout(() => { okBtn.disabled = false; okBtn.style.opacity = ''; }, armedAt - Date.now());
+          okBtn.onclick = () => { if (Date.now() >= armedAt) ok(); };
           cancel.onclick = no;
           m.onclick = e => { if (e.target === m) no(); };
           document.addEventListener('keydown', onKey);
           m.classList.remove('hidden');
-          (o.input ? input : okBtn).focus();
+          (o.input ? input : cancel).focus();
         });
       }
       window.askConfirm = (message) => openDialog(message);
