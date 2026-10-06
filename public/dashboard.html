@@ -773,7 +773,7 @@
           '<div class="grid grid-cols-1 lg:grid-cols-2 gap-1.5">' + keys.map(k => {
             const v = vc[k] && vc[k].voice;
             return '<div class="flex items-center gap-1.5 rounded-lg border border-cyber-border px-2 py-1 text-[10px] font-mono">' +
-              '<button type="button" onclick="playVoiceSample(\'' + esc(v || '') + '\')" ' + (v ? '' : 'disabled') + ' class="text-cyber-emerald hover:text-white" title="Escuchar"><i class="fa-solid fa-play"></i></button>' +
+              '<button type="button" onclick="playVoiceSample(\'' + esc(v || '') + '\', \'' + esc((vc[k] && vc[k].fx) || '') + '\')" ' + (v ? '' : 'disabled') + ' class="text-cyber-emerald hover:text-white" title="Escuchar (con su efecto)"><i class="fa-solid fa-play"></i></button>' +
               '<span class="text-white truncate flex-1" title="' + esc(k) + ' · ' + count[k] + ' línea(s)">' + esc(k) + ' <span class="text-slate-500">×' + count[k] + '</span></span>' +
               '<select onchange="setSpeakerVoice(\'' + esc(k).replace(/'/g, '') + '\', this.value)" class="bg-slate-950 border border-slate-700 rounded px-1 py-0.5 text-[10px] text-slate-200">' + (v ? '' : '<option value="">— auto —</option>') + opts(v) + '</select>' +
               '<select onchange="setSpeakerFx(\'' + esc(k).replace(/'/g, '') + '\', this.value)" title="Efecto de voz" class="bg-slate-950 border border-slate-700 rounded px-1 py-0.5 text-[10px] ' + (vc[k] && vc[k].fx ? 'text-cyber-pink' : 'text-slate-400') + '">' +
@@ -785,7 +785,9 @@
       }
       window.setSpeakerVoice = function(speaker, voice) { if (voice) setNarration({ speaker, speaker_voice: voice }); };
       window.setSpeakerFx = function(speaker, fx) { setNarration({ speaker, speaker_fx: fx }); };
-      window.playVoiceSample = function(v) { const a = window.__voiceSample || (window.__voiceSample = new Audio()); a.src = 'voces/voz_' + v + '.mp3'; a.play().catch(() => {}); };
+      // Muestra de la voz; con efecto (demonio / divina / eco) usa la muestra ya procesada con el
+      // mismo filtro que se aplica a las líneas (public/voces/voz_<Voz>__<efecto>.mp3).
+      window.playVoiceSample = function(v, fx) { const a = window.__voiceSample || (window.__voiceSample = new Audio()); a.src = 'voces/voz_' + v + (fx ? '__' + fx : '') + '.mp3'; a.play().catch(() => {}); };
       window.setNarration = async function(patch) {
         const cfg = narrationCfg(lastLoadedData && lastLoadedData.series);
         const done = (lastLoadedData.episodes || []).reduce((n, e) => n + (e.shots || []).filter(sh => sh.narration && sh.narration.url).length, 0);
