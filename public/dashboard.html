@@ -372,6 +372,12 @@
                 <div id="copyTextsInner" class="p-4 pt-0 space-y-3"></div>
             </details>
 
+            <!-- Publicar en redes (TikTok / Instagram / Facebook / YouTube): desplegable -->
+            <details id="publishDetails" class="mb-4 rounded-xl border border-cyber-pink/40 bg-cyber-darker/30 hidden">
+                <summary id="publishSummary" class="cursor-pointer list-none px-4 py-3 text-sm font-mono text-cyber-pink hover:text-white select-none"></summary>
+                <div id="publishInner" class="p-4 pt-0"></div>
+            </details>
+
             <!-- Tomas del episodio en revisión: desplegable (cerrado si ya están todas aprobadas) -->
             <details id="shotCardsDetails" class="mb-6 rounded-xl border border-cyber-border bg-cyber-darker/30 hidden">
                 <summary id="shotCardsSummary" class="cursor-pointer list-none px-4 py-3 text-sm font-mono text-cyber-cyan hover:text-white select-none"></summary>
@@ -777,7 +783,7 @@
             (run && run.status === 'error' ? '<span class="text-cyber-pink">Error: ' + esc(run.error || '') + '</span>' : '') +
             (run && run.status === 'uploaded_private' ? '<span class="text-cyber-gold">Subido como PRIVADO (YouTube obliga hasta que el proyecto pase la auditoría). <a href="https://studio.youtube.com/video/' + esc(run.video_id || '') + '/edit" target="_blank" class="underline">Abrir en YouTube Studio</a> → Visibilidad → Público.</span>' : '') +
             (run && run.status === 'draft_sent' ? '<span class="text-cyber-gold">Borrador enviado: abre la notificación en TikTok, activa “Contenido generado por IA” y publica.</span>' : '') +
-            (run && run.status === 'published' && run.url ? '<a href="' + esc(run.url) + '" target="_blank" class="text-cyber-emerald underline">ver Reel</a>' : '') +
+            (run && run.status === 'published' && run.url ? '<a href="' + esc(run.url) + '" target="_blank" class="text-cyber-emerald underline">ver publicación</a>' : '') +
           '</div>';
         };
         const platform = (key, label, steps) => {
@@ -807,10 +813,7 @@
             '</div>' +
             (pk && pk.status === 'error' ? '<p class="text-[11px] text-cyber-pink">Error: ' + esc(pk.error || '') + '</p>' : '') +
             (pk && pk.status === 'done'
-              ? '<div class="grid grid-cols-1 sm:grid-cols-[110px_1fr] gap-2">' +
-                  (pk.cover_url ? '<div><img src="' + esc(pk.cover_url) + '" class="w-[110px] rounded border border-cyber-border"><a href="' + esc(dl(pk.cover_url, 'portada_EP' + e.episode_number + '.jpg')) + '" class="block text-[10px] font-mono text-cyber-gold mt-1"><i class="fa-solid fa-download mr-1"></i>Portada</a></div>' : '<div></div>') +
-                  '<div class="space-y-2">' + box('DESCRIPCIÓN TIKTOK', pk.tiktok) + box('DESCRIPCIÓN INSTAGRAM / FACEBOOK', pk.instagram) + (pk.youtube_title ? box('TÍTULO YOUTUBE', pk.youtube_title) + box('DESCRIPCIÓN YOUTUBE', pk.youtube) : '') + box('COMENTARIO PARA FIJAR (en todas)', pk.pinned_comment) + '</div>' +
-                '</div>' +
+              ? '<p class="text-[11px] font-mono text-slate-400"><i class="fa-regular fa-copy mr-1"></i>Descripciones, título y portada: en el desplegable <b class="text-cyber-pink">TEXTOS PARA PUBLICAR</b> de arriba.</p>' +
                 '<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2">' +
                   platform('tiktok', 'TIKTOK', [
                     'Descarga el video y súbelo desde la app (botón +).',
@@ -923,13 +926,11 @@
         setTimeout(() => window.openSocialModal && window.openSocialModal(), 800);
       })();
       // Lleva al panel PUBLICAR del episodio (lo abre y hace scroll).
-      window.goPublish = function(epId) {
-        const card = document.querySelector('details[data-ep-id="' + epId + '"]');
-        if (!card) return;
-        card.open = true;
-        const pub = [...card.querySelectorAll('details')].find(d => /PUBLICAR/.test((d.querySelector(':scope > summary') || {}).textContent || ''));
-        if (pub) { pub.open = true; pub.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
-        else card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      window.goPublish = function() {
+        const box = document.getElementById('publishDetails');
+        if (!box || box.classList.contains('hidden')) return;
+        box.open = true;
+        box.scrollIntoView({ behavior: 'smooth', block: 'start' });
       };
       window.disconnectSocial = async function(platform) {
         if (!await askConfirm('¿Desconectar ' + NET[platform] + ' de VYRALES?\n\nNo borra nada de tu cuenta; solo deja de poder publicar desde aquí hasta que la vuelvas a conectar.')) return;
@@ -1281,8 +1282,23 @@
             '<p class="text-[11px] font-mono text-cyber-gold">Recuerda: activa la etiqueta de IA en la app (TikTok: Más opciones → “Contenido generado por IA”; Instagram: Configuración avanzada; Facebook: «AI label» junto a «Público»; YouTube: «Contenido alterado → Sí»).</p>';
       }
 
+      // Desplegable "PUBLICAR": usa publishPanelHtml (resumen + contenido) fuera de la tarjeta del episodio.
+      function renderPublishBox(episode) {
+        const box = document.getElementById('publishDetails');
+        const html = episode ? publishPanelHtml(episode) : '';
+        if (!html) { box.classList.add('hidden'); return; }
+        const tmp = document.createElement('div'); tmp.innerHTML = html;
+        const d = tmp.querySelector('details');
+        const sum = d.querySelector(':scope > summary');
+        document.getElementById('publishSummary').innerHTML = sum.innerHTML + ' · EP ' + episode.episode_number + ' <span class="text-slate-500">▾ ver / ocultar</span>';
+        sum.remove();
+        document.getElementById('publishInner').innerHTML = d.innerHTML;
+        box.classList.remove('hidden');
+      }
+
       function renderFinalRenderPanel(episode) {
         renderCopyTexts(episode);
+        renderPublishBox(episode);
         const panel = document.getElementById('finalRenderPanel');
         if (!episode) {
           panel.classList.add('hidden');
@@ -2228,7 +2244,6 @@
                   ((e.assets || []).some(a => a.kind === 'video_clip') && e.status !== 'generando_media'
                     ? '<button onclick="vyEditor.open(\'' + e.id + '\')" class="px-3 py-1.5 rounded-lg bg-cyber-gold/10 border border-cyber-gold/40 text-cyber-gold text-xs font-mono hover:bg-cyber-gold/20"><i class="fa-solid fa-scissors mr-1"></i>Editar episodio</button>'
                     : '') + '</div>' +
-                publishPanelHtml(e) +
               '</div>' +
             '</details>'
           );
