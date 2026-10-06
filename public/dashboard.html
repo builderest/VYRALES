@@ -1191,6 +1191,17 @@
       // ---------- Narración de voz fija encima de CUALQUIER reproductor de toma ----------
       // Un <video data-narr="url" data-narr-secs="s" data-mute="0|1"> suena con la voz del narrador
       // sincronizada, igual que en el render (empieza a 0.3 s; hasta 1.2x si no cabe en 8 s).
+      // Los <video> NO se precargan (preload="none") y muestran de portada la imagen del cuadro inicial.
+      // Antes cada repintado del panel volvía a crear ~20 reproductores con preload="metadata" y cada uno
+      // pedía al menos un pedazo del mp4 a Supabase: eso gastó ~22 GB de "Cached Egress" (límite gratis 5 GB).
+      // Las imágenes sí quedan en la caché del navegador; el video solo se baja cuando le das play.
+      function posterFor(asset, fallback) {
+        const ep = lastLoadedData && (lastLoadedData.episodes || []).find(e => e.id === asset.episode_id);
+        const imgs = ((ep && ep.assets) || []).filter(a => a.kind === 'image' && a.shot_number === asset.shot_number && a.storage_path);
+        imgs.sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
+        const src = (imgs[0] && imgs[0].storage_path) || fallback;
+        return src ? ' poster="' + esc(src) + '"' : '';
+      }
       function narrAttrsFor(asset) {
         if (!asset || !lastLoadedData) return '';
         const ep = (lastLoadedData.episodes || []).find(e => e.id === asset.episode_id || (e.assets || []).some(a => a.id === asset.id));
@@ -1242,7 +1253,7 @@
           '<div class="demo-shot-card bg-cyber-darker rounded-xl border ' + (isCliff ? 'border-2 border-cyber-pink/60 shadow-neon-pink' : 'border-cyber-border') + ' overflow-hidden group hover:border-cyber-cyan transition-all flex flex-col justify-between relative" data-asset-id="' + asset.id + '" data-updated-at="' + esc(asset.updated_at || '') + '">' +
             '<div>' +
               '<div class="relative aspect-[9/16] bg-slate-950 overflow-hidden flex items-center justify-center text-slate-600 text-xs font-mono text-center p-4">' +
-                (asset.storage_path ? ('<video src="' + esc(asset.storage_path) + '" controls preload="metadata" playsinline class="w-full h-full object-cover absolute inset-0 bg-black"' + narrAttrsFor(asset) + '></video>') : 'Sin preview aún') +
+                (asset.storage_path ? ('<video src="' + esc(asset.storage_path) + '" controls preload="none"' + posterFor(asset) + ' playsinline class="w-full h-full object-cover absolute inset-0 bg-black"' + narrAttrsFor(asset) + '></video>') : 'Sin preview aún') +
                 '<div class="absolute top-3 left-3 right-3 flex justify-between items-center text-[10px] font-mono">' +
                   '<span class="bg-black/80 text-cyber-cyan border border-cyber-cyan/30 px-2 py-0.5 rounded">TOMA ' + String(shotNo).padStart(2, '0') + ' / ' + total + '</span>' +
                   '<span class="bg-cyber-emerald/90 text-black font-bold px-2 py-0.5 rounded">' + modelLabel + ' (' + cost + ')</span>' +
@@ -1476,7 +1487,7 @@
           panel.classList.remove('hidden');
           panel.innerHTML =
             '<div class="flex items-center gap-3 bg-cyber-darker border border-cyber-emerald/40 rounded-lg p-2">' +
-              '<video src="' + esc(finalRender.storage_path) + '" controls preload="metadata" class="w-20 h-32 object-cover rounded bg-black"></video>' +
+              '<video src="' + esc(finalRender.storage_path) + '" controls preload="none"' + posterFor({ episode_id: episode.id, shot_number: 1 }, ((episode.validator_report || {}).publish_package || {}).cover_url) + ' class="w-20 h-32 object-cover rounded bg-black"></video>' +
               '<div class="text-xs font-mono">' +
                 '<p class="text-cyber-emerald font-bold"><i class="fa-solid fa-check-circle mr-1"></i>Video final del episodio #' + episode.episode_number + ' listo (' + clips.length + ' tomas unidas).</p>' +
                 '<button type="button" onclick="openMedia(this)" data-src="' + esc(finalRender.storage_path) + '" data-kind="video" data-title="EP ' + episode.episode_number + ' · Video final" class="text-cyber-cyan hover:underline"><i class="fa-solid fa-circle-play mr-1"></i>Ver / descargar</button>' +

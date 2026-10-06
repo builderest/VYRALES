@@ -24,7 +24,18 @@ async function main() {
   const episodeId = process.argv[2];
   if (!/^[0-9a-f-]{36}$/i.test(episodeId || '')) throw new Error('Uso: node agente/render_local.js <episode_id>');
   const { getSupabaseClient } = require(path.join(ROOT, 'netlify', 'functions', '_supabase'));
-  const { renderEpisode, run } = require(path.join(ROOT, 'netlify', 'functions', '_render'));
+  const { renderEpisode, run, download } = require(path.join(ROOT, 'netlify', 'functions', '_render'));
+  // Caché local de tomas/voces/música: cada archivo de Supabase se baja UNA sola vez a la PC.
+  // (Supabase gratis da 5 GB al mes de descargas; rehacer un final bajaba ~100 MB cada vez.)
+  // Las URLs de Supabase cambian cuando el archivo cambia (-v<fecha>), así que la caché nunca queda vieja.
+  const CACHE = path.join(ROOT, 'finales', '.cache');
+  fs.mkdirSync(CACHE, { recursive: true });
+  const cachedFetch = async (url, dest) => {
+    const key = require('crypto').createHash('sha1').update(url).digest('hex') + path.extname(new URL(url).pathname).slice(0, 6);
+    const hit = path.join(CACHE, key);
+    if (!fs.existsSync(hit)) { await download(url, hit + '.tmp'); fs.renameSync(hit + '.tmp', hit); }
+    fs.copyFileSync(hit, dest);
+  };
   const supabase = getSupabaseClient();
 
   const { data: ep, error } = await supabase.from('episodes').select('*, assets(*)').eq('id', episodeId).single();
@@ -42,7 +53,7 @@ async function main() {
 
   console.log(`Calidad completa: "${series.title}" EP ${ep.episode_number} (preset ${process.env.VYRALES_X264_PRESET}, crf ${process.env.VYRALES_CRF})`);
   const t0 = Date.now();
-  const result = await renderEpisode({ episode: ep, series, log: (...a) => console.log(...a), maxMb: Infinity });
+  const result = await renderEpisode({ episode: ep, series, log: (...a) => console.log(...a), maxMb: Infinity, fetchFile: cachedFetch });
   try {
     fs.mkdirSync(FINALES, { recursive: true });
     const name = fileNameFor(series.slug, ep.episode_number);
