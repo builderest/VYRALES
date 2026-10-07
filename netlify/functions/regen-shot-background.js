@@ -15,7 +15,7 @@
 // `updated_at` de la toma (lo actualiza un trigger de Postgres automáticamente en cada
 // UPDATE, ver supabase/schema.sql).
 const { getSupabaseClient } = require('./_supabase');
-const { BUCKET, uploadClip, storagePathFromPublicUrl } = require('./_storage');
+const { BUCKET, uploadClip, storeClip, storagePathFromPublicUrl } = require('./_storage');
 
 const { generateVeoClip, loadReferenceImages } = require('./_veo');
 const { effectiveShotPrompt, referenceUrlsForShot, videoGeneratesAudio } = require('./_series');
@@ -88,14 +88,15 @@ exports.handler = async (event) => {
     let modelKey = ['veo_lite', 'veo_fast', 'veo_standard'].includes(asset.model) ? asset.model : 'veo_lite';
     if (referenceImages.length) modelKey = rules.shot_model === 'veo_standard' ? 'veo_standard' : 'veo_fast';
     console.log(LOG, 'generando con Veo (' + modelKey + ')... esto tarda un rato.');
-    const { videoBuffer, costUsd, model } = await generateVeoClip({ modelKey, prompt, referenceImages, startImage, provider, generateAudio: videoGeneratesAudio((episode.series && episode.series.story_bible) || {}), log: (...a) => console.log(LOG, ...a) });
+    const veo = await generateVeoClip({ modelKey, prompt, referenceImages, startImage, provider, generateAudio: videoGeneratesAudio((episode.series && episode.series.story_bible) || {}), log: (...a) => console.log(LOG, ...a) });
+    const { costUsd, model } = veo;
     await logSpend(supabase, { seriesId: episode.series_id, episodeId: episode.id, shotNumber: asset.shot_number, kind: 'video', model: provider === 'fal' ? 'fal_' + modelKey : modelKey, costUsd, note: provider === 'fal' ? 'regenerada (fal.ai)' : 'regenerada' });
     console.log(LOG, 'Veo terminó, subiendo a Supabase Storage...');
 
     // Nombre con versión: si se reusara shot-NN.mp4, la caché del navegador/CDN podría
     // seguir mostrando el video viejo después de regenerar.
     const storagePath = `${episode.series.slug}/ep${episode.episode_number}/shot-${String(asset.shot_number).padStart(2, '0')}-v${Date.now()}.mp4`;
-    const publicUrl = await uploadClip(supabase, { path: storagePath, buffer: videoBuffer });
+    const publicUrl = await storeClip(supabase, { veo, path: storagePath });
 
     const { data: updated, error: updateError } = await supabase
       .from('assets')

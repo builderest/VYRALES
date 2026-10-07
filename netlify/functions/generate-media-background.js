@@ -15,7 +15,7 @@
 // o para un episodio específico:
 //   http://localhost:8888/.netlify/functions/generate-media-background?episode_id=<uuid>
 const { getSupabaseClient } = require('./_supabase');
-const { ensureMediaBucket, uploadClip } = require('./_storage');
+const { ensureMediaBucket, uploadClip, storeClip } = require('./_storage');
 const { generateVeoClip, loadReferenceImages } = require('./_veo');
 const { mergeEpisodeVideo } = require('./_merge');
 const { effectiveShotPrompt, referenceUrlsForShot, videoGeneratesAudio, narrationConfig } = require('./_series');
@@ -310,10 +310,10 @@ exports.handler = async (event) => {
         }
         const { videoBuffer, costUsd, model } = veo;
         await logSpend(supabase, { seriesId: series.id, episodeId: episode.id, shotNumber: scene.number, kind: 'video', model: provider === 'fal' ? 'fal_' + modelKey : modelKey, costUsd, note: provider === 'fal' ? 'fal.ai' : undefined });
-        console.log(LOG, `toma ${scene.number}/${total}: Veo terminó, subiendo a Supabase Storage...`);
+        console.log(LOG, `toma ${scene.number}/${total}: Veo terminó, guardando${veo.falUrl ? ' (queda en fal.ai, sin copiar a Supabase)' : ' en Supabase Storage'}...`);
 
         const storagePath = `${series.slug}/ep${episode.episode_number}/shot-${String(scene.number).padStart(2, '0')}.mp4`;
-        const publicUrl = await uploadClip(supabase, { path: storagePath, buffer: videoBuffer });
+        const publicUrl = await storeClip(supabase, { veo, path: storagePath });
 
         const { data: asset, error: assetError } = await supabase
           .from('assets')

@@ -206,6 +206,34 @@ async function queueFullRenders() {
   await sb.from('agent_jobs').insert({ command: 'render_full:' + todo.episode_id });
   log('nuevo video final: preparando calidad completa (episodio ' + todo.episode_id + ')');
 }
+// RESPALDO de las tomas que viven en fal.ai (desde oct-2026 ya no se copian a Supabase): cada 5 min
+// baja a VYRALE/finales/.cache las que falten. Mismo nombre de caché que render_local.js
+// (sha1 de la URL), así los renders en la PC tampoco las vuelven a bajar.
+const CLIP_CACHE = path.join(FINALES, '.cache');
+const cacheNameFor = (url) => crypto.createHash('sha1').update(url).digest('hex') + path.extname(new URL(url).pathname).slice(0, 6);
+let lastBackup = 0;
+async function backupClips() {
+  if (Date.now() - lastBackup < 5 * 60000) return;
+  lastBackup = Date.now();
+  const since = new Date(Date.now() - 60 * 86400000).toISOString();
+  const { data: clips } = await sb.from('assets').select('storage_path').eq('kind', 'video_clip').gt('created_at', since).not('storage_path', 'like', '%supabase.co%').limit(500);
+  const todo = (clips || []).map((c) => c.storage_path).filter((u) => /^https:\/\//.test(u || '') && !fs.existsSync(path.join(CLIP_CACHE, cacheNameFor(u))));
+  if (!todo.length) return;
+  fs.mkdirSync(CLIP_CACHE, { recursive: true });
+  let ok = 0;
+  for (const url of todo.slice(0, 20)) {
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(60000) });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const dest = path.join(CLIP_CACHE, cacheNameFor(url));
+      fs.writeFileSync(dest + '.tmp', Buffer.from(await res.arrayBuffer()));
+      fs.renameSync(dest + '.tmp', dest);
+      ok++;
+    } catch (err) { log('respaldo de toma falló (' + err.message + '): ' + url); }
+  }
+  log('respaldo de tomas de fal.ai: ' + ok + ' nuevas guardadas en finales/.cache' + (todo.length > 20 ? ' (quedan ' + (todo.length - 20) + ', siguen en 5 min)' : ''));
+}
+
 // Si cambian los archivos del agente, se reinicia solo (el bucle de agente_bucle.bat lo vuelve a abrir).
 const WATCH = ['agente.js', 'comandos.js'].map((f) => path.join(__dirname, f));
 const startMtimes = WATCH.map((f) => { try { return fs.statSync(f).mtimeMs; } catch (_) { return 0; } });
@@ -220,6 +248,7 @@ async function tick() {
     if (busy) return;
     if (codeChanged()) { log('el código del agente cambió: reiniciando para cargarlo...'); devStop(); process.exit(0); }
     await queueFullRenders();
+    await backupClips();
     // Órdenes viejas (más de 2 min sin atender) no se ejecutan: se marcan vencidas.
     // (Publicar espera hasta 15 min: puede tocarle detrás de un video en calidad completa.)
     await sb.from('agent_jobs').update({ status: 'expired', finished_at: new Date().toISOString() }).eq('status', 'pending').not('command', 'like', 'publish:%').lt('created_at', new Date(Date.now() - 120000).toISOString());

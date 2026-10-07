@@ -45,7 +45,9 @@ async function falGenerateVideo({ modelKey, prompt, startImage, aspectRatio = '9
     resolution: '720p',
     generate_audio: generateAudio !== false
   };
-  const sub = await falFetch(QUEUE + endpoint, { method: 'POST', body: JSON.stringify(input) });
+  // Sin vencimiento: el video se queda en el CDN de fal y VYRALES lo usa desde ahí (no se copia a
+  // Supabase, cuyo plan gratis limita las descargas a 5 GB/mes). Doc: fal.ai/docs → media-expiration.
+  const sub = await falFetch(QUEUE + endpoint, { method: 'POST', body: JSON.stringify(input), headers: { 'X-Fal-Object-Lifecycle-Preference': JSON.stringify({ expiration_duration_seconds: null }) } });
   const requestId = sub.request_id;
   const statusUrl = sub.status_url || `${QUEUE}${endpoint}/requests/${requestId}/status`;
   const responseUrl = sub.response_url || `${QUEUE}${endpoint}/requests/${requestId}`;
@@ -71,7 +73,7 @@ async function falGenerateVideo({ modelKey, prompt, startImage, aspectRatio = '9
   if (!url) throw new Error('fal.ai no devolvió video: ' + JSON.stringify(result).slice(0, 400));
   const res = await fetch(url);
   if (!res.ok) throw new Error('No se pudo descargar el video de fal.ai (HTTP ' + res.status + ')');
-  return { videoBuffer: Buffer.from(await res.arrayBuffer()), requestId };
+  return { videoBuffer: Buffer.from(await res.arrayBuffer()), requestId, url };
 }
 
 module.exports = { falGenerateVideo, FAL_ENDPOINTS };

@@ -105,8 +105,8 @@ async function generateVeoClip({ modelKey, prompt, aspectRatio = '9:16', duratio
   if (provider === 'fal') {
     if (referenceImages.length) throw new Error('Con fal.ai no se usan fotos de referencia directas; usa memoria visual (cuadro inicial).');
     const { falGenerateVideo } = require('./_fal');
-    const { videoBuffer } = await falGenerateVideo({ modelKey, prompt, startImage, aspectRatio, durationSeconds, generateAudio, log });
-    return { videoBuffer, costUsd: Number(durationSeconds) * videoPricePerSecond(modelKey, 'fal', generateAudio), model: 'fal:' + modelKey, provider: 'fal', generateAudio: generateAudio !== false };
+    const { videoBuffer, url: falUrl } = await falGenerateVideo({ modelKey, prompt, startImage, aspectRatio, durationSeconds, generateAudio, log });
+    return { videoBuffer, falUrl, costUsd: Number(durationSeconds) * videoPricePerSecond(modelKey, 'fal', generateAudio), model: 'fal:' + modelKey, provider: 'fal', generateAudio: generateAudio !== false };
   }
   const model = VEO_MODELS[modelKey];
   if (!model) throw new Error('Modelo de Veo desconocido: ' + modelKey);

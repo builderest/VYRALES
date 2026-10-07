@@ -50,4 +50,15 @@ async function removeByPublicUrl(supabase, url, log = console.log) {
   if (error) log('no se pudo borrar el archivo viejo (no es grave):', p, error.message);
 }
 
-module.exports = { BUCKET, ensureMediaBucket, uploadClip, uploadFile, storagePathFromPublicUrl, removeByPublicUrl };
+// Dónde queda una toma recién generada:
+//   - Si vino de fal.ai (pedida SIN vencimiento): se usa la URL de fal directamente. No se sube a
+//     Supabase → no gasta espacio ni las descargas del plan gratis (5 GB/mes, se pasó a 21 GB).
+//     Respaldo: el agente de la PC guarda una copia de cada toma en VYRALE/finales/.cache.
+//   - Si vino de Google (Veo directo, sin URL pública): se sube a Supabase como antes.
+// VYRALES_CLIPS_IN_SUPABASE=1 en el .env vuelve al comportamiento anterior.
+async function storeClip(supabase, { veo, path: storagePath }) {
+  if (veo && veo.falUrl && process.env.VYRALES_CLIPS_IN_SUPABASE !== '1') return veo.falUrl;
+  return uploadClip(supabase, { path: storagePath, buffer: veo.videoBuffer });
+}
+
+module.exports = { BUCKET, ensureMediaBucket, uploadClip, storeClip, uploadFile, storagePathFromPublicUrl, removeByPublicUrl };
