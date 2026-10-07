@@ -17,7 +17,7 @@ for (const line of fs.readFileSync(path.join(ROOT, '.env'), 'utf8').split(/\r?\n
 }
 const GEN = (process.env.VYRALES_GEN_URL || 'http://100.66.84.73:8188').replace(/\/$/, '');
 const TEMPLATE = path.join(__dirname, 'ltx2_api.json');
-const OUT = path.join(ROOT, 'finales', 'prueba_ltx');
+const OUT = path.join(process.env.VYRALES_FINALES_DIR || path.join(ROOT, 'finales'), 'prueba_ltx');
 const ffmpeg = require(path.join(ROOT, 'node_modules', 'ffmpeg-static'));
 
 // Nodos de la plantilla video_ltx2_5_i2v exportada (Workflow → Export (API)).
@@ -29,14 +29,22 @@ const run = (args) => new Promise((res, rej) => execFile(ffmpeg, args, { maxBuff
 // El prompt de Veo trae nombres internos (NeandertalUno) y cosas de diálogo; LTX quiere una
 // descripción corta y concreta de lo que pasa en cámara.
 function ltxPrompt(shot) {
-  const clean = (t) => String(t || '').replace(/\b([A-Z][a-z]+)(Uno|Dos|Tres|Cuatro)\b/g, (_, a, b) => ({ Uno: 'the first ', Dos: 'the second ', Tres: 'the third ', Cuatro: 'the fourth ' }[b] + a.toLowerCase())).trim();
+  const clean = (t) => String(t || '').replace(/\b([A-Z][a-z]+)(Uno|Dos|Tres|Cuatro)\b/g, (_, a, b) => ({ Uno: 'the first ', Dos: 'the second ', Tres: 'the third ', Cuatro: 'the fourth ' }[b] + a.toLowerCase())).replace(/\s+/g, ' ').trim();
+  const cam = clean(shot.camera);
+  const moving = /push|pull|dolly|pan|tilt|track|zoom|orbit|crane|handheld/i.test(cam);
+  // LTX entiende mejor una descripción larga y en orden: cuadro → acción → final, con la cámara
+  // y el fondo dichos explícitamente (si no, se acerca solo e inventa el fondo).
   return [
-    'Use the provided start image as the first frame.',
-    shot.camera ? clean(shot.camera) + '.' : '',
-    clean(shot.action_en),
-    clean(shot.reaction_en),
-    'Photorealistic cinematic documentary footage, natural subtle motion, consistent faces and clothing, nobody speaks, mouths closed, no text, no subtitles.'
-  ].filter(Boolean).join(' ').replace(/\s+/g, ' ').replace(/\.\./g, '.');
+    'The video starts exactly on the provided image and keeps its composition, people, clothing, lighting and background.',
+    'Scene at the start: ' + clean(shot.start_en) + '.',
+    'Then, slowly and naturally: ' + clean(shot.action_en) + '.',
+    'By the end: ' + clean(shot.reaction_en) + '.',
+    moving
+      ? 'Camera: ' + cam + ', very slow and subtle, the framing stays close to the first frame.'
+      : 'Camera: ' + (cam ? cam + '. ' : '') + 'Locked-off tripod shot. The camera does not move at all: no zoom, no push-in, no pan, fixed framing for the whole clip.',
+    'The background, rocks, terrain and sky stay exactly the same as in the first frame; nothing new appears or is built.',
+    'Photorealistic cinematic documentary footage, natural subtle body motion, consistent faces. Nobody speaks, mouths stay closed. No text, no subtitles.'
+  ].join(' ').replace(/\.\s*\./g, '.').replace(/\s+/g, ' ');
 }
 
 async function j(url, opts) {
@@ -62,6 +70,9 @@ async function genShot({ shot, frameBuf, tag }) {
   wf[N.seedA].inputs.noise_seed = crypto.randomInt(1, 2 ** 31);
   wf[N.seedB].inputs.noise_seed = crypto.randomInt(1, 2 ** 31);
   wf[N.save].inputs.filename_prefix = 'vyrales/' + tag;
+  // Fuerza del cuadro inicial en la 1ª pasada: 0.7 (plantilla) dejaba que LTX se alejara del cuadro
+  // (zoom solo, fondo inventado). Con VYRALES_LTX_STRENGTH se puede ajustar sin tocar código.
+  wf['398:357'].inputs.strength = Number(process.env.VYRALES_LTX_STRENGTH || 1);
   // 3) encolar y esperar
   const t0 = Date.now();
   const { prompt_id } = await j(GEN + '/prompt', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt: wf, client_id: 'vyrales-agente' }) });
@@ -105,7 +116,7 @@ async function main() {
     const frame = latest('image', n);
     const clip = latest('video_clip', n);
     if (!shot || !frame || !clip) { console.log(`toma ${n}: sin guion, cuadro o video Veo; la salto`); continue; }
-    const base = `${series.slug}_ep${ep.episode_number}_t${String(n).padStart(2, '0')}`;
+    const base = `${series.slug}_ep${ep.episode_number}_t${String(n).padStart(2, '0')}` + (process.env.VYRALES_PRUEBA_TAG || '_v2');
     console.log(`\nTOMA ${n}: generando con LTX-2.5 en king...`);
     const frameBuf = Buffer.from(await (await fetch(frame.storage_path)).arrayBuffer());
     const g = await genShot({ shot, frameBuf, tag: base });

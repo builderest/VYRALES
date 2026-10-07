@@ -15,7 +15,9 @@ for (const line of fs.readFileSync(path.join(ROOT, '.env'), 'utf8').split(/\r?\n
 process.env.VYRALES_X264_PRESET = process.env.VYRALES_X264_PRESET || 'medium';
 process.env.VYRALES_CRF = process.env.VYRALES_CRF || '18';
 
-const FINALES = path.join(ROOT, 'finales');
+// Dónde se guardan los videos grandes: VYRALES_FINALES_DIR en el .env (ej. \\\\100.66.84.73\\VYRALES_videos,
+// la carpeta compartida de king por Tailscale). Si no está, VYRALE/finales en esta PC.
+const FINALES = process.env.VYRALES_FINALES_DIR || path.join(ROOT, 'finales');
 // Versión de la receta de calidad: si sube, el agente rehace los finales que tenía (2 = 1080x1920).
 const QUALITY_V = 2;
 const fileNameFor = (slug, n) => `${slug}_ep${n}.mp4`;
@@ -28,7 +30,7 @@ async function main() {
   // Caché local de tomas/voces/música: cada archivo de Supabase se baja UNA sola vez a la PC.
   // (Supabase gratis da 5 GB al mes de descargas; rehacer un final bajaba ~100 MB cada vez.)
   // Las URLs de Supabase cambian cuando el archivo cambia (-v<fecha>), así que la caché nunca queda vieja.
-  const CACHE = path.join(ROOT, 'finales', '.cache');
+  const CACHE = path.join(FINALES, '.cache');
   fs.mkdirSync(CACHE, { recursive: true });
   const cachedFetch = async (url, dest) => {
     const key = require('crypto').createHash('sha1').update(url).digest('hex') + path.extname(new URL(url).pathname).slice(0, 6);

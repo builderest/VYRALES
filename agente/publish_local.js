@@ -10,7 +10,9 @@ for (const line of fs.readFileSync(path.join(ROOT, '.env'), 'utf8').split(/\r?\n
   const m = /^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/.exec(line);
   if (m && !process.env[m[1]]) process.env[m[1]] = m[2].replace(/^(['"])(.*)\1$/, '$2');
 }
-const FINALES = path.join(ROOT, 'finales');
+// Dónde se guardan los videos grandes: VYRALES_FINALES_DIR en el .env (ej. \\\\100.66.84.73\\VYRALES_videos,
+// la carpeta compartida de king por Tailscale). Si no está, VYRALE/finales en esta PC.
+const FINALES = process.env.VYRALES_FINALES_DIR || path.join(ROOT, 'finales');
 
 async function main() {
   const [epId, platform, privacy] = process.argv.slice(2);

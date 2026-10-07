@@ -87,6 +87,12 @@ async function runJob(job) {
         p.on('close', (c) => { clearTimeout(timer); resolve(c == null ? 1 : c); });
       });
     }
+    else if (def.special === 'discos') {
+      for (const d of 'CDEFGHIJ') {
+        try { const s = fs.statfsSync(d + ':\\'); add(d + ':  ' + (s.bavail * s.bsize / 1073741824).toFixed(0) + ' GB libres de ' + (s.blocks * s.bsize / 1073741824).toFixed(0) + ' GB\n'); } catch (_) {}
+      }
+      add('Videos de VYRALES se guardan en: ' + FINALES + '\n');
+    }
     else if (def.special === 'gen_estado') {
       // PC generadora (ComfyUI con LTX-2/Wan) por Tailscale. Dirección en .env: VYRALES_GEN_URL.
       const base = process.env.VYRALES_GEN_URL || 'http://100.66.84.73:8188';
@@ -143,7 +149,9 @@ async function runJob(job) {
 // Cada vez que hay un video final nuevo en Supabase (que va recomprimido por el límite de 50 MB),
 // el agente lo vuelve a armar aquí sin recomprimir (render_local.js) y lo sirve SOLO dentro de tu
 // red de Tailscale (escucha en la IP 100.x de este PC, no en internet ni en tu Wi-Fi), con llave.
-const FINALES = path.join(ROOT, 'finales');
+// Dónde se guardan los videos grandes: VYRALES_FINALES_DIR en el .env (ej. \\\\100.66.84.73\\VYRALES_videos,
+// la carpeta compartida de king por Tailscale). Si no está, VYRALE/finales en esta PC.
+const FINALES = process.env.VYRALES_FINALES_DIR || path.join(ROOT, 'finales');
 const FILE_PORT = 8787;
 const TOKEN_FILE = path.join(__dirname, '.llave_descargas');
 const FILE_TOKEN = (() => {
@@ -263,8 +271,32 @@ async function backupClips() {
   log('respaldo de tomas de fal.ai: ' + ok + ' nuevas guardadas en finales/.cache' + (todo.length > 20 ? ' (quedan ' + (todo.length - 20) + ', siguen en 5 min)' : ''));
 }
 
+// MUDANZA: si los videos ahora van a otra carpeta (VYRALES_FINALES_DIR, ej. king), lo que quedó en
+// VYRALE/finales de esta PC se copia allá, se verifica el tamaño y se borra de aquí (libera disco).
+let migrated = false;
+function migrateLocalFinales() {
+  if (migrated) return;
+  migrated = true;
+  const local = path.join(ROOT, 'finales');
+  if (!process.env.VYRALES_FINALES_DIR || path.resolve(FINALES) === path.resolve(local) || !fs.existsSync(local)) return;
+  let moved = 0, mb = 0;
+  const walk = (dir, rel) => {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      const src = path.join(dir, e.name), r = path.join(rel, e.name), dst = path.join(FINALES, r);
+      if (e.isDirectory()) { walk(src, r); continue; }
+      try {
+        fs.mkdirSync(path.dirname(dst), { recursive: true });
+        if (!fs.existsSync(dst) || fs.statSync(dst).size !== fs.statSync(src).size) fs.copyFileSync(src, dst);
+        if (fs.statSync(dst).size === fs.statSync(src).size) { mb += fs.statSync(src).size / 1048576; fs.unlinkSync(src); moved++; }
+      } catch (err) { log('mudanza: no pude mover ' + r + ' (' + err.message + ')'); }
+    }
+  };
+  try { walk(local, ''); } catch (err) { log('mudanza falló: ' + err.message); return; }
+  if (moved) log('mudanza: ' + moved + ' archivos (' + mb.toFixed(0) + ' MB) pasados a ' + FINALES + ' y borrados de esta PC');
+}
+
 // Si cambian los archivos del agente, se reinicia solo (el bucle de agente_bucle.bat lo vuelve a abrir).
-const WATCH = ['agente.js', 'comandos.js'].map((f) => path.join(__dirname, f));
+const WATCH = ['agente.js', 'comandos.js'].map((f) => path.join(__dirname, f)).concat(path.join(ROOT, '.env'));
 const startMtimes = WATCH.map((f) => { try { return fs.statSync(f).mtimeMs; } catch (_) { return 0; } });
 function codeChanged() { return WATCH.some((f, i) => { try { return fs.statSync(f).mtimeMs !== startMtimes[i]; } catch (_) { return false; } }); }
 
@@ -276,6 +308,7 @@ async function tick() {
     await sb.from('agent_state').upsert({ id: 1, last_seen: new Date().toISOString(), host: os.hostname(), info: { commands: Object.keys(COMMANDS), dev_running: !!dev, platform: process.platform, files: filesInfo() } });
     if (busy) return;
     if (codeChanged()) { log('el código del agente cambió: reiniciando para cargarlo...'); devStop(); process.exit(0); }
+    migrateLocalFinales();
     await queueFullRenders();
     await backupClips();
     // Órdenes viejas (más de 2 min sin atender) no se ejecutan: se marcan vencidas.
