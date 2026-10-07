@@ -96,6 +96,18 @@ async function runJob(job) {
         (st.devices || []).forEach((d) => add('✔ GPU: ' + d.name + ' · VRAM libre ' + (d.vram_free / 1073741824).toFixed(1) + ' / ' + (d.vram_total / 1073741824).toFixed(1) + ' GB\n'));
         add('✔ ComfyUI ' + ((st.system && st.system.comfyui_version) || '') + ' · RAM libre ' + (((st.system && st.system.ram_free) || 0) / 1073741824).toFixed(1) + ' GB\n');
         add('Cola: ' + ((q.queue_running || []).length) + ' generando, ' + ((q.queue_pending || []).length) + ' esperando\n');
+        // Modelos instalados (para elegir el de video y saber cuáles ocupan espacio sin usarse).
+        for (const folder of ['checkpoints', 'diffusion_models', 'unet', 'loras', 'text_encoders', 'vae']) {
+          try {
+            const list = await (await fetch(base + '/models/' + folder, { signal: AbortSignal.timeout(8000) })).json();
+            if (Array.isArray(list) && list.length) add('\n[' + folder + '] ' + list.length + '\n  ' + list.join('\n  ') + '\n');
+          } catch (_) {}
+        }
+        // Plantillas de video que el usuario guardó en ComfyUI.
+        try {
+          const wf = await (await fetch(base + '/api/userdata?dir=workflows&recurse=true', { signal: AbortSignal.timeout(8000) })).json();
+          if (Array.isArray(wf) && wf.length) add('\n[flujos guardados] ' + wf.length + '\n  ' + wf.join('\n  ') + '\n');
+        } catch (_) {}
         add(fs.existsSync(path.join(__dirname, 'ltx2_api.json')) ? '✔ Plantilla agente/ltx2_api.json encontrada\n' : '✖ Falta agente/ltx2_api.json (exportar desde ComfyUI de king: Workflow -> Export (API))\n');
       } catch (err) {
         add('✖ No responde (' + err.message + ').\n  Revisa: Tailscale encendido en king y Cronix, e INSTALAR_EN_KING.bat ejecutado en king.\n');
