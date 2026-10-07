@@ -53,8 +53,10 @@ function wardrobeLine(shot) {
   const w = shot.wardrobe || {};
   const items = Object.values(w).filter(Boolean);
   if (!items.length) return '';
-  const feet = items.some((o) => /shoe|boot|footwear|sandal|sneaker|slipper/i.test(o));
-  return 'Clothing stays exactly the same for the whole clip: ' + items.map((o) => String(o).replace(/\.$/, '')).join('; ') + '.' + (feet ? ' Everyone keeps their footwear on; nobody is barefoot.' : '');
+  // Calzado SIEMPRE (EP3 T1: la ropa no lo decía y LTX la puso a caminar descalza y en shorts).
+  const barefoot = items.some((o) => /barefoot/i.test(o));
+  return 'Clothing stays exactly the same for the whole clip, nothing is shortened or removed: ' + items.map((o) => String(o).replace(/\.$/, '')).join('; ') + '.' +
+    (barefoot ? '' : ' Everyone keeps closed footwear on at all times; nobody is barefoot; long trousers stay long.');
 }
 
 async function j(url, opts) {
