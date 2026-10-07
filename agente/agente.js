@@ -74,10 +74,10 @@ async function runJob(job) {
     if (def.special === 'dev_start') add(devStart() + '\n');
     else if (def.special === 'dev_stop') add(devStop() + '\n');
     else if (def.special === 'dev_restart') { add(devStop() + '\n'); await new Promise((r) => setTimeout(r, 1500)); add(devStart() + '\n'); }
-    else if (def.special === 'render_full' || def.special === 'publish_local' || def.special === 'prueba_ltx' || def.special === 'gen_local' || def.special === 'prueba_flux') {
+    else if (def.special === 'render_full' || def.special === 'publish_local' || def.special === 'prueba_ltx' || def.special === 'gen_local' || def.special === 'prueba_flux' || def.special === 'regen_local') {
       // Proceso aparte (siempre con el código más nuevo). Los argumentos ya pasaron la lista blanca.
-      const script = { render_full: 'render_local.js', publish_local: 'publish_local.js', prueba_ltx: 'prueba_ltx.js', gen_local: 'gen_local.js', prueba_flux: 'prueba_flux.js' }[def.special];
-      const maxMin = { prueba_ltx: 120, gen_local: 240 }[def.special] || 30;
+      const script = { render_full: 'render_local.js', publish_local: 'publish_local.js', prueba_ltx: 'prueba_ltx.js', gen_local: 'gen_local.js', prueba_flux: 'prueba_flux.js', regen_local: 'regen_local.js' }[def.special];
+      const maxMin = { prueba_ltx: 120, gen_local: 240, regen_local: 120 }[def.special] || 30;
       code = await new Promise((resolve) => {
         const p = spawn(process.execPath, [path.join(__dirname, script)].concat(arg ? arg.split(':') : []), { cwd: ROOT, shell: false });
         const timer = setTimeout(() => { add('\n[se canceló: tardó más de ' + maxMin + ' minutos]\n'); p.kill(); }, maxMin * 60000);

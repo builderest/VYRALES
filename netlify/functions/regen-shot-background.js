@@ -29,8 +29,9 @@ exports.handler = async (event) => {
     return { statusCode: 405, body: 'Method not allowed' };
   }
   try {
-    const { assetId, provider: reqProvider } = JSON.parse(event.body || '{}');
-    const provider = ['google', 'fal'].includes(reqProvider) ? reqProvider : (process.env.VIDEO_PROVIDER || 'google');
+    const { assetId, provider: reqProvider, new_frame: newFrame } = JSON.parse(event.body || '{}');
+    // 'king' = LTX-2.5 en la PC king (solo desde Cronix: agente/regen_local.js).
+    const provider = ['google', 'fal', 'king'].includes(reqProvider) ? reqProvider : (process.env.VIDEO_PROVIDER || 'google');
     if (!assetId) {
       console.error(LOG, 'falta assetId en el body');
       return { statusCode: 400, body: JSON.stringify({ error: 'Falta assetId' }) };
@@ -71,7 +72,8 @@ exports.handler = async (event) => {
       }
       // Memoria visual: se anima desde el cuadro inicial guardado (o se crea uno si no hay).
       if (sb.rules && sb.rules.keyframes) {
-        const existingFrame = await loadExistingKeyframe(supabase, episode.id, shot.n);
+        // new_frame: rehacer también el cuadro inicial (p. ej. salió con la ropa equivocada).
+        const existingFrame = newFrame ? null : await loadExistingKeyframe(supabase, episode.id, shot.n);
         const frame = existingFrame || (await createKeyframe(supabase, {
           series: Object.assign({ id: episode.series_id }, episode.series),
           episode, shot, characters, log: (...a) => console.log(LOG, ...a)
@@ -88,9 +90,9 @@ exports.handler = async (event) => {
     let modelKey = ['veo_lite', 'veo_fast', 'veo_standard'].includes(asset.model) ? asset.model : 'veo_lite';
     if (referenceImages.length) modelKey = rules.shot_model === 'veo_standard' ? 'veo_standard' : 'veo_fast';
     console.log(LOG, 'generando con Veo (' + modelKey + ')... esto tarda un rato.');
-    const veo = await generateVeoClip({ modelKey, prompt, referenceImages, startImage, provider, generateAudio: videoGeneratesAudio((episode.series && episode.series.story_bible) || {}), log: (...a) => console.log(LOG, ...a) });
+    const veo = await generateVeoClip({ modelKey, prompt, referenceImages, startImage, provider, generateAudio: videoGeneratesAudio((episode.series && episode.series.story_bible) || {}), ltxPrompt: provider === 'king' && shot ? require('./_king').ltxPromptFor(shot, (episode.series && episode.series.story_bible) || {}) : null, log: (...a) => console.log(LOG, ...a) });
     const { costUsd, model } = veo;
-    await logSpend(supabase, { seriesId: episode.series_id, episodeId: episode.id, shotNumber: asset.shot_number, kind: 'video', model: provider === 'fal' ? 'fal_' + modelKey : modelKey, costUsd, note: provider === 'fal' ? 'regenerada (fal.ai)' : 'regenerada' });
+    await logSpend(supabase, { seriesId: episode.series_id, episodeId: episode.id, shotNumber: asset.shot_number, kind: 'video', model: provider === 'fal' ? 'fal_' + modelKey : provider === 'king' ? 'ltx_king' : modelKey, costUsd, note: provider === 'fal' ? 'regenerada (fal.ai)' : provider === 'king' ? 'regenerada (PC king)' : 'regenerada' });
     console.log(LOG, 'Veo terminó, subiendo a Supabase Storage...');
 
     // Nombre con versión: si se reusara shot-NN.mp4, la caché del navegador/CDN podría
