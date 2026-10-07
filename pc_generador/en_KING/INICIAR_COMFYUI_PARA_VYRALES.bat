@@ -23,7 +23,7 @@ set "COMFY="
 if exist "%CFG%" set /p COMFY=<"%CFG%"
 if defined COMFY if not exist "!COMFY!" set "COMFY="
 if not defined COMFY (
-  for %%d in ("C:\ComfyUI_windows_portable" "D:\ComfyUI_windows_portable" "E:\ComfyUI_windows_portable" "%USERPROFILE%\Desktop\ComfyUI_windows_portable" "%USERPROFILE%\ComfyUI_windows_portable" "C:\ComfyUI" "D:\ComfyUI" "%USERPROFILE%\ComfyUI" "%USERPROFILE%\Documents\ComfyUI") do (
+  for %%d in ("C:\ComfyUI\ComfyUI_windows_portable" "C:\ComfyUI_windows_portable" "D:\ComfyUI_windows_portable" "E:\ComfyUI_windows_portable" "%USERPROFILE%\Desktop\ComfyUI_windows_portable" "%USERPROFILE%\ComfyUI_windows_portable" "C:\ComfyUI" "D:\ComfyUI" "%USERPROFILE%\ComfyUI" "%USERPROFILE%\Documents\ComfyUI") do (
     if not defined COMFY if exist "%%~d\ComfyUI\main.py" set "COMFY=%%~d"
     if not defined COMFY if exist "%%~d\main.py" set "COMFY=%%~d"
   )
