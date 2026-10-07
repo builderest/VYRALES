@@ -186,14 +186,15 @@ function ensureFileServer() {
 function serveFile(req, res) {
   try {
     const u = new URL(req.url, 'http://x');
-    const m = /^\/f\/([A-Za-z0-9_\-]+\.mp4)$/.exec(u.pathname);
+    // "/f/<serie>/<archivo>.mp4" (una carpeta por serie). Solo letras, números, _ y -: nada de "..".
+    const m = /^\/f\/((?:[A-Za-z0-9_\-]+\/)?[A-Za-z0-9_\-]+\.mp4)$/.exec(decodeURIComponent(u.pathname));
     const okKey = u.searchParams.get('k') || '';
     if (!m || okKey.length !== FILE_TOKEN.length || !crypto.timingSafeEqual(Buffer.from(okKey), Buffer.from(FILE_TOKEN))) { res.writeHead(404); return res.end('No encontrado'); }
     const file = path.join(FINALES, m[1]);
     if (!fs.existsSync(file)) { res.writeHead(404); return res.end('No encontrado'); }
     const size = fs.statSync(file).size;
     const head = { 'Content-Type': 'video/mp4', 'Accept-Ranges': 'bytes', 'Cache-Control': 'no-store' };
-    if (u.searchParams.get('dl')) head['Content-Disposition'] = 'attachment; filename="' + m[1] + '"';
+    if (u.searchParams.get('dl')) head['Content-Disposition'] = 'attachment; filename="' + path.basename(m[1]) + '"';
     // Safari (iPhone) pide el video por pedazos (Range): sin esto no lo reproduce.
     const r = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range || '');
     if (r) {
@@ -213,7 +214,13 @@ function filesInfo() {
   ensureFileServer();
   let finales = [];
   try {
-    finales = fs.readdirSync(FINALES).filter((f) => /\.mp4$/.test(f)).map((f) => {
+    // Una carpeta por serie: E:\VYRALES_videos\<serie>\<serie>_ep<N>.mp4 (+ .json con la versión).
+    const files = [];
+    for (const d of fs.readdirSync(FINALES, { withFileTypes: true })) {
+      if (d.isDirectory() && !d.name.startsWith('.')) fs.readdirSync(path.join(FINALES, d.name)).filter((f) => /_ep\d+\.mp4$/.test(f)).forEach((f) => files.push(d.name + '/' + f));
+      else if (d.isFile() && /\.mp4$/.test(d.name)) files.push(d.name);
+    }
+    finales = files.map((f) => {
       const st = fs.statSync(path.join(FINALES, f));
       let meta = {};
       try { meta = JSON.parse(fs.readFileSync(path.join(FINALES, f.replace(/\.mp4$/, '.json')), 'utf8')); } catch (_) {}
@@ -294,6 +301,29 @@ function migrateLocalFinales() {
   try { walk(local, ''); } catch (err) { log('mudanza falló: ' + err.message); return; }
   if (moved) log('mudanza: ' + moved + ' archivos (' + mb.toFixed(0) + ' MB) pasados a ' + FINALES + ' y borrados de esta PC');
 }
+// ORDEN POR SERIE: <serie>_ep<N>.* y prueba_ltx/<serie>_ep... sueltos → carpeta <serie>\ (y <serie>\prueba_ltx\).
+let organized = false;
+function organizeBySeries() {
+  if (organized) return;
+  organized = true;
+  let n = 0;
+  const mv = (src, dst) => { try { fs.mkdirSync(path.dirname(dst), { recursive: true }); if (!fs.existsSync(dst)) { fs.renameSync(src, dst); n++; } } catch (err) { log('orden por serie: no pude mover ' + src + ' (' + err.message + ')'); } };
+  try {
+    for (const f of fs.readdirSync(FINALES)) {
+      const m = /^(.+?)_ep\d+\.(mp4|json)$/.exec(f);
+      if (m && fs.statSync(path.join(FINALES, f)).isFile()) mv(path.join(FINALES, f), path.join(FINALES, m[1], f));
+    }
+    const pr = path.join(FINALES, 'prueba_ltx');
+    if (fs.existsSync(pr)) {
+      for (const f of fs.readdirSync(pr)) {
+        const m = /^(.+?)_ep\d+_/.exec(f);
+        if (m) mv(path.join(pr, f), path.join(FINALES, m[1], 'prueba_ltx', f));
+      }
+      try { if (!fs.readdirSync(pr).filter((x) => x !== 'resumen.json').length) { try { fs.unlinkSync(path.join(pr, 'resumen.json')); } catch (_) {} fs.rmdirSync(pr); } } catch (_) {}
+    }
+  } catch (_) {}
+  if (n) log('orden por serie: ' + n + ' archivos acomodados en carpetas por serie dentro de ' + FINALES);
+}
 
 // Si cambian los archivos del agente, se reinicia solo (el bucle de agente_bucle.bat lo vuelve a abrir).
 const WATCH = ['agente.js', 'comandos.js'].map((f) => path.join(__dirname, f)).concat(path.join(ROOT, '.env'));
@@ -309,6 +339,7 @@ async function tick() {
     if (busy) return;
     if (codeChanged()) { log('el código del agente cambió: reiniciando para cargarlo...'); devStop(); process.exit(0); }
     migrateLocalFinales();
+    organizeBySeries();
     await queueFullRenders();
     await backupClips();
     // Órdenes viejas (más de 2 min sin atender) no se ejecutan: se marcan vencidas.

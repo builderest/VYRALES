@@ -17,7 +17,8 @@ for (const line of fs.readFileSync(path.join(ROOT, '.env'), 'utf8').split(/\r?\n
 }
 const GEN = (process.env.VYRALES_GEN_URL || 'http://100.66.84.73:8188').replace(/\/$/, '');
 const TEMPLATE = path.join(__dirname, 'ltx2_api.json');
-const OUT = path.join(process.env.VYRALES_FINALES_DIR || path.join(ROOT, 'finales'), 'prueba_ltx');
+const FINALES = process.env.VYRALES_FINALES_DIR || path.join(ROOT, 'finales');
+let OUT = path.join(FINALES, 'prueba_ltx'); // se cambia a <serie>\prueba_ltx al saber la serie
 const ffmpeg = require(path.join(ROOT, 'node_modules', 'ffmpeg-static'));
 
 // Nodos de la plantilla video_ltx2_5_i2v exportada (Workflow → Export (API)).
@@ -107,6 +108,7 @@ async function main() {
   const { data: ep, error } = await supabase.from('episodes').select('id, episode_number, shots, series_id, assets(kind, shot_number, storage_path, created_at)').eq('id', epId).single();
   if (error || !ep) throw error || new Error('Episodio no encontrado');
   const { data: series } = await supabase.from('series').select('slug').eq('id', ep.series_id).single();
+  OUT = path.join(FINALES, series.slug, 'prueba_ltx');
   fs.mkdirSync(OUT, { recursive: true });
   const latest = (kind, n) => (ep.assets || []).filter((a) => a.kind === kind && a.shot_number === n && a.storage_path).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))[0];
 

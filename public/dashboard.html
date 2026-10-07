@@ -1451,7 +1451,7 @@
         const a = window.__agent;
         if (!a || !a.files) return '';
         const slug = (lastLoadedData && lastLoadedData.series && lastLoadedData.series.slug) || DEFAULT_SERIES;
-        const f = (a.files.finales || []).find((x) => x.episode_id === episode.id) || (a.files.finales || []).find((x) => x.name === slug + '_ep' + episode.episode_number + '.mp4');
+        const f = (a.files.finales || []).find((x) => x.episode_id === episode.id) || (a.files.finales || []).find((x) => String(x.name).split('/').pop() === slug + '_ep' + episode.episode_number + '.mp4');
         const fresh = f && f.source === finalRender.storage_path;
         const busy = (a.jobs || []).some((j) => /^render_full:/.test(j.command) && j.command.endsWith(episode.id) && (j.status === 'pending' || j.status === 'running'));
         let html = '<div class="mt-1 text-[11px]">';

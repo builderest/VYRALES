@@ -23,10 +23,16 @@ async function main() {
 
   // El archivo local tiene que ser de la MISMA versión del video final (si no, se usa el de Supabase).
   const loadVideo = async (final) => {
-    for (const f of fs.readdirSync(FINALES).filter((x) => /\.json$/.test(x))) {
+    // Busca en la carpeta de cada serie (y en la raíz, por si quedó algo viejo).
+    const jsons = [];
+    for (const d of fs.readdirSync(FINALES, { withFileTypes: true })) {
+      if (d.isDirectory() && !d.name.startsWith('.')) fs.readdirSync(path.join(FINALES, d.name)).filter((x) => /_ep\d+\.json$/.test(x)).forEach((x) => jsons.push(path.join(FINALES, d.name, x)));
+      else if (d.isFile() && /\.json$/.test(d.name)) jsons.push(path.join(FINALES, d.name));
+    }
+    for (const jf of jsons) {
       let meta = {};
-      try { meta = JSON.parse(fs.readFileSync(path.join(FINALES, f), 'utf8')); } catch (_) { continue; }
-      const mp4 = path.join(FINALES, f.replace(/\.json$/, '.mp4'));
+      try { meta = JSON.parse(fs.readFileSync(jf, 'utf8')); } catch (_) { continue; }
+      const mp4 = jf.replace(/\.json$/, '.mp4');
       if (meta.episode_id === epId && meta.source === final.storage_path && fs.existsSync(mp4)) {
         const buf = fs.readFileSync(mp4);
         console.log(`Subiendo finales/${path.basename(mp4)} (${(buf.length / 1048576).toFixed(1)} MB, calidad completa) a ${platform}...`);

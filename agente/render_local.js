@@ -57,9 +57,11 @@ async function main() {
   const t0 = Date.now();
   const result = await renderEpisode({ episode: ep, series, log: (...a) => console.log(...a), maxMb: Infinity, fetchFile: cachedFetch });
   try {
-    fs.mkdirSync(FINALES, { recursive: true });
+    // Una carpeta por serie: <FINALES>\<serie>\<serie>_ep<N>.mp4
+    const dir = path.join(FINALES, series.slug);
+    fs.mkdirSync(dir, { recursive: true });
     const name = fileNameFor(series.slug, ep.episode_number);
-    const dest = path.join(FINALES, name);
+    const dest = path.join(dir, name);
     const tmp = dest + '.part.mp4';
     // Subida a 1080x1920: las tomas de Veo vienen en 720x1280 y YouTube/TikTok comprimen MUCHO
     // más fuerte los videos de 720p (un Short en 720p se ve borroso). Escalado lanczos + nitidez
@@ -75,7 +77,7 @@ async function main() {
       source: fin ? fin.storage_path : null, quality_v: QUALITY_V, seconds: result.seconds, rendered_at: new Date().toISOString()
     }, null, 1));
     const mb = fs.statSync(dest).size / 1048576;
-    console.log(`LISTO: finales/${name} · ${mb.toFixed(1)} MB · ${result.seconds.toFixed(1)} s · ${((Date.now() - t0) / 60000).toFixed(1)} min`);
+    console.log(`LISTO: ${series.slug}/${name} · ${mb.toFixed(1)} MB · ${result.seconds.toFixed(1)} s · ${((Date.now() - t0) / 60000).toFixed(1)} min`);
   } finally {
     if (result.cleanup) result.cleanup();
   }
