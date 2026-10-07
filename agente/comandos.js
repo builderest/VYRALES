@@ -31,6 +31,8 @@ module.exports = {
     label: 'Rehacer tomas en la PC (LTX)', help: 'Rehace tomas con LTX en king y vuelve a unir el episodio',
     special: 'regen_local', arg: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}:\d{1,2}(,\d{1,2})*(:\d{1,2}(,\d{1,2})*)?$/i, hidden: true
   },
+  // "prueba_ltx_voz:<episode_id>:<tomas>" — LTX genera video CON su propia voz (prueba, no toca el episodio).
+  prueba_ltx_voz: { label: 'Prueba LTX con voces propias', help: 'LTX genera las tomas con la voz incluida (gratis en king) para comparar con las voces fijas', special: 'prueba_ltx_voz', arg: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}:\d{1,2}(,\d{1,2})*$/i, hidden: true },
   prueba_flux: { label: 'Prueba cuadros Flux en king (3 tomas EP3)', help: 'Hace 3 cuadros iniciales del EP 3 con Flux.2 Klein en king y los pone al lado de los de Gemini (gratis)', special: 'prueba_flux' },
   prueba_ltx: { label: 'Prueba LTX-2.5 en king (3 tomas EP2)', help: 'Genera 3 tomas del EP 2 con LTX-2.5 en king y las deja junto a las de Veo en finales/prueba_ltx (gratis)', special: 'prueba_ltx' },
   discos: { label: 'Espacio en discos de esta PC', help: 'Libre / total de cada disco (C:, D:, E:...) y dónde se guardan los videos', special: 'discos' },
