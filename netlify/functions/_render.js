@@ -105,6 +105,8 @@ function assHeader(sub) {
     `Style: Sub,${FONT_NAME},${size},${primary},${secondary},${st.outline},${st.back},0,0,0,0,100,100,0,0,${st.border},${st.outlineW},${st.shadow},2,60,60,${mv},1`,
     `Style: Top,${FONT_NAME},44,&H0000E1FF,&H000000FF,&H00000000,&H64000000,0,0,0,0,100,100,0,0,1,4,1,8,60,60,170,1`,
     `Style: Card,${FONT_NAME},66,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,0,0,5,70,70,0,1`,
+    `Style: EndBig,${FONT_NAME},74,&H00FFFFFF,&H000000FF,&H00000000,&H96000000,0,0,0,0,100,100,0,0,1,5,2,5,50,50,0,1`,
+    `Style: EndSmall,${FONT_NAME},44,&H0000E1FF,&H000000FF,&H00000000,&H96000000,0,0,0,0,100,100,0,0,1,4,2,5,50,50,0,1`,
     `Style: CardSmall,${FONT_NAME},40,&H00B4B4B4,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,0,0,5,70,70,0,1`,
     '', '[Events]', 'Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text'
   ];
@@ -222,6 +224,57 @@ async function renderCard({ cwd, out, lines, seconds, sub }) {
   return dur;
 }
 
+// Cierre sobre la última imagen del episodio: zoom lento, un poco más oscura, texto grande y
+// (si la serie tiene narrador con voz fija) la voz del narrador diciendo el texto.
+async function renderTail({ cwd, from, out, lines, seconds, voice, sub }) {
+  const dur = Math.max(1.5, Math.min(7, voice ? 0.4 + voice.seconds + 0.6 : Number(seconds) || 2.5));
+  const png = path.basename(out, '.mp4') + '.png';
+  await run(['-y', '-sseof', '-0.15', '-i', from, '-frames:v', '1', '-update', '1', png], cwd);
+  const frames = Math.max(2, Math.round(dur * FPS));
+  const events = [];
+  if (lines[0]) events.push({ start: 0.15, end: dur, style: 'EndBig', text: `{\\pos(${W / 2},${Math.round(H * 0.44)})\\fad(250,0)}` + clean(lines[0]) });
+  if (lines[1]) events.push({ start: 0.45, end: dur, style: 'EndSmall', text: `{\\pos(${W / 2},${Math.round(H * 0.44) + 125})\\fad(250,0)}` + clean(lines[1]) });
+  const assName = path.basename(out, '.mp4') + '.ass';
+  fs.writeFileSync(path.join(cwd, assName), [...assHeader(sub), ...events.map(dialogueLine), ''].join('\n'));
+  const vf = `scale=${W * 2}:${H * 2},zoompan=z='1+0.06*on/${frames}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${frames}:s=${W}x${H}:fps=${FPS},eq=brightness=-0.12,setsar=1,ass=${assName}:fontsdir=fonts`;
+  const args = ['-y', '-i', png];
+  let fc;
+  if (voice) {
+    args.push('-i', voice.file);
+    fc = `[0:v]${vf}[v];[1:a]aresample=48000,aformat=channel_layouts=stereo,adelay=400|400,apad[a]`;
+  } else {
+    args.push('-f', 'lavfi', '-i', 'anullsrc=channel_layout=stereo:sample_rate=48000');
+    fc = `[0:v]${vf}[v];[1:a]anull[a]`;
+  }
+  await run([...args, '-filter_complex', fc, '-map', '[v]', '-map', '[a]', '-t', dur.toFixed(3), ...VIDEO_OUT, ...AUDIO_OUT, out], cwd);
+  return { dur, narr: voice ? { start: 0.4, seconds: voice.seconds, file: voice.file, tempo: 1 } : null };
+}
+// Voz del cierre con el narrador de la serie (Gemini TTS, ~$0.001). Se guarda en caché por texto+voz
+// para no pagarla en cada render. Si falla, el cierre sale igual, solo con texto.
+async function endVoice({ cwd, text, cfg, log }) {
+  try {
+    const { synthesize, tightenSpeech, wavSeconds, DEFAULT_VOICE, DEFAULT_STYLE, TTS_MODEL_DEFAULT } = require('./_tts');
+    const voice = cfg.voice || DEFAULT_VOICE, model = cfg.model || TTS_MODEL_DEFAULT, style = cfg.style || DEFAULT_STYLE;
+    const key = require('crypto').createHash('sha1').update([text, voice, model, style].join('|')).digest('hex').slice(0, 16);
+    const dir = path.join(os.tmpdir(), 'vyrales-cierre');
+    const cached = path.join(dir, key + '.wav');
+    let wav;
+    if (fs.existsSync(cached)) wav = fs.readFileSync(cached);
+    else {
+      const r = await synthesize({ text, voice, style, model, log });
+      wav = tightenSpeech(r.wav, log);
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(cached, wav);
+      log(`voz del cierre generada (${voice}, ~$${(r.costUsd || 0).toFixed(4)}).`);
+    }
+    fs.writeFileSync(path.join(cwd, 'cierre.wav'), wav);
+    return { file: 'cierre.wav', seconds: wavSeconds(wav) };
+  } catch (err) {
+    log('AVISO: no se pudo generar la voz del cierre (' + (err.message || err) + '); va solo con texto.');
+    return null;
+  }
+}
+
 // ---------- Plan ----------
 // Transición recomendada por defecto (el corte directo se veía brusco entre tomas de IA):
 // misma escena (mismo lugar) → fundido cruzado corto; cambio de lugar → fundido a negro; última toma → corte.
@@ -250,9 +303,11 @@ function autoEndCard(episode) {
   const n = Number(episode && episode.episode_number) || 1;
   const total = Number(episode && episode.total_episodes) || 0;
   const last = total > 0 && n >= total;
+  // mode 'tail': NO es pantalla negra; es la última imagen con zoom lento + texto + la voz del narrador.
+  // Textos siempre ciertos (no dice "ya está en el perfil": puede que la parte siguiente aún no esté publicada).
   return last
-    ? { enabled: true, text: 'FIN', subtext: 'Síguenos para más historias como esta', seconds: 2.5 }
-    : { enabled: true, text: 'CONTINÚA EN LA PARTE ' + (n + 1), subtext: 'Síguenos para no perdértela', seconds: 2.5 };
+    ? { enabled: true, mode: 'tail', text: 'FIN', subtext: 'Síguenos para más historias como esta', voice: 'Fin. Síguenos para más historias como esta.', seconds: 2.5 }
+    : { enabled: true, mode: 'tail', text: 'CONTINÚA EN LA PARTE ' + (n + 1), subtext: 'Síguenos para no perdértela', voice: 'Continúa en la parte ' + (n + 1) + '. Síguenos para no perdértela.', seconds: 2.5 };
 }
 // Cuántos episodios tiene la serie (para saber si este es el último).
 async function withTotalEpisodes(supabase, episode) {
@@ -340,6 +395,8 @@ async function renderEpisode({ episode, series, log = console.log, fetchFile = d
       log('tarjeta de título...');
       parts.push({ file: 'p00-title.mp4', dur: await renderCard({ cwd, out: 'p00-title.mp4', lines: [plan.title_card.text, plan.title_card.subtext], seconds: plan.title_card.seconds, sub }), xfade: 0 });
     }
+    const tailMode = !!(plan.end_card.enabled && plan.end_card.mode === 'tail' && (plan.end_card.text || plan.end_card.subtext));
+    const TAIL_XF = 0.3;
     let i = 0;
     for (const c of chosen) {
       i++;
@@ -366,13 +423,22 @@ async function renderEpisode({ episode, series, log = console.log, fetchFile = d
       // Clips generados ANTES del narrador TTS traen la voz de Veo pegada: se silencia su audio.
       // Voces fijas para todos: se calla cualquier voz que traiga el clip (por si se generó con audio).
       const muteOriginal = !!(narration && (castMode(series && series.story_bible) || /Voice-over narration/i.test(clipsByShot[c.shot].prompt || '')));
-      const tailReserve = XFADE[c.transition] && i < chosen.length ? tSec(c) : 0;
+      const tailReserve = XFADE[c.transition] && i < chosen.length ? tSec(c) : (i === chosen.length && tailMode ? TAIL_XF : 0);
       const r = await renderClip({ cwd, input: src, out, c, subtitle, speakerColor: spk ? SPEAKER_COLORS[speakers.indexOf(spk) % SPEAKER_COLORS.length] : null, sub, fadeIn, fadeOut, narration, muteOriginal, tailReserve });
       const dur = r.dur;
       if (r.narr && r.narr.tempo > 1.001) log(`toma ${c.shot}: narración acelerada ${r.narr.tempo.toFixed(2)}x para que quepa.`);
       parts.push({ file: out, dur, narr: r.narr, xfade: XFADE[c.transition] && i < chosen.length ? Math.min(tSec(c), dur / 2) : 0, xname: XFADE[c.transition] || 'fade' });
     }
-    if (plan.end_card.enabled && (plan.end_card.text || plan.end_card.subtext)) {
+    if (tailMode) {
+      log('cierre sobre la última imagen...');
+      const lastPart = parts[parts.length - 1];
+      const cfg = narrationConfig(series && series.story_bible);
+      const voice = cfg && plan.end_card.voice ? await endVoice({ cwd, text: plan.end_card.voice, cfg, log }) : null;
+      const t = await renderTail({ cwd, from: lastPart.file, out: 'p99-end.mp4', lines: [plan.end_card.text, plan.end_card.subtext], seconds: plan.end_card.seconds, voice, sub });
+      lastPart.xfade = Math.min(TAIL_XF, lastPart.dur / 2);
+      lastPart.xname = 'fade';
+      parts.push({ file: 'p99-end.mp4', dur: t.dur, narr: t.narr, xfade: 0 });
+    } else if (plan.end_card.enabled && (plan.end_card.text || plan.end_card.subtext)) {
       log('tarjeta final...');
       parts.push({ file: 'p99-end.mp4', dur: await renderCard({ cwd, out: 'p99-end.mp4', lines: [plan.end_card.text, plan.end_card.subtext], seconds: plan.end_card.seconds, sub }), xfade: 0 });
     }

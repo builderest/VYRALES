@@ -868,8 +868,6 @@
     if (!res.ok) return alert(out.error || 'No se pudo cargar el plan de edición.');
     st.plan = normalizePlan(out.plan);
     if (!out.saved) {
-      st.plan.end_card.text = 'Continúa en el episodio ' + (st.ep.episode_number + 1);
-      st.plan.end_card.subtext = 'Sígueme para no perdértelo';
       st.plan.title_card.text = (d.series && d.series.title) || '';
       st.plan.title_card.subtext = 'Episodio ' + st.ep.episode_number + (st.ep.title ? ' · ' + st.ep.title : '');
     }
