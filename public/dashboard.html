@@ -1882,12 +1882,14 @@
         const price = o.kind === 'video' ? (o.cost ? Number(o.cost) : null) : IMAGE_PRICE_USD;
         document.getElementById('pmTitle').textContent = title;
         document.getElementById('pmSubtitle').textContent = o.kind === 'video'
-          ? 'Prompt que recibirá Veo para esta toma.'
+          ? (o.prov === 'king' ? 'Se rehace con LTX en tu PC king (gratis). Si editas este texto, LTX lo usa como descripción de la escena (más la ropa, el fondo y la cámara de la toma).' : 'Prompt que recibirá Veo para esta toma.')
           : o.kind === 'character' ? 'Prompt de la foto de cara (Gemini). Se adjuntan las fotos ya hechas de otros personajes SOLO como referencia de estilo, para que todas salgan iguales. Se guarda y se reutiliza en todos los cuadros.'
           : (o.kind === 'keyframe' ? 'Prompt del cuadro inicial (Gemini). Se le adjuntan las fotos de cara y la imagen fija del lugar.' : 'Prompt de la imagen fija del lugar (Gemini).');
         const gen = document.getElementById('pmGenerate');
         gen.classList.toggle('hidden', o.mode === 'save');
-        gen.innerHTML = '<i class="fa-solid fa-bolt mr-1"></i>Guardar y generar' + ((o.kind === 'keyframe' || o.kind === 'video') ? ' TOMA ' + String(o.n).padStart(2, '0') : '') + (price ? ' (~$' + price.toFixed(2) + ')' : '');
+        gen.innerHTML = (o.kind === 'video' && o.prov === 'king')
+          ? '<i class="fa-solid fa-bolt mr-1"></i>Guardar y rehacer TOMA ' + String(o.n).padStart(2, '0') + ' con LTX (gratis)'
+          : '<i class="fa-solid fa-bolt mr-1"></i>Guardar y generar' + ((o.kind === 'keyframe' || o.kind === 'video') ? ' TOMA ' + String(o.n).padStart(2, '0') : '') + (o.kind === 'video' && o.prov === 'fal' ? ' con Veo' : '') + (price ? ' (~$' + price.toFixed(2) + ')' : '');
         document.getElementById('pmText').value = 'Cargando...';
         pmError('');
         pm = o;
@@ -2020,7 +2022,7 @@
         const m = seriesModels(lastLoadedData.series);
         const model = asset.model === 'veo_fast' || asset.model === 'veo_standard' ? asset.model : m.shot;
         window.openPromptEditor(null, {
-          kind: 'video', episodeId: ep.id, n: asset.shot_number, mode: 'generate',
+          kind: 'video', episodeId: ep.id, n: asset.shot_number, mode: 'generate', prov,
           cost: prov === 'king' ? '0.00' : (m.secs * ((FAL_PRICE_PER_SEC[model] || {})[silentVideo() ? 'silent' : 'audio'] || 0)).toFixed(2),
           onGenerate: () => runRegenShot(assetId, prov)
         });

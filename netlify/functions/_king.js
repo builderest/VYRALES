@@ -29,9 +29,14 @@ function ltxPromptFor(shot, storyBible) {
   void names;
   return [
     'The video starts exactly on the provided image and keeps its composition, people, clothing, lighting and background.',
-    shot.start_en ? 'Scene at the start: ' + clean(shot.start_en) + '.' : '',
-    shot.action_en ? 'Then, slowly and naturally: ' + clean(shot.action_en) + '.' : '',
-    shot.reaction_en ? 'By the end: ' + clean(shot.reaction_en) + '.' : '',
+    // Si el usuario editó el prompt de la toma en el panel, esa descripción manda.
+    ...(shot.prompt_override && shot.prompt_override.trim()
+      ? ['Scene: ' + clean(shot.prompt_override).slice(0, 1200)]
+      : [
+        shot.start_en ? 'Scene at the start: ' + clean(shot.start_en) + '.' : '',
+        shot.action_en ? 'Then, slowly and naturally: ' + clean(shot.action_en) + '.' : '',
+        shot.reaction_en ? 'By the end: ' + clean(shot.reaction_en) + '.' : ''
+      ]),
     moving
       ? 'Camera: ' + cam + ', very slow and subtle; the framing stays close to the first frame.'
       : 'Camera: ' + (cam ? cam + '. ' : '') + 'Locked-off tripod shot. The camera does not move at all: no zoom, no push-in, no pan, fixed framing for the whole clip.',

@@ -112,12 +112,19 @@ Si algo no está escrito en el JSON, la IA lo inventa distinto en cada toma. Esc
 12c. Fotos, retratos, cuadros y pósters: son objetos quietos; nunca les des acción (no "la foto sonríe"). Si alguien le habla a una foto, la foto debe verse en start_en y la mirada del personaje va a la foto.
 12d. Close-up con 2 personajes: start_en dice cuál está enfocado y dónde queda el otro (al borde, desenfocado). Una sola imagen continua, nunca pantalla dividida.
 13. EVITA en cámara (Veo los genera mal): espejos y reflejos, texto legible (carteles, pantallas con letras, documentos leíbles), multitudes, peleas, carreras o persecuciones, primeros planos de dedos/manos haciendo cosas finas. Para cartas o pantallas, describe la reacción del personaje, no el texto.
+13a. CERO ERRORES VISUALES (aprendido produciendo episodios reales; cumple TODAS):
+   - wardrobe: en CADA toma y para CADA personaje en cuadro, ropa completa INCLUYENDO EL CALZADO ("brown leather ankle boots", "simple indoor shoes", o "barefoot" si la época lo exige). Si no dices el calzado, la IA de video deja a la gente descalza.
+   - visual_style describe SOLO el look (fotorrealista/animado, luz, color, tipo de cámara). NUNCA ropa, época ni "prehistoric garments": si la serie mezcla épocas (ej. científica de hoy + escenas prehistóricas), eso vistió de pieles a la científica. La ropa va solo en default_outfit y wardrobe.
+   - camera: usa SOLO "static camera", "slow push-in" o (en planos generales) "slow pan". PROHIBIDO: aerial, drone, pull-back, glide, crane, orbit, "epic". La IA de video exagera esos movimientos e inventa terreno nuevo al alejarse.
+   - action_en / reaction_en: solo se mueven personajes u objetos que YA se ven en start_en. Clima y entorno, mínimos y sutiles ("a few snowflakes drift", "grass sways slightly"). PROHIBIDO pedir cosas que la IA convierte en elementos nuevos: routes, roads, paths, trails, avalanche, waterfall, storm, crowd, herd, fire spreading.
+   - background_en repite los 3–4 elementos clave del lugar (de locations.<lugar>.visual) y nada más.
+   - Personas de HOY en lugares de HOY con ropa de HOY; personas prehistóricas en lugares prehistóricos con ropa de pieles. Nunca mezcles dentro de la misma toma.
 14. Contenido apto para plataformas: sin violencia gráfica, sin contenido sexual explícito, sin marcas reales ni personas reales.
 
 === EJEMPLO DE ESTRUCTURA (respeta nombres de campos y tipos; el contenido es solo ilustrativo) ===
 ${buildExample(sample)}
 
-Antes de entregar, revisa tú mismo cada regla toma por toma (número de tomas, toma 1 con gancho fuerte, 1 hablante, ≤15 palabras, ≤2 personajes, sin comillas dobles, campos completos, start_en con posición/mirada/manos, background_en, action_en que no repite el start_en y dice a quién se habla, reaction_en posible en el mismo plano) y corrige lo que falle. Entrega solo el JSON final.`;
+Antes de entregar, revisa tú mismo cada regla toma por toma (número de tomas, toma 1 con gancho fuerte, 1 hablante, ≤15 palabras, ≤2 personajes, sin comillas dobles, campos completos, start_en con posición/mirada/manos, background_en, wardrobe con calzado, cámara permitida, sin palabras prohibidas, action_en que no repite el start_en y dice a quién se habla, reaction_en posible en el mismo plano) y corrige lo que falle. Entrega solo el JSON final.`;
 }
 
 module.exports = { buildMasterPrompt };

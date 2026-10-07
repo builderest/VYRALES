@@ -468,7 +468,8 @@ function buildImagePrompt(character, storyBible) {
   const stylized = /anim|3d|cartoon|anime|illustrat|comic|painted|claymation/i.test(fullStyle);
   const common =
     'close-up head and shoulders, facing the camera, neutral relaxed expression, ' +
-    'wearing a plain simple light-gray crew-neck top, soft even studio lighting, ' +
+    // Sin cordones ni costuras de época: Gemini copiaba esa prenda a los cuadros (EP3 T8, túnica en una casa moderna).
+    'wearing a plain simple light-gray modern cotton crew-neck t-shirt with no laces, no seams and no period details, soft even studio lighting, ' +
     'plain light-gray background, vertical 9:16. ';
   if (stylized) {
     return (
