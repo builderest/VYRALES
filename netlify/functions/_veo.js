@@ -100,7 +100,13 @@ const MODELS_WITH_REFERENCE_IMAGES = new Set(['veo_fast', 'veo_standard']);
 // los personajes de la toma para que Veo mantenga sus caras.
 // startImage: { imageBytes, mimeType } — CUADRO INICIAL (image-to-video). Veo 3.1 Lite sí lo
 // acepta: es como la memoria visual llega a Lite (la cara y el set ya vienen en el cuadro).
-async function generateVeoClip({ modelKey, prompt, aspectRatio = '9:16', durationSeconds = 8, referenceImages = [], startImage = null, provider = 'google', generateAudio = true, log = console.log }) {
+async function generateVeoClip({ modelKey, prompt, aspectRatio = '9:16', durationSeconds = 8, referenceImages = [], startImage = null, provider = 'google', generateAudio = true, ltxPrompt = null, log = console.log }) {
+  // Proveedor PC king: LTX-2.5 local por Tailscale, gratis (solo corre desde Cronix, ver _king.js).
+  if (provider === 'king') {
+    const { kingGenerateVideo } = require('./_king');
+    const { videoBuffer } = await kingGenerateVideo({ prompt: ltxPrompt || prompt, startImage, durationSeconds, log });
+    return { videoBuffer, costUsd: 0, model: 'king:ltx2.5', provider: 'king', generateAudio: false };
+  }
   // Proveedor fal.ai: mismo modelo y precio, sin cuota diaria (ver _fal.js).
   if (provider === 'fal') {
     if (referenceImages.length) throw new Error('Con fal.ai no se usan fotos de referencia directas; usa memoria visual (cuadro inicial).');

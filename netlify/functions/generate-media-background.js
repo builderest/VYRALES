@@ -21,6 +21,7 @@ const { mergeEpisodeVideo } = require('./_merge');
 const { effectiveShotPrompt, referenceUrlsForShot, videoGeneratesAudio, narrationConfig } = require('./_series');
 const { createKeyframe, loadExistingKeyframe } = require('./_keyframe');
 const { logSpend } = require('./_spend');
+const { ltxPromptFor } = require('./_king');
 
 // Estilo por defecto SOLO para series viejas sin story_bible.visual_style (dragon_silicio).
 // Las novelas nuevas definen su estilo en story_bible.visual_style (ej. animación 3D).
@@ -107,7 +108,7 @@ exports.handler = async (event) => {
   const ALLOWED_MODELS = ['veo_lite', 'veo_fast', 'veo_standard'];
   const modelOverride = ALLOWED_MODELS.includes(body.model || qs.model) ? (body.model || qs.model) : null;
   // provider: 'google' (API de Gemini, cuota diaria) o 'fal' (fal.ai, sin cuota diaria).
-  const provider = ['google', 'fal'].includes(body.provider || qs.provider) ? (body.provider || qs.provider) : (process.env.VIDEO_PROVIDER || 'google');
+  const provider = ['google', 'fal', 'king'].includes(body.provider || qs.provider) ? (body.provider || qs.provider) : (process.env.VIDEO_PROVIDER || 'google');
 
   let markedGenerating = null; // id del episodio que ESTA corrida marcó como generando_media
   console.log(LOG, 'arrancó. series=', seriesSlug, 'episode_id=', episodeId || '(ninguno, toma el siguiente en guion_generado)', isContinuation ? '(continuación)' : '');
@@ -275,7 +276,7 @@ exports.handler = async (event) => {
         console.warn(LOG, 'DETENIDO por el usuario antes de la toma', scene.number);
         break;
       }
-      if (Date.now() - startedAt > TIME_BUDGET_MS) {
+      if (!process.env.VYRALES_LOCAL_RUN && Date.now() - startedAt > TIME_BUDGET_MS) {
         console.warn(LOG, 'cerca del límite de 15 min de Netlify — me vuelvo a llamar para seguir con las tomas que faltan...');
         await fetch(selfUrl(event, Object.assign({ series: seriesSlug, episode_id: episode.id, continue: '1', provider }, modelOverride ? { model: modelOverride } : {})), { method: 'POST', headers: process.env.DASHBOARD_KEY ? { 'x-vyrales-key': process.env.DASHBOARD_KEY } : {} });
         return { statusCode: 202, body: JSON.stringify({ episode_id: episode.id, continued: true, shots_ok_this_run: results.filter((r) => r.status === 'fulfilled').length }) };
@@ -296,7 +297,7 @@ exports.handler = async (event) => {
         }
         let veo;
         try {
-          veo = await generateVeoClip({ modelKey, prompt, referenceImages, startImage, provider, generateAudio: videoGeneratesAudio(series.story_bible), log: (...a) => console.log(LOG, ...a) });
+          veo = await generateVeoClip({ modelKey, prompt, referenceImages, startImage, provider, generateAudio: videoGeneratesAudio(series.story_bible), ltxPrompt: provider === 'king' && scene.shot ? ltxPromptFor(scene.shot, series.story_bible) : null, log: (...a) => console.log(LOG, ...a) });
         } catch (vErr) {
           // Filtro de contenido de fal (Job T13: rechazó 5 veces el mismo cuadro; con un cuadro
           // nuevo de otra composición pasó a la primera). Se rehace el cuadro UNA vez (~$0.067,
@@ -306,10 +307,10 @@ exports.handler = async (event) => {
           console.warn(LOG, `toma ${scene.number}/${total}: el filtro de contenido rechazó la toma; rehago el cuadro inicial con otra composición y reintento una vez...`);
           const alt = Object.assign({}, scene.shot, { start_en: String(scene.shot.start_en || '').replace(/\.?\s*$/, '.') + ' Alternate composition: a slightly wider, calm framing with the characters a little farther from the camera, modest relaxed poses, clothing neat and covering the body.' });
           const frame2 = await createKeyframe(supabase, { series, episode, shot: alt, characters, log: (...a) => console.log(LOG, ...a) });
-          veo = await generateVeoClip({ modelKey, prompt, referenceImages, startImage: frame2.startImage, provider, generateAudio: videoGeneratesAudio(series.story_bible), log: (...a) => console.log(LOG, ...a) });
+          veo = await generateVeoClip({ modelKey, prompt, referenceImages, startImage: frame2.startImage, provider, generateAudio: videoGeneratesAudio(series.story_bible), ltxPrompt: provider === 'king' && scene.shot ? ltxPromptFor(scene.shot, series.story_bible) : null, log: (...a) => console.log(LOG, ...a) });
         }
         const { videoBuffer, costUsd, model } = veo;
-        await logSpend(supabase, { seriesId: series.id, episodeId: episode.id, shotNumber: scene.number, kind: 'video', model: provider === 'fal' ? 'fal_' + modelKey : modelKey, costUsd, note: provider === 'fal' ? 'fal.ai' : undefined });
+        await logSpend(supabase, { seriesId: series.id, episodeId: episode.id, shotNumber: scene.number, kind: 'video', model: provider === 'fal' ? 'fal_' + modelKey : provider === 'king' ? 'ltx_king' : modelKey, costUsd, note: provider === 'fal' ? 'fal.ai' : provider === 'king' ? 'PC king (gratis)' : undefined });
         console.log(LOG, `toma ${scene.number}/${total}: Veo terminó, guardando${veo.falUrl ? ' (queda en fal.ai, sin copiar a Supabase)' : ' en Supabase Storage'}...`);
 
         const storagePath = `${series.slug}/ep${episode.episode_number}/shot-${String(scene.number).padStart(2, '0')}.mp4`;
