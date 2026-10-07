@@ -34,6 +34,7 @@ module.exports = {
   prueba_flux: { label: 'Prueba cuadros Flux en king (3 tomas EP3)', help: 'Hace 3 cuadros iniciales del EP 3 con Flux.2 Klein en king y los pone al lado de los de Gemini (gratis)', special: 'prueba_flux' },
   prueba_ltx: { label: 'Prueba LTX-2.5 en king (3 tomas EP2)', help: 'Genera 3 tomas del EP 2 con LTX-2.5 en king y las deja junto a las de Veo en finales/prueba_ltx (gratis)', special: 'prueba_ltx' },
   discos: { label: 'Espacio en discos de esta PC', help: 'Libre / total de cada disco (C:, D:, E:...) y dónde se guardan los videos', special: 'discos' },
+  pc_https: { label: 'Activar reproducción desde la PC (HTTPS)', help: 'tailscale serve: publica dentro de Tailscale https://<esta-pc>.ts.net para que el panel reproduzca desde aquí', special: 'pc_https' },
   gen_estado: { label: 'Probar PC generadora (king)', help: 'Revisa por Tailscale si ComfyUI de king responde (GPU, memoria, cola)', special: 'gen_estado' },
   // Con argumento: "render_full:<episode_id>" (solo un UUID; se valida aquí y en la función agent).
   // No sale como botón en la Terminal: lo pide el panel de revisión o el propio agente.

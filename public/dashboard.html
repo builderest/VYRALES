@@ -1263,7 +1263,7 @@
           '<div class="demo-shot-card bg-cyber-darker rounded-xl border ' + (isCliff ? 'border-2 border-cyber-pink/60 shadow-neon-pink' : 'border-cyber-border') + ' overflow-hidden group hover:border-cyber-cyan transition-all flex flex-col justify-between relative" data-asset-id="' + asset.id + '" data-updated-at="' + esc(asset.updated_at || '') + '">' +
             '<div>' +
               '<div class="relative aspect-[9/16] bg-slate-950 overflow-hidden flex items-center justify-center text-slate-600 text-xs font-mono text-center p-4">' +
-                (asset.storage_path ? ('<video src="' + esc(asset.storage_path) + '" controls preload="none"' + posterFor(asset) + ' playsinline class="w-full h-full object-cover absolute inset-0 bg-black"' + narrAttrsFor(asset) + '></video>') : 'Sin preview aún') +
+                (asset.storage_path ? ('<video src="' + esc(vyMedia(asset.storage_path)) + '" controls preload="none"' + posterFor(asset) + ' playsinline class="w-full h-full object-cover absolute inset-0 bg-black"' + narrAttrsFor(asset) + '></video>') : 'Sin preview aún') +
                 '<div class="absolute top-3 left-3 right-3 flex justify-between items-center text-[10px] font-mono">' +
                   '<span class="bg-black/80 text-cyber-cyan border border-cyber-cyan/30 px-2 py-0.5 rounded">TOMA ' + String(shotNo).padStart(2, '0') + ' / ' + total + '</span>' +
                   '<span class="bg-cyber-emerald/90 text-black font-bold px-2 py-0.5 rounded">' + modelLabel + ' (' + cost + ')</span>' +
@@ -1447,6 +1447,34 @@
         box.classList.remove('hidden');
       }
 
+      // ---------- Reproducir desde la PC (Tailscale) y Supabase SOLO si la PC no responde ----------
+      // La PC guarda una copia de cada toma/video final y la sirve por https://<pc>.ts.net (tailscale serve).
+      // Si el celular/PC no llega a la PC (Tailscale apagado, PC apagada, archivo aún no copiado),
+      // el reproductor cambia solo a la dirección de Supabase.
+      window.__pcMedia = null;
+      window.vyMedia = function(u) {
+        const p = window.__pcMedia;
+        if (!u || !p || !/^https:\/\//.test(u) || u.startsWith(p.base)) return u;
+        return p.base + '/u?k=' + encodeURIComponent(p.token) + '&url=' + encodeURIComponent(u);
+      };
+      document.addEventListener('error', (e) => {
+        const el = e.target;
+        if (!el || !/^(VIDEO|AUDIO|IMG|SOURCE)$/.test(el.tagName || '')) return;
+        const src = el.getAttribute('src') || '';
+        if (!/\/u\?k=/.test(src)) return;
+        try { const orig = new URL(src).searchParams.get('url'); if (orig) { el.setAttribute('src', orig); if (el.load) el.load(); } } catch (_) {}
+      }, true);
+      async function probePc(a) {
+        const f = a && a.files;
+        if (!f || !f.https_base) { window.__pcMedia = null; return; }
+        if (window.__pcProbe && Date.now() - window.__pcProbe < 60000) return;
+        window.__pcProbe = Date.now();
+        try {
+          const r = await fetch(f.https_base + '/ping?k=' + encodeURIComponent(f.token), { cache: 'no-store', signal: AbortSignal.timeout(2500) });
+          window.__pcMedia = r.ok ? { base: f.https_base, token: f.token } : null;
+        } catch (_) { window.__pcMedia = null; }
+      }
+
       // ---------- Calidad completa desde la PC (agente + Tailscale) ----------
       // El video final de Supabase va recomprimido (límite de 50 MB del plan gratis). El agente de la PC
       // lo vuelve a armar sin recomprimir en VYRALE/finales y lo sirve solo dentro de Tailscale.
@@ -1498,7 +1526,7 @@
           panel.classList.remove('hidden');
           panel.innerHTML =
             '<div class="flex items-center gap-3 bg-cyber-darker border border-cyber-emerald/40 rounded-lg p-2">' +
-              '<video src="' + esc(finalRender.storage_path) + '" controls preload="none"' + posterFor({ episode_id: episode.id, shot_number: 1 }, ((episode.validator_report || {}).publish_package || {}).cover_url) + ' class="w-20 h-32 object-cover rounded bg-black"></video>' +
+              '<video src="' + esc(vyMedia(finalRender.storage_path)) + '" controls preload="none"' + posterFor({ episode_id: episode.id, shot_number: 1 }, ((episode.validator_report || {}).publish_package || {}).cover_url) + ' class="w-20 h-32 object-cover rounded bg-black"></video>' +
               '<div class="text-xs font-mono">' +
                 '<p class="text-cyber-emerald font-bold"><i class="fa-solid fa-check-circle mr-1"></i>Video final del episodio #' + episode.episode_number + ' listo (' + clips.length + ' tomas unidas).</p>' +
                 '<button type="button" onclick="openMedia(this)" data-src="' + esc(finalRender.storage_path) + '" data-kind="video" data-title="EP ' + episode.episode_number + ' · Video final" class="text-cyber-cyan hover:underline"><i class="fa-solid fa-circle-play mr-1"></i>Ver / descargar</button>' +
@@ -1763,7 +1791,7 @@
         const body = document.getElementById('mediaBody');
         body.innerHTML = kind === 'image'
           ? '<img src="' + esc(src) + '" alt="' + esc(title) + '" class="max-h-[85vh] w-auto object-contain">'
-          : '<video src="' + esc(src) + '" controls autoplay playsinline class="max-h-[85vh] w-full bg-black"' +
+          : '<video src="' + esc(vyMedia(src)) + '" controls autoplay playsinline class="max-h-[85vh] w-full bg-black"' +
             (el.getAttribute('data-narr') ? ' data-narr="' + esc(el.getAttribute('data-narr')) + '" data-narr-secs="' + esc(el.getAttribute('data-narr-secs') || '') + '" data-mute="' + esc(el.getAttribute('data-mute') || '0') + '"' : '') + '></video>';
         document.getElementById('mediaModal').classList.remove('hidden');
         document.body.style.overflow = 'hidden';
@@ -3010,6 +3038,7 @@
           lastDataSig = dataSig(data);
           window.__social = await socialP; // cuentas conectadas (sin tokens) para el panel PUBLICAR
           window.__agent = await agentP;   // videos en calidad completa en la PC (Tailscale)
+          await probePc(window.__agent);   // ¿se puede reproducir desde la PC? (si no, Supabase)
           lastAgentSig = agentSig(window.__agent);
           renderSeriesSelector(data.all_series || [], data.series);
           renderVeoMode(data.series);
@@ -3341,6 +3370,6 @@
             </div>
         </div>
     </div>
-    <script src="editor.js?v=17"></script>
+    <script src="editor.js?v=18"></script>
 </body>
 </html>

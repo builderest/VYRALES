@@ -87,6 +87,13 @@ async function runJob(job) {
         p.on('close', (c) => { clearTimeout(timer); resolve(c == null ? 1 : c); });
       });
     }
+    else if (def.special === 'pc_https') {
+      try {
+        add(execFileSync(tailscaleExe(), ['serve', '--bg', '8788'], { encoding: 'utf8', timeout: 30000 }) + '\n');
+      } catch (err) { add('ERROR: ' + String(err.stdout || '') + String(err.stderr || err.message) + '\n'); code = 1; }
+      httpsCheckedAt = 0; refreshHttpsBase();
+      add(httpsBase ? '✔ Reproducción desde la PC activa: ' + httpsBase + '\n' : '✖ Todavía no hay dirección https. Revisa arriba el mensaje de Tailscale (puede pedir activar HTTPS en login.tailscale.com → DNS).\n');
+    }
     else if (def.special === 'discos') {
       for (const d of 'CDEFGHIJ') {
         try { const s = fs.statfsSync(d + ':\\'); add(d + ':  ' + (s.bavail * s.bsize / 1073741824).toFixed(0) + ' GB libres de ' + (s.blocks * s.bsize / 1073741824).toFixed(0) + ' GB\n'); } catch (_) {}
@@ -182,19 +189,58 @@ function ensureFileServer() {
   srv.on('error', (e) => { fileServerErr = e.message; fileServer = null; fileServerIp = null; log('descargas: ' + e.message); });
   srv.listen(FILE_PORT, ip, () => { fileServerErr = null; log('descargas en calidad completa: http://' + ip + ':' + FILE_PORT + ' (solo Tailscale)'); });
   fileServer = srv; fileServerIp = ip;
+  ensureLocalServer();
+}
+// Copia en 127.0.0.1:8788 para "tailscale serve" (HTTPS dentro de Tailscale): la página https://vyrales.app
+// solo puede reproducir videos de direcciones https. No se abre a la red: solo Tailscale la publica.
+let localServer = null;
+function ensureLocalServer() {
+  if (localServer) return;
+  localServer = http.createServer(serveFile);
+  localServer.on('error', (e) => { log('servidor local 8788: ' + e.message); localServer = null; });
+  localServer.listen(8788, '127.0.0.1');
+}
+// Dirección https de esta PC en Tailscale (MagicDNS), si "tailscale serve" está activo.
+let httpsBase = null;
+let httpsCheckedAt = 0;
+function tailscaleExe() { return IS_WIN && fs.existsSync('C:\\Program Files\\Tailscale\\tailscale.exe') ? 'C:\\Program Files\\Tailscale\\tailscale.exe' : 'tailscale'; }
+function refreshHttpsBase() {
+  if (Date.now() - httpsCheckedAt < 5 * 60000) return;
+  httpsCheckedAt = Date.now();
+  try {
+    const st = JSON.parse(execFileSync(tailscaleExe(), ['serve', 'status', '--json'], { encoding: 'utf8', timeout: 8000 }) || '{}');
+    const web = st.Web || {};
+    const host = Object.keys(web).find((h) => /:443$/.test(h));
+    httpsBase = host ? 'https://' + host.replace(/:443$/, '') : null;
+  } catch (_) { httpsBase = null; }
 }
 function serveFile(req, res) {
   try {
     const u = new URL(req.url, 'http://x');
+    const okKey = u.searchParams.get('k') || '';
+    const keyOk = okKey.length === FILE_TOKEN.length && crypto.timingSafeEqual(Buffer.from(okKey), Buffer.from(FILE_TOKEN));
+    // La página (https://vyrales.app) prueba si la PC responde y reproduce desde aquí.
+    const cors = { 'Access-Control-Allow-Origin': '*' };
+    if (u.pathname === '/ping') { res.writeHead(keyOk ? 200 : 404, Object.assign({ 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }, cors)); return res.end(keyOk ? '{"ok":true}' : '{}'); }
+    if (!keyOk) { res.writeHead(404); return res.end('No encontrado'); }
+    let file = null;
+    let type = 'video/mp4';
+    let dlName = null;
     // "/f/<serie>/<archivo>.mp4" (una carpeta por serie). Solo letras, números, _ y -: nada de "..".
     const m = /^\/f\/((?:[A-Za-z0-9_\-]+\/)?[A-Za-z0-9_\-]+\.mp4)$/.exec(decodeURIComponent(u.pathname));
-    const okKey = u.searchParams.get('k') || '';
-    if (!m || okKey.length !== FILE_TOKEN.length || !crypto.timingSafeEqual(Buffer.from(okKey), Buffer.from(FILE_TOKEN))) { res.writeHead(404); return res.end('No encontrado'); }
-    const file = path.join(FINALES, m[1]);
-    if (!fs.existsSync(file)) { res.writeHead(404); return res.end('No encontrado'); }
+    if (m) { file = path.join(FINALES, m[1]); dlName = path.basename(m[1]); }
+    // "/u?url=<url de Supabase/fal>": la copia guardada en esta PC (para reproducir SIN gastar Supabase).
+    if (u.pathname === '/u') {
+      const orig = u.searchParams.get('url') || '';
+      if (!/^https:\/\//.test(orig)) { res.writeHead(404); return res.end('No encontrado'); }
+      file = path.join(CLIP_CACHE, cacheNameFor(orig));
+      const ext = path.extname(new URL(orig).pathname).toLowerCase();
+      type = { '.mp4': 'video/mp4', '.wav': 'audio/wav', '.mp3': 'audio/mpeg', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp' }[ext] || 'application/octet-stream';
+    }
+    if (!file || !fs.existsSync(file)) { res.writeHead(404, cors); return res.end('No encontrado'); }
     const size = fs.statSync(file).size;
-    const head = { 'Content-Type': 'video/mp4', 'Accept-Ranges': 'bytes', 'Cache-Control': 'no-store' };
-    if (u.searchParams.get('dl')) head['Content-Disposition'] = 'attachment; filename="' + path.basename(m[1]) + '"';
+    const head = Object.assign({ 'Content-Type': type, 'Accept-Ranges': 'bytes', 'Cache-Control': u.pathname === '/u' ? 'public, max-age=86400' : 'no-store' }, cors);
+    if (u.searchParams.get('dl') && dlName) head['Content-Disposition'] = 'attachment; filename="' + dlName + '"';
     // Safari (iPhone) pide el video por pedazos (Range): sin esto no lo reproduce.
     const r = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range || '');
     if (r) {
@@ -227,7 +273,8 @@ function filesInfo() {
       return { name: f, mb: Math.round(st.size / 104857.6) / 10, episode_id: meta.episode_id || null, source: meta.source || null, quality_v: meta.quality_v || 1 };
     });
   } catch (_) {}
-  return { base: fileServerIp ? 'http://' + fileServerIp + ':' + FILE_PORT : null, token: FILE_TOKEN, error: fileServerErr, finales };
+  refreshHttpsBase();
+  return { base: fileServerIp ? 'http://' + fileServerIp + ':' + FILE_PORT : null, https_base: httpsBase, token: FILE_TOKEN, error: fileServerErr, finales };
 }
 // Encola "render_full" para los videos finales (últimos 10 días) que todavía no están en calidad
 // completa en la PC o que cambiaron desde entonces. Uno a la vez; revisa cada minuto.
@@ -260,12 +307,14 @@ async function backupClips() {
   if (Date.now() - lastBackup < 5 * 60000) return;
   lastBackup = Date.now();
   const since = new Date(Date.now() - 60 * 86400000).toISOString();
-  const { data: clips } = await sb.from('assets').select('storage_path').eq('kind', 'video_clip').gt('created_at', since).not('storage_path', 'like', '%supabase.co%').limit(500);
+  // Todas las tomas y videos finales recientes (de fal y de Supabase): la PC los sirve para
+  // reproducir en el panel/editor sin gastar las descargas de Supabase (se bajan UNA sola vez).
+  const { data: clips } = await sb.from('assets').select('storage_path').in('kind', ['video_clip', 'final_render', 'image']).gt('updated_at', since).limit(1000);
   const todo = (clips || []).map((c) => c.storage_path).filter((u) => /^https:\/\//.test(u || '') && !fs.existsSync(path.join(CLIP_CACHE, cacheNameFor(u))));
   if (!todo.length) return;
   fs.mkdirSync(CLIP_CACHE, { recursive: true });
   let ok = 0;
-  for (const url of todo.slice(0, 20)) {
+  for (const url of todo.slice(0, 60)) {
     try {
       const res = await fetch(url, { signal: AbortSignal.timeout(60000) });
       if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -275,7 +324,7 @@ async function backupClips() {
       ok++;
     } catch (err) { log('respaldo de toma falló (' + err.message + '): ' + url); }
   }
-  log('respaldo de tomas de fal.ai: ' + ok + ' nuevas guardadas en finales/.cache' + (todo.length > 20 ? ' (quedan ' + (todo.length - 20) + ', siguen en 5 min)' : ''));
+  log('respaldo de tomas de fal.ai: ' + ok + ' nuevas guardadas en finales/.cache' + (todo.length > 60 ? ' (quedan ' + (todo.length - 60) + ', siguen en 5 min)' : ''));
 }
 
 // MUDANZA: si los videos ahora van a otra carpeta (VYRALES_FINALES_DIR, ej. king), lo que quedó en

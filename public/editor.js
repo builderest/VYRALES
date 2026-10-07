@@ -335,7 +335,7 @@
       const tr = k < inc.length - 1 ? c.transition : 'cut';
       const narr = narrOf(c, a, OVERLAP(tr) ? transS(c) : 0);
       const start0 = Number(c.trim_start) || 0;
-      push({ type: 'clip', shot: c.shot, url: a.storage_path, start: start0, end: srcLen() - (Number(c.trim_end) || 0), speed: speedOf(c), zoom: !!c.zoom, narr,
+      push({ type: 'clip', shot: c.shot, url: window.vyMedia ? window.vyMedia(a.storage_path) : a.storage_path, start: start0, end: srcLen() - (Number(c.trim_end) || 0), speed: speedOf(c), zoom: !!c.zoom, narr,
         subWin: narr ? [start0 + NARR_START * speedOf(c), start0 + (NARR_START + narr.seconds / narr.tempo) * speedOf(c)] : null,
         volume: narr && narr.mute ? 0 : (c.volume == null ? 1 : Number(c.volume)), subtitle: p.subtitles.enabled ? (c.subtitle || dialogueOf(c.shot)) : '', speaker: speakerOf(c.shot),
         overlay: c.overlay || '', dur: clipDur(c), transition: k < inc.length - 1 ? c.transition : 'cut', transition_s: transS(c), label: 'TOMA ' + String(c.shot).padStart(2, '0') });
@@ -828,7 +828,8 @@
       if (item && item.shot === shot) showOverlay(item, v.currentTime);
       movePlayhead();
     };
-    if (v.getAttribute('src') !== a.storage_path) { v.setAttribute('src', a.storage_path); v.addEventListener('loadedmetadata', seek, { once: true }); v.load(); } else seek();
+    const srcA = window.vyMedia ? window.vyMedia(a.storage_path) : a.storage_path;
+    if (v.getAttribute('src') !== srcA) { v.setAttribute('src', srcA); v.addEventListener('loadedmetadata', seek, { once: true }); v.load(); } else seek();
   }
 
   // ================= Atajos =================
