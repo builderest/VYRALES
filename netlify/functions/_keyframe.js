@@ -49,7 +49,9 @@ function buildKeyframePrompt(shot, characterRows, storyBible, hasLocationRef) {
     const outfit = (shot.wardrobe && shot.wardrobe[name]) || (row.profile && row.profile.default_outfit) || '';
     parts.push(
       `${names.length > 1 ? `Character ${i + 1}: ` : ''}${row.fixed_prompt_tag.replace(/\.?$/, '')}` +
-      (outfit ? `, wearing ${outfit}` : '') +
+      // "exactly" + prioridad sobre el estilo: el estilo de la serie decía "period-appropriate hide
+      // garments" y en las escenas modernas Gemini le puso túnica prehistórica (EP3 T8).
+      (outfit ? `, wearing exactly ${outfit.replace(/\.?$/, '')} (this outfit has priority over any clothing mentioned in the style)` : '') +
       `. From the face reference image of ${first} take ONLY the identity: exact face shape, skin tone, eye color and hair color; ` +
       `the hairstyle, clothing and accessories come from this text, never from the plain gray top in the reference photo.`
     );

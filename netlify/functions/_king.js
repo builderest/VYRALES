@@ -11,7 +11,7 @@ const GEN = () => (process.env.VYRALES_GEN_URL || 'http://100.66.84.73:8188').re
 const TEMPLATE = path.join(__dirname, '..', '..', 'agente', 'ltx2_api.json');
 // Nodos de la plantilla video_ltx2_5_i2v.
 const N = { image: '395', prompt: '398:376', negative: '398:373', width: '398:372', height: '398:360', duration: '398:362', seedA: '398:339', seedB: '398:338', strength: '398:357', save: '75' };
-const NEGATIVE = 'pc game, console game, video game, cartoon, childish, ugly, text, watermark, subtitles, letters, distorted face, deformed hands, extra fingers, extra limbs, flicker, morphing, talking, lip movement, new buildings, brick walls';
+const NEGATIVE = 'pc game, console game, video game, cartoon, childish, ugly, text, watermark, subtitles, letters, distorted face, changing face, deformed hands, extra fingers, extra limbs, flicker, morphing, talking, lip movement, new buildings, brick walls, road, dirt road, path, vehicles, outfit change, barefoot, bare feet';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -35,10 +35,21 @@ function ltxPromptFor(shot, storyBible) {
     moving
       ? 'Camera: ' + cam + ', very slow and subtle; the framing stays close to the first frame.'
       : 'Camera: ' + (cam ? cam + '. ' : '') + 'Locked-off tripod shot. The camera does not move at all: no zoom, no push-in, no pan, fixed framing for the whole clip.',
+    // Ropa de cada personaje (LTX inventaba pies descalzos o cambiaba la ropa al moverse: EP3 T2/T9).
+    wardrobeLine(shot),
     shot.background_en ? 'Background: ' + clean(shot.background_en) + ', it stays exactly the same.' : 'The background, walls, terrain and sky stay exactly the same as in the first frame; nothing new appears or is built.',
-    sb.visual_style ? clean(sb.visual_style).slice(0, 200) : 'Photorealistic cinematic footage.',
+    // Estilo de la serie SIN lo de ropa ("period-appropriate hide garments" vestía de pieles a la científica moderna).
+    sb.visual_style ? clean(sb.visual_style).split(/,\s*/).filter((x) => !/garment|cloth|outfit|wear|hide/i.test(x)).join(', ').slice(0, 200).replace(/[,.\s]*$/, '.') : 'Photorealistic cinematic footage.',
     'Natural subtle body motion, consistent faces. Nobody speaks, mouths stay closed. No text, no subtitles.'
   ].filter(Boolean).join(' ').replace(/\.\s*\./g, '.').replace(/\s+/g, ' ');
+}
+
+function wardrobeLine(shot) {
+  const w = shot.wardrobe || {};
+  const items = Object.values(w).filter(Boolean);
+  if (!items.length) return '';
+  const feet = items.some((o) => /shoe|boot|footwear|sandal|sneaker|slipper/i.test(o));
+  return 'Clothing stays exactly the same for the whole clip: ' + items.map((o) => String(o).replace(/\.$/, '')).join('; ') + '.' + (feet ? ' Everyone keeps their footwear on; nobody is barefoot.' : '');
 }
 
 async function j(url, opts) {
