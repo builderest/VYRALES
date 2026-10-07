@@ -54,7 +54,7 @@ async function runPublish({ supabase, epId, platform, privacy, loadVideo, qualit
     } else if (platform === 'youtube') {
       const title = pk.youtube_title || youtubeTitle(pk.cover_text, pk.part || ('Parte ' + ep.episode_number));
       const description = pk.youtube || [pk.instagram, '#Shorts'].join('\n');
-      const r = await youtubeUpload(supabase, { videoBuffer: await loadVideo(final), title, description, tags: pk.hashtags || [], privacy: privacy || 'public', log });
+      const r = await youtubeUpload(supabase, { videoBuffer: await loadVideo(final), title, description, tags: pk.hashtags || [], privacy: privacy || 'private', log }); // PRIVADO por defecto (Franklin, oct-7: revisa antes de hacerlo público)
       if (r.privacy === 'private') await save({ status: 'uploaded_private', url: r.url, video_id: r.videoId, forced: r.forcedPrivate });
       else await save({ status: 'published', url: r.url, video_id: r.videoId, privacy: r.privacy }, { url: r.url, via: 'api' });
       log('YouTube: subido ✅', r.url, r.privacy, '· calidad', quality);
