@@ -169,6 +169,7 @@ function buildVoiceCast({ episodes = [], characters = [], storyBible = {}, exist
     vc[x.key] = {
       voice: keep[x.key] ? keep[x.key].voice : assigned[x.key],
       auto: !keep[x.key],
+      ...(x.voiceDesc ? { desc: x.voiceDesc } : {}), // descripción en inglés: la usa LTX en modo voz de LTX
       fx: old && old.fx_manual ? old.fx : (explicitFx != null ? explicitFx : fxFor(x.key, x)),
       ...(old && old.fx_manual ? { fx_manual: true } : {})
     };

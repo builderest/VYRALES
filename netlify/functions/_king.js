@@ -22,8 +22,8 @@ const isAnimated = (sb) => /animat|\b3d\b|pixar|cartoon|anime/i.test(String((sb 
 const isAncient = (sb) => /neandert|prehist|paleol|stone age|homo sapiens/i.test(JSON.stringify(sb || {}));
 // ¿Alguien habla EN CUADRO en esta toma? (voces fijas para todos y la línea no es del narrador en off)
 function speaksOnScreen(shot, sb) {
-  const { castMode, extraOf, isVoiceover } = require('./_series');
-  if (!castMode(sb || {})) return false;
+  const { castMode, extraOf, isVoiceover, ltxVoiceMode } = require('./_series');
+  if (!castMode(sb || {}) && !ltxVoiceMode(sb || {})) return false;
   // lip_sync: false = la voz va encima pero en cuadro no se le ve hablar (de espaldas/perfil). LTX, al
   // pedirle que hable, la giraba hacia la cámara (EP1 Dulce T1: dejaba de mirar la foto de la mamá).
   if (shot && shot.lip_sync === false) return false;
@@ -57,6 +57,15 @@ function ltxPromptFor(shot, storyBible) {
   // Fondo: el del guion (background_en) o, en guiones viejos, la descripción del lugar en la biblia.
   const locVisual = (() => { const l = sb.locations && shot.location && sb.locations[shot.location]; return l ? (typeof l === 'string' ? l : l.visual) : ''; })();
   const bg = shot.background_en || locVisual;
+  // Modo voz de LTX: la línea va dicha EN el video (en español, con la voz descrita del personaje).
+  const { ltxVoiceMode } = require('./_series');
+  const line = (() => { const d = shot.dialogue; return (Array.isArray(d) ? d : d ? [d] : []).find((x) => x && x.line) || null; })();
+  const vc = line && sb.voice_cast && sb.voice_cast[line.speaker];
+  const sayLine = ltxVoiceMode(sb) && speaker && line
+    ? (speaker.charAt(0).toUpperCase() + speaker.slice(1)) + ' says in Spanish' + (vc && vc.desc ? ', with ' + clean(vc.desc).replace(/^an?\s+/i, 'a ') : '') + ', calmly and clearly, the whole sentence: "' + String(line.line).replace(/"/g, '') + '" Only this person speaks.'
+    : '';
+  const ambient = (() => { const l = sb.locations && shot.location && sb.locations[shot.location]; return l && typeof l === 'object' ? l.ambient : ''; })();
+  const soundLine = ltxVoiceMode(sb) ? 'Sound: ' + (ambient ? clean(ambient) + ', ' : '') + 'soft and quiet' + (sayLine ? ', with the spoken words clear on top.' : '.') : '';
   return [
     'The video starts exactly on the provided image and keeps its composition, people, clothing, lighting and background.',
     // Si el usuario editó el prompt de la toma en el panel, esa descripción manda.
@@ -84,8 +93,8 @@ function ltxPromptFor(shot, storyBible) {
     'Acting is subtle and restrained, like a premium animated feature: small natural expressions with the eyes and brows, lips relaxed.',
     // Voces fijas para todos: el que habla mueve la boca en 0–6 s (ahí el render pone su voz); si no, bocas cerradas.
     speaksOnScreen(shot, sb)
-      ? 'Natural subtle body motion, consistent faces. ' + (speaker ? speaker.charAt(0).toUpperCase() + speaker.slice(1) : 'The character who speaks') + ' keeps the head and eyes turned toward whoever or whatever the action says they are talking to, from the first frame to the last frame, and moves the lips softly and naturally as if talking quietly during the first 6 seconds, then closes the mouth. Everyone else keeps the mouth closed. Photos, paintings and screens on the walls are still pictures. Clean cinematic image.'
-      : 'Natural subtle body motion, consistent faces, mouths closed. Clean cinematic image.'
+      ? 'Natural subtle body motion, consistent faces. ' + (speaker ? speaker.charAt(0).toUpperCase() + speaker.slice(1) : 'The character who speaks') + ' keeps the head and eyes turned toward whoever or whatever the action says they are talking to, from the first frame to the last frame' + (sayLine ? '. ' + sayLine + ' ' : ', and moves the lips softly and naturally as if talking quietly during the first 6 seconds, then closes the mouth. ') + 'Everyone else keeps the mouth closed. Photos, paintings and screens on the walls are still pictures. ' + soundLine + ' Clean cinematic image.'
+      : 'Natural subtle body motion, consistent faces, mouths closed. ' + soundLine + ' Clean cinematic image.'
   ].filter(Boolean).join(' ').replace(/\.\s*\./g, '.')
     // Guiones con "no readable text, no logos": con cfg = 1 nombrar texto/letras/logos los hace aparecer.
     .replace(/,?\s*(?:with\s+|and\s+)?(?:no|without)\s+(?:any\s+)?(?:readable\s+|visible\s+|on-screen\s+)?(?:text|writing|words|letters|logos?|captions|subtitles|watermarks?)\b(?:\s*(?:,|or|and)\s*(?:no\s+)?(?:readable\s+)?(?:text|writing|words|letters|logos?|captions|subtitles|watermarks?)\b)*/gi, '')

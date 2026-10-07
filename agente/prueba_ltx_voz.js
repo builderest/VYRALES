@@ -47,13 +47,12 @@ async function main() {
     const d = (Array.isArray(shot.dialogue) ? shot.dialogue : shot.dialogue ? [shot.dialogue] : []).find((x) => x && x.line);
     const loc = sb.locations && sb.locations[shot.location];
     const ambient = loc && typeof loc === 'object' ? loc.ambient : '';
-    let prompt = K.ltxPromptFor(shot, sb);
-    if (d) {
-      const voice = voiceOf(d.speaker) || 'a natural voice';
-      prompt = prompt.replace('There are absolutely no captions', `The speaker says, in Spanish, with ${voice}, clearly and at a natural pace: "${d.line}" Only this person speaks; everyone else stays silent. Sound: ${ambient ? ambient + ', ' : ''}quiet, no music, no other voices. There are absolutely no captions`);
-    }
-    // Sin "talking, lip movement" en el negativo (aquí SÍ debe hablar) y sin música/voces extra.
-    const negative = K.ltxNegativeFor(shot, sb) + ', music, singing, background voices, crowd noise';
+    // Se fuerza el modo voz de LTX (el mismo que usará el episodio) con la descripción de voz de cada personaje.
+    const vcast = Object.assign({}, sb.voice_cast || {});
+    if (d && !(vcast[d.speaker] && vcast[d.speaker].desc)) vcast[d.speaker] = Object.assign({}, vcast[d.speaker] || {}, { desc: voiceOf(d.speaker) });
+    const sbx = Object.assign({}, sb, { narration: Object.assign({}, sb.narration || {}, { engine: 'ltx' }), voice_cast: vcast });
+    const prompt = K.ltxPromptFor(shot, sbx);
+    const negative = K.ltxNegativeFor(shot, sbx);
     const fb = Buffer.from(await (await fetch(frame.storage_path)).arrayBuffer());
     console.log(`\nTOMA ${n} (${d ? d.speaker + ': ' + d.line : 'sin diálogo'})`);
     const t0 = Date.now();

@@ -86,6 +86,11 @@ function narrationLines(shot, sb) {
   return castMode(sb) ? all : all.filter((d) => isVoiceover(extraOf(sb || {}, d.speaker)));
 }
 // ¿El video de Veo lleva audio? Con narrador TTS se puede pedir sin audio (más barato en fal).
+// narration.engine = 'ltx': LTX genera la voz junto con el video (labios sincronizados). Nada de TTS
+// por toma; el audio del clip se conserva. (Franklin, oct-2026: "se ven mucho mejor con la voz de LTX").
+function ltxVoiceMode(sb) {
+  return !!(sb && sb.narration && sb.narration.engine === 'ltx');
+}
 function videoGeneratesAudio(sb) {
   const n = narrationConfig(sb);
   // Con voces fijas para todos, el video va SIEMPRE sin audio (si no, Veo diría las líneas
@@ -511,6 +516,7 @@ function effectiveShotPrompt(shot, characterRows, storyBible) {
 
 module.exports = {
   castMode,
+  ltxVoiceMode,
   extraOf,
   isVoiceover,
   shortName,

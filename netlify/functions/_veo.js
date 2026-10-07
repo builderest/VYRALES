@@ -104,8 +104,9 @@ async function generateVeoClip({ modelKey, prompt, aspectRatio = '9:16', duratio
   // Proveedor PC king: LTX-2.5 local por Tailscale, gratis (solo corre desde Cronix, ver _king.js).
   if (provider === 'king') {
     const { kingGenerateVideo } = require('./_king');
-    const { videoBuffer } = await kingGenerateVideo({ prompt: ltxPrompt || prompt, negative: ltxNegative, startImage, durationSeconds, log });
-    return { videoBuffer, costUsd: 0, model: 'king:ltx2.5', provider: 'king', generateAudio: false };
+    const { videoBuffer } = await kingGenerateVideo({ prompt: ltxPrompt || prompt, negative: ltxNegative, startImage, durationSeconds, keepAudio: !!generateAudio, log });
+    // generateAudio = videoGeneratesAudio(story_bible): con narración TTS se quita el audio de LTX; en modo voz de LTX se conserva.
+    return { videoBuffer, costUsd: 0, model: 'king:ltx2.5', provider: 'king', generateAudio: !!generateAudio };
   }
   // Proveedor fal.ai: mismo modelo y precio, sin cuota diaria (ver _fal.js).
   if (provider === 'fal') {

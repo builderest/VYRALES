@@ -432,7 +432,9 @@ async function renderEpisode({ episode, series, log = console.log, fetchFile = d
     if (tailMode) {
       log('cierre sobre la última imagen...');
       const lastPart = parts[parts.length - 1];
-      const cfg = narrationConfig(series && series.story_bible);
+      const sbx = (series && series.story_bible) || {};
+      // Voz del cierre: el narrador TTS de la serie (también en modo voz de LTX, que no tiene narrador).
+      const cfg = narrationConfig(sbx) || (sbx.narration && sbx.narration.engine === 'ltx' ? Object.assign({}, sbx.narration, { engine: 'gemini_tts' }) : null);
       const voice = cfg && plan.end_card.voice ? await endVoice({ cwd, text: plan.end_card.voice, cfg, log }) : null;
       const t = await renderTail({ cwd, from: lastPart.file, out: 'p99-end.mp4', lines: [plan.end_card.text, plan.end_card.subtext], seconds: plan.end_card.seconds, voice, sub });
       lastPart.xfade = Math.min(TAIL_XF, lastPart.dur / 2);
