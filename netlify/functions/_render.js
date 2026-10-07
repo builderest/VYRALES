@@ -45,6 +45,27 @@ async function probeMedia(file, cwd) {
 }
 async function probeDuration(file, cwd) { return (await probeMedia(file, cwd)).duration; }
 
+// Modo voz de LTX: dónde habla de verdad el personaje en el clip (para que el subtítulo karaoke
+// siga a la voz real). Devuelve [inicio, fin] en segundos del clip original, o null si no hay voz.
+async function detectSpeech(file, cwd) {
+  let stderr = '';
+  try { stderr = (await run(['-hide_banner', '-nostdin', '-i', file, '-vn', '-af', 'silencedetect=n=-35dB:d=0.35', '-f', 'null', '-'], cwd)).stderr; } catch (err) { stderr = err.stderr || ''; }
+  const total = (stderr.match(/Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)/) || []).slice(1).reduce((s, x, i) => s + Number(x) * [3600, 60, 1][i], 0);
+  const ev = [...stderr.matchAll(/silence_(start|end): ([0-9.]+)/g)].map((m) => [m[1], Number(m[2])]);
+  // Tramos con sonido = huecos entre silencios.
+  const sound = [];
+  let cur = 0;
+  let inSil = false;
+  for (const [k, t] of ev) {
+    if (k === 'start') { if (t - cur > 0.25) sound.push([cur, t]); inSil = true; } else { cur = t; inSil = false; }
+  }
+  if (!inSil && total - cur > 0.25) sound.push([cur, total]);
+  // Ruiditos sueltos (< 0.6 s) no son la frase: se ignoran (T12 Dulce: clic al inicio y al final).
+  const speech = sound.filter(([a, b]) => b - a >= 0.6);
+  if (!speech.length) return null;
+  return [speech[0][0], speech[speech.length - 1][1]];
+}
+
 function findFont() {
   const candidates = [
     path.join(__dirname, 'assets', 'fonts', FONT_FILE),
@@ -135,7 +156,7 @@ const NORMALIZE_V = `scale=${W}:${H}:force_original_aspect_ratio=decrease,pad=${
 const NARR_START = 0.3;
 const NARR_MAX_TEMPO = 1.2;
 
-async function renderClip({ cwd, input, out, c, subtitle, speakerColor, sub, fadeIn, fadeOut, narration = null, muteOriginal = false, tailReserve = 0 }) {
+async function renderClip({ cwd, input, out, c, subtitle, speakerColor, sub, fadeIn, fadeOut, narration = null, muteOriginal = false, tailReserve = 0, speechWindow = null }) {
   const probe = await probeMedia(input, cwd);
   const full = probe.duration;
   const ts = Math.max(0, Math.min(Number(c.trim_start) || 0, full - 1));
@@ -157,8 +178,9 @@ async function renderClip({ cwd, input, out, c, subtitle, speakerColor, sub, fad
   const events = [];
   if (subtitle) {
     // Con narración TTS el subtítulo sigue a la voz real; si no, la ventana fija del prompt (0–6 s).
-    const st = narr ? NARR_START : Math.max(0, (SPEECH[0] - ts) / speed);
-    const en = narr ? Math.min(dur - 0.05, NARR_START + narr.seconds) : Math.min(dur - 0.05, (SPEECH[1] - ts) / speed);
+    const win = speechWindow || SPEECH; // modo voz de LTX: la voz detectada en el clip
+    const st = narr ? NARR_START : Math.max(0, (win[0] - ts) / speed);
+    const en = narr ? Math.min(dur - 0.05, NARR_START + narr.seconds) : Math.min(dur - 0.05, (win[1] - ts) / speed);
     if (en > st + 0.3) events.push({ start: st, end: en, style: 'Sub', text: subtitleText(subtitle, en - st, sub, speakerColor) });
   }
   if (c.overlay) events.push({ start: 0, end: dur, style: 'Top', text: clean(c.overlay) });
@@ -383,6 +405,7 @@ async function renderEpisode({ episode, series, log = console.log, fetchFile = d
   chosen.forEach((c) => { const s = speakerOf(shotsByN[c.shot]); if (s && !speakers.includes(s)) speakers.push(s); });
 
   const ttsMode = !!narrationConfig(series && series.story_bible);
+  const ltxVoice = !!(series && series.story_bible && series.story_bible.narration && series.story_bible.narration.engine === 'ltx');
   const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'vyrales-render-'));
   const cleanup = () => fs.rmSync(cwd, { recursive: true, force: true });
   try {
@@ -424,7 +447,8 @@ async function renderEpisode({ episode, series, log = console.log, fetchFile = d
       // Voces fijas para todos: se calla cualquier voz que traiga el clip (por si se generó con audio).
       const muteOriginal = !!(narration && (castMode(series && series.story_bible) || /Voice-over narration/i.test(clipsByShot[c.shot].prompt || '')));
       const tailReserve = XFADE[c.transition] && i < chosen.length ? tSec(c) : (i === chosen.length && tailMode ? TAIL_XF : 0);
-      const r = await renderClip({ cwd, input: src, out, c, subtitle, speakerColor: spk ? SPEAKER_COLORS[speakers.indexOf(spk) % SPEAKER_COLORS.length] : null, sub, fadeIn, fadeOut, narration, muteOriginal, tailReserve });
+      const speechWindow = ltxVoice && subtitle ? await detectSpeech(src, cwd) : null;
+      const r = await renderClip({ cwd, input: src, out, c, subtitle, speechWindow, speakerColor: spk ? SPEAKER_COLORS[speakers.indexOf(spk) % SPEAKER_COLORS.length] : null, sub, fadeIn, fadeOut, narration, muteOriginal, tailReserve });
       const dur = r.dur;
       if (r.narr && r.narr.tempo > 1.001) log(`toma ${c.shot}: narración acelerada ${r.narr.tempo.toFixed(2)}x para que quepa.`);
       parts.push({ file: out, dur, narr: r.narr, xfade: XFADE[c.transition] && i < chosen.length ? Math.min(tSec(c), dur / 2) : 0, xname: XFADE[c.transition] || 'fade' });
@@ -533,4 +557,4 @@ async function renderEpisode({ episode, series, log = console.log, fetchFile = d
   }
 }
 
-module.exports = { run, download, renderEpisode, resolvePlan, defaultPlan, autoTransition, autoEndCard, withTotalEpisodes, dialogueOf, findFont, FONT_FILE, FONT_NAME };
+module.exports = { run, download, detectSpeech, renderEpisode, resolvePlan, defaultPlan, autoTransition, autoEndCard, withTotalEpisodes, dialogueOf, findFont, FONT_FILE, FONT_NAME };
