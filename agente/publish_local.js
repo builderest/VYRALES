@@ -41,7 +41,7 @@ async function main() {
     }
     throw new Error('No encontré en finales/ la versión en calidad completa de este video final (¿se volvió a unir?). Dale publicar otra vez en un minuto.');
   };
-  const r = await runPublish({ supabase, epId, platform, privacy: privacy === 'private' ? 'private' : undefined, loadVideo, quality: 'completa', log: (...a) => console.log(...a) });
+  const r = await runPublish({ supabase, epId, platform, privacy: privacy === 'public' ? 'public' : privacy === 'private' ? 'private' : undefined, loadVideo, quality: 'completa', log: (...a) => console.log(...a) });
   if (!r.ok) throw new Error(r.error);
   console.log('LISTO: publicado desde la PC en calidad completa.');
 }

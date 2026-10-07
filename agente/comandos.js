@@ -48,6 +48,6 @@ module.exports = {
   // la versión en calidad completa; sube ESE archivo con las cuentas conectadas.
   publish: {
     label: 'Publicar en calidad completa', help: 'Sube el video de VYRALE/finales a TikTok o YouTube',
-    special: 'publish_local', arg: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}:(tiktok|youtube)(:private)?$/i, hidden: true
+    special: 'publish_local', arg: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}:(tiktok|youtube)(:private|:public)?$/i, hidden: true
   }
 };

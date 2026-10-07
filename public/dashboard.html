@@ -835,12 +835,13 @@
           if (!acc || acc.old) return '<button onclick="connectSocial(\'' + connectKey + '\')" class="text-[10px] font-mono px-2 py-0.5 rounded border border-cyber-violet/50 text-cyber-violet hover:bg-cyber-violet/10"><i class="fa-solid fa-link mr-1"></i>' + (acc ? 'Reconectar ' : 'Conectar ') + NET[connectKey] + '</button>';
           return '<div class="flex flex-wrap items-center gap-2 text-[10px] font-mono"><span class="text-cyber-emerald">● ' + esc(acc.name || label) + '</span>' +
             (busy ? '<span class="text-cyber-pink"><i class="fa-solid fa-spinner fa-spin mr-1"></i>' + (run.via === 'pc' ? 'Tu PC lo está subiendo en calidad completa... ' : '') + (key === 'tiktok' ? 'Enviando a TikTok...' : (key === 'youtube' ? 'Subiendo a YouTube...' : 'Publicando en ' + NET[key] + '...') + ' (1-5 min)') + '</span>'
-              : '<button onclick="socialPublish(\'' + e.id + '\', \'' + key + '\')" class="px-2 py-0.5 rounded border border-cyber-pink/50 text-cyber-pink hover:bg-cyber-pink/10"><i class="fa-solid fa-paper-plane mr-1"></i>' + (key === 'tiktok' ? 'Enviar a TikTok (borrador)' : key === 'youtube' ? 'Subir Short a YouTube' : 'Publicar Reel en ' + NET[key] + ' ahora') + '</button>') +
+              : (key === 'youtube' ? '<select id="ytPriv_' + e.id + '" title="Visibilidad en YouTube" class="bg-slate-950 border border-slate-700 rounded px-1 py-0.5 text-[10px] font-mono text-white"><option value="private" selected>Privado</option><option value="public">Público</option></select>' : '') +
+                '<button onclick="socialPublish(\'' + e.id + '\', \'' + key + '\')" class="px-2 py-0.5 rounded border border-cyber-pink/50 text-cyber-pink hover:bg-cyber-pink/10"><i class="fa-solid fa-paper-plane mr-1"></i>' + (key === 'tiktok' ? 'Enviar a TikTok (borrador)' : key === 'youtube' ? 'Subir Short a YouTube' : 'Publicar Reel en ' + NET[key] + ' ahora') + '</button>') +
             (run && run.status === 'error' ? '<span class="text-cyber-pink">Error: ' + esc(run.error || '') + '</span>' : '') +
             (run && run.quality && run.status !== 'error' ? (run.quality === 'completa'
               ? '<span class="text-cyber-emerald"><i class="fa-solid fa-gem mr-1"></i>calidad completa (desde tu PC)</span>'
               : '<span class="text-slate-500" title="La PC estaba apagada o no tenía la versión completa: se subió el video de Supabase (recomprimido por el límite de 50 MB).">calidad reducida (Supabase)</span>') : '') +
-            (run && run.status === 'uploaded_private' ? '<span class="text-cyber-gold">Subido como PRIVADO (YouTube obliga hasta que el proyecto pase la auditoría). <a href="https://studio.youtube.com/video/' + esc(run.video_id || '') + '/edit" target="_blank" class="underline">Abrir en YouTube Studio</a> → Visibilidad → Público.</span>' : '') +
+            (run && run.status === 'uploaded_private' ? '<span class="text-cyber-gold">Subido como PRIVADO' + (run.forced ? ' (YouTube lo forzó: el proyecto no ha pasado la auditoría)' : '') + '. <a href="https://studio.youtube.com/video/' + esc(run.video_id || '') + '/edit" target="_blank" class="underline">Abrir en YouTube Studio</a> → Visibilidad → Público.</span>' : '') +
             (run && run.status === 'draft_sent' ? '<span class="text-cyber-gold">Borrador enviado: abre la notificación en TikTok, activa “Contenido generado por IA” y publica.</span>' : '') +
             (run && run.status === 'published' && run.url ? '<a href="' + esc(run.url) + '" target="_blank" class="text-cyber-emerald underline">ver publicación</a>' : '') +
           '</div>';
@@ -1073,14 +1074,17 @@
       };
       window.socialPublish = async function(epId, platform) {
         const ep = (lastLoadedData.episodes || []).find(x => x.id === epId);
+        // YouTube: Privado por defecto (lo revisas y lo haces público en YouTube Studio cuando quieras).
+        const privSel = document.getElementById('ytPriv_' + epId);
+        const privacy = platform === 'youtube' ? ((privSel && privSel.value) || 'private') : undefined;
         const msg = platform === 'youtube'
-          ? 'Subir el EP ' + ep.episode_number + ' a YouTube como Short, con título, descripción y la etiqueta «Contenido alterado (IA)» ya marcada.\n\nMientras tu proyecto de Google no pase la auditoría de YouTube, el video queda PRIVADO y lo pasas a Público en YouTube Studio. ¿Subir?'
+          ? 'Subir el EP ' + ep.episode_number + ' a YouTube como Short ' + (privacy === 'public' ? 'PÚBLICO (lo verá todo el mundo en cuanto termine de subir)' : 'PRIVADO (solo tú lo ves; lo haces público en YouTube Studio cuando quieras)') + ', con título, descripción y la etiqueta «Contenido alterado (IA)» ya marcada. ¿Subir?'
           : platform === 'tiktok'
           ? 'Enviar el EP ' + ep.episode_number + ' a TikTok como BORRADOR.\n\nTe llega una notificación en la app: ahí pegas la descripción, activas “Contenido generado por IA” y publicas. ¿Enviar?'
           : 'PUBLICAR el EP ' + ep.episode_number + ' en ' + NET[platform] + ' como Reel AHORA (público), con la descripción' + (platform === 'instagram' ? ', la portada' : '') + ' y el aviso de IA en el texto.\n\nLa API de Meta NO activa la etiqueta oficial de IA: después ábrelo en la app y actívala si quieres.\nNo se puede deshacer desde aquí (se borra desde la app). ¿Publicar?';
         if (!await askConfirm(msg)) return;
         try {
-          const res = await keyedFetch('/.netlify/functions/social-publish-background', { episode_id: epId, platform });
+          const res = await keyedFetch('/.netlify/functions/social-publish-background', { episode_id: epId, platform, privacy });
           if (!res.ok && res.status !== 202) throw new Error('HTTP ' + res.status);
         } catch (err) { return alert('No se pudo enviar: ' + err.message); }
         const poll = (n) => setTimeout(async () => { await loadDashboard(); const e2 = (lastLoadedData.episodes || []).find(x => x.id === epId); const r = e2 && ((e2.validator_report || {}).social_runs || {})[platform]; if (n > 0 && r && r.status === 'running') poll(n - 1); }, 6000);

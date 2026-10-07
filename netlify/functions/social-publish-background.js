@@ -99,7 +99,7 @@ exports.handler = async (event) => {
         const vr = Object.assign({}, ep.validator_report || {});
         vr.social_runs = Object.assign({}, vr.social_runs || {}, { [platform]: { at: new Date().toISOString(), status: 'running', quality: 'completa', via: 'pc' } });
         await supabase.from('episodes').update({ validator_report: vr }).eq('id', epId);
-        const { error } = await supabase.from('agent_jobs').insert({ command: 'publish:' + epId + ':' + platform + (body.privacy === 'private' ? ':private' : '') });
+        const { error } = await supabase.from('agent_jobs').insert({ command: 'publish:' + epId + ':' + platform + (body.privacy === 'public' ? ':public' : body.privacy === 'private' ? ':private' : '') });
         if (!error) { console.log(LOG, platform, '→ lo sube la PC en calidad completa'); return { statusCode: 200, body: JSON.stringify({ ok: true, via: 'pc' }) }; }
         console.log(LOG, 'no se pudo encargar a la PC (', error.message, '): se sube desde Netlify');
       }
