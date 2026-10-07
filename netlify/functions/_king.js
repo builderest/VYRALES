@@ -12,7 +12,7 @@ const TEMPLATE = path.join(__dirname, '..', '..', 'agente', 'ltx2_api.json');
 // Nodos de la plantilla video_ltx2_5_i2v.
 const N = { image: '395', prompt: '398:376', negative: '398:373', width: '398:372', height: '398:360', duration: '398:362', seedA: '398:339', seedB: '398:338', strength: '398:357', save: '75' };
 // Negativo armado según la serie y la toma (ltxNegativeFor):
-const NEG_BASE = 'pc game, console game, video game, ugly, text, watermark, subtitles, captions, on-screen words, letters, readable writing, exaggerated expression, grimace, screaming, wide open mouth, crying face, object disappears, distorted face, changing face, deformed hands, extra fingers, extra limbs, flicker, morphing, outfit change, barefoot, bare feet';
+const NEG_BASE = 'pc game, console game, video game, ugly, text, watermark, subtitles, captions, on-screen words, letters, readable writing, looking at the camera, eye contact with the viewer, breaking the fourth wall, exaggerated expression, grimace, screaming, wide open mouth, crying face, object disappears, distorted face, changing face, deformed hands, extra fingers, extra limbs, flicker, morphing, outfit change, barefoot, bare feet';
 const NEG_REAL = 'cartoon, childish';                                        // no en series animadas (Dulce Engaño es 3D)
 const NEG_ANIMATED = 'live action, photorealistic, real human skin, style change'; // series animadas: que no se vuelva "real"
 const NEG_ANCIENT = 'new buildings, brick walls, road, dirt road, path, vehicles'; // solo series prehistóricas
@@ -58,7 +58,7 @@ function ltxPromptFor(shot, storyBible) {
     'The video starts exactly on the provided image and keeps its composition, people, clothing, lighting and background.',
     // Si el usuario editó el prompt de la toma en el panel, esa descripción manda.
     ...(shot.prompt_override && shot.prompt_override.trim()
-      ? ['Scene: ' + named(stripVeoSpeech(shot.prompt_override)).slice(0, 1400).replace(/[^.]*$/, '')]
+      ? ['Scene: ' + named(stripVeoSpeech(shot.prompt_override)).slice(0, 2200).replace(/[^.]*$/, '')]
       : [
         shot.start_en ? 'Scene at the start: ' + named(shot.start_en) + '.' : '',
         shot.action_en ? 'Then, slowly and naturally: ' + named(shot.action_en) + '.' : '',
@@ -79,7 +79,7 @@ function ltxPromptFor(shot, storyBible) {
     'Acting is subtle and restrained, like a premium animated feature: small natural expressions with the eyes and brows, no exaggerated grimaces, no screaming, no wide-open mouth, no crying face.',
     // Voces fijas para todos: el que habla mueve la boca en 0–6 s (ahí el render pone su voz); si no, bocas cerradas.
     speaksOnScreen(shot, sb)
-      ? 'Natural subtle body motion, consistent faces. ' + (speaker ? speaker.charAt(0).toUpperCase() + speaker.slice(1) + ' is the one who talks' : 'The character who speaks talks') + ', with natural, clearly visible lip movement from the start until about second 6, then stops talking and closes the mouth; any other person keeps the mouth closed. There are absolutely no captions, subtitles or words anywhere on screen.'
+      ? 'Natural subtle body motion, consistent faces. Nobody ever looks into the camera: while talking, the speaker turns the head and eyes toward whoever or whatever the action says they are talking to, and keeps looking there. ' + (speaker ? speaker.charAt(0).toUpperCase() + speaker.slice(1) + ' is the one who talks' : 'The character who speaks talks') + ', with natural, clearly visible lip movement from the start until about second 6, then stops talking and closes the mouth; any other person keeps the mouth closed. There are absolutely no captions, subtitles or words anywhere on screen.'
       : 'Natural subtle body motion, consistent faces. Nobody speaks, mouths stay closed. There are absolutely no captions, subtitles or words anywhere on screen.'
   ].filter(Boolean).join(' ').replace(/\.\s*\./g, '.').replace(/\s+/g, ' ');
 }
@@ -110,6 +110,7 @@ function speakerDesc(shot, who) {
 // y el texto entre comillas lo empuja a escribir letras: se cambia por "talks".
 function stripVeoSpeech(t) {
   return String(t || '')
+    .replace(/Audio:[\s\S]*?(?=A clean cinematic frame|$)/i, '') // la parte de sonido del prompt de Veo no le sirve a LTX
     .replace(/\b(says|whispers|shouts|asks|replies|murmurs|exclaims)\b[^."]*?:\s*"[^"]*"/gi, 'talks, lips moving naturally. ')
     .replace(/"[^"]*"/g, '')
     .replace(/\s+/g, ' ');
