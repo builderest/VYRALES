@@ -227,7 +227,8 @@ function serveFile(req, res) {
     let type = 'video/mp4';
     let dlName = null;
     // "/f/<serie>/<archivo>.mp4" (una carpeta por serie). Solo letras, números, _ y -: nada de "..".
-    const m = /^\/f\/((?:[A-Za-z0-9_\-]+\/)?[A-Za-z0-9_\-]+\.mp4)$/.exec(decodeURIComponent(u.pathname));
+    // (hasta 2 carpetas: <serie>/prueba_ltx_voz/<archivo>.mp4)
+    const m = /^\/f\/((?:[A-Za-z0-9_\-]+\/){0,2}[A-Za-z0-9_\-]+\.mp4)$/.exec(decodeURIComponent(u.pathname));
     if (m) { file = path.join(FINALES, m[1]); dlName = path.basename(m[1]); }
     // "/u?url=<url de Supabase/fal>": la copia guardada en esta PC (para reproducir SIN gastar Supabase).
     if (u.pathname === '/u') {
