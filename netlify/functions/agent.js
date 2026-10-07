@@ -20,8 +20,16 @@ exports.handler = async (event) => {
       const [name, arg] = String(command || '').split(/:(.*)/s);
       const def = Object.prototype.hasOwnProperty.call(COMMANDS, name) ? COMMANDS[name] : null;
       if (!def || (def.arg ? !def.arg.test(arg || '') : arg !== undefined)) return json(400, { error: 'Comando no permitido.' });
-      const { data: busy } = await sb.from('agent_jobs').select('id').in('status', ['pending', 'running']).limit(1);
-      if (busy && busy.length) return json(409, { error: 'Ya hay una orden en curso; espera a que termine.' });
+      // Producir / rehacer en la PC esperan su turno en la fila (el agente las hace una por una);
+      // los comandos de la Terminal no se encolan si hay algo corriendo.
+      const queueable = ['gen_local', 'regen_local'].includes(name);
+      if (!queueable) {
+        const { data: busy } = await sb.from('agent_jobs').select('id').in('status', ['pending', 'running']).limit(1);
+        if (busy && busy.length) return json(409, { error: 'Ya hay una orden en curso; espera a que termine.' });
+      } else {
+        const { data: dup } = await sb.from('agent_jobs').select('id').eq('command', command).in('status', ['pending', 'running']).limit(1);
+        if (dup && dup.length) return json(409, { error: 'Esa misma orden ya está en la fila de la PC.' });
+      }
       const { data, error } = await sb.from('agent_jobs').insert({ command }).select().single();
       if (error) throw error;
       return json(200, { job: data });

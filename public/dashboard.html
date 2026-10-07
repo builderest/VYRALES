@@ -706,7 +706,7 @@
       const FAL_PRICE_PER_SEC = { veo_lite: { audio: 0.05, silent: 0.03 }, veo_fast: { audio: 0.15, silent: 0.10 }, veo_standard: { audio: 0.40, silent: 0.20 } };
       function silentVideo() { const n = narrationCfg(lastLoadedData && lastLoadedData.series); return !!(n && (n.video_audio === 'none' || n.cast)); }
       // Precio por segundo según el proveedor elegido (y audio sí/no en fal). Mismo uso que antes: VEO_PRICE_PER_SEC[modelo].
-      const VEO_PRICE_PER_SEC = new Proxy({}, { get: (_, k) => videoProvider === 'fal' ? ((FAL_PRICE_PER_SEC[k] || {})[silentVideo() ? 'silent' : 'audio'] || 0) : (GOOGLE_PRICE_PER_SEC[k] || 0) });
+      const VEO_PRICE_PER_SEC = new Proxy({}, { get: (_, k) => videoProvider === 'king' ? 0 : videoProvider === 'fal' ? ((FAL_PRICE_PER_SEC[k] || {})[silentVideo() ? 'silent' : 'audio'] || 0) : (GOOGLE_PRICE_PER_SEC[k] || 0) });
       // ---------- Narrador con voz fija (Gemini TTS) ----------
       const TTS_LINE_USD = 0.004; // ~8 s de audio a 25 tokens/s, $18 por 1M tokens
       const TTS_VOICES = [['Algenib', 'grave, rasposa'], ['Charon', 'informativa'], ['Orus', 'firme'], ['Iapetus', 'clara'], ['Rasalgethi', 'informativa'], ['Sadaltager', 'experta'], ['Gacrux', 'madura']];
@@ -1124,9 +1124,17 @@
       let veoModelChoice = null;
       // Proveedor del video: 'google' (cuota diaria de 10) o 'fal' (fal.ai, sin cuota diaria).
       // Se recuerda en este navegador para no tener que elegirlo cada vez.
-      let videoProvider = (function() { try { return localStorage.getItem('vyrales_provider') || 'google'; } catch (_) { return 'google'; } })();
-      window.setVideoProvider = function(p) { videoProvider = p; try { localStorage.setItem('vyrales_provider', p); } catch (_) {} loadDashboard(); };
-      const providerBody = () => (videoProvider === 'fal' ? { provider: 'fal' } : {});
+      // 'king' = LTX-2.5 en la PC king (gratis), PRINCIPAL por defecto desde oct-2026. Veo (fal/Google) queda de respaldo.
+      let videoProvider = (function() { try { return localStorage.getItem('vyrales_provider2') || 'king'; } catch (_) { return 'king'; } })();
+      window.setVideoProvider = function(p) { videoProvider = p; try { localStorage.setItem('vyrales_provider2', p); } catch (_) {} loadDashboard(); };
+      const providerBody = () => (videoProvider === 'fal' ? { provider: 'fal' } : videoProvider === 'king' ? { provider: 'fal' } : {});
+      // Encola una orden para el agente de la PC (producir / rehacer con LTX en king).
+      async function agentOrder(command) {
+        const res = await keyedFetch('/.netlify/functions/agent', { command });
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(j.error || ('HTTP ' + res.status));
+        return j.job;
+      }
       // Contexto para editor.js (otro archivo): serie actual, datos cargados y recarga.
       window.vyCtx = () => ({ series: DEFAULT_SERIES, data: lastLoadedData, reload: loadDashboard });
       function seriesModels(series) {
@@ -1155,9 +1163,11 @@
           ' class="flex-1 px-2 py-1.5 rounded-lg border text-[10px] font-mono leading-tight ' + (videoProvider === key ? 'border-cyber-emerald bg-cyber-emerald/15 text-cyber-emerald' : 'border-cyber-border text-slate-400 hover:text-white') + (key === 'fal' && !hasFal ? ' opacity-40' : '') + '">' +
           '<span class="block font-bold">' + label + '</span><span class="block">' + sub + '</span></button>';
         return '<div class="w-full mt-3"><p class="text-[10px] font-mono text-slate-500 mb-1">PROVEEDOR</p>' +
-          '<div class="flex gap-2 mb-2">' + provBtn('google', 'Google directo', 'cuota 10/día por modelo') + provBtn('fal', 'fal.ai', hasFal ? 'sin límite diario' : 'sin FAL_KEY') + '</div>' +
-          '<p class="text-[10px] font-mono text-slate-500 mb-1">MODELO DE VIDEO PARA PRODUCIR · ' + (silentVideo() ? '<span class="text-cyber-emerald">SIN AUDIO (las voces van aparte)</span>' : '<span class="text-cyber-gold">CON AUDIO DE VEO</span>') + '</p>' +
-          '<div class="flex gap-2">' + opt('veo_lite', 'Veo Lite') + opt('veo_fast', 'Veo Fast') + '</div>' +
+          '<div class="flex gap-2 mb-2">' + provBtn('king', 'PC king · LTX', 'gratis · ~90 s/toma') + provBtn('fal', 'Veo (fal.ai)', hasFal ? '$0.24/toma' : 'sin FAL_KEY') + provBtn('google', 'Veo Google', 'cuota 10/día') + '</div>' +
+          (videoProvider === 'king'
+            ? '<p class="text-[10px] font-mono text-cyber-emerald">Video con LTX-2.5 en tu PC king: $0. Solo se pagan cuadros iniciales y voces. Las tomas que salgan mal se rehacen con Veo desde el panel de revisión.</p>'
+            : '<p class="text-[10px] font-mono text-slate-500 mb-1">MODELO DE VIDEO PARA PRODUCIR · ' + (silentVideo() ? '<span class="text-cyber-emerald">SIN AUDIO (las voces van aparte)</span>' : '<span class="text-cyber-gold">CON AUDIO DE VEO</span>') + '</p>' +
+              '<div class="flex gap-2">' + opt('veo_lite', 'Veo Lite') + opt('veo_fast', 'Veo Fast') + '</div>') +
           (veoModelChoice && veoModelChoice !== base ? '<p class="text-[10px] text-cyber-gold mt-1">Solo para esta sesión; la serie sigue en ' + esc(base.replace('veo_', 'Veo ')) + '.</p>' : '') +
         '</div>';
       }
@@ -1268,7 +1278,8 @@
             '<div class="p-3 bg-slate-900/80 border-t border-cyber-border flex items-center justify-between gap-2">' +
               approveBtn +
               (asset.storage_path ? '<button onclick="openMedia(this)" data-src="' + esc(asset.storage_path) + '" data-kind="video"' + narrAttrsFor(asset) + ' data-title="Toma ' + String(index + 1).padStart(2, '0') + '" class="px-2.5 py-1.5 rounded bg-cyber-cyan/10 hover:bg-cyber-cyan/20 text-cyber-cyan border border-cyber-cyan/30 text-xs font-mono transition-all" title="Ver en grande / descargar"><i class="fa-solid fa-expand"></i></button>' : '') +
-              '<button onclick="regenShot(\'' + asset.id + '\')" class="px-2.5 py-1.5 rounded bg-cyber-pink/20 hover:bg-cyber-pink/30 text-cyber-pink border border-cyber-pink/40 text-xs font-mono transition-all" title="Regenerar toma"><i class="fa-solid fa-rotate"></i></button>' +
+              '<button onclick="regenShot(\'' + asset.id + '\', \'king\')" class="px-2 py-1.5 rounded bg-cyber-emerald/15 hover:bg-cyber-emerald/25 text-cyber-emerald border border-cyber-emerald/40 text-[10px] font-mono transition-all" title="Rehacer con LTX en tu PC (gratis)"><i class="fa-solid fa-rotate mr-1"></i>LTX</button>' +
+              '<button onclick="regenShot(\'' + asset.id + '\', \'fal\')" class="px-2 py-1.5 rounded bg-cyber-pink/20 hover:bg-cyber-pink/30 text-cyber-pink border border-cyber-pink/40 text-[10px] font-mono transition-all" title="Rehacer con Veo (fal.ai, ~$0.24)"><i class="fa-solid fa-rotate mr-1"></i>Veo</button>' +
             '</div>' +
           '</div>'
         );
@@ -2001,16 +2012,17 @@
       };
 
       // Regenerar desde el panel de revisión: primero el modal con el prompt actual.
-      window.regenShot = function(assetId) {
+      window.regenShot = function(assetId, prov) {
+        prov = prov || (videoProvider === 'king' ? 'king' : 'fal');
         const ep = (lastLoadedData && lastLoadedData.episodes || []).find(e => (e.assets || []).some(a => a.id === assetId));
         const asset = ep && ep.assets.find(a => a.id === assetId);
-        if (!ep || !asset || !Array.isArray(ep.shots) || !ep.shots.length) return runRegenShot(assetId);
+        if (!ep || !asset || !Array.isArray(ep.shots) || !ep.shots.length) return runRegenShot(assetId, prov);
         const m = seriesModels(lastLoadedData.series);
         const model = asset.model === 'veo_fast' || asset.model === 'veo_standard' ? asset.model : m.shot;
         window.openPromptEditor(null, {
           kind: 'video', episodeId: ep.id, n: asset.shot_number, mode: 'generate',
-          cost: (m.secs * VEO_PRICE_PER_SEC[model]).toFixed(2),
-          onGenerate: () => runRegenShot(assetId)
+          cost: prov === 'king' ? '0.00' : (m.secs * ((FAL_PRICE_PER_SEC[model] || {})[silentVideo() ? 'silent' : 'audio'] || 0)).toFixed(2),
+          onGenerate: () => runRegenShot(assetId, prov)
         });
       };
 
@@ -2697,6 +2709,14 @@
         const quotaNote = q ? 'Cuota de Google hoy: ' + q.used + ' de ' + q.limit + ' videos usados.' +
           (missingClips > q.left ? ' ⚠️ Faltan ' + missingClips + ' tomas pero hoy solo quedan ' + q.left + ': se harán ' + q.left + ' y la producción se detiene sola; el resto con "Producir" después de ' + q.resetLabel + '.' : '') + '\n\n' : '';
         const cost = estimateEpisodeCost(ep);
+        if (videoProvider === 'king') {
+          if (!await askConfirm('Producir EP ' + ep.episode_number + ' "' + (ep.title || '') + '" con LTX-2.5 en tu PC king.\n\n' +
+            (doneClips ? 'Ya hay ' + doneClips + ' toma(s) hechas: NO se repiten. Se generan solo las ' + missingClips + ' que faltan.\n\n' : '') +
+            'Video: $0 (tu PC). Costo estimado: ~$' + cost.toFixed(2) + ' USD (cuadros iniciales y voces).\nNecesita Cronix y king prendidas. Tarda ~2 min por toma. ¿Continuar?')) return;
+          try { await agentOrder('gen_local:' + episodeId); } catch (err) { return alert('No se pudo mandar a la PC: ' + err.message); }
+          await new Promise(r => setTimeout(r, 2500));
+          return loadDashboard();
+        }
         if (!await askConfirm('Producir EP ' + ep.episode_number + ' "' + (ep.title || '') + '" con Veo.\n\n' +
           (doneClips ? 'Ya hay ' + doneClips + ' toma(s) hechas: NO se repiten. Se generan solo las ' + missingClips + ' que faltan.\n\n' : '') + quotaNote +
           'Modelo: ' + seriesModels(lastLoadedData.series).shot.replace('veo_', 'Veo ').toUpperCase() + (veoModelChoice ? ' (elegido solo para esta producción)' : '') + ' · Proveedor: ' + (videoProvider === 'fal' ? 'fal.ai (sin límite diario)' : 'Google') + '.\n' +
@@ -2754,6 +2774,7 @@
           await loadDashboard();
           return alert('La TOMA ' + String(shotNumber).padStart(2, '0') + ' ya tiene video. Si quieres otra versión usa "Regenerar" en el panel de revisión. No se generó nada.');
         }
+        if (videoProvider === 'king') return alert('Con la PC king no hay "toma de prueba": usa "Producir" (es gratis) y rehaz solo las que salgan mal. O elige Veo arriba para probar una toma suelta.');
         if (!skipConfirm && !await askConfirm('Generar SOLO la toma ' + shotNumber + ' del EP ' + ep.episode_number + ' con Veo.\n\nCosto: ~$' + Number(cost).toFixed(2) + ' USD (cargo real en Google Cloud). Tarda de 1 a 6 minutos. ¿Continuar?')) return;
         const box = document.querySelector('[data-shot="' + episodeId + '-' + shotNumber + '"]');
         const btn = box && box.querySelector('button[data-kind="video"][data-mode="generate"]');
@@ -3106,7 +3127,8 @@
         }
       };
 
-      async function runRegenShot(assetId) {
+      async function runRegenShot(assetId, prov) {
+        prov = prov || (videoProvider === 'king' ? 'king' : 'fal');
         const card = document.querySelector('[data-asset-id="' + assetId + '"]');
         const prevUpdatedAt = card ? card.getAttribute('data-updated-at') : null;
         let overlay = null;
@@ -3116,16 +3138,23 @@
           overlay.className = 'absolute inset-0 bg-black/80 flex flex-col items-center justify-center z-10 text-center p-3 gap-1';
           overlay.innerHTML =
             '<i class="fa-solid fa-spinner fa-spin text-xl text-cyber-pink"></i>' +
-            '<p class="text-[11px] font-mono text-cyber-pink">Regenerando con Veo...</p>' +
+            '<p class="text-[11px] font-mono text-cyber-pink">Regenerando con ' + (prov === 'king' ? 'LTX en tu PC (gratis)' : 'Veo') + '...</p>' +
             '<p class="text-[10px] font-mono text-slate-400">puede tardar varios minutos</p>';
           card.appendChild(overlay);
         }
         try {
-          const res = await fetch('/.netlify/functions/regen-shot-background', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(Object.assign({ assetId }, providerBody()))
-          });
-          if (!res.ok) throw new Error('HTTP ' + res.status);
+          if (prov === 'king') {
+            // La PC rehace la toma (LTX) y vuelve a unir el episodio.
+            const ep = (lastLoadedData.episodes || []).find(e => (e.assets || []).some(a => a.id === assetId));
+            const asset = ep && ep.assets.find(a => a.id === assetId);
+            await agentOrder('regen_local:' + ep.id + ':' + asset.shot_number);
+          } else {
+            const res = await fetch('/.netlify/functions/regen-shot-background', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ assetId, provider: prov === 'google' ? 'google' : 'fal' })
+            });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+          }
           const found = await pollUntilAssetChanged(
             (data) => (data.episodes || []).flatMap((e) => e.assets || []).find((a) => a.id === assetId),
             prevUpdatedAt
@@ -3310,6 +3339,6 @@
             </div>
         </div>
     </div>
-    <script src="editor.js?v=16"></script>
+    <script src="editor.js?v=17"></script>
 </body>
 </html>

@@ -344,8 +344,9 @@ async function tick() {
     await backupClips();
     // Órdenes viejas (más de 2 min sin atender) no se ejecutan: se marcan vencidas.
     // (Publicar espera hasta 15 min: puede tocarle detrás de un video en calidad completa.)
-    await sb.from('agent_jobs').update({ status: 'expired', finished_at: new Date().toISOString() }).eq('status', 'pending').not('command', 'like', 'publish:%').not('command', 'like', 'prueba_%').lt('created_at', new Date(Date.now() - 120000).toISOString());
-    await sb.from('agent_jobs').update({ status: 'expired', finished_at: new Date().toISOString() }).eq('status', 'pending').like('command', 'prueba_%').lt('created_at', new Date(Date.now() - 90 * 60000).toISOString());
+    await sb.from('agent_jobs').update({ status: 'expired', finished_at: new Date().toISOString() }).eq('status', 'pending').not('command', 'like', 'publish:%').not('command', 'like', 'prueba_%').not('command', 'like', 'gen_local:%').not('command', 'like', 'regen_local:%').lt('created_at', new Date(Date.now() - 120000).toISOString());
+    // Pruebas y producciones en la PC esperan hasta 3 h en la fila (king puede estar ocupada con otro episodio).
+    for (const pat of ['prueba_%', 'gen_local:%', 'regen_local:%']) await sb.from('agent_jobs').update({ status: 'expired', finished_at: new Date().toISOString() }).eq('status', 'pending').like('command', pat).lt('created_at', new Date(Date.now() - 180 * 60000).toISOString());
     await sb.from('agent_jobs').update({ status: 'expired', finished_at: new Date().toISOString() }).eq('status', 'pending').like('command', 'publish:%').lt('created_at', new Date(Date.now() - 15 * 60000).toISOString());
     const { data } = await sb.from('agent_jobs').select('*').eq('status', 'pending').order('created_at').limit(1);
     const job = data && data[0];
