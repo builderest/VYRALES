@@ -66,22 +66,27 @@ function ltxPromptFor(shot, storyBible) {
       ]),
     moving
       ? 'Camera: ' + cam + ', very slow and subtle; the framing stays close to the first frame.'
-      : 'Camera: ' + (cam ? cam + '. ' : '') + 'Locked-off tripod shot. The camera does not move at all: no zoom, no push-in, no pan, fixed framing for the whole clip.',
+      : 'Camera: ' + (cam ? cam + '. ' : '') + 'Locked-off tripod shot with the same fixed framing from the first frame to the last frame.',
     // Ropa de cada personaje (LTX inventaba pies descalzos o cambiaba la ropa al moverse: EP3 T2/T9).
     wardrobeLine(shot),
-    bg ? 'Background: ' + clean(bg).replace(/[.\s]*$/, '') + '; it stays exactly the same as in the first frame, nothing new appears.' : 'The background, walls, terrain and sky stay exactly the same as in the first frame; nothing new appears or is built.',
+    bg ? 'Background: ' + clean(bg).replace(/[.\s]*$/, '') + '; it stays exactly as in the first frame.' : 'The background, walls, terrain and sky stay exactly as in the first frame.',
     // Estilo de la serie SIN lo de ropa ("period-appropriate hide garments" vestía de pieles a la científica moderna) ni el formato.
     sb.visual_style ? clean(sb.visual_style).split(/,\s*/).filter((x) => !/garment|cloth|outfit|wear|hide|vertical|9:16|framing|aspect/i.test(x)).join(', ').slice(0, 260).replace(/,[^,]*$/, (m) => (clean(sb.visual_style).length > 260 ? '' : m)).replace(/[,.\s]*$/, '.') : 'Photorealistic cinematic footage.',
-    isAnimated(sb) ? 'The whole clip keeps exactly the same 3D animated look as the first frame; it never turns live action.' : '',
-    // Revisión EP1 Dulce (oct-2026): LTX quemó subtítulos inventados ("Hoy tamehén abmirims"), la carta
-    // desapareció de las manos y la cara se sobreactuó (boca muy abierta, llanto). Se pide explícito:
-    'Objects that the characters hold at the start (trays, envelopes, letters, phones, cups) stay in the same hands for the whole clip; nothing disappears, appears or changes. Papers and letters show no readable writing.',
-    'Acting is subtle and restrained, like a premium animated feature: small natural expressions with the eyes and brows, no exaggerated grimaces, no screaming, no wide-open mouth, no crying face.',
+    isAnimated(sb) ? 'The whole clip keeps exactly the same stylized 3D animated look as the first frame.' : '',
+    // IMPORTANTE (HECHO, oct-2026): la plantilla usa el modelo DESTILADO con cfg = 1, así que el prompt
+    // NEGATIVO NO HACE NADA y nombrar algo en el positivo (aunque sea "no subtitles", "nobody is barefoot")
+    // lo PROVOCA: EP1 Dulce salió con subtítulos inventados (hasta en chino) y con pies descalzos.
+    // Todo se pide en AFIRMATIVO: lo que sí debe verse.
+    'Objects that the characters hold at the start (trays, envelopes, letters, phones, cups) stay in the same hands for the whole clip. Papers and letters are plain and blank.',
+    'Acting is subtle and restrained, like a premium animated feature: small natural expressions with the eyes and brows, lips relaxed.',
     // Voces fijas para todos: el que habla mueve la boca en 0–6 s (ahí el render pone su voz); si no, bocas cerradas.
     speaksOnScreen(shot, sb)
-      ? 'Natural subtle body motion, consistent faces. Nobody ever looks into the camera: while talking, the speaker turns the head and eyes toward whoever or whatever the action says they are talking to, and keeps looking there until the very last frame, never turning back to the front. Photos, paintings and screens on the walls are completely still images. ' + (speaker ? speaker.charAt(0).toUpperCase() + speaker.slice(1) + ' is the one who talks' : 'The character who speaks talks') + ', with natural, clearly visible lip movement from the start until about second 6, then stops talking and closes the mouth; any other person keeps the mouth closed. There are absolutely no captions, subtitles or words anywhere on screen.'
-      : 'Natural subtle body motion, consistent faces. Nobody speaks, mouths stay closed. There are absolutely no captions, subtitles or words anywhere on screen.'
-  ].filter(Boolean).join(' ').replace(/\.\s*\./g, '.').replace(/\s+/g, ' ');
+      ? 'Natural subtle body motion, consistent faces. ' + (speaker ? speaker.charAt(0).toUpperCase() + speaker.slice(1) : 'The character who speaks') + ' keeps the head and eyes turned toward whoever or whatever the action says they are talking to, from the first frame to the last frame, and moves the lips softly and naturally as if talking quietly during the first 6 seconds, then closes the mouth. Everyone else keeps the mouth closed. Photos, paintings and screens on the walls are still pictures. Clean cinematic image.'
+      : 'Natural subtle body motion, consistent faces, mouths closed. Clean cinematic image.'
+  ].filter(Boolean).join(' ').replace(/\.\s*\./g, '.')
+    // Guiones con "no readable text, no logos": con cfg = 1 nombrar texto/letras/logos los hace aparecer.
+    .replace(/,?\s*(?:with\s+|and\s+)?(?:no|without)\s+(?:any\s+)?(?:readable\s+|visible\s+|on-screen\s+)?(?:text|writing|words|letters|logos?|captions|subtitles|watermarks?)\b(?:\s*(?:,|or|and)\s*(?:no\s+)?(?:readable\s+)?(?:text|writing|words|letters|logos?|captions|subtitles|watermarks?)\b)*/gi, '')
+    .replace(/\s+/g, ' ');
 }
 
 // [nombre → "the person in <primera prenda>"] desde shot.wardrobe (nombre completo y nombre de pila).
@@ -113,6 +118,8 @@ function stripVeoSpeech(t) {
     .replace(/Audio:[\s\S]*?(?=A clean cinematic frame|$)/i, '') // la parte de sonido del prompt de Veo no le sirve a LTX
     .replace(/\b(says|whispers|shouts|asks|replies|murmurs|exclaims)\b[^."]*?:\s*"[^"]*"/gi, 'talks, lips moving naturally. ')
     .replace(/"[^"]*"/g, '')
+    // frases en negativo ("free of any on-screen text, captions…", "never looks into the camera") provocan eso mismo en LTX
+    .split(/(?<=\.)\s+/).filter((x) => !/caption|subtitle|on-screen text|watermark|logo|unreadable|never|\bno\b|without/i.test(x)).join(' ')
     .replace(/\s+/g, ' ');
 }
 
@@ -122,8 +129,9 @@ function wardrobeLine(shot) {
   if (!items.length) return '';
   // Calzado SIEMPRE (EP3 T1: la ropa no lo decía y LTX la puso a caminar descalza y en shorts).
   const barefoot = items.some((o) => /barefoot/i.test(o));
-  return 'Clothing stays exactly the same for the whole clip, nothing is shortened or removed: ' + items.map((o) => String(o).replace(/\.$/, '')).join('; ') + '.' +
-    (barefoot ? '' : ' Everyone keeps closed footwear on at all times; nobody is barefoot; long trousers stay long.');
+  // En afirmativo (cfg = 1: "nobody is barefoot" dejaba descalza a Valentina en EP1 T3).
+  return 'Clothing stays exactly the same for the whole clip: ' + items.map((o) => String(o).replace(/\.$/, '')).join('; ') + '.' +
+    (barefoot ? '' : ' Everyone wears closed shoes on their feet the whole time, and trousers stay full length.');
 }
 
 async function j(url, opts) {
