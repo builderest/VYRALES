@@ -1,0 +1,21 @@
+GENERADOR DE VIDEO EN LA PC "KING" (LTX-2 / Wan en ComfyUI) PARA VYRALES
+=========================================================================
+La PC king NO necesita la carpeta VYRALE: solo ComfyUI + Tailscale.
+Cronix (VYRALE + agente) le manda imagen + prompt por Tailscale y recibe el video.
+
+EN KING (una sola vez, ~2 minutos; después no se vuelve a tocar):
+  1) Copia la carpeta "en_KING" a king (USB o red) a un lugar fijo, ej. C:\VYRALES_KING
+  2) Clic derecho en INSTALAR_EN_KING.bat -> "Ejecutar como administrador".
+     - Abre el puerto 8188 SOLO para tus aparatos de Tailscale.
+     - Busca ComfyUI (si no lo encuentra, arrastras la carpeta a la ventana).
+     - Deja ComfyUI arrancando solo y oculto cada vez que prendas king.
+  3) (Una vez) En ComfyUI de king: abre tu flujo de LTX-2 de IMAGEN A VIDEO ->
+     Workflow -> Export (API) -> pásalo a Cronix como
+     C:\Users\frank\Documents\VYRALE\agente\ltx2_api.json
+
+EN CRONIX:
+  - en_CRONIX\VENTANA_KING.bat = ventana de comandos para ver si king responde,
+    qué está generando y abrir su ComfyUI.
+  - También desde vyrales.app -> Terminal -> "Probar PC generadora (king)".
+
+Quitar todo de king: DESINSTALAR_EN_KING.bat (como administrador).

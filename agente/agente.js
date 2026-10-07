@@ -86,6 +86,22 @@ async function runJob(job) {
         p.on('close', (c) => { clearTimeout(timer); resolve(c == null ? 1 : c); });
       });
     }
+    else if (def.special === 'gen_estado') {
+      // PC generadora (ComfyUI con LTX-2/Wan) por Tailscale. Dirección en .env: VYRALES_GEN_URL.
+      const base = process.env.VYRALES_GEN_URL || 'http://100.66.84.73:8188';
+      add('Probando ' + base + ' ...\n');
+      try {
+        const st = await (await fetch(base + '/system_stats', { signal: AbortSignal.timeout(8000) })).json();
+        const q = await (await fetch(base + '/queue', { signal: AbortSignal.timeout(8000) })).json();
+        (st.devices || []).forEach((d) => add('✔ GPU: ' + d.name + ' · VRAM libre ' + (d.vram_free / 1073741824).toFixed(1) + ' / ' + (d.vram_total / 1073741824).toFixed(1) + ' GB\n'));
+        add('✔ ComfyUI ' + ((st.system && st.system.comfyui_version) || '') + ' · RAM libre ' + (((st.system && st.system.ram_free) || 0) / 1073741824).toFixed(1) + ' GB\n');
+        add('Cola: ' + ((q.queue_running || []).length) + ' generando, ' + ((q.queue_pending || []).length) + ' esperando\n');
+        add(fs.existsSync(path.join(__dirname, 'ltx2_api.json')) ? '✔ Plantilla agente/ltx2_api.json encontrada\n' : '✖ Falta agente/ltx2_api.json (exportar desde ComfyUI de king: Workflow -> Export (API))\n');
+      } catch (err) {
+        add('✖ No responde (' + err.message + ').\n  Revisa: Tailscale encendido en king y Cronix, e INSTALAR_EN_KING.bat ejecutado en king.\n');
+        code = 1;
+      }
+    }
     else if (def.special === 'dev_log') add((devLog.length ? devLog.slice(-120).join('\n') : '(sin log: el servidor local no lo inició el agente)') + '\n');
     else {
       for (const [cmd, args] of def.steps) {
