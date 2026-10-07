@@ -2350,7 +2350,7 @@
         const kf = usesKeyframes(series);
         const video = (k) => m.secs * VEO_PRICE_PER_SEC[k];
         const perEp = (n - 1) * video(m.shot) + video(m.cliff) + (kf ? n * IMAGE_PRICE_USD : 0);
-        t.textContent = (m.shot === m.cliff ? 'TODO ' + VEO_LABEL[m.shot].toUpperCase() : VEO_LABEL[m.shot].toUpperCase() + ' + ' + VEO_LABEL[m.cliff].toUpperCase()) + (kf ? ' + CUADRO INICIAL' : '');
+        t.textContent = (videoProvider === 'king' ? 'LTX EN TU PC' : (m.shot === m.cliff ? 'TODO ' + VEO_LABEL[m.shot].toUpperCase() : VEO_LABEL[m.shot].toUpperCase() + ' + ' + VEO_LABEL[m.cliff].toUpperCase())) + (kf ? ' + CUADRO INICIAL' : '');
         d.textContent = n + ' tomas × ($' + video(m.shot).toFixed(2) + ' video' + (kf ? ' + $' + IMAGE_PRICE_USD.toFixed(2) + ' cuadro' : '') + ')' +
           (m.shot !== m.cliff ? ' (gancho en ' + VEO_LABEL[m.cliff] + ': $' + video(m.cliff).toFixed(2) + ')' : '') +
           ' = ~$' + perEp.toFixed(2) + ' por episodio completo.' + (r.reference_images ? ' Fotos enviadas directo a Veo.' : '');
