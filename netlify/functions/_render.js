@@ -237,7 +237,8 @@ function defaultPlan(episode) {
   return {
     version: 2,
     clips: shots.map((s, i) => Object.assign({ shot: s.n, include: true, trim_start: 0, trim_end: 0, volume: 1, speed: 1, zoom: false, subtitle: null, overlay: '' }, autoTransition(s, shots[i + 1]))),
-    subtitles: { enabled: true, size: 38, margin_v: 180, style: 'classic', karaoke: false, speaker_colors: false, animation: 'none' },
+    // karaoke por defecto: cada palabra se pone amarilla cuando la voz la dice (sigue a la narración real).
+    subtitles: { enabled: true, size: 38, margin_v: 180, style: 'classic', karaoke: true, speaker_colors: false, animation: 'none' },
     audio: { normalize: true, music_url: null, music_volume: 0.12, duck: true },
     title_card: { enabled: false, text: '', subtext: '', seconds: 2 },
     end_card: { enabled: false, text: '', subtext: '', seconds: 2 }

@@ -310,7 +310,7 @@
   const transS = (c) => Math.min(1.5, Math.max(0.2, Number(c.transition_s) || 0.4));
 
   function normalizePlan(p) {
-    p.subtitles = Object.assign({ enabled: true, size: 38, margin_v: 180, style: 'classic', karaoke: false, speaker_colors: false, animation: 'none' }, p.subtitles || {});
+    p.subtitles = Object.assign({ enabled: true, size: 38, margin_v: 180, style: 'classic', karaoke: true, speaker_colors: false, animation: 'none' }, p.subtitles || {});
     if (p.subtitles.margin_v == null) p.subtitles.margin_v = p.subtitles.position === 'middle' ? 560 : 300;
     p.clips.forEach((c) => {
       if (c.speed == null) c.speed = 1;
