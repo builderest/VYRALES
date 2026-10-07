@@ -100,14 +100,14 @@ async function makeCover({ imageUrl, coverText, part }) {
       '[Script Info]', 'ScriptType: v4.00+', 'PlayResX: 720', 'PlayResY: 1280', '',
       '[V4+ Styles]',
       'Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding',
-      `Style: Big,${FONT_NAME},78,&H00FFFFFF,&H00FFFFFF,&H00000000,&H96000000,-1,0,0,0,100,100,0,0,1,6,3,8,50,50,190,1`,
-      `Style: Part,${FONT_NAME},40,&H0000E5FF,&H0000E5FF,&H00000000,&H96000000,-1,0,0,0,100,100,2,0,1,4,2,8,50,50,120,1`,
+      // Portada: texto GRANDE y al CENTRO (no arriba), "PARTE N/M" justo encima, todo en un bloque.
+      `Style: Big,${FONT_NAME},112,&H00FFFFFF,&H00FFFFFF,&H00000000,&H96000000,-1,0,0,0,100,100,0,0,1,8,4,5,40,40,0,1`,
+      `Style: Part,${FONT_NAME},58,&H0000E5FF,&H0000E5FF,&H00000000,&H96000000,-1,0,0,0,100,100,2,0,1,6,3,5,40,40,0,1`,
       '', '[Events]', 'Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text',
-      `Dialogue: 0,0:00:00.00,0:00:05.00,Part,,0,0,0,,${clean(part).toUpperCase()}`,
-      `Dialogue: 0,0:00:00.00,0:00:05.00,Big,,0,0,0,,${clean(coverText)}`
+      `Dialogue: 0,0:00:00.00,0:00:05.00,Big,,0,0,0,,{\\an5\\pos(360,610)}${part ? `{\\rPart}${clean(part).toUpperCase()}\\N{\\rBig}` : ''}${clean(coverText)}`
     ].join('\n');
     fs.writeFileSync(path.join(cwd, 'c.ass'), ass);
-    await run(['-y', '-i', 'in.jpg', '-vf', 'scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280,eq=brightness=-0.04,ass=c.ass:fontsdir=fonts', '-frames:v', '1', '-q:v', '3', 'cover.jpg'], cwd);
+    await run(['-y', '-i', 'in.jpg', '-vf', 'scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280,eq=brightness=-0.07,ass=c.ass:fontsdir=fonts', '-frames:v', '1', '-q:v', '3', 'cover.jpg'], cwd);
     return fs.readFileSync(path.join(cwd, 'cover.jpg'));
   } finally {
     fs.rmSync(cwd, { recursive: true, force: true });
