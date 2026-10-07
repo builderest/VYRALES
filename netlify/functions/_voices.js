@@ -65,7 +65,9 @@ const KEYWORDS = [
   [/nasal/i, 'nasal'],
   [/firm|blunt|steady|stern|authorit|firme/i, 'firm'],
   [/measured|lectur|thin/i, 'measured'],
-  [/clear|clara/i, 'clear'],
+  [/clear|clara|crisp|nítid/i, 'clear'],
+  [/elegant|refined|sophisticat|elegante|refinad/i, 'elegant'],
+  [/confident|assertive|segur/i, 'firm'],
   [/narrat|storyteller|documentary|narrador/i, 'narrator'],
   [/low\b|grave/i, 'low']
 ];
