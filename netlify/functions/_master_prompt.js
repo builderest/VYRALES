@@ -119,6 +119,11 @@ Si algo no está escrito en el JSON, la IA lo inventa distinto en cada toma. Esc
    - action_en / reaction_en: solo se mueven personajes u objetos que YA se ven en start_en. Clima y entorno, mínimos y sutiles ("a few snowflakes drift", "grass sways slightly"). PROHIBIDO pedir cosas que la IA convierte en elementos nuevos: routes, roads, paths, trails, avalanche, waterfall, storm, crowd, herd, fire spreading.
    - background_en repite los 3–4 elementos clave del lugar (de locations.<lugar>.visual) y nada más.
    - Personas de HOY en lugares de HOY con ropa de HOY; personas prehistóricas en lugares prehistóricos con ropa de pieles. Nunca mezcles dentro de la misma toma.
+   - Objetos en mano: si alguien sostiene algo en start_en (bandeja, carta, sobre, teléfono, taza), dilo con la mano exacta ("holding the letter in both hands at chest height") y que SIGA en esa mano en action_en y reaction_en. La IA de video hace desaparecer lo que el guion deja de nombrar.
+   - Papeles, cartas, pantallas y letreros: siempre "with no readable writing". Nunca pidas leer en voz alta un texto en cuadro.
+   - Actuación CONTENIDA: emociones con ojos, cejas y postura ("her eyes fill with tears, her lips press together"). PROHIBIDO: screams, sobs, wails, mouth wide open, breaks down crying, collapses. La IA de video lo convierte en muecas exageradas.
+   - Quien habla: en action_en di a quién le habla y dónde mira ("speaks softly to Mateo, looking at him"); los demás en cuadro "listen with mouths closed".
+   - Cada start_en/action_en/reaction_en describe posición en el cuadro (izquierda/derecha/centro), manos, mirada y expresión de CADA persona visible: cuanto más exacto, menos inventa la IA.
 14. Contenido apto para plataformas: sin violencia gráfica, sin contenido sexual explícito, sin marcas reales ni personas reales.
 
 === EJEMPLO DE ESTRUCTURA (respeta nombres de campos y tipos; el contenido es solo ilustrativo) ===
