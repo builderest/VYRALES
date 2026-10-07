@@ -24,6 +24,9 @@ const isAncient = (sb) => /neandert|prehist|paleol|stone age|homo sapiens/i.test
 function speaksOnScreen(shot, sb) {
   const { castMode, extraOf, isVoiceover } = require('./_series');
   if (!castMode(sb || {})) return false;
+  // lip_sync: false = la voz va encima pero en cuadro no se le ve hablar (de espaldas/perfil). LTX, al
+  // pedirle que hable, la giraba hacia la cámara (EP1 Dulce T1: dejaba de mirar la foto de la mamá).
+  if (shot && shot.lip_sync === false) return false;
   const d = shot && shot.dialogue;
   const list = (Array.isArray(d) ? d : d ? [d] : []).filter((x) => x && x.line);
   return list.some((x) => !isVoiceover(extraOf(sb || {}, x.speaker)));
