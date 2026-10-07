@@ -511,6 +511,8 @@ function effectiveShotPrompt(shot, characterRows, storyBible) {
 
 module.exports = {
   castMode,
+  extraOf,
+  isVoiceover,
   shortName,
   onScreenExtras,
   narrationConfig,
