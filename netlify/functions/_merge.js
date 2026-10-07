@@ -41,6 +41,10 @@ async function mergeEpisodeVideo(supabase, { episode, series, log = console.log 
   // Documentales con narrador de voz fija: la unión simple de abajo NO lleva la voz (los clips
   // vienen sin narración). Se usa el renderizador del editor, que mezcla narración + música.
   if (narrationConfig(series && series.story_bible)) return mergeWithNarration(supabase, { episode, series, log });
+  // Modo voz de LTX: la voz ya viene en cada clip; igual se usa el renderizador del editor
+  // (karaoke que sigue a la voz, transiciones, música, cierre) en vez de la unión simple.
+  const sbm = (series && series.story_bible) || {};
+  if (sbm.narration && sbm.narration.engine === 'ltx') return mergeWithNarration(supabase, { episode, series, log, skipNarration: true });
   const clips = (episode.assets || [])
     .filter((a) => a.kind === 'video_clip' && a.storage_path)
     .sort((a, b) => (a.shot_number || 0) - (b.shot_number || 0));
@@ -145,8 +149,9 @@ async function mergeEpisodeVideo(supabase, { episode, series, log = console.log 
   }
 }
 
-async function mergeWithNarration(supabase, { episode, series, log }) {
+async function mergeWithNarration(supabase, { episode, series, log, skipNarration = false }) {
   // 1) Narraciones que falten o estén desactualizadas (~$0.004 c/u): sin ellas el video saldría mudo.
+  if (!skipNarration) {
   const { handler: narrate } = require('./narration-background');
   log('narrador de voz fija: revisando narraciones que falten...');
   const nr = await narrate({ httpMethod: 'POST', body: JSON.stringify({ episode_id: episode.id }) });
@@ -154,6 +159,7 @@ async function mergeWithNarration(supabase, { episode, series, log }) {
   if (nr.statusCode !== 200) throw new Error('No se pudo generar la narración: ' + (nb.error || nr.statusCode));
   if ((nb.created || []).length) log('narraciones generadas ahora:', nb.created.map((c) => 'T' + c.shot).join(', '));
   if ((nb.failed || []).length) throw new Error('Fallaron narraciones: ' + nb.failed.map((f) => 'T' + f.shot + ' ' + f.error).join(' | '));
+  }
   // 2) Render con el plan del editor (o el plan por defecto): voz, ducking, subtítulos, -14 LUFS.
   const { data: fresh, error } = await supabase.from('episodes').select('*, assets(*)').eq('id', episode.id).single();
   if (error || !fresh) throw error || new Error('No se pudo releer el episodio.');
