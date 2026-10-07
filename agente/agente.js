@@ -74,12 +74,13 @@ async function runJob(job) {
     if (def.special === 'dev_start') add(devStart() + '\n');
     else if (def.special === 'dev_stop') add(devStop() + '\n');
     else if (def.special === 'dev_restart') { add(devStop() + '\n'); await new Promise((r) => setTimeout(r, 1500)); add(devStart() + '\n'); }
-    else if (def.special === 'render_full' || def.special === 'publish_local') {
-      // Proceso aparte (siempre con el código más nuevo) y hasta 30 min. Los argumentos ya pasaron la lista blanca.
-      const script = def.special === 'render_full' ? 'render_local.js' : 'publish_local.js';
+    else if (def.special === 'render_full' || def.special === 'publish_local' || def.special === 'prueba_ltx') {
+      // Proceso aparte (siempre con el código más nuevo). Los argumentos ya pasaron la lista blanca.
+      const script = { render_full: 'render_local.js', publish_local: 'publish_local.js', prueba_ltx: 'prueba_ltx.js' }[def.special];
+      const maxMin = def.special === 'prueba_ltx' ? 120 : 30;
       code = await new Promise((resolve) => {
-        const p = spawn(process.execPath, [path.join(__dirname, script)].concat(arg.split(':')), { cwd: ROOT, shell: false });
-        const timer = setTimeout(() => { add('\n[se canceló: tardó más de 30 minutos]\n'); p.kill(); }, 30 * 60000);
+        const p = spawn(process.execPath, [path.join(__dirname, script)].concat(arg ? arg.split(':') : []), { cwd: ROOT, shell: false });
+        const timer = setTimeout(() => { add('\n[se canceló: tardó más de ' + maxMin + ' minutos]\n'); p.kill(); }, maxMin * 60000);
         p.stdout.on('data', (d) => add(String(d)));
         p.stderr.on('data', (d) => add(String(d)));
         p.on('error', (e) => { add('ERROR: ' + e.message + '\n'); resolve(1); });

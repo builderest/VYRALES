@@ -21,6 +21,7 @@ module.exports = {
   dev_stop: { label: 'Detener servidor local', help: 'Para el netlify dev que inició el agente', special: 'dev_stop' },
   dev_restart: { label: 'Reiniciar servidor local', help: 'Detiene y vuelve a iniciar netlify dev', special: 'dev_restart' },
   dev_log: { label: 'Ver log del servidor local', help: 'Últimas 120 líneas de netlify dev', special: 'dev_log' },
+  prueba_ltx: { label: 'Prueba LTX-2.5 en king (3 tomas EP2)', help: 'Genera 3 tomas del EP 2 con LTX-2.5 en king y las deja junto a las de Veo en finales/prueba_ltx (gratis)', special: 'prueba_ltx' },
   gen_estado: { label: 'Probar PC generadora (king)', help: 'Revisa por Tailscale si ComfyUI de king responde (GPU, memoria, cola)', special: 'gen_estado' },
   // Con argumento: "render_full:<episode_id>" (solo un UUID; se valida aquí y en la función agent).
   // No sale como botón en la Terminal: lo pide el panel de revisión o el propio agente.
