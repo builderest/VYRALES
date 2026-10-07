@@ -58,6 +58,7 @@ exports.handler = async (event) => {
       if (/edit_plan/.test(error.message || '')) return json(500, { error: 'Falta la columna episodes.edit_plan: corre la migración supabase/migrations/005_editor.sql en Supabase.' });
       return json(404, { error: 'Episodio no encontrado.' });
     }
+    await require('./_render').withTotalEpisodes(supabase, ep);
     if (event.httpMethod === 'GET') return json(200, { plan: resolvePlan(ep), saved: !!ep.edit_plan });
     if (event.httpMethod !== 'POST') return json(405, { error: 'Method not allowed' });
     const plan = input.reset ? null : sanitize(input.plan);

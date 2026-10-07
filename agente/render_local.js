@@ -55,6 +55,7 @@ async function main() {
 
   console.log(`Calidad completa: "${series.title}" EP ${ep.episode_number} (preset ${process.env.VYRALES_X264_PRESET}, crf ${process.env.VYRALES_CRF})`);
   const t0 = Date.now();
+  await require(path.join(ROOT, 'netlify', 'functions', '_render')).withTotalEpisodes(supabase, ep);
   const result = await renderEpisode({ episode: ep, series, log: (...a) => console.log(...a), maxMb: Infinity, fetchFile: cachedFetch });
   try {
     // Una carpeta por serie: <FINALES>\<serie>\<serie>_ep<N>.mp4

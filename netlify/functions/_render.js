@@ -241,8 +241,27 @@ function defaultPlan(episode) {
     subtitles: { enabled: true, size: 38, margin_v: 180, style: 'classic', karaoke: true, speaker_colors: false, animation: 'none' },
     audio: { normalize: true, music_url: null, music_volume: 0.12, duck: true },
     title_card: { enabled: false, text: '', subtext: '', seconds: 2 },
-    end_card: { enabled: false, text: '', subtext: '', seconds: 2 }
+    end_card: autoEndCard(episode)
   };
+}
+// Cierre automático de cada episodio: avisa que hay otra parte e invita a seguir la cuenta.
+// episode.total_episodes lo pone withTotalEpisodes(); sin él se asume que NO es el último.
+function autoEndCard(episode) {
+  const n = Number(episode && episode.episode_number) || 1;
+  const total = Number(episode && episode.total_episodes) || 0;
+  const last = total > 0 && n >= total;
+  return last
+    ? { enabled: true, text: 'FIN', subtext: 'Síguenos para más historias como esta', seconds: 2.5 }
+    : { enabled: true, text: 'CONTINÚA EN LA PARTE ' + (n + 1), subtext: 'Síguenos para no perdértela', seconds: 2.5 };
+}
+// Cuántos episodios tiene la serie (para saber si este es el último).
+async function withTotalEpisodes(supabase, episode) {
+  if (!episode || !episode.series_id) return episode;
+  try {
+    const { count } = await supabase.from('episodes').select('id', { count: 'exact', head: true }).eq('series_id', episode.series_id);
+    if (count) episode.total_episodes = count;
+  } catch (_) {}
+  return episode;
 }
 
 function dialogueOf(shot) {
@@ -446,4 +465,4 @@ async function renderEpisode({ episode, series, log = console.log, fetchFile = d
   }
 }
 
-module.exports = { run, download, renderEpisode, resolvePlan, defaultPlan, autoTransition, dialogueOf, findFont, FONT_FILE, FONT_NAME };
+module.exports = { run, download, renderEpisode, resolvePlan, defaultPlan, autoTransition, autoEndCard, withTotalEpisodes, dialogueOf, findFont, FONT_FILE, FONT_NAME };

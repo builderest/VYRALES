@@ -179,7 +179,8 @@ async function mergeWithNarration(supabase, { episode, series, log }) {
     fresh.edit_plan = Object.assign({}, plan, { audio: Object.assign({ normalize: true, duck: true, music_volume: 0.2 }, plan.audio || {}, { music_url: lib[0].url, music_name: lib[0].name }) });
     log('música de la biblioteca de la serie:', lib[0].name);
   }
-  const { renderEpisode } = require('./_render');
+  const { renderEpisode, withTotalEpisodes } = require('./_render');
+  await withTotalEpisodes(supabase, fresh);
   const result = await renderEpisode({ episode: fresh, series, log });
   try {
     await ensureMediaBucket(supabase);

@@ -31,6 +31,7 @@ exports.handler = async (event) => {
     await report({ status: 'rendering' });
 
     const t0 = Date.now();
+    await require('./_render').withTotalEpisodes(supabase, ep);
     const result = await renderEpisode({ episode: ep, series, log: (...a) => console.log(LOG, ...a) });
     try {
       await ensureMediaBucket(supabase);
