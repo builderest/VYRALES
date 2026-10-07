@@ -26,6 +26,7 @@ module.exports = {
     label: 'Producir episodio en la PC (LTX)', help: 'Genera todas las tomas con LTX-2.5 en king, voces, unión y textos',
     special: 'gen_local', arg: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, hidden: true
   },
+  prueba_flux: { label: 'Prueba cuadros Flux en king (3 tomas EP3)', help: 'Hace 3 cuadros iniciales del EP 3 con Flux.2 Klein en king y los pone al lado de los de Gemini (gratis)', special: 'prueba_flux' },
   prueba_ltx: { label: 'Prueba LTX-2.5 en king (3 tomas EP2)', help: 'Genera 3 tomas del EP 2 con LTX-2.5 en king y las deja junto a las de Veo en finales/prueba_ltx (gratis)', special: 'prueba_ltx' },
   discos: { label: 'Espacio en discos de esta PC', help: 'Libre / total de cada disco (C:, D:, E:...) y dónde se guardan los videos', special: 'discos' },
   gen_estado: { label: 'Probar PC generadora (king)', help: 'Revisa por Tailscale si ComfyUI de king responde (GPU, memoria, cola)', special: 'gen_estado' },
