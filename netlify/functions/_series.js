@@ -292,6 +292,9 @@ function toEpisodeRows(data) {
         action_en: s.action_en || s.visual_en || '',
         reaction_en: s.reaction_en || '',
         sfx: s.sfx || '',
+        // Para LTX (PC king): fondo que no debe cambiar y, si el guion lo trae, un prompt propio.
+        background_en: s.background_en || '',
+        ltx_en: s.ltx_en || '',
         scene_es: s.scene_es,
         dialogue: dialogueList(s.dialogue)
       };

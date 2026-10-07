@@ -89,7 +89,9 @@ Si algo no está escrito en el JSON, la IA lo inventa distinto en cada toma. Esc
 9. Cada toma:
    - characters: máximo 2 personajes con nombre en cuadro (usa sus key).
    - dialogue: UN solo hablante por toma ({ "speaker": key o extra, "line": "…" }) o null. Máximo 15 palabras, IDEAL 8 a 12 (la voz debe caber en ~6 segundos aunque el personaje hable lento y grave). El hablante debe estar en characters (o ser un extra).
-   - camera: encuadre + movimiento simple (ej. "Close-up, static camera", "Medium two-shot, slow push-in").
+   - camera: encuadre + movimiento simple (ej. "Close-up, static camera", "Medium two-shot, slow push-in"). Las tomas también se generan con LTX (modelo local), que tiende a acercarse solo: prefiere "slow push-in" (acercamiento lento) cuando el momento lo permita y usa "static camera" solo cuando de verdad importe que el encuadre no cambie.
+   - background_en (OBLIGATORIO, máx. ~25 palabras, inglés): el fondo concreto que se ve detrás (ej. "rough natural limestone cave wall, dry grass slope, pale blue sky"). Se le exige al modelo de video que NO lo cambie; sin esto LTX inventa paredes, edificios u objetos.
+   - Movimiento: UNA sola acción simple y continua por toma (girar la cabeza, levantar una piedra, caminar dos pasos). Nada de varias acciones seguidas ni movimientos rápidos: ningún modelo de video los hace bien en 8 s.
    - start_en (OBLIGATORIO): el CUADRO INICIAL congelado, exacto, en inglés (máx. ~60 palabras). Con él se genera la imagen y desde ella arranca el video. Debe decir: dónde está cada personaje en el cuadro (izquierda / derecha / centro / primer plano; enfocado o desenfocado), hacia dónde mira cada uno, qué tiene cada uno en las manos (o "hands empty"), y la luz/hora si el lugar se repite en tomas seguidas (la luz debe ser la misma).
    - action_en: lo que pasa de 0 a 6 s DESPUÉS del cuadro inicial, UNA acción principal. NUNCA repitas algo que start_en ya muestra hecho (si start_en tiene la charola fuera del horno, action_en no puede decir "saca la charola"; si alguien ya está dentro, no "entra"). Si hay diálogo, action_en DEBE decir a quién le habla y a dónde mira el que habla ("speaks to Mateo, her eyes on him", "speaks into the phone", "speaks to herself, eyes on the letter"). Nadie le habla ni mira a la cámara.
    - reaction_en: de 6 a 8 s, una reacción QUIETA (mirada, pausa, respiración), en el MISMO lugar y con la MISMA cámara (nada de "ya está afuera"). Todo lo que la reacción necesite (puertas que se abren, un monitor, una silla) tiene que verse ya en start_en. Así el corte entre tomas es limpio y no hay que editar.
@@ -115,7 +117,7 @@ Si algo no está escrito en el JSON, la IA lo inventa distinto en cada toma. Esc
 === EJEMPLO DE ESTRUCTURA (respeta nombres de campos y tipos; el contenido es solo ilustrativo) ===
 ${buildExample(sample)}
 
-Antes de entregar, revisa tú mismo cada regla toma por toma (número de tomas, toma 1 con gancho fuerte, 1 hablante, ≤15 palabras, ≤2 personajes, sin comillas dobles, campos completos, start_en con posición/mirada/manos, action_en que no repite el start_en y dice a quién se habla, reaction_en posible en el mismo plano) y corrige lo que falle. Entrega solo el JSON final.`;
+Antes de entregar, revisa tú mismo cada regla toma por toma (número de tomas, toma 1 con gancho fuerte, 1 hablante, ≤15 palabras, ≤2 personajes, sin comillas dobles, campos completos, start_en con posición/mirada/manos, background_en, action_en que no repite el start_en y dice a quién se habla, reaction_en posible en el mismo plano) y corrige lo que falle. Entrega solo el JSON final.`;
 }
 
 module.exports = { buildMasterPrompt };
