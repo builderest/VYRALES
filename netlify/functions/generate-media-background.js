@@ -297,7 +297,7 @@ exports.handler = async (event) => {
         }
         let veo;
         try {
-          veo = await generateVeoClip({ modelKey, prompt, referenceImages, startImage, provider, generateAudio: videoGeneratesAudio(series.story_bible), ltxPrompt: provider === 'king' && scene.shot ? ltxPromptFor(scene.shot, series.story_bible) : null, ltxNegative: provider === 'king' && scene.shot ? ltxNegativeFor(scene.shot, series.story_bible) : null, log: (...a) => console.log(LOG, ...a) });
+          veo = await generateVeoClip({ modelKey, prompt, durationSeconds: provider === 'king' && scene.shot ? require('./_king').kingSecondsFor(scene.shot) : 8, referenceImages, startImage, provider, generateAudio: videoGeneratesAudio(series.story_bible), ltxPrompt: provider === 'king' && scene.shot ? ltxPromptFor(scene.shot, series.story_bible) : null, ltxNegative: provider === 'king' && scene.shot ? ltxNegativeFor(scene.shot, series.story_bible) : null, log: (...a) => console.log(LOG, ...a) });
         } catch (vErr) {
           // Filtro de contenido de fal (Job T13: rechazó 5 veces el mismo cuadro; con un cuadro
           // nuevo de otra composición pasó a la primera). Se rehace el cuadro UNA vez (~$0.067,
@@ -307,7 +307,7 @@ exports.handler = async (event) => {
           console.warn(LOG, `toma ${scene.number}/${total}: el filtro de contenido rechazó la toma; rehago el cuadro inicial con otra composición y reintento una vez...`);
           const alt = Object.assign({}, scene.shot, { start_en: String(scene.shot.start_en || '').replace(/\.?\s*$/, '.') + ' Alternate composition: a slightly wider, calm framing with the characters a little farther from the camera, modest relaxed poses, clothing neat and covering the body.' });
           const frame2 = await createKeyframe(supabase, { series, episode, shot: alt, characters, log: (...a) => console.log(LOG, ...a) });
-          veo = await generateVeoClip({ modelKey, prompt, referenceImages, startImage: frame2.startImage, provider, generateAudio: videoGeneratesAudio(series.story_bible), ltxPrompt: provider === 'king' && scene.shot ? ltxPromptFor(scene.shot, series.story_bible) : null, ltxNegative: provider === 'king' && scene.shot ? ltxNegativeFor(scene.shot, series.story_bible) : null, log: (...a) => console.log(LOG, ...a) });
+          veo = await generateVeoClip({ modelKey, prompt, durationSeconds: provider === 'king' && scene.shot ? require('./_king').kingSecondsFor(scene.shot) : 8, referenceImages, startImage: frame2.startImage, provider, generateAudio: videoGeneratesAudio(series.story_bible), ltxPrompt: provider === 'king' && scene.shot ? ltxPromptFor(scene.shot, series.story_bible) : null, ltxNegative: provider === 'king' && scene.shot ? ltxNegativeFor(scene.shot, series.story_bible) : null, log: (...a) => console.log(LOG, ...a) });
         }
         const { videoBuffer, costUsd, model } = veo;
         await logSpend(supabase, { seriesId: series.id, episodeId: episode.id, shotNumber: scene.number, kind: 'video', model: provider === 'fal' ? 'fal_' + modelKey : provider === 'king' ? 'ltx_king' : modelKey, costUsd, note: provider === 'fal' ? 'fal.ai' : provider === 'king' ? 'PC king (gratis)' : undefined });

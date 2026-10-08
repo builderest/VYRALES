@@ -22,7 +22,7 @@ ${topic ? `TEMA: ${topic}\n` : 'TEMA: elige tú una curiosidad REAL, sorprendent
 9. CERO DATOS FALSOS: cada dato lleva su fuente en continuity.sources (estudio, institución, año). Si la ciencia da un rango, usa palabras prudentes ("unas", "cerca de", "casi"). Si no se puede verificar, no entra.
 
 === REGLAS TÉCNICAS (obligatorias; el sistema valida el JSON) ===
-- 14 a 16 tomas de 8 s (video de 1:50–2:10). Cada toma: UNA línea del narrador de 10 a 14 palabras (la voz debe caber en 7 s sin acelerarse). Cuenta las palabras.
+- 12 a 16 tomas (video de 1:40–2:30). Cada toma: UNA línea del narrador. Lo normal son 10 a 14 palabras (toma de 8 s), pero si la frase queda mejor más larga, úsala: hasta 28 palabras (la toma se alarga sola hasta 16 s en la PC). Nunca recortes una buena frase por tiempo; tampoco rellenes. Alterna tomas cortas y largas para dar ritmo.
 - Solo narrador en off: dialogue = [{ "speaker": "Narrador", "line": "…" }] en todas las tomas. Nadie habla ni mueve la boca en cuadro.
 - characters: [] (sin personajes fijos). Si sale una persona, que sea genérica, de espaldas o en silueta, descrita en start_en.
 - Textos para la IA de video en INGLÉS y en AFIRMATIVO (lo que SÍ se ve; nunca "no", "without", "never"): camera, start_en, action_en, reaction_en, background_en, locations.visual, visual_style.
@@ -49,7 +49,7 @@ ${topic ? `TEMA: ${topic}\n` : 'TEMA: elige tú una curiosidad REAL, sorprendent
     "narration": { "engine": "gemini_tts", "voice": "Charon", "model": "gemini-3.8-flash-tts", "video_audio": "none", "style": "Narra en español latino neutro como si le contaras un secreto fascinante a un amigo: cálido, cercano, natural, con pausas con intención. Nada de tono de locutor." },
     "end_card": { "enabled": true, "mode": "tail", "text": "¿SABÍAS ESTO?", "subtext": "Cada día una curiosidad nueva", "voice": "Síguenos: cada día una curiosidad nueva.", "seconds": 2.5 },
     "extras": { "Narrador": { "who": "an off-screen narrator who is never visible on camera", "voice": "a warm, close, natural adult male voice in neutral Latin American Spanish, conversational, like telling a friend a fascinating secret", "voiceover": true } },
-    "rules": { "keyframes": true, "shot_seconds": 8, "shots_per_episode": <número de tomas>, "max_dialogue_words_per_shot": 14, "max_characters_per_shot": 2, "max_words_per_episode": 450, "shot_model": "veo_lite", "cliffhanger_model": "veo_lite", "reference_images": false },
+    "rules": { "keyframes": true, "shot_seconds": 8, "shots_per_episode": <número de tomas>, "max_dialogue_words_per_shot": 28, "max_characters_per_shot": 2, "max_words_per_episode": 450, "shot_model": "veo_lite", "cliffhanger_model": "veo_lite", "reference_images": false },
     "locations": { "<lugar>": { "visual": "…", "ambient": "…" } }
   },
   "characters": [],

@@ -175,7 +175,8 @@ async function kingGenerateVideo({ prompt, negative = null, startImage, duration
   wf[N.negative].inputs.text = negative || NEGATIVE;
   wf[N.width].inputs.value = 704;   // 9:16 (la 1ª pasada va a la mitad; el escalador ×2 la sube)
   wf[N.height].inputs.value = 1280;
-  wf[N.duration].inputs.value = Math.max(2, Math.min(10, Number(durationSeconds) || 8));
+  // LTX en king aguanta hasta 16 s por toma (probado por Franklin; tarda más).
+  wf[N.duration].inputs.value = Math.max(2, Math.min(16, Math.round(Number(durationSeconds) || 8)));
   wf[N.seedA].inputs.noise_seed = crypto.randomInt(1, 2 ** 31);
   wf[N.seedB].inputs.noise_seed = crypto.randomInt(1, 2 ** 31);
   wf[N.strength].inputs.strength = Number(process.env.VYRALES_LTX_STRENGTH || 1);
@@ -218,4 +219,19 @@ async function stripAudio(buf) {
   }
 }
 
-module.exports = { kingGenerateVideo, ltxPromptFor, ltxNegativeFor, speaksOnScreen, NEG_BASE };
+// Duración de la toma en king según lo que dura la voz: así una frase buena no se acorta ni se acelera.
+// Usa la narración ya generada si existe; si no, estima ~1.9 palabras por segundo (voz de documental).
+// Mínimo 8 s, máximo 16 s. shot.seconds (si el guion lo trae) manda.
+function kingSecondsFor(shot) {
+  if (!shot) return 8;
+  if (Number(shot.seconds) > 0) return Math.max(4, Math.min(16, Math.round(Number(shot.seconds))));
+  let voice = Number(shot.narration && shot.narration.seconds) || 0;
+  if (!voice) {
+    const d = shot.dialogue;
+    const words = (Array.isArray(d) ? d : d ? [d] : []).map((x) => (x && x.line) || '').join(' ').split(/\s+/).filter(Boolean).length;
+    voice = words / 1.9;
+  }
+  return Math.max(8, Math.min(16, Math.ceil(voice + 1.3)));
+}
+
+module.exports = { kingSecondsFor, kingGenerateVideo, ltxPromptFor, ltxNegativeFor, speaksOnScreen, NEG_BASE };

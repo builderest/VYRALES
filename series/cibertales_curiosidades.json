@@ -35,7 +35,7 @@
       "keyframes": true,
       "shot_seconds": 8,
       "shots_per_episode": 15,
-      "max_dialogue_words_per_shot": 14,
+      "max_dialogue_words_per_shot": 28,
       "max_characters_per_shot": 2,
       "max_words_per_episode": 450,
       "shot_model": "veo_lite",
