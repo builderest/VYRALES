@@ -18,7 +18,7 @@ const LOG = '[narration]';
 const MAX_COMFORT_S = 7.4;
 const FASTER = 'IMPORTANTE: ritmo más ágil y continuo, sin pausas entre palabras; la frase completa debe durar como máximo 6 segundos.';
 
-const TRIM_V = 3; // v3: voz más pareja (2 tomas, sin "ritmo más ágil" en narrados)
+const TRIM_V = 4; // v4: primera palabra clara (instrucción al TTS); v3: voz más pareja (2 tomas)
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method not allowed' };
   const supabase = getSupabaseClient();

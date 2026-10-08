@@ -50,6 +50,8 @@ async function callTts(body) {
 }
 
 // Devuelve { wav: Buffer, seconds, costUsd, model, voice }.
+// La PRIMERA palabra salía débil o partida ("A… prendí", "No" 6–8 dB más bajo que el resto; medido oct-2026).
+const FIRST_WORD = ' Empieza con fuerza y total claridad desde la primera sílaba de la primera palabra; nunca hagas pausas dentro de una palabra, solo entre frases.';
 async function synthesize({ text, voice = DEFAULT_VOICE, style = DEFAULT_STYLE, model: requestedModel = TTS_MODEL_DEFAULT, log = console.log }) {
   let model = requestedModel;
   if (model !== FALLBACK_MODEL && Date.now() - dailyLimitHitAt < 6 * 3600000) model = FALLBACK_MODEL;
@@ -57,7 +59,7 @@ async function synthesize({ text, voice = DEFAULT_VOICE, style = DEFAULT_STYLE, 
   if (!line) throw new Error('No hay texto para narrar.');
   const body = {
     model,
-    input: [{ type: 'user_input', content: [{ type: 'text', text: line, annotations: [{ type: 'speech_metadata', style: style || DEFAULT_STYLE }] }] }],
+    input: [{ type: 'user_input', content: [{ type: 'text', text: line, annotations: [{ type: 'speech_metadata', style: (style || DEFAULT_STYLE) + FIRST_WORD }] }] }],
     response_format: { type: 'audio' },
     generation_config: { speech_config: [{ voice: voice || DEFAULT_VOICE }] }
   };

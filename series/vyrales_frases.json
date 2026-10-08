@@ -14,7 +14,7 @@
       "voice": "Orus",
       "model": "gemini-3.8-flash-tts",
       "video_audio": "none",
-      "style": "Narrador épico en español latino: voz grave, profunda y firme, lenta y solemne, con pausas largas antes de las palabras clave (luchar, silencio, Dios, victoria); crece con fuerza en la frase final. Nunca grita, nunca suena a comercial. Mantén la MISMA energía e intensidad de principio a fin de cada frase: nunca te apagues ni bajes la voz al final."
+      "style": "Narrador épico en español latino: voz grave, profunda y firme, solemne, con peso en las palabras clave (luchar, silencio, Dios, victoria) y pausas solemnes solo entre frases; crece con fuerza en la frase final. Nunca grita, nunca suena a comercial. Mantén la MISMA energía e intensidad de principio a fin de cada frase: nunca te apagues ni bajes la voz al final."
     },
     "end_card": {
       "enabled": true,
