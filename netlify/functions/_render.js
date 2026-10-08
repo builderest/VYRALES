@@ -309,6 +309,20 @@ async function endVoice({ cwd, text, cfg, log }) {
 // Solo aplica a tomas SIN plan guardado: lo que se elija a mano en el editor se respeta.
 function autoTransition(shot, next) {
   if (!next) return { transition: 'cut', transition_s: 0.4 };
+  // Videos narrados sin personajes (curiosidades…): la transición sigue al movimiento para que no se
+  // sienta el efecto (Franklin, oct-2026). El fundido a negro en cada cambio de lugar cortaba el ritmo.
+  const narrated = !(shot.characters || []).length && !(next.characters || []).length;
+  if (narrated) {
+    const cam = String(shot.camera || '').toLowerCase();
+    const nextLine = String(((Array.isArray(next.dialogue) ? next.dialogue[0] : next.dialogue) || {}).line || '');
+    const a = shot.location || '', b = next.location || '';
+    // Pausa dramática solo antes de un giro ("Pero…", "Entonces…", "Hasta que…").
+    if (/^(pero|entonces|hasta que|sin embargo|y entonces)\b/i.test(nextLine.trim())) return { transition: 'fade_black', transition_s: 0.6 };
+    if (a && a === b) return { transition: 'crossfade', transition_s: 0.3 };
+    // La cámara viene avanzando: la siguiente escena "entra" siguiendo ese mismo empuje.
+    if (/push|rush|fpv|dolly|fly|glide|toward|travels/.test(cam)) return { transition: 'zoom', transition_s: 0.45 };
+    return { transition: 'dissolve', transition_s: 0.5 };
+  }
   const a = (shot && shot.location) || '', b = (next && next.location) || '';
   if (a && b && a !== b) return { transition: 'fade_black', transition_s: 0.7 };
   return { transition: 'crossfade', transition_s: 0.35 };
