@@ -271,6 +271,7 @@ exports.handler = async (event) => {
     const VF = require('./_voice_full');
     const continuous = useKeyframes && VF.continuousMode(series.story_bible);
     let prevEnd = null; // cuadro final de la toma anterior (encadenado)
+    let firstStart = null; // primer cuadro del video (ancla del personaje)
     if (continuous) {
       const voice = await VF.ensureFullVoice(supabase, { episode, series, log: (...a) => console.log(LOG, ...a) });
       const ordered = allScenes.filter((x) => x.shot).map((x) => x.shot);
@@ -321,7 +322,8 @@ exports.handler = async (event) => {
           console.log(LOG, `toma ${scene.number}/${total}: ${existingFrame ? 'usando el cuadro inicial ya guardado' : 'cuadro inicial creado'}.`);
           // Cuadro FINAL (solo LTX en king y si la toma trae end_en): la toma termina donde dice el guion.
           if (provider === 'king' && scene.shot.end_en) {
-            endImage = await require('./_keyframe').endFrameFor(supabase, { series, episode, shot: scene.shot, startImage, fresh: !existingFrame || !!existingFrame.chained, log: (...a) => console.log(LOG, ...a) });
+            if (continuous && !firstStart) { const f1 = scene.number === 1 ? { startImage } : await loadExistingKeyframe(supabase, episode.id, 1); firstStart = f1 && f1.startImage; }
+            endImage = await require('./_keyframe').endFrameFor(supabase, { series, episode, shot: scene.shot, startImage, anchorImage: continuous && scene.number > 1 ? firstStart : null, fresh: !existingFrame || !!existingFrame.chained, log: (...a) => console.log(LOG, ...a) });
           }
         }
         let veo;

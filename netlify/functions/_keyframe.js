@@ -245,7 +245,7 @@ async function similarity(a, b) {
 // LTX en king anima del cuadro inicial al final. El final se crea EDITANDO el cuadro inicial
 // (misma escena, mismo estilo, misma luz) para que la toma sea continua, y se guarda en
 // episodes.shots[n].end_frame_url (sin tocar la tabla assets).
-async function createEndFrame(supabase, { series, episode, shot, startImage, log = console.log }) {
+async function createEndFrame(supabase, { series, episode, shot, startImage, anchorImage = null, log = console.log }) {
   if (!shot || !shot.end_en || !startImage) return null;
   const sb = series.story_bible || {};
   const prompt = [
@@ -259,6 +259,9 @@ async function createEndFrame(supabase, { series, episode, shot, startImage, log
   ].filter(Boolean).join(' ');
   log('generando cuadro FINAL de la toma', shot.n, '(editando el cuadro inicial)...');
   const ref = [Object.assign({}, startImage, { label: 'the FIRST frame of this same shot (keep its world, style and light)' })];
+  // Voz continua: el primer cuadro del video ancla al personaje y al lugar (sin esto el caballero
+  // cambiaba de capucha a casco y el fondo se volvía otro entre tomas).
+  if (anchorImage) ref.push(Object.assign({}, anchorImage, { label: 'the FIRST frame of the whole video: the character must keep EXACTLY this look (same armor, same hood, same cape) and the place must stay this same battlefield' }));
   let img = null;
   let lastSim = null;
   for (let attempt = 0; attempt < 2 && !img; attempt++) {
@@ -297,14 +300,14 @@ async function createEndFrame(supabase, { series, episode, shot, startImage, log
   return { imageBytes: img.buffer.toString('base64'), mimeType: img.mimeType };
 }
 // Cuadro final de la toma: el guardado, o uno nuevo (fresh=true lo rehace). null si la toma no lleva final.
-async function endFrameFor(supabase, { series, episode, shot, startImage, fresh = false, log = console.log }) {
+async function endFrameFor(supabase, { series, episode, shot, startImage, anchorImage = null, fresh = false, log = console.log }) {
   if (!shot || !shot.end_en) return null;
   if (!fresh && shot.end_frame_skip) return null;
   if (!fresh && shot.end_frame_url) {
     const [img] = await loadReferenceImages([shot.end_frame_url]);
     if (img) return img;
   }
-  return createEndFrame(supabase, { series, episode, shot, startImage, log });
+  return createEndFrame(supabase, { series, episode, shot, startImage, anchorImage, log });
 }
 
 // Guarda una imagen YA HECHA como cuadro inicial de la toma (voz continua: el inicial de la toma N es el
