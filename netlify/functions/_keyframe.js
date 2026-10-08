@@ -301,6 +301,36 @@ async function endFrameFor(supabase, { series, episode, shot, startImage, fresh 
   return createEndFrame(supabase, { series, episode, shot, startImage, log });
 }
 
+// Guarda una imagen YA HECHA como cuadro inicial de la toma (voz continua: el inicial de la toma N es el
+// final de la toma N-1, así el video se ve como un solo movimiento).
+async function storeKeyframeImage(supabase, { series, episode, shotN, image, note = 'encadenado', log = console.log }) {
+  await ensureMediaBucket(supabase);
+  const ext = String(image.mimeType || '').includes('png') ? 'png' : 'jpg';
+  const url = await uploadFile(supabase, { path: `${series.slug}/ep${episode.episode_number}/frame-${String(shotN).padStart(2, '0')}-v${Date.now()}.${ext}`, buffer: Buffer.from(image.imageBytes, 'base64'), contentType: image.mimeType || 'image/jpeg' });
+  const { data: existing } = await supabase.from('assets').select('id, storage_path').eq('episode_id', episode.id).eq('kind', 'image').eq('shot_number', shotN).maybeSingle();
+  if (existing) {
+    await supabase.from('assets').update({ storage_path: url, prompt: note, cost_usd: 0, model: 'chain', approved: false, approved_at: null }).eq('id', existing.id);
+    if (existing.storage_path && existing.storage_path !== url) await removeByPublicUrl(supabase, existing.storage_path, log);
+  } else {
+    await supabase.from('assets').insert({ episode_id: episode.id, kind: 'image', model: 'chain', shot_number: shotN, storage_path: url, prompt: note, cost_usd: 0, approved: false });
+  }
+  log(`toma ${shotN}: cuadro inicial = cuadro final de la toma anterior (${note})`);
+  return url;
+}
+// Último cuadro de un video (respaldo cuando la toma anterior no tuvo cuadro final).
+async function lastFrameOf(videoBuffer) {
+  const os = require('os'); const path = require('path'); const fs = require('fs');
+  const { execFile } = require('child_process');
+  const ffmpeg = require('ffmpeg-static');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vy-last-'));
+  const v = path.join(dir, 'v.mp4'), o = path.join(dir, 'last.jpg');
+  fs.writeFileSync(v, videoBuffer);
+  await new Promise((res, rej) => execFile(ffmpeg, ['-y', '-sseof', '-0.15', '-i', v, '-frames:v', '1', '-q:v', '2', o], (e, so, se) => (e ? rej(new Error(String(se).slice(-300))) : res())));
+  const buf = fs.readFileSync(o);
+  fs.rmSync(dir, { recursive: true, force: true });
+  return { imageBytes: buf.toString('base64'), mimeType: 'image/jpeg' };
+}
+
 // Cuadro inicial ya guardado de una toma (para reutilizarlo al animar o regenerar el video).
 async function loadExistingKeyframe(supabase, episodeId, shotNumber) {
   const { data: frame } = await supabase
@@ -321,4 +351,4 @@ module.exports = {
   effectiveKeyframePrompt,
   keyframeReferences,
   createKeyframe,
-  loadExistingKeyframe, createLocationImage, createEndFrame, endFrameFor };
+  loadExistingKeyframe, createLocationImage, createEndFrame, endFrameFor, storeKeyframeImage, lastFrameOf };

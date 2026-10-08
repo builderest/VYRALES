@@ -151,6 +151,12 @@ async function mergeEpisodeVideo(supabase, { episode, series, log = console.log 
 
 async function mergeWithNarration(supabase, { episode, series, log, skipNarration = false }) {
   // 1) Narraciones que falten o estén desactualizadas (~$0.004 c/u): sin ellas el video saldría mudo.
+  const VF = require('./_voice_full');
+  if (!skipNarration && VF.continuousMode(series.story_bible)) {
+    // Voz continua: UNA voz para todo el video (se genera si falta o si cambió el texto).
+    await VF.ensureFullVoice(supabase, { episode, series, log });
+    skipNarration = true;
+  }
   if (!skipNarration) {
   const { handler: narrate } = require('./narration-background');
   log('narrador de voz fija: revisando narraciones que falten...');

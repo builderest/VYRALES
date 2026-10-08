@@ -465,6 +465,9 @@ async function renderEpisode({ episode, series, log = console.log, fetchFile = d
   chosen.forEach((c) => { const s = speakerOf(shotsByN[c.shot]); if (s && !speakers.includes(s)) speakers.push(s); });
 
   const ttsMode = !!narrationConfig(series && series.story_bible);
+  // VOZ CONTINUA: una sola voz para todo el video (continuity.voice) + texto sincronizado; tomas en corte directo.
+  const VF = require('./_voice_full');
+  const contVoice = VF.continuousMode(series && series.story_bible) && episode.continuity && episode.continuity.voice && episode.continuity.voice.url ? episode.continuity.voice : null;
   const ltxVoice = !!(series && series.story_bible && series.story_bible.narration && series.story_bible.narration.engine === 'ltx');
   const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'vyrales-render-'));
   const cleanup = () => fs.rmSync(cwd, { recursive: true, force: true });
@@ -490,18 +493,19 @@ async function renderEpisode({ episode, series, log = console.log, fetchFile = d
       await fetchFile(clipsByShot[c.shot].storage_path, path.join(cwd, src));
       const out = `p${String(i).padStart(2, '0')}-shot${c.shot}.mp4`;
       const shot = shotsByN[c.shot];
-      const subtitle = sub.enabled ? (c.subtitle != null && c.subtitle !== '' ? c.subtitle : dialogueOf(shot)) : '';
+      if (contVoice && i < chosen.length) c.transition = 'cut'; // el final de una toma ES el inicio de la siguiente
+      const subtitle = contVoice ? '' : sub.enabled ? (c.subtitle != null && c.subtitle !== '' ? c.subtitle : dialogueOf(shot)) : '';
       const spk = speakerOf(shot);
       const tSec = (x) => Math.min(1.5, Math.max(0.2, Number(x && x.transition_s) || 0.4));
       const fadeIn = prev && prev.transition === 'fade_black' ? tSec(prev) / 2 : 0;
       const fadeOut = c.transition === 'fade_black' && i < chosen.length ? tSec(c) / 2 : 0;
       // Narrador con voz fija: se baja la narración de la toma (si ya se generó).
       let narration = null;
-      if (ttsMode && shot && shot.narration && shot.narration.url) {
+      if (ttsMode && !contVoice && shot && shot.narration && shot.narration.url) {
         const nf = `narr-${String(c.shot).padStart(2, '0')}.wav`;
         await fetchFile(shot.narration.url, path.join(cwd, nf));
         narration = { file: nf, seconds: shot.narration.seconds, window: castMode(series && series.story_bible) ? 6.6 : 0 };
-      } else if (ttsMode) {
+      } else if (ttsMode && !contVoice) {
         log(`toma ${c.shot}: AVISO — no tiene narración generada, va sin voz.`);
       }
       // Clips generados ANTES del narrador TTS traen la voz de Veo pegada: se silencia su audio.
@@ -567,6 +571,32 @@ async function renderEpisode({ episode, series, log = console.log, fetchFile = d
       await run(['-y', '-f', 'concat', '-safe', '0', '-i', 'list.txt', '-c', 'copy', 'joined.mp4'], cwd);
     }
 
+    let contKey = null;
+    if (contVoice) {
+      log('voz continua: poniendo UNA voz sobre todo el video y el texto al mismo tiempo...');
+      await fetchFile(contVoice.url, path.join(cwd, 'voz.wav'));
+      const tailDur = tailMode ? parts[parts.length - 1].dur : 0;
+      const bodyEnd = total - tailDur;
+      const segs = (contVoice.segments || []).filter((x) => x && x.text);
+      const sbx = (series && series.story_bible) || {};
+      const big = [...new Set((episode.shots || []).flatMap((x) => x.text_big || []))];
+      const gold = [...new Set((episode.shots || []).flatMap((x) => x.text_gold || []))];
+      const evs = segs.map((x, k) => {
+        const st = VF.LEAD + Number(x.start) - 0.05;
+        const en = Math.min(bodyEnd - 0.1, k + 1 < segs.length ? VF.LEAD + Number(segs[k + 1].start) - 0.08 : VF.LEAD + Number(x.end) + 1.6);
+        const text = sbx.subtitle_style === 'poster' ? posterText(x.text, big, gold) : subtitleText(x.text, Math.max(0.3, Number(x.end) - Number(x.start)), Object.assign({}, sub, { karaoke: true }), null);
+        return en > st + 0.3 ? { start: st, end: en, style: sbx.subtitle_style === 'poster' ? 'PosterSm' : 'Sub', text } : null;
+      }).filter(Boolean);
+      fs.writeFileSync(path.join(cwd, 'voz.ass'), [...assHeader(sub), ...evs.map(dialogueLine), ''].join('\n'));
+      const ms = Math.round(VF.LEAD * 1000);
+      await run(['-y', '-i', 'joined.mp4', '-i', 'voz.wav', '-filter_complex',
+        `[0:v]ass=voz.ass:fontsdir=fonts[v];[1:a]aresample=48000,aformat=channel_layouts=stereo,dynaudnorm=f=150:g=9:p=0.9:m=8,volume='if(lt(t,0.45),1.45,if(lt(t,0.9),1.45-0.45*(t-0.45)/0.45,1))':eval=frame,adelay=${ms}|${ms},apad[vo];[0:a][vo]amix=inputs=2:duration=first:dropout_transition=0:normalize=0[a]`,
+        '-map', '[v]', '-map', '[a]', ...VIDEO_OUT, ...AUDIO_OUT, '-t', total.toFixed(3), 'joined-voz.mp4'], cwd);
+      fs.renameSync(path.join(cwd, 'joined-voz.mp4'), path.join(cwd, 'joined.mp4'));
+      contKey = { file: 'voz.wav', start: VF.LEAD, tempo: 1 };
+      log('voz continua:', contVoice.seconds, 's ·', evs.length, 'textos en pantalla.');
+    }
+
     const music = plan.audio.music_url;
     const filters = [];
     const args = ['-y', '-i', 'joined.mp4'];
@@ -586,6 +616,7 @@ async function renderEpisode({ episode, series, log = console.log, fetchFile = d
       const windows = [];
       let at = 0;
       parts.forEach((p) => { if (p.narr) windows.push({ file: p.narr.file, start: at + p.narr.start, tempo: p.narr.tempo }); at += p.dur - p.xfade; });
+      if (contKey) windows.unshift(contKey);
       if (plan.audio.duck !== false && windows.length) {
         const keyLabels = [];
         windows.forEach((w, k) => {

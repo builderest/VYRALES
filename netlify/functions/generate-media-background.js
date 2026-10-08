@@ -267,6 +267,25 @@ exports.handler = async (event) => {
     console.log(LOG, 'audio del video:', videoGeneratesAudio(series.story_bible) ? 'con audio de Veo' : 'SIN audio (narrador TTS + música en el render)');
     console.log(LOG, 'modelos:', shotModel, '(tomas) /', cliffhangerModel, '(cliffhanger)');
 
+    // VOZ CONTINUA: primero la voz completa (una sola), y cada toma dura su parte de esa voz.
+    const VF = require('./_voice_full');
+    const continuous = useKeyframes && VF.continuousMode(series.story_bible);
+    let prevEnd = null; // cuadro final de la toma anterior (encadenado)
+    if (continuous) {
+      const voice = await VF.ensureFullVoice(supabase, { episode, series, log: (...a) => console.log(LOG, ...a) });
+      const ordered = allScenes.filter((x) => x.shot).map((x) => x.shot);
+      const secs = VF.shotSecondsFor(voice, ordered);
+      const byN = {}; ordered.forEach((sh, i) => { byN[sh.n] = secs[i]; });
+      allScenes.forEach((x) => { if (x.shot && byN[x.shot.n]) x.shot.seconds = byN[x.shot.n]; });
+      const { data: fr } = await supabase.from('episodes').select('shots').eq('id', episode.id).single();
+      await supabase.from('episodes').update({ shots: (fr.shots || []).map((x) => (byN[x.n] ? Object.assign({}, x, { seconds: byN[x.n] }) : x)) }).eq('id', episode.id);
+      console.log(LOG, 'voz continua:', voice.seconds, 's → tomas de', ordered.map((x) => byN[x.n] + ' s').join(' + '));
+      // Si se retoma una producción a medias: el final de la última toma ya hecha.
+      const firstTodo = scenes[0] && scenes[0].number;
+      const prevShot = firstTodo ? (allScenes.find((x) => x.number === firstTodo - 1) || {}).shot : null;
+      if (prevShot && prevShot.end_frame_url) { const [im] = await require('./_veo').loadReferenceImages([prevShot.end_frame_url]); prevEnd = im || null; }
+    }
+
     const results = [];
     let quotaStop = null;
     let stoppedByUser = false;
@@ -291,13 +310,18 @@ exports.handler = async (event) => {
         let startImage = null;
         let endImage = null;
         if (useKeyframes && scene.shot) {
-          const existingFrame = await loadExistingKeyframe(supabase, episode.id, scene.number);
+          let existingFrame = await loadExistingKeyframe(supabase, episode.id, scene.number);
+          // Voz continua: el cuadro inicial de esta toma ES el final de la anterior (un solo movimiento).
+          if (continuous && !existingFrame && prevEnd) {
+            await require('./_keyframe').storeKeyframeImage(supabase, { series, episode, shotN: scene.number, image: prevEnd, log: (...a) => console.log(LOG, ...a) });
+            existingFrame = { startImage: prevEnd, chained: true };
+          }
           const frame = existingFrame || (await createKeyframe(supabase, { series, episode, shot: scene.shot, characters, log: (...a) => console.log(LOG, ...a) }));
           startImage = frame.startImage;
           console.log(LOG, `toma ${scene.number}/${total}: ${existingFrame ? 'usando el cuadro inicial ya guardado' : 'cuadro inicial creado'}.`);
           // Cuadro FINAL (solo LTX en king y si la toma trae end_en): la toma termina donde dice el guion.
           if (provider === 'king' && scene.shot.end_en) {
-            endImage = await require('./_keyframe').endFrameFor(supabase, { series, episode, shot: scene.shot, startImage, fresh: !existingFrame, log: (...a) => console.log(LOG, ...a) });
+            endImage = await require('./_keyframe').endFrameFor(supabase, { series, episode, shot: scene.shot, startImage, fresh: !existingFrame || !!existingFrame.chained, log: (...a) => console.log(LOG, ...a) });
           }
         }
         let veo;
@@ -338,11 +362,12 @@ exports.handler = async (event) => {
         if (assetError) throw assetError;
 
         console.log(LOG, `toma ${scene.number}/${total}: OK ✅ (asset ${asset.id})`);
+        if (continuous) prevEnd = endImage || await require('./_keyframe').lastFrameOf(videoBuffer).catch(() => null);
         results.push({ status: 'fulfilled', value: { shot: scene.number, model, costUsd, assetId: asset.id } });
         // Voces fijas: la voz de ESTA toma se genera junto con su video (~$0.004), así cada
         // toma ya suena en la vista previa mientras avanza la producción. Un fallo de voz no
         // detiene el video (al unir se reintenta).
-        if (narrationConfig(series.story_bible)) {
+        if (narrationConfig(series.story_bible) && !continuous) {
           try {
             const { handler: narrate } = require('./narration-background');
             const nr = await narrate({ httpMethod: 'POST', body: JSON.stringify({ episode_id: episode.id, shot: scene.number, if_stale: true }) });
