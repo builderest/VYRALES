@@ -568,6 +568,7 @@ async function renderEpisode({ episode, series, log = console.log, fetchFile = d
     args.push('-filter_complex', filters.join(';'), '-map', '0:v', '-map', '[aout]', '-c:v', 'copy', ...AUDIO_OUT, '-t', total.toFixed(3), '-movflags', '+faststart', 'final.mp4');
     log('audio final (música / volumen parejo)...');
     await run(args, cwd);
+    tagAiMetadata(path.join(cwd, 'final.mp4'), log);
     // Supabase rechaza archivos de más de 50 MB (probado: 45 MB OK, 55 MB → 413). Un episodio de
     // 2:40 salía en ~87 MB y la subida fallaba sin video final. Si pasa de MAX_UPLOAD_MB se
     // recomprime al bitrate justo para quedar debajo (en 720p vertical no se nota).
@@ -578,6 +579,7 @@ async function renderEpisode({ episode, series, log = console.log, fetchFile = d
       const videoK = Math.max(600, Math.floor((MAX_UPLOAD_MB * 0.94 * 8 * 1024) / total - audioK));
       log(`el video final pesa ${sizeMb.toFixed(0)} MB (límite ${MAX_UPLOAD_MB}); recomprimiendo a ${videoK} kb/s...`);
       await run(['-y', '-i', 'final.mp4', '-c:v', 'libx264', '-preset', 'veryfast', '-b:v', videoK + 'k', '-maxrate', Math.round(videoK * 1.3) + 'k', '-bufsize', (videoK * 2) + 'k', '-pix_fmt', 'yuv420p', '-c:a', 'copy', '-movflags', '+faststart', 'final-small.mp4'], cwd);
+      tagAiMetadata(path.join(cwd, 'final-small.mp4'), log);
       finalName = 'final-small.mp4';
       log(`recomprimido: ${(fs.statSync(path.join(cwd, finalName)).size / 1048576).toFixed(1)} MB`);
     }
@@ -586,6 +588,27 @@ async function renderEpisode({ episode, series, log = console.log, fetchFile = d
     cleanup();
     throw err;
   }
+}
+
+
+// Marca el MP4 como "hecho con IA" con el estándar IPTC (XMP DigitalSourceType = trainedAlgorithmicMedia),
+// el mismo que leen Meta / TikTok / Google para poner su etiqueta de IA cuando la detectan.
+// Se agrega una caja 'uuid' XMP al FINAL del archivo (no mueve nada del video; sigue reproduciéndose igual).
+function tagAiMetadata(file, log = console.log) {
+  try {
+    const xmp = '<?xpacket begin="﻿" id="W5M0MpCehiHzreSzNTczkc9d"?><x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">' +
+      '<rdf:Description rdf:about="" xmlns:Iptc4xmpExt="http://iptc.org/std/Iptc4xmpExt/2008-02-29/" xmlns:dc="http://purl.org/dc/elements/1.1/" ' +
+      'Iptc4xmpExt:DigitalSourceType="http://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia">' +
+      '<dc:description><rdf:Alt><rdf:li xml:lang="x-default">AI-generated video (VYRALES)</rdf:li></rdf:Alt></dc:description>' +
+      '</rdf:Description></rdf:RDF></x:xmpmeta><?xpacket end="w"?>';
+    const payload = Buffer.from(xmp, 'utf8');
+    const uuid = Buffer.from('BE7ACFCB97A942E89C71999491E3AFAC', 'hex'); // UUID estándar de XMP en MP4
+    const head = Buffer.alloc(8);
+    head.writeUInt32BE(8 + 16 + payload.length, 0);
+    head.write('uuid', 4, 'ascii');
+    fs.appendFileSync(file, Buffer.concat([head, uuid, payload]));
+    log('metadatos de IA (IPTC trainedAlgorithmicMedia) agregados al video.');
+  } catch (err) { log('AVISO: no pude agregar los metadatos de IA:', err.message); }
 }
 
 module.exports = { run, download, detectSpeech, renderEpisode, resolvePlan, defaultPlan, autoTransition, autoEndCard, withTotalEpisodes, dialogueOf, findFont, FONT_FILE, FONT_NAME };
