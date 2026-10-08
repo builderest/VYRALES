@@ -157,8 +157,22 @@ async function metaConnect(supabase, code) {
   if (!long.res.ok || !long.body.access_token) throw new Error('Meta no dio el token largo: ' + graphErr(long.body));
   const pages = await jsonFetch(`${FB_GRAPH}/me/accounts?${new URLSearchParams({ fields: 'id,name,access_token,instagram_business_account{id,username}', limit: '50', access_token: long.body.access_token })}`);
   if (!pages.res.ok) throw new Error('No se pudieron leer tus Páginas: ' + graphErr(pages.body));
-  const list = (pages.body.data || []);
-  if (!list.length) throw new Error('Meta no devolvió ninguna Página. En la pantalla de permisos tienes que MARCAR tu Página de VYRALES (y su Instagram). Vuelve a darle Conectar.');
+  let list = (pages.body.data || []);
+  // /me/accounts puede venir VACÍO aunque se haya marcado la Página (oct-2026, app nueva con casos de
+  // uso / "Inicio de sesión para empresas", Página dentro de un portfolio). Plan B: debug_token dice qué
+  // Páginas se autorizaron (granular_scopes.target_ids) y se piden una por una con su token de Página.
+  if (!list.length) {
+    const dbg = await jsonFetch(`${FB_GRAPH}/debug_token?${new URLSearchParams({ input_token: long.body.access_token, access_token: metaId() + '|' + metaSecret() })}`);
+    const scopes = (dbg.body && dbg.body.data && dbg.body.data.granular_scopes) || [];
+    const ids = new Set();
+    scopes.filter((g) => /^pages_/.test(g.scope)).forEach((g) => (g.target_ids || []).forEach((id) => ids.add(id)));
+    if (process.env.META_PAGE_ID) ids.add(process.env.META_PAGE_ID);
+    for (const id of ids) {
+      const pg = await jsonFetch(`${FB_GRAPH}/${id}?${new URLSearchParams({ fields: 'id,name,access_token,instagram_business_account{id,username}', access_token: long.body.access_token })}`);
+      if (pg.res.ok && pg.body && pg.body.access_token) list.push(pg.body);
+    }
+    if (!list.length) throw new Error('Meta no devolvió ninguna Página. Permisos concedidos: ' + scopes.map((g) => g.scope + (g.target_ids ? '[' + g.target_ids.length + ']' : '')).join(', ') + '. Revisa que marcaste tu Página de VYRALES y que tu perfil es administrador de esa Página.');
+  }
   const page = (process.env.META_PAGE_ID && list.find((p) => p.id === process.env.META_PAGE_ID)) || list.find((p) => p.instagram_business_account) || list[0];
   await saveAccount(supabase, { platform: 'facebook', account_id: page.id, account_name: page.name, access_token: page.access_token, expires_at: null, scopes: 'meta' });
   const ig = page.instagram_business_account;
