@@ -126,6 +126,7 @@ function assHeader(sub) {
     `Style: Sub,${FONT_NAME},${size},${primary},${secondary},${st.outline},${st.back},0,0,0,0,100,100,0,0,${st.border},${st.outlineW},${st.shadow},2,60,60,${mv},1`,
     `Style: Top,${FONT_NAME},44,&H0000E1FF,&H000000FF,&H00000000,&H64000000,0,0,0,0,100,100,0,0,1,4,1,8,60,60,170,1`,
     `Style: Card,${FONT_NAME},66,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,0,0,5,70,70,0,1`,
+    `Style: Hook,${FONT_NAME},62,&H00FFFFFF,&H000000FF,&H00000000,&H96000000,0,0,0,0,100,100,0,0,1,6,2,8,50,50,230,1`,
     `Style: EndBig,${FONT_NAME},74,&H00FFFFFF,&H000000FF,&H00000000,&H96000000,0,0,0,0,100,100,0,0,1,5,2,5,50,50,0,1`,
     `Style: EndSmall,${FONT_NAME},44,&H0000E1FF,&H000000FF,&H00000000,&H96000000,0,0,0,0,100,100,0,0,1,4,2,5,50,50,0,1`,
     `Style: CardSmall,${FONT_NAME},40,&H00B4B4B4,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,0,0,5,70,70,0,1`,
@@ -156,7 +157,7 @@ const NORMALIZE_V = `scale=${W}:${H}:force_original_aspect_ratio=decrease,pad=${
 const NARR_START = 0.3;
 const NARR_MAX_TEMPO = 1.2;
 
-async function renderClip({ cwd, input, out, c, subtitle, speakerColor, sub, fadeIn, fadeOut, narration = null, muteOriginal = false, tailReserve = 0, speechWindow = null }) {
+async function renderClip({ cwd, input, out, c, subtitle, speakerColor, sub, fadeIn, fadeOut, narration = null, muteOriginal = false, tailReserve = 0, speechWindow = null, hookText = '' }) {
   const probe = await probeMedia(input, cwd);
   const full = probe.duration;
   const ts = Math.max(0, Math.min(Number(c.trim_start) || 0, full - 1));
@@ -184,6 +185,8 @@ async function renderClip({ cwd, input, out, c, subtitle, speakerColor, sub, fad
     if (en > st + 0.3) events.push({ start: st, end: en, style: 'Sub', text: subtitleText(subtitle, en - st, sub, speakerColor) });
   }
   if (c.overlay) events.push({ start: 0, end: dur, style: 'Top', text: clean(c.overlay) });
+  // Gancho en pantalla los primeros ~3 s (para quien ve sin sonido; FB: 2 de cada 3 se iban antes de 3 s).
+  if (hookText) events.push({ start: 0, end: Math.min(3.2, dur - 0.1), style: 'Hook', text: '{\\fad(0,300)}' + clean(hookText) });
 
   const vf = [];
   if (speed !== 1) vf.push(`setpts=PTS/${speed}`);
@@ -451,7 +454,8 @@ async function renderEpisode({ episode, series, log = console.log, fetchFile = d
       const muteOriginal = !!(narration && (castMode(series && series.story_bible) || /Voice-over narration/i.test(clipsByShot[c.shot].prompt || '')));
       const tailReserve = XFADE[c.transition] && i < chosen.length ? tSec(c) : (i === chosen.length && tailMode ? TAIL_XF : 0);
       const speechWindow = ltxVoice && subtitle ? await detectSpeech(src, cwd) : null;
-      const r = await renderClip({ cwd, input: src, out, c, subtitle, speechWindow, speakerColor: spk ? SPEAKER_COLORS[speakers.indexOf(spk) % SPEAKER_COLORS.length] : null, sub, fadeIn, fadeOut, narration, muteOriginal, tailReserve });
+      const hookText = i === 1 && !plan.title_card.enabled ? ((episode.continuity && episode.continuity.hook_text) || '') : '';
+      const r = await renderClip({ cwd, input: src, out, c, subtitle, speechWindow, hookText, speakerColor: spk ? SPEAKER_COLORS[speakers.indexOf(spk) % SPEAKER_COLORS.length] : null, sub, fadeIn, fadeOut, narration, muteOriginal, tailReserve });
       const dur = r.dur;
       if (r.narr && r.narr.tempo > 1.001) log(`toma ${c.shot}: narración acelerada ${r.narr.tempo.toFixed(2)}x para que quepa.`);
       parts.push({ file: out, dur, narr: r.narr, xfade: XFADE[c.transition] && i < chosen.length ? Math.min(tSec(c), dur / 2) : 0, xname: XFADE[c.transition] || 'fade' });
