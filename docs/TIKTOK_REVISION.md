@@ -3,25 +3,20 @@
 Estado: el código ya está (panel "Post to TikTok", etiqueta de IA `is_aigc`, grabador del demo).
 Falta lo que solo puedes hacer tú en developers.tiktok.com.
 
-## Paso 1 — Sandbox (para grabar el demo antes de que TikTok apruebe)
-1. developers.tiktok.com → Manage apps → tu app VYRALES → arriba cambia a **Sandbox** → **Create Sandbox** (nombre: `vyrales-demo`).
-2. En el Sandbox:
-   - **Products → Add products**: Login Kit y **Content Posting API**.
-   - En Content Posting API: activa **Direct Post**.
-   - **Scopes**: `user.info.basic`, `video.upload`, `video.publish`.
-   - Login Kit → **Redirect URI** (Web): `https://vyrales.app/auth/tiktok/callback`
-   - **Sandbox settings → Target users**: agrega tu cuenta de TikTok (la que vas a usar en el demo).
-3. Copia el **Client key** y el **Client secret** del Sandbox (NO me los pegues en el chat).
+## Paso 1 — Sandbox (YA EXISTE)
+HECHO (oct-8): el TIKTOK_CLIENT_KEY del .env empieza con "sb" → VYRALES ya usa la app **Sandbox**
+(Login Kit + redirect `https://vyrales.app/auth/tiktok/callback` ya configurados). Solo falta, en ese Sandbox:
+1. Content Posting API → activar **Direct Post**.
+2. Scopes → agregar **`video.publish`** (además de `user.info.basic` y `video.upload`).
+3. Sandbox settings → **Target users**: confirmar que tu cuenta de TikTok está ahí.
+4. **Apply changes**.
 
-## Paso 2 — Llaves (tú las pones, en los dos lados)
-En el `.env` de la PC **y** en Netlify (Site configuration → Environment variables):
+## Paso 2 — Activar Direct Post en VYRALES
+En el `.env` de la PC **y** en Netlify (Environment variables) agrega una línea:
 ```
-TIKTOK_SANDBOX=1
-TIKTOK_SANDBOX_CLIENT_KEY=<client key del sandbox>
-TIKTOK_SANDBOX_CLIENT_SECRET=<client secret del sandbox>
+TIKTOK_DIRECT=1
 ```
-En Netlify, después de guardar: Deploys → **Trigger deploy → Deploy site**.
-(Las llaves normales TIKTOK_CLIENT_KEY/SECRET se quedan igual; no las borres.)
+En Netlify: Deploys → **Trigger deploy → Deploy site**. (No hace falta TIKTOK_SANDBOX: las llaves actuales ya son las del Sandbox.)
 
 ## Paso 3 — Grabar el demo (lo hago yo; tú solo inicias sesión)
 1. Siéntate en la PC (Cronix). En vyrales.app → **Terminal** → **Grabar demo para TikTok**.
@@ -60,11 +55,11 @@ The demo video was recorded in our Sandbox app with a sandbox target user, so ev
 Sube `vyrales_tiktok_demo.mp4` como demo video.
 
 ## Paso 5 — Después de que aprueben la app
-1. En `.env` y Netlify: borra `TIKTOK_SANDBOX` y pon `TIKTOK_DIRECT=1` → redeploy.
+1. En `.env` y Netlify: cambia TIKTOK_CLIENT_KEY / TIKTOK_CLIENT_SECRET por las llaves de **producción** (deja `TIKTOK_DIRECT=1`) → redeploy.
 2. Redes → TikTok → Desconectar → Conectar TikTok (ahora pide `video.publish`).
 3. Mientras TikTok no haga la **auditoría de Direct Post**, todo sale "Only me". Para quitar esa restricción:
    Content Posting API → **Direct Post audit / "Apply for audit"** con el mismo video demo y los mismos textos.
    Cuando la aprueben, "Everyone" funciona y la etiqueta de IA sale sola en cada video.
 
 ## Volver atrás
-Sin `TIKTOK_SANDBOX` ni `TIKTOK_DIRECT`, VYRALES sigue mandando borradores como hasta hoy.
+Sin `TIKTOK_DIRECT`, VYRALES sigue mandando borradores como hasta hoy.
