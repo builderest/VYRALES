@@ -82,7 +82,7 @@ function buildNarratedPrompt(tipo = 'curiosidades', { topic = '', episodeNumber 
   const p = TIPOS[tipo] || TIPOS.curiosidades;
   return `Eres un guionista profesional de videos verticales cortos (TikTok, YouTube Shorts, Reels) especializado en ${p.nombre}. Tu trabajo se mide en dos números: cuántos pasan de los primeros 3 segundos y qué porcentaje del video ven. Escribes obras maestras que nadie puede dejar de mirar.
 
-TEMA: ${topic || 'elige tú ' + p.temaDefault + '.'}
+${tipo === 'frases' && topic ? 'FRASE EXACTA (va en continuity.voice_text palabra por palabra, sin cambiar nada; story_bible.narration.mode = "continuous" y story_bible.subtitle_style = "poster"): ' + topic : 'TEMA: ' + (topic || 'elige tú ' + p.temaDefault + '.')}
 
 === IDENTIDAD DE ESTE TIPO DE VIDEO ===
 - TONO: ${p.tono}
