@@ -54,10 +54,10 @@ exports.handler = async (event) => {
   try {
     const qs = event.queryStringParameters || {};
 
-    // Guionista de videos únicos narrados (curiosidades): ?master=curiosidades[&topic=…]
-    if (event.httpMethod === 'GET' && qs.master === 'curiosidades') {
-      const { buildCuriosityPrompt } = require('./_guionista');
-      return { statusCode: 200, headers: { 'Content-Type': 'text/plain; charset=utf-8' }, body: buildCuriosityPrompt({ topic: qs.topic || '' }) };
+    // Guionistas de videos únicos narrados, UNO POR TIPO: ?master=curiosidades|historia|misterios|motivacion[&topic=…]
+    if (event.httpMethod === 'GET' && qs.master && qs.master !== '1') {
+      const { TIPOS, buildNarratedPrompt } = require('./_guionista');
+      if (TIPOS[qs.master]) return { statusCode: 200, headers: { 'Content-Type': 'text/plain; charset=utf-8' }, body: buildNarratedPrompt(qs.master, { topic: qs.topic || '' }) };
     }
     if (event.httpMethod === 'GET' && qs.master) {
       return {
