@@ -5,7 +5,7 @@
 //   youtube   → sube el Short (título + descripción + etiqueta de IA por API; privado si el proyecto no está auditado)
 // Resultado en episodes.validator_report.social_runs[platform] { status, at, error?, url? }.
 const { getSupabaseClient } = require('./_supabase');
-const { tiktokSendDraft, instagramPublishReel, facebookPublishReel, youtubeUpload } = require('./_social');
+const { tiktokSendDraft, tiktokDirectPost, instagramPublishReel, facebookPublishReel, youtubeUpload } = require('./_social');
 const { youtubeTitle } = require('./_publish');
 
 const LOG = '[social]';
@@ -47,7 +47,15 @@ async function runPublish({ supabase, epId, platform, privacy, loadVideo, qualit
     const pk = (ep.validator_report || {}).publish_package;
     if (!pk || pk.status !== 'done') throw new Error('Primero dale "Preparar textos y portada".');
     await save({ status: 'running' });
-    if (platform === 'tiktok') {
+    // TikTok Direct Post: el panel guarda lo que el usuario eligió (privacidad, interruptores,
+    // divulgación, etiqueta de IA) en validator_report.tiktok_post justo antes de publicar.
+    const tp = (ep.validator_report || {}).tiktok_post;
+    if (platform === 'tiktok' && tp && tp.privacy_level && Date.now() - new Date(tp.at || 0).getTime() < 30 * 60000) {
+      const r = await tiktokDirectPost(supabase, { videoBuffer: await loadVideo(final), post: tp, log });
+      const done = r.status === 'PUBLISH_COMPLETE';
+      await save({ status: done ? 'published' : 'tiktok_processing', publish_id: r.publishId, tiktok_status: r.status, privacy: r.privacy, url: r.url, is_aigc: tp.is_aigc !== false }, done && r.privacy !== 'SELF_ONLY' ? { url: r.url, via: 'api' } : null);
+      log('TikTok: publicado directo ✅', r.status, r.privacy, r.url || '', '· calidad', quality);
+    } else if (platform === 'tiktok') {
       const r = await tiktokSendDraft(supabase, { videoBuffer: await loadVideo(final), log });
       await save({ status: 'draft_sent', publish_id: r.publishId, tiktok_status: r.status });
       log('TikTok: borrador enviado ✅', r.status, '· calidad', quality);
@@ -89,8 +97,24 @@ exports.handler = async (event) => {
   const body = JSON.parse(event.body || '{}');
   const platform = body.platform;
   const epId = body.episode_id;
+  // Lo elegido en el panel de TikTok (Direct Post): se guarda en el episodio para que lo use
+  // quien suba el video (Netlify o la PC). Solo campos conocidos, con sus tipos.
+  if (platform === 'tiktok' && body.tiktok_post && /^[0-9a-f-]{36}$/i.test(epId || '')) {
+    const t = body.tiktok_post;
+    const tp = {
+      at: new Date().toISOString(),
+      title: String(t.title || '').slice(0, 2200),
+      privacy_level: ['PUBLIC_TO_EVERYONE', 'MUTUAL_FOLLOW_FRIENDS', 'FOLLOWER_OF_CREATOR', 'SELF_ONLY'].includes(t.privacy_level) ? t.privacy_level : null,
+      disable_comment: !!t.disable_comment, disable_duet: !!t.disable_duet, disable_stitch: !!t.disable_stitch,
+      brand_content_toggle: !!t.brand_content_toggle, brand_organic_toggle: !!t.brand_organic_toggle,
+      is_aigc: t.is_aigc !== false
+    };
+    if (!tp.privacy_level) return { statusCode: 400, body: JSON.stringify({ error: 'Elige la privacidad.' }) };
+    const { data: cur } = await supabase.from('episodes').select('validator_report').eq('id', epId).single();
+    await supabase.from('episodes').update({ validator_report: Object.assign({}, (cur && cur.validator_report) || {}, { tiktok_post: tp }) }).eq('id', epId);
+  }
   // YouTube / TikTok: si la PC tiene la versión en calidad completa, la sube el agente desde la PC.
-  if (PC_PLATFORMS.includes(platform) && /^[0-9a-f-]{36}$/i.test(epId || '')) {
+  if (PC_PLATFORMS.includes(platform) && !body.no_pc && /^[0-9a-f-]{36}$/i.test(epId || '')) {
     try {
       const { data: ep } = await supabase.from('episodes').select('id, validator_report, assets(kind, storage_path)').eq('id', epId).single();
       const final = ep && (ep.assets || []).find((a) => a.kind === 'final_render' && a.storage_path);

@@ -19,7 +19,7 @@ function need(name) {
 }
 
 // state anti-CSRF firmado (sin guardar nada): plataforma + hora + firma HMAC con el secreto.
-const stateSecret = (platform) => platform === 'tiktok' ? need('TIKTOK_CLIENT_SECRET') : platform === 'youtube' ? need('YOUTUBE_CLIENT_SECRET') : metaSecret();
+const stateSecret = (platform) => platform === 'tiktok' ? ttSecret() : platform === 'youtube' ? need('YOUTUBE_CLIENT_SECRET') : metaSecret();
 function makeState(platform) {
   const secret = stateSecret(platform);
   const payload = `${platform}.${Date.now()}`;
@@ -58,18 +58,25 @@ async function jsonFetch(url, opts) {
 }
 
 // ---------------- TikTok ----------------
+// TIKTOK_SANDBOX=1 → usa la app de pruebas (Sandbox) de TikTok: TIKTOK_SANDBOX_CLIENT_KEY / _SECRET.
+// Sirve para grabar el video demo de la revisión (video.publish) antes de que TikTok lo apruebe.
+const ttSandbox = () => /^(1|true|si|sí)$/i.test(process.env.TIKTOK_SANDBOX || '');
+const ttKey = () => ttSandbox() ? need('TIKTOK_SANDBOX_CLIENT_KEY') : need('TIKTOK_CLIENT_KEY');
+const ttSecret = () => ttSandbox() ? need('TIKTOK_SANDBOX_CLIENT_SECRET') : need('TIKTOK_CLIENT_SECRET');
+// Direct Post (publicar directo con etiqueta de IA): TIKTOK_DIRECT=1 cuando la app tenga video.publish.
+const ttDirect = () => ttSandbox() || /^(1|true|si|sí)$/i.test(process.env.TIKTOK_DIRECT || '');
 // Solo lo que tiene la app en TikTok: borrador (video.upload). video.publish aparece al activar
 // "Direct Post"; para pedirlo, poner TIKTOK_SCOPES=user.info.basic,video.upload,video.publish.
-const TIKTOK_SCOPES = process.env.TIKTOK_SCOPES || 'user.info.basic,video.upload';
+const tiktokScopes = () => process.env.TIKTOK_SCOPES || (ttDirect() ? 'user.info.basic,video.upload,video.publish' : 'user.info.basic,video.upload');
 function tiktokAuthUrl() {
-  const q = new URLSearchParams({ client_key: need('TIKTOK_CLIENT_KEY'), scope: TIKTOK_SCOPES, response_type: 'code', redirect_uri: REDIRECT('tiktok'), state: makeState('tiktok') });
+  const q = new URLSearchParams({ client_key: ttKey(), scope: tiktokScopes(), response_type: 'code', redirect_uri: REDIRECT('tiktok'), state: makeState('tiktok') });
   return `https://www.tiktok.com/v2/auth/authorize/?${q}`;
 }
 async function tiktokToken(params) {
   const { res, body } = await jsonFetch('https://open.tiktokapis.com/v2/oauth/token/', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams(Object.assign({ client_key: need('TIKTOK_CLIENT_KEY'), client_secret: need('TIKTOK_CLIENT_SECRET') }, params))
+    body: new URLSearchParams(Object.assign({ client_key: ttKey(), client_secret: ttSecret() }, params))
   });
   if (!res.ok || !body.access_token) throw new Error('TikTok no dio el token: ' + JSON.stringify(body).slice(0, 300));
   return body;
@@ -85,7 +92,7 @@ async function tiktokConnect(supabase, code) {
     platform: 'tiktok', account_id: t.open_id, account_name: name, access_token: t.access_token, refresh_token: t.refresh_token,
     expires_at: new Date(Date.now() + (t.expires_in || 86400) * 1000).toISOString(),
     refresh_expires_at: t.refresh_expires_in ? new Date(Date.now() + t.refresh_expires_in * 1000).toISOString() : null,
-    scopes: t.scope || TIKTOK_SCOPES
+    scopes: t.scope || tiktokScopes()
   });
   return name || t.open_id;
 }
@@ -130,6 +137,93 @@ async function tiktokSendDraft(supabase, { videoBuffer, log = console.log }) {
     if (s === 'FAILED') throw new Error('TikTok falló al procesar: ' + (st.body.data.fail_reason || 'sin detalle'));
   }
   return { publishId, status: 'PROCESSING' };
+}
+
+// ---- TikTok Direct Post (publica directo, con la etiqueta oficial de IA: is_aigc) ----
+// Requiere video.publish. Mientras TikTok no audite la app, todo sale en SELF_ONLY (solo yo).
+// Reglas de UX de TikTok (developers.tiktok.com/doc/content-sharing-guidelines): el panel muestra
+// el nombre del creador, la privacidad SIN valor por defecto (de privacy_level_options), los
+// interruptores de comentarios/dúo/stitch apagados y bloqueados si el creador los tiene apagados,
+// la divulgación de contenido comercial y la declaración de Música / Contenido de marca.
+async function tiktokCreatorInfo(supabase) {
+  const token = await tiktokAccessToken(supabase);
+  const { res, body } = await jsonFetch('https://open.tiktokapis.com/v2/post/publish/creator_info/query/', {
+    method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json; charset=UTF-8' }
+  });
+  const err = body && body.error;
+  if (!res.ok || (err && err.code && err.code !== 'ok')) {
+    const code = err && err.code;
+    if (code === 'scope_not_authorized') throw new Error('La cuenta de TikTok no autorizó "video.publish". Dale Desconectar y Conectar TikTok otra vez (con TIKTOK_DIRECT=1 o TIKTOK_SANDBOX=1).');
+    if (code === 'spam_risk_too_many_posts') throw new Error('TikTok: esta cuenta llegó al límite de publicaciones por hoy. Intenta más tarde.');
+    if (code === 'spam_risk_user_banned_from_posting') throw new Error('TikTok: esta cuenta no puede publicar ahora mismo.');
+    throw new Error('TikTok creator_info: ' + JSON.stringify(err || body).slice(0, 300));
+  }
+  return body.data; // { creator_avatar_url, creator_username, creator_nickname, privacy_level_options, comment_disabled, duet_disabled, stitch_disabled, max_video_post_duration_sec }
+}
+
+// Sube el archivo a una upload_url de TikTok (1 pedazo hasta 64 MB; si no, pedazos de 10 MB).
+function ttChunks(size) {
+  const MB = 1024 * 1024;
+  const chunk = size <= 64 * MB ? size : 10 * MB;
+  return { chunk, count: size <= 64 * MB ? 1 : Math.floor(size / chunk) };
+}
+async function ttUpload(uploadUrl, videoBuffer, log) {
+  const size = videoBuffer.length;
+  const { chunk, count } = ttChunks(size);
+  log('[tiktok] subiendo', (size / 1048576).toFixed(1), 'MB en', count, count === 1 ? 'pedazo...' : 'pedazos...');
+  for (let k = 0; k < count; k++) {
+    const start = k * chunk;
+    const end = k === count - 1 ? size - 1 : start + chunk - 1;
+    const part = videoBuffer.subarray(start, end + 1);
+    const up = await fetch(uploadUrl, { method: 'PUT', headers: { 'Content-Type': 'video/mp4', 'Content-Length': String(part.length), 'Content-Range': `bytes ${start}-${end}/${size}` }, body: part });
+    if (!up.ok) throw new Error('TikTok rechazó el pedazo ' + (k + 1) + '/' + count + ' (HTTP ' + up.status + '): ' + (await up.text()).slice(0, 200));
+  }
+}
+
+// post: { title, privacy_level, disable_comment, disable_duet, disable_stitch, brand_content_toggle, brand_organic_toggle, is_aigc }
+async function tiktokDirectPost(supabase, { videoBuffer, post, log = console.log }) {
+  const info = await tiktokCreatorInfo(supabase); // TikTok exige consultarlo justo antes de publicar
+  const opts = info.privacy_level_options || [];
+  if (!post || !opts.includes(post.privacy_level)) throw new Error('Privacidad no válida para esta cuenta: ' + (post && post.privacy_level) + ' (opciones: ' + opts.join(', ') + ').');
+  if (post.brand_content_toggle && post.privacy_level === 'SELF_ONLY') throw new Error('El contenido de marca no puede ser privado (regla de TikTok).');
+  const post_info = {
+    title: String(post.title || '').slice(0, 2200),
+    privacy_level: post.privacy_level,
+    disable_comment: !!(post.disable_comment || info.comment_disabled),
+    disable_duet: !!(post.disable_duet || info.duet_disabled),
+    disable_stitch: !!(post.disable_stitch || info.stitch_disabled),
+    brand_content_toggle: !!post.brand_content_toggle,
+    brand_organic_toggle: !!post.brand_organic_toggle,
+    is_aigc: post.is_aigc !== false
+  };
+  const token = await tiktokAccessToken(supabase);
+  const size = videoBuffer.length;
+  const { chunk, count } = ttChunks(size);
+  const { res, body } = await jsonFetch('https://open.tiktokapis.com/v2/post/publish/video/init/', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json; charset=UTF-8' },
+    body: JSON.stringify({ post_info, source_info: { source: 'FILE_UPLOAD', video_size: size, chunk_size: chunk, total_chunk_count: count } })
+  });
+  if (!res.ok || !body.data || !body.data.upload_url) {
+    const code = body && body.error && body.error.code;
+    if (code === 'unaudited_client_can_only_post_to_private_accounts') throw new Error('TikTok todavía no auditó la app: por ahora solo se puede publicar en "Solo yo" (SELF_ONLY).');
+    throw new Error('TikTok rechazó la publicación: ' + JSON.stringify(body.error || body).slice(0, 300));
+  }
+  await ttUpload(body.data.upload_url, videoBuffer, log);
+  const publishId = body.data.publish_id;
+  for (let i = 0; i < 36; i++) {
+    await new Promise((r) => setTimeout(r, 5000));
+    const st = await jsonFetch('https://open.tiktokapis.com/v2/post/publish/status/fetch/', { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json; charset=UTF-8' }, body: JSON.stringify({ publish_id: publishId }) });
+    const d = (st.body && st.body.data) || {};
+    log('[tiktok] estado:', d.status);
+    if (d.status === 'PUBLISH_COMPLETE') {
+      const vid = (d.publicaly_available_post_id || d.publicly_available_post_id || [])[0];
+      const url = vid && info.creator_username ? `https://www.tiktok.com/@${info.creator_username}/video/${vid}` : (info.creator_username ? `https://www.tiktok.com/@${info.creator_username}` : null);
+      return { publishId, status: d.status, url, privacy: post_info.privacy_level, username: info.creator_username };
+    }
+    if (d.status === 'FAILED') throw new Error('TikTok falló al procesar: ' + (d.fail_reason || 'sin detalle'));
+  }
+  return { publishId, status: 'PROCESSING', url: info.creator_username ? `https://www.tiktok.com/@${info.creator_username}` : null, privacy: post_info.privacy_level, username: info.creator_username };
 }
 
 // ---------------- Meta: Facebook (Página) + Instagram ----------------
@@ -303,4 +397,4 @@ async function youtubeUpload(supabase, { videoBuffer, title, description, tags =
   return { videoId: up.body.id, url: `https://youtube.com/shorts/${up.body.id}`, privacy: got.privacyStatus || privacy, forcedPrivate: privacy !== 'private' && got.privacyStatus === 'private' };
 }
 
-module.exports = { tiktokAuthUrl, tiktokConnect, tiktokSendDraft, metaAuthUrl, metaConnect, instagramPublishReel, facebookPublishReel, youtubeAuthUrl, youtubeConnect, youtubeUpload, checkState, stateProblem, getAccount, REDIRECT };
+module.exports = { tiktokAuthUrl, tiktokConnect, tiktokSendDraft, tiktokCreatorInfo, tiktokDirectPost, ttDirect, metaAuthUrl, metaConnect, instagramPublishReel, facebookPublishReel, youtubeAuthUrl, youtubeConnect, youtubeUpload, checkState, stateProblem, getAccount, REDIRECT };
