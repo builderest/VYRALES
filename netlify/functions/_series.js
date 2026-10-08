@@ -297,6 +297,10 @@ function toEpisodeRows(data) {
         wardrobe,
         camera: s.camera || '',
         start_en: s.start_en || '',
+        // Cuadro FINAL (LTX va del inicial al final) y música en silencio por toma.
+        ...(s.end_en ? { end_en: s.end_en } : {}),
+        ...(s.music ? { music: s.music } : {}),
+        ...(Number(s.seconds) > 0 ? { seconds: Number(s.seconds) } : {}),
         action_en: s.action_en || s.visual_en || '',
         reaction_en: s.reaction_en || '',
         sfx: s.sfx || '',

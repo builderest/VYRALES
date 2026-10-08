@@ -1,0 +1,210 @@
+{
+  "format_version": 3,
+  "slug": "vyrales_frases",
+  "title": "Frases que te levantan",
+  "genre": "motivacion",
+  "language": "es",
+  "synopsis": "Frases de fe y fortaleza contadas como una mini historia épica de un caballero que lucha en silencio.",
+  "story_bible": {
+    "format": "narrado_unico",
+    "tone": "Épico, solemne y emotivo, como el tráiler de una película de caballeros; fe y fortaleza, nada cursi.",
+    "visual_style": "Dark epic cinematic fantasy, photorealistic, a lone battle-worn medieval knight, black and gold palette, volumetric god rays, rain, embers and golden particles in the air, dramatic low-key light, film grain, vertical 9:16 framing",
+    "narration": {
+      "engine": "gemini_tts",
+      "voice": "Orus",
+      "model": "gemini-3.8-flash-tts",
+      "video_audio": "none",
+      "style": "Narrador épico en español latino: voz grave, profunda y firme, lenta y solemne, con pausas largas antes de las palabras clave (luchar, silencio, Dios, victoria); crece con fuerza en la frase final. Nunca grita, nunca suena a comercial. Mantén la MISMA energía e intensidad de principio a fin de cada frase: nunca te apagues ni bajes la voz al final."
+    },
+    "end_card": {
+      "enabled": true,
+      "mode": "tail",
+      "text": "SOLO DIOS DA LA VICTORIA",
+      "subtext": "Síguenos para más frases que te levantan",
+      "voice": "Síguenos para más frases que te levantan.",
+      "seconds": 3
+    },
+    "extras": {
+      "Narrador": {
+        "who": "an off-screen narrator who is never visible on camera",
+        "voice": "a deep, slow, solemn adult male voice in neutral Latin American Spanish",
+        "voiceover": true
+      }
+    },
+    "rules": {
+      "keyframes": true,
+      "shot_seconds": 8,
+      "shots_per_episode": 7,
+      "max_dialogue_words_per_shot": 14,
+      "max_characters_per_shot": 2,
+      "max_words_per_episode": 450,
+      "shot_model": "veo_lite",
+      "cliffhanger_model": "veo_lite",
+      "reference_images": false
+    },
+    "locations": {
+      "battlefield_night": {
+        "visual": "a dark muddy medieval battlefield at night under heavy rain, smoke, broken banners, distant fires",
+        "ambient": "heavy rain and distant thunder"
+      },
+      "battlefield_dawn": {
+        "visual": "a ruined rocky battlefield at dawn, smoke and embers, dramatic clouds with golden light breaking through",
+        "ambient": "wind and distant birds"
+      }
+    }
+  },
+  "characters": [],
+  "episodes": [
+    {
+      "episode_number": 1,
+      "title": "Aprendí a luchar en silencio",
+      "continuity": {
+        "hook_text": "APRENDÍ A LUCHAR EN SILENCIO",
+        "summary": "Un caballero que lucha en silencio cae, entiende que la victoria viene de Dios y se levanta en la luz.",
+        "last_cliffhanger": "Si hoy estás peleando una batalla en silencio… no estás solo."
+      },
+      "shots": [
+        {
+          "n": 1,
+          "location": "battlefield_night",
+          "characters": [],
+          "scene_es": "Hubo noches… en que nadie supo lo que estaba cargando.",
+          "camera": "slow tracking shot behind the knight",
+          "start_en": "From behind, a lone knight in dark battle-worn steel armor with a tattered dark hooded cape and an engraved lion crest on the chest, face hidden in the shadow of the hood, walking alone through heavy rain across a dark muddy battlefield at night, broken banners and smoke around him",
+          "end_en": "a lone knight in dark battle-worn steel armor with a tattered dark hooded cape and an engraved lion crest on the chest, face hidden in the shadow of the hood has stopped in the rain, head lowered, shoulders heavy, the rain falling hard on his armor, faint golden light far in the sky",
+          "action_en": "the knight walks slowly through the storm, each step heavy in the mud, then stops and lowers his head",
+          "reaction_en": "the knight stands still in the rain, head lowered",
+          "background_en": "",
+          "dialogue": [
+            {
+              "speaker": "Narrador",
+              "line": "Hubo noches… en que nadie supo lo que estaba cargando."
+            }
+          ],
+          "sfx": "",
+          "music": ""
+        },
+        {
+          "n": 2,
+          "location": "battlefield_night",
+          "characters": [],
+          "scene_es": "Peleé batallas que nadie vio… y perdí algunas que nadie supo",
+          "camera": "fast handheld orbit",
+          "start_en": "a lone knight in dark battle-worn steel armor with a tattered dark hooded cape and an engraved lion crest on the chest, face hidden in the shadow of the hood swinging his sword against dark shadowy silhouettes in thick fog, sparks flying from the clash, embers in the air",
+          "end_en": "a lone knight in dark battle-worn steel armor with a tattered dark hooded cape and an engraved lion crest on the chest, face hidden in the shadow of the hood down on one knee in the fog, his sword driven into the ground, gripping the hilt, breathing heavily, embers drifting",
+          "action_en": "the knight fights the shadowy figures in the fog with sparks flying, until he falls to one knee and drives his sword into the ground",
+          "reaction_en": "the knight stays on one knee, breathing heavily, holding the sword",
+          "background_en": "",
+          "dialogue": [
+            {
+              "speaker": "Narrador",
+              "line": "Peleé batallas que nadie vio… y perdí algunas que nadie supo."
+            }
+          ],
+          "sfx": "",
+          "music": ""
+        },
+        {
+          "n": 3,
+          "location": "battlefield_night",
+          "characters": [],
+          "scene_es": "Hasta que un día… entendí algo que lo cambió todo.",
+          "camera": "extreme close-up, slow push-in",
+          "start_en": "Extreme close-up of an armored steel gauntlet trembling as it grips the hilt of a sword planted in the mud, rain drops bouncing off the metal",
+          "end_en": "Close view from below of a lone knight in dark battle-worn steel armor with a tattered dark hooded cape and an engraved lion crest on the chest, face hidden in the shadow of the hood, slowly raising his hooded head toward the sky as the dark storm clouds above begin to part and a thin beam of golden light breaks through",
+          "action_en": "the trembling hand slowly loosens its grip and the knight lifts his head toward the opening sky",
+          "reaction_en": "the knight looks up at the thin golden light",
+          "background_en": "",
+          "dialogue": [
+            {
+              "speaker": "Narrador",
+              "line": "Hasta que un día… entendí algo que lo cambió todo."
+            }
+          ],
+          "sfx": "",
+          "music": ""
+        },
+        {
+          "n": 4,
+          "location": "battlefield_dawn",
+          "characters": [],
+          "scene_es": "Aprendí a luchar… en silencio.",
+          "camera": "slow crane up",
+          "start_en": "a lone knight in dark battle-worn steel armor with a tattered dark hooded cape and an engraved lion crest on the chest, face hidden in the shadow of the hood walking forward alone through a ruined smoking field at the first light of dawn, embers floating around him",
+          "end_en": "Wide shot of a lone knight in dark battle-worn steel armor with a tattered dark hooded cape and an engraved lion crest on the chest, face hidden in the shadow of the hood standing tall and alone on top of a rocky hill at dawn, cape moving in the wind, a vast golden sky behind him",
+          "action_en": "the knight walks steadily up the hill while the camera cranes up and the dawn grows brighter",
+          "reaction_en": "the knight stands still on the hill, cape moving in the wind",
+          "background_en": "",
+          "dialogue": [
+            {
+              "speaker": "Narrador",
+              "line": "Aprendí a luchar… en silencio."
+            }
+          ],
+          "sfx": "",
+          "music": ""
+        },
+        {
+          "n": 5,
+          "location": "battlefield_dawn",
+          "characters": [],
+          "scene_es": "No porque fuera fuerte…",
+          "camera": "slow push-in to the armor",
+          "start_en": "Close view of the chest of a lone knight in dark battle-worn steel armor with a tattered dark hooded cape and an engraved lion crest on the chest, face hidden in the shadow of the hood: the steel armor dented, scratched and cracked, the engraved lion crest worn, ash on the metal",
+          "end_en": "a lone knight in dark battle-worn steel armor with a tattered dark hooded cape and an engraved lion crest on the chest, face hidden in the shadow of the hood slowly kneeling down on the rocky ground, head bowed, both hands resting on the pommel of his sword planted in front of him",
+          "action_en": "the camera moves along the damaged armor as the knight slowly kneels down",
+          "reaction_en": "the knight stays kneeling, head bowed",
+          "background_en": "",
+          "dialogue": [
+            {
+              "speaker": "Narrador",
+              "line": "No porque fuera fuerte…"
+            }
+          ],
+          "sfx": "",
+          "music": ""
+        },
+        {
+          "n": 6,
+          "location": "battlefield_dawn",
+          "characters": [],
+          "scene_es": "Sino porque entendí… que solo Dios podía darme la victoria.",
+          "camera": "static, then very slow push-in",
+          "start_en": "a lone knight in dark battle-worn steel armor with a tattered dark hooded cape and an engraved lion crest on the chest, face hidden in the shadow of the hood kneeling in near darkness with his head bowed, his sword planted in the ground beside him, rain falling",
+          "end_en": "A powerful beam of golden light falls from the heavens onto the kneeling a lone knight in dark battle-worn steel armor with a tattered dark hooded cape and an engraved lion crest on the chest, face hidden in the shadow of the hood, golden particles glowing all around him, the rain sparkling like gold",
+          "action_en": "the dark sky opens and a golden beam of light descends slowly onto the kneeling knight",
+          "reaction_en": "the knight stays kneeling, bathed in golden light",
+          "background_en": "",
+          "dialogue": [
+            {
+              "speaker": "Narrador",
+              "line": "Sino porque entendí… que solo Dios podía darme la victoria."
+            }
+          ],
+          "sfx": "",
+          "music": ""
+        },
+        {
+          "n": 7,
+          "location": "battlefield_dawn",
+          "characters": [],
+          "scene_es": "Si hoy estás peleando una batalla en silencio… no estás solo",
+          "camera": "slow crane up and pull-back",
+          "start_en": "Wide shot of a lone knight in dark battle-worn steel armor with a tattered dark hooded cape and an engraved lion crest on the chest, face hidden in the shadow of the hood kneeling inside a column of golden light on a dark battlefield, golden particles rising",
+          "end_en": "High wide view of the tiny kneeling knight far below in a column of golden light, the whole sky filled with golden rays breaking through the clouds",
+          "action_en": "the camera rises slowly into the sky as the golden light spreads across the clouds",
+          "reaction_en": "golden rays fill the sky",
+          "background_en": "",
+          "dialogue": [
+            {
+              "speaker": "Narrador",
+              "line": "Si hoy estás peleando una batalla en silencio… no estás solo."
+            }
+          ],
+          "sfx": "",
+          "music": ""
+        }
+      ]
+    }
+  ]
+}

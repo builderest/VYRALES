@@ -60,6 +60,21 @@ const TIPOS = {
     vozEstilo: 'Narrador de historia de superación en español latino: voz firme, cálida y profunda, intensa sin gritar; baja la voz en el momento más duro y crece en la victoria. Mantén la MISMA energía e intensidad de principio a fin de cada frase: nunca te apagues ni bajes la voz al final.',
     cierre: { text: 'NUNCA ES TARDE', subtext: 'Cada día una historia que inspira', voice: 'Síguenos: cada día, una historia que te va a mover.' },
     fuentes: true
+  },
+  // Frases motivacionales de fe y guerrero (pedido de Franklin, oct-2026: estilo póster "Aprendí a luchar en silencio…").
+  frases: {
+    nombre: 'frases motivacionales de fe, disciplina y batalla interior (el guerrero que lucha en silencio y confía en Dios)',
+    slug: 'vyrales_frases', title: 'Frases que te levantan',
+    temaDefault: 'UNA frase poderosa de fe y fortaleza (original o la que pida el usuario), contada como una mini historia de batalla interior',
+    tono: 'Épico, solemne y emotivo, como el tráiler de una película de caballeros: dolor real, silencio, fe y victoria. Nada cursi ni de autoayuda barata; frases cortas con peso, que se sientan en el pecho.',
+    gancho: 'El dolor que nadie ve, en segunda o primera persona y en una sola frase ("Hubo noches en que nadie supo lo que estaba cargando.").',
+    estructura: 'La batalla que nadie ve (2 tomas) → la caída (1) → el momento de entender (1) → LA FRASE dicha completa, partida en 2–3 tomas con pausas solemnes → la victoria / la luz (1) → una línea final que le habla directo al espectador ("Si hoy estás peleando en silencio… no estás solo."). 7–9 tomas, 45–75 s.',
+    visual: 'Dark epic cinematic fantasy, photorealistic, a lone battle-worn medieval knight, black and gold palette, volumetric god rays, rain, embers and golden particles in the air, dramatic low-key light, film grain',
+    voz: 'Orus',
+    vozEstilo: 'Narrador épico en español latino: voz grave, profunda y firme, lenta y solemne, con pausas largas antes de las palabras clave (luchar, silencio, Dios, victoria); crece con fuerza en la frase final. Nunca grita, nunca suena a comercial. Mantén la MISMA energía e intensidad de principio a fin de cada frase: nunca te apagues ni bajes la voz al final.',
+    cierre: { text: 'SOLO DIOS DA LA VICTORIA', subtext: 'Síguenos para más frases que te levantan', voice: 'Síguenos para más frases que te levantan.' },
+    reglas: 'El mismo personaje en TODAS las tomas, descrito igual en cada start_en/end_en (p. ej. "a lone knight in dark battle-worn steel armor, a tattered dark hooded cape and an engraved lion crest on the chest, face hidden in shadow"); nunca se le ve la cara de frente. La frase pedida se dice EXACTA, palabra por palabra. hook_text = la frase más fuerte en MAYÚSCULAS (máx. 6 palabras). Sin sangre ni violencia gráfica: las batallas son siluetas, humo y chispas.',
+    fuentes: false
   }
 };
 
@@ -83,7 +98,7 @@ TEMA: ${topic || 'elige tú ' + p.temaDefault + '.'}
 6. PALABRAS CON PESO, ritmo de tráiler: alterna frases cortísimas (2–4 palabras) con frases largas; "…" donde la voz debe respirar antes de lo fuerte. Traduce cifras a algo concreto. PROHIBIDO lo infantil o cursi ("un poquito", "como un trompo", diminutivos, chistes) y el relleno.
 7. IMAGEN = FRASE: cada toma muestra EXACTAMENTE lo que dice su frase (si dice "volcanes", se ven volcanes; si dice "gigante", se ve gigante), con una acción visual fuerte y una cámara con energía. Nunca una imagen quieta ni decorativa.
 8. FINAL: responde el bucle abierto; si puedes, vuelve a la imagen o la idea del gancho para que al repetirse el video se sienta continuo. Nada de "dale like".
-${p.fuentes ? '9. CERO DATOS FALSOS: cada dato lleva su fuente en continuity.sources (estudio, institución, libro, año). Si hay un rango, palabras prudentes ("unas", "cerca de", "casi"). Si no se puede verificar, no entra. Nunca inventes cifras para que suene más dramático.\n' : ''}
+${p.reglas ? '8b. REGLAS DE ESTE TIPO: ' + p.reglas + '\n' : ''}${p.fuentes ? '9. CERO DATOS FALSOS: cada dato lleva su fuente en continuity.sources (estudio, institución, libro, año). Si hay un rango, palabras prudentes ("unas", "cerca de", "casi"). Si no se puede verificar, no entra. Nunca inventes cifras para que suene más dramático.\n' : ''}
 === REGLAS TÉCNICAS (obligatorias; el sistema valida el JSON) ===
 - 12 a 16 tomas (video de 1:40–2:30). Cada toma: UNA línea del narrador. Lo normal: 10 a 14 palabras (toma de 8 s); si la frase queda mejor más larga, hasta 28 palabras (la toma se alarga sola hasta 16 s). Nunca recortes una buena frase; tampoco rellenes. Alterna tomas cortas y largas.
 - Solo narrador en off: dialogue = [{ "speaker": "Narrador", "line": "…" }] en todas las tomas. Nadie habla ni mueve la boca en cuadro.
