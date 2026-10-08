@@ -52,7 +52,7 @@ async function main() {
   fs.mkdirSync(OUT, { recursive: true });
   const rawDir = path.join(OUT, 'raw_' + Date.now());
   let browser = null;
-  for (const channel of ['msedge', 'chrome']) {
+  for (const channel of ['chrome', 'msedge']) {
     try { browser = await chromium.launch({ channel, headless: false, args: ['--window-size=1300,900'] }); console.log('Navegador:', channel); break; }
     catch (e) { console.log('No pude abrir', channel, '→', String(e.message).split('\n')[0]); }
   }
@@ -64,7 +64,13 @@ async function main() {
   await context.addCookies([{ name: 'vyrales_auth', value: exp + '.' + sig, domain: new URL(SITE).hostname, path: '/', httpOnly: true, secure: true, sameSite: 'Lax' }]);
   await context.addInitScript((slug) => { try { if (location.hostname.endsWith('vyrales.app')) localStorage.setItem('vyrales_series', slug); window.__ttNoPc = true; } catch (_) {} }, series.slug);
   // __ttNoPc: el video lo sube Netlify (no el agente), porque el agente está ocupado grabando este demo.
-  const page = await context.newPage();
+  let page = await context.newPage();
+  const firstPage = page;
+  // Diagnóstico: si la ventana o el navegador se cierran solos, que quede escrito cuándo y dónde.
+  browser.on('disconnected', () => console.log('[diag] el navegador se desconectó/cerró', new Date().toLocaleTimeString()));
+  context.on('page', (pg) => console.log('[diag] se abrió otra pestaña/ventana:', pg.url()));
+  firstPage.on('close', () => console.log('[diag] la pestaña principal se cerró en', firstPage.url(), new Date().toLocaleTimeString()));
+  firstPage.on('crash', () => console.log('[diag] la pestaña se colgó (crash)'));
 
   // ---- Subtítulos de narración (en inglés, para el revisor de TikTok) ----
   let caption = '';
@@ -181,7 +187,7 @@ async function main() {
     }
     await cap('End of demo. VYRALES only posts videos the creator made, to the creator’s own account, after they review every setting and click "Post".', 6000);
   } finally {
-    const vidPath = await page.video()?.path().catch(() => null);
+    const vidPath = await (firstPage.video() ? firstPage.video().path().catch(() => null) : null);
     await context.close().catch(() => {});
     await browser.close().catch(() => {});
     if (vidPath && fs.existsSync(vidPath)) {
@@ -194,4 +200,6 @@ async function main() {
   }
 }
 
+process.on('uncaughtException', (e) => console.log('[diag] excepción sin manejar:', (e && e.message) || e));
+process.on('unhandledRejection', (e) => console.log('[diag] promesa sin manejar:', (e && e.message) || e));
 main().catch((err) => { console.error('ERROR:', err.message || err); process.exit(1); });
