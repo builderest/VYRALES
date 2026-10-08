@@ -206,7 +206,7 @@ async function tiktokDirectPost(supabase, { videoBuffer, post, log = console.log
   });
   if (!res.ok || !body.data || !body.data.upload_url) {
     const code = body && body.error && body.error.code;
-    if (code === 'unaudited_client_can_only_post_to_private_accounts') throw new Error('TikTok todavía no auditó la app: por ahora solo se puede publicar en "Solo yo" (SELF_ONLY).');
+    if (code === 'unaudited_client_can_only_post_to_private_accounts') throw new Error('TikTok todavía no auditó la app: mientras tanto solo deja publicar en cuentas de TikTok PRIVADAS. Pon tu cuenta en privada (TikTok → Configuración y privacidad → Privacidad → Cuenta privada), publica, y luego vuelve a ponerla pública.');
     throw new Error('TikTok rechazó la publicación: ' + JSON.stringify(body.error || body).slice(0, 300));
   }
   await ttUpload(body.data.upload_url, videoBuffer, log);

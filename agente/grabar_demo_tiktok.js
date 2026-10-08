@@ -6,6 +6,8 @@
 //   3) Panel PUBLICAR → "Post to TikTok" → muestra cada opción (cuenta, privacidad, interacciones,
 //      etiqueta de IA, divulgación comercial, declaración de música) → Post (privacidad "Only me")
 //   4) Espera a que TikTok termine y abre tu perfil de TikTok para mostrar el video publicado.
+// OJO: mientras TikTok no audite la app, la CUENTA de TikTok tiene que estar en PRIVADA durante el demo
+//   (TikTok → Configuración y privacidad → Privacidad → Cuenta privada). Después se vuelve a poner pública.
 // Resultado: <VYRALES_FINALES_DIR>\tiktok_demo\vyrales_tiktok_demo.mp4 (menos de 50 MB, lo que pide TikTok).
 const fs = require('fs');
 const path = require('path');
