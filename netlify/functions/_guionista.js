@@ -13,7 +13,8 @@ const TIPOS = {
     slug: 'cibertales_curiosidades', title: 'Curiosidades CIBERTALES',
     temaDefault: 'una curiosidad REAL de ciencia, espacio, naturaleza o cuerpo humano que contradiga lo que la gente cree o suene imposible, y que toque algo de su vida diaria',
     tono: 'Épico de documental (estilo History Channel / Discovery): asombro y tensión, frases con peso, ritmo de tráiler.',
-    gancho: 'Un dato imposible que te afecta a TI ("Cada siglo, tu día se alarga. Y la culpa… es de la Luna.").',
+    // Elegido por Franklin (oct-2026): abrir con un salto en el tiempo "te lleva hacia atrás automáticamente".
+    gancho: 'Un salto en el tiempo con un dato imposible y concreto, que te transporta de golpe ("Hace cuatro mil millones de años, un día entero duraba apenas seis horas."). Después, conecta con el presente del espectador.',
     estructura: 'Gancho → bucle abierto → la causa (historia de causa y efecto) → giro inesperado al 70–80 % → prueba concreta → final que vuelve al gancho.',
     visual: 'Photorealistic cinematic science documentary, epic natural light, rich deep colors, atmospheric depth, premium nature-documentary cinematography',
     voz: 'Alnilam',
