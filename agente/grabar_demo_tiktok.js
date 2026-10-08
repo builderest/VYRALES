@@ -43,6 +43,12 @@ async function main() {
   if (!(((ep.validator_report || {}).publish_package || {}).status === 'done')) throw new Error('El episodio no tiene "Preparar textos y portada" hecho.');
 
   const { chromium } = loadPlaywright();
+  // Playwright graba con SU propio ffmpeg (C:\Users\<tú>\AppData\Local\ms-playwright\ffmpeg-*). Se baja una vez (~1 MB).
+  try {
+    const cli = path.join(path.dirname(require.resolve('playwright-core/package.json', { paths: [ROOT] })), 'cli.js');
+    console.log('Revisando el grabador de video de Playwright (ffmpeg)...');
+    execFileSync(process.execPath, [cli, 'install', 'ffmpeg'], { cwd: ROOT, stdio: 'inherit' });
+  } catch (e) { console.log('Aviso: no pude instalar el ffmpeg de Playwright:', String(e.message).split('\n')[0]); }
   fs.mkdirSync(OUT, { recursive: true });
   const rawDir = path.join(OUT, 'raw_' + Date.now());
   let browser = null;
