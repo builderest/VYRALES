@@ -69,7 +69,7 @@ const ttDirect = () => ttSandbox() || /^(1|true|si|sí)$/i.test(process.env.TIKT
 // "Direct Post"; para pedirlo, poner TIKTOK_SCOPES=user.info.basic,video.upload,video.publish.
 const tiktokScopes = () => process.env.TIKTOK_SCOPES || (ttDirect() ? 'user.info.basic,video.upload,video.publish' : 'user.info.basic,video.upload');
 function tiktokAuthUrl() {
-  const q = new URLSearchParams({ client_key: ttKey(), scope: tiktokScopes(), response_type: 'code', redirect_uri: REDIRECT('tiktok'), state: makeState('tiktok') });
+  const q = new URLSearchParams({ client_key: ttKey(), scope: tiktokScopes(), response_type: 'code', redirect_uri: REDIRECT('tiktok'), state: makeState('tiktok'), disable_auto_auth: '1' }); // siempre muestra la pantalla de permisos
   return `https://www.tiktok.com/v2/auth/authorize/?${q}`;
 }
 async function tiktokToken(params) {

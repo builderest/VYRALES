@@ -182,10 +182,19 @@ async function main() {
     await cap('VYRALES shows the result of the post in the PUBLISH panel.', 4000);
     const profile = run.url || null;
     if (profile) {
-      await cap('Step 4: the video on the creator’s TikTok profile.', 2500);
+      await cap('Step 4: the creator opens their TikTok profile to see the post.', 2500);
       await page.goto(profile, { waitUntil: 'domcontentloaded' }).catch(() => {});
       await sleep(7000);
-      await cap('The video is on the creator’s TikTok account, posted with the privacy the creator chose and the AI-generated label.', 8000);
+      // TikTok web a veces dice "Something went wrong" en la lista de videos: un reintento con su botón Refresh.
+      const refresh = page.getByRole('button', { name: /refresh/i }).first();
+      if (await refresh.isVisible().catch(() => false)) { await refresh.click().catch(() => {}); await sleep(6000); }
+      const bad = await page.getByText(/something went wrong/i).first().isVisible().catch(() => false);
+      if (bad) {
+        await cap('The TikTok web profile did not load the video list here; TikTok Studio lists the creator’s posts.', 2500);
+        await page.goto('https://www.tiktok.com/tiktokstudio/content', { waitUntil: 'domcontentloaded' }).catch(() => {});
+        await sleep(9000);
+      }
+      await cap('The post is in the creator’s TikTok account with the privacy they chose ("Only me") and the AI-generated label.', 7000);
     }
     await cap('End of demo. VYRALES only posts videos the creator made, to the creator’s own account, after they review every setting and click "Post".', 6000);
   } finally {
