@@ -129,11 +129,43 @@ function assHeader(sub) {
     `Style: Hook,${FONT_NAME},62,&H00FFFFFF,&H000000FF,&H00000000,&H96000000,0,0,0,0,100,100,0,0,1,6,2,8,50,50,230,1`,
     `Style: EndBig,${FONT_NAME},74,&H00FFFFFF,&H000000FF,&H00000000,&H96000000,0,0,0,0,100,100,0,0,1,5,2,5,50,50,0,1`,
     `Style: EndSmall,${FONT_NAME},44,&H0000E1FF,&H000000FF,&H00000000,&H96000000,0,0,0,0,100,100,0,0,1,4,2,5,50,50,0,1`,
+    // Póster (frases motivacionales): letras romanas grandes, plata y oro, arriba (el personaje queda abajo).
+    `Style: PosterSm,Cinzel,58,&H00E6E6E6,&H000000FF,&H00101010,&HA0000000,-1,0,0,0,100,100,2,0,1,3,4,8,50,50,190,1`,
+    `Style: PosterBig,Cinzel,116,&H00D8D8D8,&H000000FF,&H00101010,&HA0000000,-1,0,0,0,100,100,1,0,1,4,5,8,40,40,190,1`,
     `Style: CardSmall,${FONT_NAME},40,&H00B4B4B4,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,0,0,5,70,70,0,1`,
     '', '[Events]', 'Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text'
   ];
 }
 const dialogueLine = (e) => `Dialogue: 0,${assTime(e.start)},${assTime(e.end)},${e.style},,0,0,0,,${e.text}`;
+
+// Texto estilo PÓSTER: mayúsculas, las palabras clave en grande (plata) u oro, cada palabra clave en su
+// propia línea y el resto agrupado en líneas cortas. big/gold: listas de palabras (sin signos).
+function posterText(text, big = [], gold = []) {
+  const norm = (w) => w.toUpperCase().replace(/[^\p{L}\p{N}]/gu, '');
+  const B = new Set(big.map(norm)), G = new Set(gold.map(norm));
+  const words = clean(text).replace(/\s*(…|\.\.\.)\s*/g, ' ').toUpperCase().split(' ').filter(Boolean);
+  const lines = [];
+  let cur = [];
+  const flush = () => { if (cur.length) { lines.push(`{\\fs58\\1c&H00E6E6E6&\\3c&H00101010&}${cur.join(' ')}`); cur = []; } };
+  words.forEach((w) => {
+    const k = norm(w);
+    if (B.has(k) || G.has(k)) {
+      flush();
+      const color = G.has(k) ? '{\\1c&H004CC0E8&\\3c&H00062A4A&}' : '{\\1c&H00D8D8D8&\\3c&H00101010&}';
+      // dos palabras clave seguidas en la misma línea (p. ej. SOLO DIOS)
+      const last = lines[lines.length - 1];
+      if (last && last.startsWith('{\\fs116}') && lines._lastBig) lines[lines.length - 1] = last + ' ' + color + w;
+      else lines.push('{\\fs116}' + color + w);
+      lines._lastBig = true;
+      return;
+    }
+    lines._lastBig = false;
+    cur.push(w);
+    if (cur.join(' ').length >= 16) flush();
+  });
+  flush();
+  return '{\\fad(500,250)\\fscx92\\fscy92\\t(0,700,\\fscx100\\fscy100)}' + lines.join('\\N');
+}
 
 function subtitleText(text, seconds, sub, color) {
   let body = sub.karaoke ? karaoke(text, seconds) : clean(text);
@@ -185,7 +217,10 @@ async function renderClip({ cwd, input, out, c, subtitle, speakerColor, sub, fad
     const win = speechWindow || SPEECH; // modo voz de LTX: la voz detectada en el clip
     const st = narr ? NS : Math.max(0, (win[0] - ts) / speed);
     const en = narr ? Math.min(dur - 0.05, NS + narr.seconds) : Math.min(dur - 0.05, (win[1] - ts) / speed);
-    if (en > st + 0.3) events.push({ start: st, end: en, style: 'Sub', text: subtitleText(subtitle, en - st, sub, speakerColor) });
+    if (sub.style === 'poster') {
+      // Póster: aparece cuando empieza la voz y se queda hasta el final de la toma.
+      if (dur - 0.1 > st + 0.3) events.push({ start: st, end: dur - 0.1, style: 'PosterSm', text: posterText(subtitle, c.poster_big || [], c.poster_gold || []) });
+    } else if (en > st + 0.3) events.push({ start: st, end: en, style: 'Sub', text: subtitleText(subtitle, en - st, sub, speakerColor) });
   }
   if (c.overlay) events.push({ start: 0, end: dur, style: 'Top', text: clean(c.overlay) });
   // Gancho en pantalla los primeros ~3 s (para quien ve sin sonido; FB: 2 de cada 3 se iban antes de 3 s).
@@ -416,6 +451,8 @@ async function renderEpisode({ episode, series, log = console.log, fetchFile = d
   const sbEnd = series && series.story_bible && series.story_bible.end_card;
   if (sbEnd && !(episode.edit_plan && episode.edit_plan.end_card)) plan.end_card = Object.assign({}, plan.end_card, sbEnd);
   const sub = Object.assign({}, plan.subtitles, { margin_v: Math.min(1150, Math.max(20, Number(plan.subtitles.margin_v) || 180)) });
+  // Series con story_bible.subtitle_style = 'poster' (frases motivacionales): texto tipo póster en vez del karaoke.
+  if (series && series.story_bible && series.story_bible.subtitle_style === 'poster') { sub.style = 'poster'; sub.karaoke = false; }
   const clipsByShot = {};
   (episode.assets || []).filter((a) => a.kind === 'video_clip' && a.storage_path).forEach((a) => { clipsByShot[a.shot_number] = a; });
   const shotsByN = {};
@@ -434,6 +471,7 @@ async function renderEpisode({ episode, series, log = console.log, fetchFile = d
   try {
     fs.mkdirSync(path.join(cwd, 'fonts'));
     fs.copyFileSync(findFont(), path.join(cwd, 'fonts', FONT_FILE));
+    { const cz = path.join(path.dirname(findFont()), 'Cinzel-Bold.ttf'); if (fs.existsSync(cz)) fs.copyFileSync(cz, path.join(cwd, 'fonts', 'Cinzel-Bold.ttf')); }
     // parts: { file, dur, xfade (segundos de fundido cruzado CON la pieza siguiente) }
     const parts = [];
 
@@ -474,7 +512,8 @@ async function renderEpisode({ episode, series, log = console.log, fetchFile = d
       const hookText = i === 1 && !plan.title_card.enabled ? ((episode.continuity && episode.continuity.hook_text) || '') : '';
       // Si esta toma entra con fundido cruzado o fundido desde negro, la voz espera a que termine.
       const narrStartMin = (prev && XFADE[prev.transition] ? tSec(prev) : 0) + fadeIn + 0.15;
-      const r = await renderClip({ cwd, input: src, out, c, subtitle, speechWindow, hookText, narrStartMin, speakerColor: spk ? SPEAKER_COLORS[speakers.indexOf(spk) % SPEAKER_COLORS.length] : null, sub, fadeIn, fadeOut, narration, muteOriginal, tailReserve });
+      const cP = sub.style === 'poster' && shot ? Object.assign({}, c, { poster_big: shot.text_big || [], poster_gold: shot.text_gold || [] }) : c;
+      const r = await renderClip({ cwd, input: src, out, c: cP, subtitle, speechWindow, hookText, narrStartMin, speakerColor: spk ? SPEAKER_COLORS[speakers.indexOf(spk) % SPEAKER_COLORS.length] : null, sub, fadeIn, fadeOut, narration, muteOriginal, tailReserve });
       const dur = r.dur;
       if (r.narr && r.narr.tempo > 1.001) log(`toma ${c.shot}: narración acelerada ${r.narr.tempo.toFixed(2)}x para que quepa.`);
       parts.push({ file: out, dur, narr: r.narr, xfade: XFADE[c.transition] && i < chosen.length ? Math.min(tSec(c), dur / 2) : 0, xname: XFADE[c.transition] || 'fade', musicOff: !!(shot && /^(off|none|silence|silencio)$/i.test(String(shot.music || ''))) });
