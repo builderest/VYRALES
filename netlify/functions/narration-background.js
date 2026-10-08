@@ -8,7 +8,7 @@
 //   { url, text, voice, model, seconds, at } y el resultado de la corrida en
 //   episodes.validator_report.last_narration_run (el dashboard hace polling).
 const { getSupabaseClient } = require('./_supabase');
-const { synthesize, concatWavs, tightenSpeech, applyVoiceFx, wavSeconds, DEFAULT_VOICE, DEFAULT_STYLE, TTS_MODEL_DEFAULT } = require('./_tts');
+const { energyScore, synthesize, concatWavs, tightenSpeech, applyVoiceFx, wavSeconds, DEFAULT_VOICE, DEFAULT_STYLE, TTS_MODEL_DEFAULT } = require('./_tts');
 const { narrationConfig, narrationLines, castMode } = require('./_series');
 const { assignVoices, seriesSpeakers, speakerInfo, actingStyle, fxFor } = require('./_voices');
 const { ensureMediaBucket, uploadFile, removeByPublicUrl } = require('./_storage');
@@ -107,6 +107,17 @@ exports.handler = async (event) => {
         for (const d of (cast ? lines : [{ speaker: 'Narrador', line: lines.map((x) => x.line).join(' ') }])) {
           let r1 = await synthLine(d);
           const tightSecs = (r) => wavSeconds(tightenSpeech(r.wav, () => {}));
+          // Videos narrados (curiosidades…): el TTS da una energía distinta en cada llamada y algunas frases
+          // "perdían el estilo". Se hacen 2 tomas y se queda la más intensa y pareja (~$0.003 más por frase).
+          // La toma de video se alarga sola hasta 16 s, así que aquí no se pide ritmo más rápido.
+          if (sb.format === 'narrado_unico') {
+            const r2 = await synthLine(d);
+            const s1 = energyScore(r1.wav), s2 = energyScore(r2.wav);
+            console.log(LOG, `toma ${shot.n}: energía de la voz ${s1.toFixed(1)} vs ${s2.toFixed(1)} → se queda la ${s2 > s1 ? '2ª' : '1ª'}`);
+            if (s2 > s1) r1 = r2;
+            parts.push(r1);
+            continue;
+          }
           // Si aun sin pausas no cabe cómodo (diálogo: ~6.5 s de boca; narrador: 7.4 s), un
           // reintento con ritmo más ágil (~$0.004 más).
           const limit = (cast ? 6.6 : MAX_COMFORT_S) / (cast ? lines.length : 1);

@@ -18,7 +18,7 @@ const TIPOS = {
     estructura: 'Gancho → bucle abierto → la causa (historia de causa y efecto) → giro inesperado al 70–80 % → prueba concreta → final que vuelve al gancho.',
     visual: 'Photorealistic cinematic science documentary, epic natural light, rich deep colors, atmospheric depth, premium nature-documentary cinematography',
     voz: 'Alnilam',
-    vozEstilo: 'Narrador de documental estilo History Channel en español latino: voz grave, profunda y resonante, con autoridad y misterio; dramático pero natural, con pausas solemnes antes de cada revelación. Nada de tono de comercial.',
+    vozEstilo: 'Narrador de documental estilo History Channel en español latino: voz grave, profunda y resonante, con autoridad y misterio; dramático pero natural, con pausas solemnes antes de cada revelación. Nada de tono de comercial. Mantén la MISMA energía e intensidad de principio a fin de cada frase: nunca te apagues ni bajes la voz al final.',
     cierre: { text: '¿SABÍAS ESTO?', subtext: 'Cada día una curiosidad nueva', voice: 'Síguenos: cada día, una curiosidad nueva.' },
     fuentes: true
   },
@@ -31,7 +31,7 @@ const TIPOS = {
     estructura: 'Gancho en el momento crítico → retroceso breve para el contexto → escalada → decisión o giro → consecuencia que llega hasta hoy.',
     visual: 'Photorealistic cinematic historical documentary, period-accurate settings and costumes, dramatic chiaroscuro light, smoke and dust in the air, epic wide shots',
     voz: 'Algenib',
-    vozEstilo: 'Narrador de documental histórico en español latino: voz grave y rasposa, solemne, con peso; cuenta la historia como un thriller, con pausas dramáticas antes de los momentos clave.',
+    vozEstilo: 'Narrador de documental histórico en español latino: voz grave y rasposa, solemne, con peso; cuenta la historia como un thriller, con pausas dramáticas antes de los momentos clave. Mantén la MISMA energía e intensidad de principio a fin de cada frase: nunca te apagues ni bajes la voz al final.',
     cierre: { text: 'LA HISTORIA REAL', subtext: 'Cada día una historia que no te contaron', voice: 'Síguenos: cada día, una historia que no te contaron.' },
     fuentes: true
   },
@@ -44,7 +44,7 @@ const TIPOS = {
     estructura: 'Detalle perturbador → lo que se sabe → pistas que no encajan → la teoría más fuerte → lo que sigue sin explicación (pregunta al espectador).',
     visual: 'Photorealistic cinematic mystery documentary, moody low-key lighting, fog and deep shadows, desaturated cold colors with a single warm accent, slow suspenseful atmosphere',
     voz: 'Charon',
-    vozEstilo: 'Narrador de misterio en español latino: voz profunda y baja, casi en confidencia, inquietante; pausas largas antes de cada detalle perturbador; nunca grita.',
+    vozEstilo: 'Narrador de misterio en español latino: voz profunda y baja, casi en confidencia, inquietante; pausas largas antes de cada detalle perturbador; nunca grita. Mantén la MISMA energía e intensidad de principio a fin de cada frase: nunca te apagues ni bajes la voz al final.',
     cierre: { text: '¿TÚ QUÉ CREES?', subtext: 'Cada día un misterio nuevo', voice: 'Síguenos: cada día, un misterio nuevo.' },
     fuentes: true
   },
@@ -57,7 +57,7 @@ const TIPOS = {
     estructura: 'Punto más bajo → por qué parecía imposible → los rechazos → el momento de quiebre → la victoria → una sola frase final que el espectador se lleva.',
     visual: 'Photorealistic cinematic biographical drama, emotional golden-hour and low-key light, intimate close details of hands and places, film grain, warm-cold color contrast',
     voz: 'Orus',
-    vozEstilo: 'Narrador de historia de superación en español latino: voz firme, cálida y profunda, intensa sin gritar; baja la voz en el momento más duro y crece en la victoria.',
+    vozEstilo: 'Narrador de historia de superación en español latino: voz firme, cálida y profunda, intensa sin gritar; baja la voz en el momento más duro y crece en la victoria. Mantén la MISMA energía e intensidad de principio a fin de cada frase: nunca te apagues ni bajes la voz al final.',
     cierre: { text: 'NUNCA ES TARDE', subtext: 'Cada día una historia que inspira', voice: 'Síguenos: cada día, una historia que te va a mover.' },
     fuentes: true
   }

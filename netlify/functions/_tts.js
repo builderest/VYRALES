@@ -111,6 +111,25 @@ function pcmOf(buf) {
   if (!fmt || !data) throw new Error('WAV sin chunk fmt/data.');
   return { fmt, data };
 }
+// Energía de una toma de voz (para elegir la mejor de 2): volumen medio de la voz + cómo termina la
+// frase (el TTS a veces "se apaga" al final y el narrador pierde fuerza). Más alto = más intenso y parejo.
+function energyScore(wav) {
+  const { data } = pcmOf(wav);
+  const n = Math.floor(data.length / 2);
+  const win = 2400; // ~0.1 s a 24 kHz
+  const db = [];
+  for (let i = 0; i + win <= n; i += win) {
+    let sum = 0;
+    for (let j = i; j < i + win; j++) { const v = data.readInt16LE(j * 2) / 32768; sum += v * v; }
+    const d = 10 * Math.log10(sum / win + 1e-12);
+    if (d > -40) db.push(d); // solo tramos con voz
+  }
+  if (!db.length) return -99;
+  const mean = db.reduce((a, b) => a + b, 0) / db.length;
+  const tail = db.slice(Math.floor(db.length * 0.66));
+  const tailMean = tail.reduce((a, b) => a + b, 0) / (tail.length || 1);
+  return mean + 0.7 * tailMean;
+}
 function concatWavs(bufs, gapSeconds = 0.35) {
   if (bufs.length === 1) return bufs[0];
   const parts = bufs.map(pcmOf);
@@ -189,4 +208,4 @@ function applyVoiceFx(wav, preset, log = console.log) {
   return wav;
 }
 
-module.exports = { applyVoiceFx, VOICE_FX, tightenSpeech, concatWavs, synthesize, wavSeconds, TTS_MODEL_DEFAULT, DEFAULT_VOICE, DEFAULT_STYLE, VOICES, TTS_PRICE_PER_M };
+module.exports = { energyScore, applyVoiceFx, VOICE_FX, tightenSpeech, concatWavs, synthesize, wavSeconds, TTS_MODEL_DEFAULT, DEFAULT_VOICE, DEFAULT_STYLE, VOICES, TTS_PRICE_PER_M };

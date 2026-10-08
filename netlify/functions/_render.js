@@ -228,7 +228,7 @@ async function renderClip({ cwd, input, out, c, subtitle, speakerColor, sub, fad
     const ni = inputs.filter((x) => x === '-i').length - 1;
     const ms = Math.round(NS * 1000);
     fc.push(`[${origLabel}]${oa.join(',')}[ao]`);
-    fc.push(`[${ni}:a]aresample=48000,aformat=channel_layouts=stereo${narr.tempo > 1.001 ? `,atempo=${narr.tempo.toFixed(3)}` : ''},adelay=${ms}|${ms},apad[an]`);
+    fc.push(`[${ni}:a]aresample=48000,aformat=channel_layouts=stereo${narr.tempo > 1.001 ? `,atempo=${narr.tempo.toFixed(3)}` : ''},dynaudnorm=f=150:g=9:p=0.9:m=8,adelay=${ms}|${ms},apad[an]`);
     fc.push(`[ao][an]amix=inputs=2:duration=first:dropout_transition=0:normalize=0,${fades}[a]`);
   } else {
     fc.push(`[${origLabel}]${oa.join(',')},${fades}[a]`);
