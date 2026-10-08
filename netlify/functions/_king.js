@@ -47,7 +47,10 @@ function ltxPromptFor(shot, storyBible) {
   const clean = (t) => String(t || '').replace(/\b([A-Z][a-z]+)(Uno|Dos|Tres|Cuatro)\b/g, (_, a, b) => ({ Uno: 'the first ', Dos: 'the second ', Tres: 'the third ', Cuatro: 'the fourth ' }[b] + a.toLowerCase())).replace(/\s+/g, ' ').trim();
   if (shot.ltx_en) return clean(shot.ltx_en); // si el guion trae un prompt propio para LTX, manda ese
   const cam = clean(shot.camera);
-  const moving = /push|pull|dolly|pan|tilt|track|zoom|orbit|crane|handheld/i.test(cam);
+  const moving = /push|pull|dolly|pan|tilt|track|zoom|orbit|crane|handheld|fpv|drone|fly|follow|glide|rise|rush/i.test(cam);
+  // Videos narrados de curiosidades (sin personajes): cámara con energía, se mueve de verdad.
+  // En novelas con personas se mantiene lenta (con gente, el movimiento fuerte deforma caras e inventa fondos).
+  const dynamic = sb.format === 'narrado_unico';
   void names;
   // LTX no sabe quién es "Valentina": cada nombre se cambia por lo que lleva puesto
   // ("the person in a mustard-yellow cardigan over a white t-shirt"), así sabe a quién mover y quién habla.
@@ -76,15 +79,15 @@ function ltxPromptFor(shot, storyBible) {
       ? ['Scene: ' + named(stripVeoSpeech(shot.prompt_override)).slice(0, 2200).replace(/[^.]*$/, '')]
       : [
         shot.start_en ? 'Scene at the start: ' + named(shot.start_en) + '.' : '',
-        shot.action_en ? 'Then, slowly and naturally: ' + named(shot.action_en) + '.' : '',
+        shot.action_en ? (dynamic ? 'Then: ' : 'Then, slowly and naturally: ') + named(shot.action_en) + '.' : '',
         shot.reaction_en ? 'By the end: ' + named(shot.reaction_en) + '.' : ''
       ]),
     moving
-      ? 'Camera: ' + cam + ', very slow and subtle; the framing stays close to the first frame.'
+      ? (dynamic ? 'Camera: ' + cam + '. The camera moves clearly, smoothly and with energy through the scene, like a premium cinematic documentary shot; strong sense of depth and motion from the first second.' : 'Camera: ' + cam + ', very slow and subtle; the framing stays close to the first frame.')
       : 'Camera: ' + (cam ? cam + '. ' : '') + 'Locked-off tripod shot with the same fixed framing from the first frame to the last frame.',
     // Ropa de cada personaje (LTX inventaba pies descalzos o cambiaba la ropa al moverse: EP3 T2/T9).
     wardrobeLine(shot),
-    bg ? 'Background: ' + clean(bg).replace(/[.\s]*$/, '') + '; it stays exactly as in the first frame.' : 'The background, walls, terrain and sky stay exactly as in the first frame.',
+    bg ? 'Background: ' + clean(bg).replace(/[.\s]*$/, '') + (dynamic ? '; the same place throughout the shot.' : '; it stays exactly as in the first frame.') : (dynamic ? '' : 'The background, walls, terrain and sky stay exactly as in the first frame.'),
     // Estilo de la serie SIN lo de ropa ("period-appropriate hide garments" vestía de pieles a la científica moderna) ni el formato.
     sb.visual_style ? clean(sb.visual_style).split(/,\s*/).filter((x) => !/garment|cloth|outfit|wear|hide|vertical|9:16|framing|aspect/i.test(x)).join(', ').slice(0, 260).replace(/,[^,]*$/, (m) => (clean(sb.visual_style).length > 260 ? '' : m)).replace(/[,.\s]*$/, '.') : 'Photorealistic cinematic footage.',
     isAnimated(sb) ? 'The whole clip keeps exactly the same stylized 3D animated look as the first frame.' : '',
@@ -97,7 +100,7 @@ function ltxPromptFor(shot, storyBible) {
     // Voces fijas para todos: el que habla mueve la boca en 0–6 s (ahí el render pone su voz); si no, bocas cerradas.
     speaksOnScreen(shot, sb)
       ? 'Natural subtle body motion, consistent faces. ' + (speaker ? speaker.charAt(0).toUpperCase() + speaker.slice(1) : 'The character who speaks') + ' keeps the head and eyes turned toward whoever or whatever the action says they are talking to, from the first frame to the last frame' + (sayLine ? '. ' + sayLine + ' ' : ', and moves the lips softly and naturally as if talking quietly during the first 6 seconds, then closes the mouth. ') + 'Everyone else keeps the mouth closed. Photos, paintings and screens on the walls are still pictures. ' + soundLine + ' Clean cinematic image.'
-      : (hasPeople ? 'Natural subtle body motion, consistent faces, mouths closed. ' : 'Smooth, continuous, natural motion. ') + soundLine + ' Clean cinematic image.'
+      : (hasPeople ? 'Natural subtle body motion, consistent faces, mouths closed. ' : (dynamic ? 'Constant, vivid, powerful motion in every part of the frame from the first second to the last: the scene feels alive and spectacular. ' : 'Smooth, continuous, natural motion. ')) + soundLine + ' Clean cinematic image.'
   ].filter(Boolean).join(' ').replace(/\.\s*\./g, '.')
     // Guiones con "no readable text, no logos": con cfg = 1 nombrar texto/letras/logos los hace aparecer.
     .replace(/,?\s*(?:with\s+|and\s+)?(?:no|without)\s+(?:any\s+)?(?:readable\s+|visible\s+|on-screen\s+)?(?:text|writing|words|letters|logos?|captions|subtitles|watermarks?)\b(?:\s*(?:,|or|and)\s*(?:no\s+)?(?:readable\s+)?(?:text|writing|words|letters|logos?|captions|subtitles|watermarks?)\b)*/gi, '')
