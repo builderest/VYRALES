@@ -168,6 +168,9 @@ function validateSeries(data) {
   // Formato "narrado_unico" (curiosidades / documental corto de 1 video): solo narrador en off,
   // tomas sin personajes fijos (espacio, paisajes, animales…). Personajes opcionales.
   const narradoUnico = sb.format === 'narrado_unico';
+  // Voz continua (frases): una sola voz y tomas encadenadas → sin gancho de episodio, sin reacción fija,
+  // y solo la toma 1 lleva start_en (las demás empiezan en el final de la anterior).
+  const continuo = !!(sb.narration && sb.narration.mode === 'continuous');
   const characters = data.characters || [];
   if (!narradoUnico) req(characters.length > 0, 'La serie no tiene personajes.');
   const byKey = {};
@@ -197,11 +200,11 @@ function validateSeries(data) {
     req(ep.episode_number === idx + 1, `${tag}: numeración no consecutiva (se esperaba ${idx + 1}).`);
     req(ep.title, `${tag}: falta title.`);
     req(ep.continuity && ep.continuity.summary, `${tag}: falta continuity.summary.`);
-    req(ep.continuity && ep.continuity.last_cliffhanger, `${tag}: falta continuity.last_cliffhanger (el gancho es obligatorio).`);
+    if (!continuo) req(ep.continuity && ep.continuity.last_cliffhanger, `${tag}: falta continuity.last_cliffhanger (el gancho es obligatorio).`);
     Object.keys(ep.wardrobe || {}).forEach((k) => req(byKey[k], `${tag}: vestuario para personaje desconocido "${k}".`));
 
     const shots = ep.shots || [];
-    req(shots.length === shotsPerEpisode, `${tag}: tiene ${shots.length} tomas, se esperaban ${shotsPerEpisode}.`);
+    if (!continuo) req(shots.length === shotsPerEpisode, `${tag}: tiene ${shots.length} tomas, se esperaban ${shotsPerEpisode}.`);
 
     let words = 0;
     let withDialogue = 0;
@@ -216,12 +219,12 @@ function validateSeries(data) {
       req(s.scene_es && s.scene_es.trim(), `${st}: falta scene_es.`);
       req(s.camera && s.camera.trim(), `${st}: falta camera (encuadre y movimiento).`);
       req(s.action_en && s.action_en.trim(), `${st}: falta action_en (lo que pasa de 0 a 6 s).`);
-      req(s.reaction_en && s.reaction_en.trim(), `${st}: falta reaction_en (reacción quieta de 6 a 8 s, para que el corte sea limpio).`);
+      if (!continuo) req(s.reaction_en && s.reaction_en.trim(), `${st}: falta reaction_en (reacción quieta de 6 a 8 s, para que el corte sea limpio).`);
       // start_en = el cuadro inicial exacto (pose, a dónde mira cada uno, qué tiene en las manos).
       // Lo comparten la imagen y el video: sin él, el video re-actúa cosas que el cuadro ya
       // mostró (EP1 T1: volvió al horno y le habló a la cámara). Obligatorio desde formato 3.
       if (rules.keyframes) {
-        if ((data.format_version || 1) >= 3) req(s.start_en && s.start_en.trim(), `${st}: falta start_en (el cuadro inicial exacto: pose, mirada y qué tiene cada uno en las manos).`);
+        if ((data.format_version || 1) >= 3 && !(continuo && s.n > 1)) req(s.start_en && s.start_en.trim(), `${st}: falta start_en (el cuadro inicial exacto: pose, mirada y qué tiene cada uno en las manos).`);
         else if (!(s.start_en && s.start_en.trim())) warnings.push(`${st}: sin start_en (cuadro inicial); el video puede repetir una acción que el cuadro ya muestra.`);
       }
 
@@ -303,6 +306,8 @@ function toEpisodeRows(data) {
         ...(Number(s.seconds) > 0 ? { seconds: Number(s.seconds) } : {}),
         ...(Array.isArray(s.text_big) ? { text_big: s.text_big } : {}),
         ...(Array.isArray(s.text_gold) ? { text_gold: s.text_gold } : {}),
+        ...(s.voice_part ? { voice_part: s.voice_part } : {}),
+        ...(Number(s.weight) > 0 ? { weight: Number(s.weight) } : {}),
         action_en: s.action_en || s.visual_en || '',
         reaction_en: s.reaction_en || '',
         sfx: s.sfx || '',
