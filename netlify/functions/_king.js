@@ -252,7 +252,7 @@ async function stripAudio(buf) {
 // Mínimo 8 s, máximo 16 s. shot.seconds (si el guion lo trae) manda.
 function kingSecondsFor(shot) {
   if (!shot) return 8;
-  if (Number(shot.seconds) > 0) return Math.max(4, Math.min(16, Math.round(Number(shot.seconds))));
+  if (Number(shot.seconds) > 0) return Math.max(2, Math.min(16, Math.round(Number(shot.seconds)))); // voz continua: tomas cortas tipo anime (2 s)
   let voice = Number(shot.narration && shot.narration.seconds) || 0;
   if (!voice) {
     const d = shot.dialogue;
