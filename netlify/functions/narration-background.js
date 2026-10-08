@@ -18,6 +18,7 @@ const LOG = '[narration]';
 const MAX_COMFORT_S = 7.4;
 const FASTER = 'IMPORTANTE: ritmo más ágil y continuo, sin pausas entre palabras; la frase completa debe durar como máximo 6 segundos.';
 
+const TRIM_V = 2;
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method not allowed' };
   const supabase = getSupabaseClient();
@@ -76,7 +77,8 @@ exports.handler = async (event) => {
       const text = lineKey(s);
       if (!text) return false;
       const n = s.narration;
-      return !(n && n.url && n.text === text && n.voice === voiceKey(s));
+      // trim: versión del recorte de silencios (v2, oct-2026: ya no se come la primera sílaba).
+      return !(n && n.url && n.text === text && n.voice === voiceKey(s) && n.trim === TRIM_V);
     });
     if (only && !targets.length && !body.if_stale) throw new Error(`El episodio no tiene la toma ${only}.`);
     console.log(LOG, `EP${ep.episode_number}: ${targets.length} narraciones por generar (voz ${voice}).`);
@@ -131,7 +133,7 @@ exports.handler = async (event) => {
         const idx = shots.findIndex((s) => s.n === shot.n);
         if (idx === -1) throw new Error('La toma desapareció del episodio.');
         const old = shots[idx].narration && shots[idx].narration.url;
-        shots[idx] = Object.assign({}, shots[idx], { narration: { url, text, voice: voiceKey(shot), model, seconds: Math.round(r.seconds * 100) / 100, speakers: cast ? lines.map((d) => d.speaker) : undefined, at: new Date().toISOString() } });
+        shots[idx] = Object.assign({}, shots[idx], { narration: { url, text, voice: voiceKey(shot), trim: TRIM_V, model, seconds: Math.round(r.seconds * 100) / 100, speakers: cast ? lines.map((d) => d.speaker) : undefined, at: new Date().toISOString() } });
         const { error: uErr } = await supabase.from('episodes').update({ shots }).eq('id', ep.id);
         if (uErr) throw uErr;
         if (old && old !== url) await removeByPublicUrl(supabase, old, (...a) => console.log(LOG, ...a));

@@ -157,7 +157,7 @@ const NORMALIZE_V = `scale=${W}:${H}:force_original_aspect_ratio=decrease,pad=${
 const NARR_START = 0.3;
 const NARR_MAX_TEMPO = 1.2;
 
-async function renderClip({ cwd, input, out, c, subtitle, speakerColor, sub, fadeIn, fadeOut, narration = null, muteOriginal = false, tailReserve = 0, speechWindow = null, hookText = '' }) {
+async function renderClip({ cwd, input, out, c, subtitle, speakerColor, sub, fadeIn, fadeOut, narration = null, muteOriginal = false, tailReserve = 0, speechWindow = null, hookText = '', narrStartMin = 0 }) {
   const probe = await probeMedia(input, cwd);
   const full = probe.duration;
   const ts = Math.max(0, Math.min(Number(c.trim_start) || 0, full - 1));
@@ -165,13 +165,16 @@ async function renderClip({ cwd, input, out, c, subtitle, speakerColor, sub, fad
   const speed = Math.min(2, Math.max(0.5, Number(c.speed) || 1));
   const dur = srcDur / speed;
 
+  // La voz NO empieza dentro del fundido de entrada / fundido cruzado: ahí el audio está bajando o
+  // mezclándose con la toma anterior y la primera palabra no se entendía (oct-2026, video Luna).
+  const NS = Math.max(NARR_START, narrStartMin);
   // Narración: cuánto dura ya ajustada a la toma.
   let narr = null;
   if (narration && narration.file) {
     const nSecs = Number(narration.seconds) || (await probeDuration(narration.file, cwd));
-    let avail = Math.max(1, dur - NARR_START - Math.max(0.15, tailReserve));
+    let avail = Math.max(1, dur - NS - Math.max(0.15, tailReserve));
     // Diálogo doblado: la boca se mueve en 0–6 s (prompt), así que la voz se ajusta a esa ventana.
-    if (narration.window) avail = Math.min(avail, Math.max(1, narration.window - NARR_START));
+    if (narration.window) avail = Math.min(avail, Math.max(1, narration.window - NS));
     const tempo = Math.min(NARR_MAX_TEMPO, Math.max(1, nSecs / avail));
     narr = { file: narration.file, tempo, seconds: nSecs / tempo };
   }
@@ -180,8 +183,8 @@ async function renderClip({ cwd, input, out, c, subtitle, speakerColor, sub, fad
   if (subtitle) {
     // Con narración TTS el subtítulo sigue a la voz real; si no, la ventana fija del prompt (0–6 s).
     const win = speechWindow || SPEECH; // modo voz de LTX: la voz detectada en el clip
-    const st = narr ? NARR_START : Math.max(0, (win[0] - ts) / speed);
-    const en = narr ? Math.min(dur - 0.05, NARR_START + narr.seconds) : Math.min(dur - 0.05, (win[1] - ts) / speed);
+    const st = narr ? NS : Math.max(0, (win[0] - ts) / speed);
+    const en = narr ? Math.min(dur - 0.05, NS + narr.seconds) : Math.min(dur - 0.05, (win[1] - ts) / speed);
     if (en > st + 0.3) events.push({ start: st, end: en, style: 'Sub', text: subtitleText(subtitle, en - st, sub, speakerColor) });
   }
   if (c.overlay) events.push({ start: 0, end: dur, style: 'Top', text: clean(c.overlay) });
@@ -223,7 +226,7 @@ async function renderClip({ cwd, input, out, c, subtitle, speakerColor, sub, fad
   if (narr) {
     inputs.push('-i', narr.file);
     const ni = inputs.filter((x) => x === '-i').length - 1;
-    const ms = Math.round(NARR_START * 1000);
+    const ms = Math.round(NS * 1000);
     fc.push(`[${origLabel}]${oa.join(',')}[ao]`);
     fc.push(`[${ni}:a]aresample=48000,aformat=channel_layouts=stereo${narr.tempo > 1.001 ? `,atempo=${narr.tempo.toFixed(3)}` : ''},adelay=${ms}|${ms},apad[an]`);
     fc.push(`[ao][an]amix=inputs=2:duration=first:dropout_transition=0:normalize=0,${fades}[a]`);
@@ -231,7 +234,7 @@ async function renderClip({ cwd, input, out, c, subtitle, speakerColor, sub, fad
     fc.push(`[${origLabel}]${oa.join(',')},${fades}[a]`);
   }
   await run(['-y', ...inputs, '-filter_complex', fc.join(';'), '-map', '[v]', '-map', '[a]', '-t', dur.toFixed(3), ...VIDEO_OUT, ...AUDIO_OUT, out], cwd);
-  return { dur, narr: narr ? { start: NARR_START, seconds: narr.seconds, file: narr.file, tempo: narr.tempo } : null };
+  return { dur, narr: narr ? { start: NS, seconds: narr.seconds, file: narr.file, tempo: narr.tempo } : null };
 }
 
 async function renderCard({ cwd, out, lines, seconds, sub }) {
@@ -455,7 +458,9 @@ async function renderEpisode({ episode, series, log = console.log, fetchFile = d
       const tailReserve = XFADE[c.transition] && i < chosen.length ? tSec(c) : (i === chosen.length && tailMode ? TAIL_XF : 0);
       const speechWindow = ltxVoice && subtitle ? await detectSpeech(src, cwd) : null;
       const hookText = i === 1 && !plan.title_card.enabled ? ((episode.continuity && episode.continuity.hook_text) || '') : '';
-      const r = await renderClip({ cwd, input: src, out, c, subtitle, speechWindow, hookText, speakerColor: spk ? SPEAKER_COLORS[speakers.indexOf(spk) % SPEAKER_COLORS.length] : null, sub, fadeIn, fadeOut, narration, muteOriginal, tailReserve });
+      // Si esta toma entra con fundido cruzado o fundido desde negro, la voz espera a que termine.
+      const narrStartMin = (prev && XFADE[prev.transition] ? tSec(prev) : 0) + fadeIn + 0.15;
+      const r = await renderClip({ cwd, input: src, out, c, subtitle, speechWindow, hookText, narrStartMin, speakerColor: spk ? SPEAKER_COLORS[speakers.indexOf(spk) % SPEAKER_COLORS.length] : null, sub, fadeIn, fadeOut, narration, muteOriginal, tailReserve });
       const dur = r.dur;
       if (r.narr && r.narr.tempo > 1.001) log(`toma ${c.shot}: narración acelerada ${r.narr.tempo.toFixed(2)}x para que quepa.`);
       parts.push({ file: out, dur, narr: r.narr, xfade: XFADE[c.transition] && i < chosen.length ? Math.min(tSec(c), dur / 2) : 0, xname: XFADE[c.transition] || 'fade' });
@@ -527,12 +532,12 @@ async function renderEpisode({ episode, series, log = console.log, fetchFile = d
         const keyLabels = [];
         windows.forEach((w, k) => {
           args.push('-i', w.file);
-          const ms = Math.round(w.start * 1000);
+          const ms = Math.max(0, Math.round((w.start - 0.15) * 1000)); // la música baja un poco ANTES de que hable
           filters.push(`[${k + 2}:a]aresample=48000,aformat=channel_layouts=stereo${w.tempo > 1.001 ? `,atempo=${w.tempo.toFixed(3)}` : ''},adelay=${ms}|${ms}[k${k}]`);
           keyLabels.push(`[k${k}]`);
         });
         filters.push(`${keyLabels.join('')}amix=inputs=${keyLabels.length}:duration=longest:dropout_transition=0:normalize=0,apad[key]`);
-        filters.push(`[m0][key]sidechaincompress=threshold=0.02:ratio=4:attack=120:release=1200:makeup=1[m]`);
+        filters.push(`[m0][key]sidechaincompress=threshold=0.02:ratio=4:attack=30:release=1200:makeup=1[m]`);
         log('música con ducking bajo', windows.length, 'narraciones.');
       } else {
         filters.push('[m0]anull[m]');

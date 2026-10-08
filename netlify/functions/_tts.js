@@ -140,7 +140,7 @@ function tightenSpeech(wav, log = console.log) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tts-'));
   const inF = path.join(dir, 'in.wav'); const outF = path.join(dir, 'out.wav');
   fs.writeFileSync(inF, wav);
-  const af = 'silenceremove=start_periods=1:start_silence=0.05:start_threshold=-38dB:stop_periods=-1:stop_duration=0.28:stop_silence=0.22:stop_threshold=-38dB';
+  const af = 'silenceremove=start_periods=1:start_silence=0.15:start_threshold=-50dB:stop_periods=-1:stop_duration=0.28:stop_silence=0.22:stop_threshold=-38dB';
   for (const bin of bins) {
     try {
       execFileSync(bin, ['-y', '-loglevel', 'error', '-i', inF, '-af', af, outF], { stdio: 'pipe' });
