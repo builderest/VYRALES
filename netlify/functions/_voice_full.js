@@ -12,9 +12,35 @@ const { execFile } = require('child_process');
 const { energyScore, synthesize, tightenSpeech, wavSeconds } = require('./_tts');
 const { ensureMediaBucket, uploadFile, removeByPublicUrl } = require('./_storage');
 const { logSpend } = require('./_spend');
-const VOICE_V = 1;
+const VOICE_V = 2; // v2: pausas entre frases recortadas a 0.12 s (Franklin: "las pausas son muy grandes")
 const LEAD = 0.6; // la voz empieza a los 0.6 s del video
 const TAIL = 1.4; // y el video sigue 1.4 s después de la última palabra
+
+
+// Pausas cortas: cualquier silencio de más de 0.15 s queda en 0.12 s (la frase se dice de corrido).
+function shortPauses(wav) {
+  const { execFileSync } = require('child_process');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vy-pause-'));
+  const a = path.join(dir, 'a.wav'), b = path.join(dir, 'b.wav');
+  fs.writeFileSync(a, wav);
+  try {
+    execFileSync(ffmpegBin(), ['-y', '-loglevel', 'error', '-i', a, '-af', 'silenceremove=start_periods=1:start_silence=0.12:start_threshold=-50dB:stop_periods=-1:stop_duration=0.15:stop_silence=0.12:stop_threshold=-40dB', b], { stdio: 'pipe' });
+    return fs.readFileSync(b);
+  } catch (_) { return wav; } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+}
+// Tiempo de cada palabra (dentro de cada pedazo, repartido por el largo de la palabra).
+function wordTimes(segments) {
+  const out = [];
+  for (const sg of segments || []) {
+    const ws = String(sg.text).split(/\s+/).filter(Boolean);
+    const w = ws.map((x) => x.replace(/[^\p{L}\p{N}]/gu, '').length + 1);
+    const tot = w.reduce((a, b) => a + b, 0) || 1;
+    let t = Number(sg.start);
+    ws.forEach((x, i) => { const d = (w[i] / tot) * (Number(sg.end) - Number(sg.start)); out.push({ word: x, start: t, end: t + d }); t += d; });
+  }
+  return out;
+}
+const normW = (x) => String(x).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9ñ]/g, '');
 
 const continuousMode = (sb) => !!(sb && sb.narration && sb.narration.engine === 'gemini_tts' && sb.narration.mode === 'continuous');
 function voiceText(episode) {
@@ -74,7 +100,7 @@ async function ensureFullVoice(supabase, { episode, series, log = console.log, f
     takes.push(r);
   }
   const best = energyScore(takes[1].wav) > energyScore(takes[0].wav) ? takes[1] : takes[0];
-  const wav = tightenSpeech(best.wav, log);
+  const wav = shortPauses(tightenSpeech(best.wav, log));
   const seconds = Math.round(wavSeconds(wav) * 100) / 100;
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vy-voice-'));
   const f = path.join(dir, 'v.wav');
@@ -97,9 +123,29 @@ async function ensureFullVoice(supabase, { episode, series, log = console.log, f
 // shot.weight (opcional) da más tiempo a una toma. LTX: 3–16 s enteros.
 function shotSecondsFor(voice, shots) {
   const total = LEAD + Number(voice.seconds || 0) + TAIL;
+  // Sincronía: si las tomas dicen qué parte de la frase cubren (shot.voice_part), cada toma dura
+  // exactamente lo que tarda la voz en llegar a la parte de la siguiente (cortes redondeados en el
+  // acumulado para no ir corriendo el desfase).
+  if (shots.length > 1 && shots.every((s) => s.voice_part)) {
+    const wt = wordTimes(voice.segments);
+    const words = wt.map((x) => normW(x.word));
+    let cursor = 0;
+    const startOf = shots.map((s) => {
+      const first = normW(String(s.voice_part).split(/\s+/)[0]);
+      let k = words.indexOf(first, cursor);
+      if (k < 0) k = cursor;
+      cursor = k + 1;
+      return wt[k] ? wt[k].start : 0;
+    });
+    const cuts = [0];
+    for (let i = 1; i < shots.length; i++) cuts.push(Math.round(LEAD + startOf[i] - 0.15));
+    cuts.push(Math.round(total));
+    const secs = shots.map((_, i) => Math.max(2, Math.min(16, cuts[i + 1] - cuts[i])));
+    return secs;
+  }
   const ws = shots.map((s) => Number(s.weight) > 0 ? Number(s.weight) : 1);
   const tot = ws.reduce((a, b) => a + b, 0) || 1;
   return shots.map((s, i) => Math.max(3, Math.min(16, Math.round((ws[i] / tot) * total))));
 }
 
-module.exports = { continuousMode, voiceText, textChunks, ensureFullVoice, shotSecondsFor, LEAD, TAIL };
+module.exports = { wordTimes, continuousMode, voiceText, textChunks, ensureFullVoice, shotSecondsFor, LEAD, TAIL };

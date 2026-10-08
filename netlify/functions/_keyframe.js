@@ -252,6 +252,7 @@ async function createEndFrame(supabase, { series, episode, shot, startImage, log
     'Edit the reference image into the LAST frame of the same continuous vertical 9:16 video shot.',
     (sb.visual_style || '').replace(/\.?$/, '.'),
     'Keep exactly the same world, style, lighting, color palette, lens look and level of realism as the reference image; it is the same shot a few seconds later.',
+    (sb.narration && sb.narration.mode === 'continuous') ? 'This is the NEXT DRAWING of a smooth animation, a small step forward: keep the same camera angle and almost the same framing (at most slightly closer, higher or a few degrees around), the same character in the same place; only the described action advances a little. Nothing jumps or changes abruptly.' : '',
     `Final moment (this exact frame): ${String(shot.end_en).trim().replace(/\.?$/, '.')}`,
     'This is ONE single continuous full-frame image, like a single movie frame, with no split screen, panels, collage, borders or inset pictures.',
     CLEAN_FRAME
@@ -259,14 +260,19 @@ async function createEndFrame(supabase, { series, episode, shot, startImage, log
   log('generando cuadro FINAL de la toma', shot.n, '(editando el cuadro inicial)...');
   const ref = [Object.assign({}, startImage, { label: 'the FIRST frame of this same shot (keep its world, style and light)' })];
   let img = null;
+  let lastSim = null;
   for (let attempt = 0; attempt < 2 && !img; attempt++) {
-    const p = attempt === 0 ? prompt : prompt + ' IMPORTANT: the previous attempt looked almost identical to the reference. The final frame must look clearly DIFFERENT from the reference image: a new camera position, a new framing and the new content described in the final moment.';
+    const p = attempt === 0 ? prompt : prompt + (lastSim != null && lastSim < 0.5 ? ' IMPORTANT: the previous attempt changed too much. Stay much closer to the reference: same camera angle, same framing, same place; only a small step of the action.' : ' IMPORTANT: the previous attempt looked almost identical to the reference. The final frame must show the described action clearly advanced, with a slightly different framing.');
     const cand = await generateImage({ prompt: p, references: ref });
     await logSpend(supabase, { seriesId: series.id || episode.series_id, episodeId: episode.id, shotNumber: shot.n, kind: 'keyframe', model: cand.model, costUsd: cand.costUsd, note: 'cuadro final' });
     // Si sale casi igual al inicial (SSIM alto) la toma queda quieta: se reintenta una vez; si no, sin cuadro final.
     const sim = await similarity(startImage, cand);
+    lastSim = sim;
     log(`cuadro final toma ${shot.n}: parecido con el inicial ${sim == null ? '?' : sim.toFixed(2)}`);
-    if (sim == null || sim < 0.85) img = cand;
+    // Voz continua (movimiento tipo anime): ni igual (quieto) ni muy distinto (salto brusco).
+    const minSim = sb.narration && sb.narration.mode === 'continuous' ? 0.38 : 0;
+    if (sim == null || (sim < 0.85 && sim >= minSim)) img = cand;
+    else if (sim < minSim) { log(`cuadro final toma ${shot.n}: cambió demasiado (salto brusco) → reintento más parecido`); if (attempt === 1) img = cand; }
   }
   if (!img) {
     log(`toma ${shot.n}: el cuadro final salía igual al inicial → se anima solo desde el inicial`);
