@@ -147,7 +147,7 @@ exports.handler = async (event) => {
     if (seriesError) throw seriesError;
 
     // 2) Personajes (con su prompt de foto ya generado)
-    const characterPayload = data.characters.map((c) => ({
+    const characterPayload = (data.characters || []).map((c) => ({
       series_id: series.id,
       name: c.name,
       role: c.role || null,
@@ -158,9 +158,10 @@ exports.handler = async (event) => {
       }),
       sort_order: c.sort_order || 0
     }));
-    const { error: charsError } = await supabase
+    // (formato narrado_unico: puede venir sin personajes)
+    const { error: charsError } = characterPayload.length ? await supabase
       .from('characters')
-      .upsert(characterPayload, { onConflict: 'series_id,name' });
+      .upsert(characterPayload, { onConflict: 'series_id,name' }) : { error: null };
     if (charsError) throw charsError;
 
     // 3) Episodios

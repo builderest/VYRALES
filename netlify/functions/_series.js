@@ -165,8 +165,11 @@ function validateSeries(data) {
     req(ex && ex.who, `Extra "${k}": falta "who" (descripción en inglés).`);
   });
 
+  // Formato "narrado_unico" (curiosidades / documental corto de 1 video): solo narrador en off,
+  // tomas sin personajes fijos (espacio, paisajes, animales…). Personajes opcionales.
+  const narradoUnico = sb.format === 'narrado_unico';
   const characters = data.characters || [];
-  req(characters.length > 0, 'La serie no tiene personajes.');
+  if (!narradoUnico) req(characters.length > 0, 'La serie no tiene personajes.');
   const byKey = {};
   characters.forEach((c, i) => {
     const label = c.key || `personaje #${i + 1}`;
@@ -207,7 +210,7 @@ function validateSeries(data) {
       req(s.n === j + 1, `${st}: n=${s.n}, se esperaba ${j + 1}.`);
       req(locationOf(sb, s.location), `${st}: location desconocida "${s.location}".`);
       const cast = Array.isArray(s.characters) ? s.characters : [];
-      req(cast.length > 0, `${st}: no tiene personajes.`);
+      if (!narradoUnico) req(cast.length > 0, `${st}: no tiene personajes.`);
       req(cast.length <= maxCast, `${st}: ${cast.length} personajes con nombre en cuadro (máx. ${maxCast}; Veo mezcla caras).`);
       cast.forEach((k) => req(byKey[k], `${st}: personaje desconocido "${k}".`));
       req(s.scene_es && s.scene_es.trim(), `${st}: falta scene_es.`);

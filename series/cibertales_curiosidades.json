@@ -1,0 +1,244 @@
+{
+  "format_version": 3,
+  "slug": "cibertales_curiosidades",
+  "title": "Curiosidades CIBERTALES",
+  "genre": "curiosidades",
+  "language": "es",
+  "synopsis": "Videos únicos narrados de curiosidades reales y verificadas: cada video cuenta un dato sorprendente como una historia con giro final.",
+  "story_bible": {
+    "format": "narrado_unico",
+    "tone": "Cercano, humano y fascinante: como contarle un secreto a un amigo. Ritmo fluido, frases cortas y largas alternadas, pausas con intención y un giro antes del final.",
+    "visual_style": "Photorealistic cinematic science documentary, epic natural light, rich deep colors, atmospheric depth, premium nature-documentary cinematography, vertical 9:16 framing",
+    "narration": {
+      "engine": "gemini_tts",
+      "voice": "Charon",
+      "model": "gemini-3.8-flash-tts",
+      "video_audio": "none",
+      "style": "Narra en español latino neutro como si le contaras un secreto fascinante a un amigo: voz cálida, cercana y natural, con curiosidad y pequeñas pausas con intención antes de lo sorprendente. Nada de tono de locutor ni de lectura: conversado, fluido, que enganche."
+    },
+    "end_card": {
+      "enabled": true,
+      "mode": "tail",
+      "text": "¿SABÍAS ESTO?",
+      "subtext": "Síguenos para más curiosidades",
+      "voice": "Síguenos para más curiosidades como esta.",
+      "seconds": 2.5
+    },
+    "extras": {
+      "Narrador": {
+        "who": "an off-screen narrator who is never visible on camera",
+        "voice": "a warm, close, natural adult male voice in neutral Latin American Spanish, conversational, like telling a friend a fascinating secret",
+        "voiceover": true
+      }
+    },
+    "rules": {
+      "keyframes": true,
+      "shot_seconds": 8,
+      "shots_per_episode": 15,
+      "max_dialogue_words_per_shot": 14,
+      "max_characters_per_shot": 2,
+      "max_words_per_episode": 450,
+      "shot_model": "veo_lite",
+      "cliffhanger_model": "veo_lite",
+      "reference_images": false
+    },
+    "locations": {
+      "modern_sky": { "visual": "a vast bright blue daytime sky with soft white clouds above a calm green meadow", "ambient": "a soft breeze and distant birds" },
+      "early_earth_space": { "visual": "the young Earth seen from space, a dark reddish-brown planet with glowing volcanic spots and thin clouds, black starry space around it", "ambient": "a deep low cosmic hum" },
+      "volcanic_world": { "visual": "a primordial volcanic landscape of black basalt rock, glowing orange lava rivers and smoking volcanoes under a hazy reddish sky", "ambient": "deep rumbling and bubbling lava" },
+      "primordial_coast": { "visual": "a barren primordial rocky coastline of dark stone with a wide grey-green ocean and a huge pale Moon low over the horizon", "ambient": "powerful waves and wind" },
+      "earth_moon_space": { "visual": "Earth and the Moon seen together from deep space, Earth large in the foreground, the grey Moon smaller in the distance, sunlight from the side", "ambient": "a calm deep space hum" },
+      "golden_ocean": { "visual": "a calm endless ocean at sunrise, golden light on the water, soft clouds glowing orange and pink", "ambient": "gentle waves and soft wind" },
+      "coral_reef": { "visual": "a shallow ancient coral reef in clear turquoise water, branching and dome-shaped corals, sun rays from above", "ambient": "soft underwater bubbles" },
+      "cretaceous_plain": { "visual": "a lush Cretaceous river plain at sunset with ferns, tall conifers and a herd of long-necked dinosaurs far away", "ambient": "distant animal calls and insects" },
+      "observatory_night": { "visual": "a modern astronomical observatory dome open at night on a mountain, a large telescope pointing at a bright full Moon, clear starry sky", "ambient": "quiet night wind and a soft mechanical hum" },
+      "night_hill_moon": { "visual": "a quiet grassy hill at night under a bright full Moon and a sky full of stars, distant city lights on the horizon", "ambient": "crickets and a soft night breeze" }
+    }
+  },
+  "characters": [],
+  "episodes": [
+    {
+      "episode_number": 1,
+      "title": "Cuando el día duraba seis horas",
+      "continuity": {
+        "summary": "La Tierra primitiva giraba tan rápido que el día duraba unas seis horas; la Luna, con sus mareas, la fue frenando, el día se atascó en unas 19 horas casi mil millones de años y hoy sigue alargándose.",
+        "last_cliffhanger": "¿Qué harías con un día de solo seis horas?",
+        "pending_state": "Video único: no hay siguiente parte.",
+        "sources": [
+          "Universidad de Toronto 2023 (Mitchell y Kirscher, Nature Geoscience): día de ~19 h entre hace ~2000 y ~1000 millones de años",
+          "Wells 1963 (Nature): corales del Devónico, ~400 días por año",
+          "Winter et al. 2020 (Paleoceanography and Paleoclimatology): hace 70 millones de años, 372 días por año, día ~23.5 h",
+          "Lunar Laser Ranging (espejos de las misiones Apolo): la Luna se aleja ~3.8 cm por año",
+          "Día de ~4 a 6 horas poco después de la formación de la Luna (modelos de evolución Tierra-Luna)"
+        ]
+      },
+      "shots": [
+        {
+          "n": 1, "location": "modern_sky", "characters": [],
+          "scene_es": "Gancho: el cielo de hoy y la idea de un día de seis horas.",
+          "camera": "slow push-in",
+          "start_en": "Wide view of a bright blue daytime sky with soft white clouds over a calm green meadow, the Sun high and bright in the upper part of the frame",
+          "action_en": "the clouds drift steadily across the sky and the sunlight flickers softly through them as the view rises slowly toward the Sun",
+          "reaction_en": "the Sun glows brightly among the drifting clouds",
+          "background_en": "bright blue sky, soft white clouds, green meadow at the bottom edge",
+          "dialogue": [{ "speaker": "Narrador", "line": "Mira el cielo. Ahora imagina que el día entero dura solo seis horas." }],
+          "sfx": ""
+        },
+        {
+          "n": 2, "location": "volcanic_world", "characters": [],
+          "scene_es": "El Sol cruza el cielo a toda velocidad sobre un mundo primitivo.",
+          "camera": "static camera",
+          "start_en": "Wide view of a primordial volcanic landscape at dawn, the Sun just rising over a distant smoking volcano, long shadows on black rock",
+          "action_en": "in a fast time-lapse the Sun races up and across the hazy sky, the shadows sweep quickly over the rocks and the light shifts from orange to white",
+          "reaction_en": "the Sun sinks quickly toward the horizon and the sky turns deep orange",
+          "background_en": "black basalt rock, smoking volcano, hazy reddish sky",
+          "dialogue": [{ "speaker": "Narrador", "line": "Y pasó. Amanecía… y apenas tres horas después, ya era de noche." }],
+          "sfx": ""
+        },
+        {
+          "n": 3, "location": "early_earth_space", "characters": [],
+          "scene_es": "La Tierra joven girando muy rápido vista desde el espacio.",
+          "camera": "static camera",
+          "start_en": "The young reddish-brown Earth centered in black starry space, half lit by the Sun, glowing volcanic spots on its surface",
+          "action_en": "the planet spins fast on its axis, the day side and night side sweeping visibly across the surface and the thin clouds swirling",
+          "reaction_en": "the planet keeps spinning steadily, half in sunlight",
+          "background_en": "black space with scattered stars",
+          "dialogue": [{ "speaker": "Narrador", "line": "Hace más de cuatro mil millones de años, la Tierra giraba como trompo." }],
+          "sfx": ""
+        },
+        {
+          "n": 4, "location": "primordial_coast", "characters": [],
+          "scene_es": "Volcanes, cielo rojizo y una Luna enorme muy cerca.",
+          "camera": "slow push-in",
+          "start_en": "A barren dark rocky coastline at dusk, a huge pale Moon filling a large part of the sky low over the ocean, volcanoes smoking far away on the left",
+          "action_en": "the huge Moon rises slowly above the horizon while smoke drifts from the distant volcanoes and the reddish sky darkens",
+          "reaction_en": "the giant Moon hangs low and bright over the dark ocean",
+          "background_en": "dark rocky coast, wide grey-green ocean, distant smoking volcanoes, reddish sky",
+          "dialogue": [{ "speaker": "Narrador", "line": "Volcanes por todas partes, un cielo rojizo… y una Luna gigantesca, más cerca." }],
+          "sfx": ""
+        },
+        {
+          "n": 5, "location": "primordial_coast", "characters": [],
+          "scene_es": "La gravedad de la Luna levanta mareas gigantes.",
+          "camera": "static camera",
+          "start_en": "Low view of the dark rocky shore with the huge Moon above the ocean, the water far out from the rocks",
+          "action_en": "a massive tide surges in, the ocean rises quickly and floods over the dark rocks in a wide powerful wave of foam",
+          "reaction_en": "the water settles high over the rocks under the Moon",
+          "background_en": "dark rocky shore, wide ocean, huge pale Moon low in the sky",
+          "dialogue": [{ "speaker": "Narrador", "line": "Aquí viene lo interesante: esa Luna tiraba del océano, levantando mareas gigantes." }],
+          "sfx": ""
+        },
+        {
+          "n": 6, "location": "primordial_coast", "characters": [],
+          "scene_es": "Cada marea funciona como un freno.",
+          "camera": "slow pan",
+          "start_en": "The flooded dark rocks with water pouring back out toward the ocean, foam everywhere, the huge Moon in the upper part of the frame",
+          "action_en": "the water pulls back out to sea over the rocks, then a new wave rolls in again, slower and heavier",
+          "reaction_en": "the foam spreads calmly over the wet dark stone",
+          "background_en": "wet dark rocks, ocean, huge Moon",
+          "dialogue": [{ "speaker": "Narrador", "line": "Cada marea era como pisar el freno. Un poquito… y luego otro poquito." }],
+          "sfx": ""
+        },
+        {
+          "n": 7, "location": "earth_moon_space", "characters": [],
+          "scene_es": "La Tierra gira cada vez más despacio.",
+          "camera": "static camera",
+          "start_en": "Earth large in the foreground lit from the side, the grey Moon smaller in the distance on the right, black starry space",
+          "action_en": "Earth spins visibly on its axis and its rotation gradually slows down, the clouds and oceans moving more and more calmly",
+          "reaction_en": "Earth turns slowly and calmly in the sunlight",
+          "background_en": "black space, scattered stars, the distant grey Moon",
+          "dialogue": [{ "speaker": "Narrador", "line": "Millones de años frenando… y la Tierra empezó a girar más despacio." }],
+          "sfx": ""
+        },
+        {
+          "n": 8, "location": "earth_moon_space", "characters": [],
+          "scene_es": "La Luna se aleja poco a poco.",
+          "camera": "static camera",
+          "start_en": "The grey Moon in the center of the frame close to the camera, Earth glowing blue and white behind it in the distance",
+          "action_en": "the Moon drifts slowly away from Earth, growing smaller and moving toward the edge of the frame",
+          "reaction_en": "the Moon floats far from Earth in the dark",
+          "background_en": "black starry space, Earth in the distance",
+          "dialogue": [{ "speaker": "Narrador", "line": "Y la Luna, empujada por esa misma fuerza, se fue alejando de nosotros." }],
+          "sfx": ""
+        },
+        {
+          "n": 9, "location": "golden_ocean", "characters": [],
+          "scene_es": "El giro: el día se queda atascado en 19 horas.",
+          "camera": "slow push-in",
+          "start_en": "A calm endless ocean at sunrise, the Sun half above the horizon, golden light across the water",
+          "action_en": "the Sun rises very slowly and the golden light spreads over the calm water while soft clouds glow orange and pink",
+          "reaction_en": "the Sun hangs low and still above the golden horizon",
+          "background_en": "calm ocean, golden sunrise, glowing clouds",
+          "dialogue": [{ "speaker": "Narrador", "line": "Pero aquí viene el giro: el día se quedó atascado en diecinueve horas." }],
+          "sfx": ""
+        },
+        {
+          "n": 10, "location": "earth_moon_space", "characters": [],
+          "scene_es": "El calor del Sol en la atmósfera empuja al revés.",
+          "camera": "slow push-in",
+          "start_en": "Earth seen from space with the Sun blazing at the left edge of the frame, a thin glowing blue layer of atmosphere along the lit edge of the planet",
+          "action_en": "warm sunlight pours over the atmosphere, a soft golden glow ripples along the thin blue layer and the clouds below swirl gently",
+          "reaction_en": "the atmosphere glows softly in the sunlight",
+          "background_en": "black space, the blazing Sun at the left edge, the thin blue atmosphere",
+          "dialogue": [{ "speaker": "Narrador", "line": "Casi mil millones de años así. El calor del Sol empujaba al revés." }],
+          "sfx": ""
+        },
+        {
+          "n": 11, "location": "golden_ocean", "characters": [],
+          "scene_es": "El empate se rompe y los días siguen creciendo.",
+          "camera": "static camera",
+          "start_en": "The calm ocean under thick grey clouds with a narrow gap of golden light on the horizon",
+          "action_en": "the clouds slowly part and wide beams of sunlight break through, spreading across the ocean surface",
+          "reaction_en": "bright sunlight shines over the calm ocean",
+          "background_en": "calm ocean, parting grey clouds, golden light",
+          "dialogue": [{ "speaker": "Narrador", "line": "Freno contra empuje. Empate… hasta que se rompió, y los días siguieron creciendo." }],
+          "sfx": ""
+        },
+        {
+          "n": 12, "location": "coral_reef", "characters": [],
+          "scene_es": "Los corales antiguos registran 400 días por año.",
+          "camera": "slow push-in",
+          "start_en": "Close view of a dome-shaped ancient coral in clear turquoise water, its surface covered in fine growth bands, sun rays from above",
+          "action_en": "the view moves slowly closer to the fine growth bands on the coral while small fish swim past and sun rays shimmer",
+          "reaction_en": "the coral bands glow softly in the shimmering light",
+          "background_en": "turquoise water, branching corals, sun rays from above",
+          "dialogue": [{ "speaker": "Narrador", "line": "Según los corales, hace cuatrocientos millones de años, el año tenía cuatrocientos días." }],
+          "sfx": ""
+        },
+        {
+          "n": 13, "location": "cretaceous_plain", "characters": [],
+          "scene_es": "En la época de los dinosaurios el día duraba media hora menos.",
+          "camera": "slow pan",
+          "start_en": "A lush river plain at sunset, ferns in the foreground, a herd of long-necked dinosaurs walking calmly along the river in the middle distance",
+          "action_en": "the dinosaurs walk slowly along the river, the low Sun lights the ferns and the tall conifers in warm orange",
+          "reaction_en": "the herd keeps walking calmly in the sunset light",
+          "background_en": "river plain, ferns, tall conifers, sunset sky",
+          "dialogue": [{ "speaker": "Narrador", "line": "Y con los dinosaurios, cada día duraba media hora menos que el tuyo." }],
+          "sfx": ""
+        },
+        {
+          "n": 14, "location": "observatory_night", "characters": [],
+          "scene_es": "Hoy medimos con láser cómo se aleja la Luna.",
+          "camera": "static camera",
+          "start_en": "An observatory dome open at night with a large telescope pointing up at the bright full Moon",
+          "action_en": "a thin bright green laser beam shoots from the telescope up into the night sky toward the Moon and pulses steadily",
+          "reaction_en": "the green beam glows steadily toward the bright Moon",
+          "background_en": "open observatory dome, starry sky, bright full Moon",
+          "dialogue": [{ "speaker": "Narrador", "line": "La Luna sigue alejándose: casi cuatro centímetros al año. Lo medimos con láser." }],
+          "sfx": ""
+        },
+        {
+          "n": 15, "location": "night_hill_moon", "characters": [],
+          "scene_es": "Cierre: una persona mira la Luna; pregunta al espectador.",
+          "camera": "slow push-in",
+          "start_en": "A person seen from behind as a dark silhouette sitting on a grassy hill at night, looking up at a bright full Moon in a sky full of stars",
+          "action_en": "the grass sways gently in the breeze and the stars twinkle while the person keeps looking up at the Moon",
+          "reaction_en": "the silhouette sits still under the bright Moon",
+          "background_en": "grassy hill, bright full Moon, starry sky, distant city lights",
+          "dialogue": [{ "speaker": "Narrador", "line": "Esta noche, cuando la mires, piénsalo: ¿qué harías con un día de seis horas?" }],
+          "sfx": ""
+        }
+      ]
+    }
+  ]
+}

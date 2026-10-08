@@ -392,6 +392,9 @@ async function download(url, dest) {
 // ---------- Episodio ----------
 async function renderEpisode({ episode, series, log = console.log, fetchFile = download, maxMb = MAX_UPLOAD_MB }) {
   const plan = resolvePlan(episode);
+  // Cierre propio de la serie (ej. curiosidades: "Síguenos para más curiosidades"), si el editor no lo cambió.
+  const sbEnd = series && series.story_bible && series.story_bible.end_card;
+  if (sbEnd && !(episode.edit_plan && episode.edit_plan.end_card)) plan.end_card = Object.assign({}, plan.end_card, sbEnd);
   const sub = Object.assign({}, plan.subtitles, { margin_v: Math.min(1150, Math.max(20, Number(plan.subtitles.margin_v) || 180)) });
   const clipsByShot = {};
   (episode.assets || []).filter((a) => a.kind === 'video_clip' && a.storage_path).forEach((a) => { clipsByShot[a.shot_number] = a; });

@@ -66,8 +66,11 @@ function ltxPromptFor(shot, storyBible) {
     : '';
   const ambient = (() => { const l = sb.locations && shot.location && sb.locations[shot.location]; return l && typeof l === 'object' ? l.ambient : ''; })();
   const soundLine = ltxVoiceMode(sb) ? 'Sound: ' + (ambient ? clean(ambient) + ', ' : '') + 'soft and quiet' + (sayLine ? ', with the spoken words clear on top.' : '.') : '';
+  // Tomas sin personas (espacio, paisajes, animales: curiosidades): nada de frases de gente/ropa/actuación,
+  // que con cfg = 1 pueden hacer aparecer personas donde no hay.
+  const hasPeople = (shot.characters || []).length > 0 || /\b(person|people|man|men|woman|women|child|children|boy|girl|silhouette|guard|crowd)\b/i.test([shot.start_en, shot.action_en, shot.prompt_override].join(' '));
   return [
-    'The video starts exactly on the provided image and keeps its composition, people, clothing, lighting and background.',
+    hasPeople ? 'The video starts exactly on the provided image and keeps its composition, people, clothing, lighting and background.' : 'The video starts exactly on the provided image and keeps its composition, lighting and background.',
     // Si el usuario editó el prompt de la toma en el panel, esa descripción manda.
     ...(shot.prompt_override && shot.prompt_override.trim()
       ? ['Scene: ' + named(stripVeoSpeech(shot.prompt_override)).slice(0, 2200).replace(/[^.]*$/, '')]
@@ -89,12 +92,12 @@ function ltxPromptFor(shot, storyBible) {
     // NEGATIVO NO HACE NADA y nombrar algo en el positivo (aunque sea "no subtitles", "nobody is barefoot")
     // lo PROVOCA: EP1 Dulce salió con subtítulos inventados (hasta en chino) y con pies descalzos.
     // Todo se pide en AFIRMATIVO: lo que sí debe verse.
-    'Objects that the characters hold at the start (trays, envelopes, letters, phones, cups) stay in the same hands for the whole clip. Papers and letters are plain and blank.',
-    'Acting is subtle and restrained, like a premium animated feature: small natural expressions with the eyes and brows, lips relaxed.',
+    hasPeople ? 'Objects that the characters hold at the start (trays, envelopes, letters, phones, cups) stay in the same hands for the whole clip. Papers and letters are plain and blank.' : '',
+    hasPeople ? 'Acting is subtle and restrained' + (isAnimated(sb) ? ', like a premium animated feature' : '') + ': small natural expressions with the eyes and brows, lips relaxed.' : '',
     // Voces fijas para todos: el que habla mueve la boca en 0–6 s (ahí el render pone su voz); si no, bocas cerradas.
     speaksOnScreen(shot, sb)
       ? 'Natural subtle body motion, consistent faces. ' + (speaker ? speaker.charAt(0).toUpperCase() + speaker.slice(1) : 'The character who speaks') + ' keeps the head and eyes turned toward whoever or whatever the action says they are talking to, from the first frame to the last frame' + (sayLine ? '. ' + sayLine + ' ' : ', and moves the lips softly and naturally as if talking quietly during the first 6 seconds, then closes the mouth. ') + 'Everyone else keeps the mouth closed. Photos, paintings and screens on the walls are still pictures. ' + soundLine + ' Clean cinematic image.'
-      : 'Natural subtle body motion, consistent faces, mouths closed. ' + soundLine + ' Clean cinematic image.'
+      : (hasPeople ? 'Natural subtle body motion, consistent faces, mouths closed. ' : 'Smooth, continuous, natural motion. ') + soundLine + ' Clean cinematic image.'
   ].filter(Boolean).join(' ').replace(/\.\s*\./g, '.')
     // Guiones con "no readable text, no logos": con cfg = 1 nombrar texto/letras/logos los hace aparecer.
     .replace(/,?\s*(?:with\s+|and\s+)?(?:no|without)\s+(?:any\s+)?(?:readable\s+|visible\s+|on-screen\s+)?(?:text|writing|words|letters|logos?|captions|subtitles|watermarks?)\b(?:\s*(?:,|or|and)\s*(?:no\s+)?(?:readable\s+)?(?:text|writing|words|letters|logos?|captions|subtitles|watermarks?)\b)*/gi, '')
