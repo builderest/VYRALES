@@ -61,12 +61,17 @@ function buildKeyframePrompt(shot, characterRows, storyBible, hasLocationRef) {
   }
   // Personas secundarias que hablan en esta toma (sin foto): su descripción fija.
   onScreenExtras(shot, sb).forEach((ex) => parts.push(`Also in the frame: ${ex.who.replace(/\.?$/, '')}.`));
-  if (loc) {
+  const narrado = sb.format === 'narrado_unico';
+  // Videos narrados: el cuadro muestra SOLO lo que dice start_en (el set fijo metía el bosque en una toma
+  // que empezaba en agua negra, EP2 T2).
+  if (loc && !narrado) {
     parts.push(`Setting: ${loc.visual.replace(/\.?$/, '.')}` + (hasLocationRef ? ' ' + SET_REF_SENTENCE : ''));
   }
   parts.push(shot.start_en && shot.start_en.trim()
     ? `Moment (this exact frame, before anyone speaks): ${shot.start_en.trim().replace(/\.?$/, '.')}`
     : `Moment: the instant this action begins, before anyone speaks — ${String(shot.action_en || '').replace(/\.?$/, '.')}`);
+  if (!names.length) parts.push('The whole image shows exactly and only what the Moment describes, as the main subject filling the frame. Add no people, scientists, laboratories, screens or equipment unless the Moment mentions them.');
+  // (EP2 T4: "microscope view" salió como una científica en un microscopio)
   parts.push('Natural anatomy and natural hands, expressive faces, cinematic composition.');
   // Una sola imagen continua: con "close-up" + 2 personajes Gemini llegó a armar un collage de
   // 3 paneles (EP1 T10), que Veo no puede animar como una sola toma.
@@ -168,13 +173,14 @@ async function createKeyframe(supabase, { series, episode, shot, characters, log
       (characters || []).forEach((c) => { if (c.name === name) c.reference_image_url = url; });
     }
   }
+  const narradoFmt = !!(series.story_bible && series.story_bible.format === 'narrado_unico');
   const locs = (series.visual_memory && series.visual_memory.locations) || {};
-  const hasLocDef = !!(series.story_bible && series.story_bible.locations && series.story_bible.locations[shot.location]);
+  const hasLocDef = !narradoFmt && !!(series.story_bible && series.story_bible.locations && series.story_bible.locations[shot.location]);
   if (shot.location && hasLocDef && !(locs[shot.location] && locs[shot.location].url)) {
     const { visualMemory } = await createLocationImage(supabase, { seriesId, slug: series.slug, storyBible: series.story_bible, key: shot.location, log });
     series.visual_memory = visualMemory; // la misma corrida reutiliza el lugar en las siguientes tomas
   }
-  const { refs, hasLocationRef } = await keyframeReferences(shot, characters, series.visual_memory);
+  const { refs, hasLocationRef } = await keyframeReferences(shot, characters, narradoFmt ? {} : series.visual_memory);
   const prompt = effectiveKeyframePrompt(shot, characters, series.story_bible, hasLocationRef);
   log('generando cuadro inicial de la toma', shot.n, 'con', refs.length, 'imagen(es) de referencia...');
   const img = await generateImage({ prompt, references: refs });
@@ -217,6 +223,24 @@ async function createKeyframe(supabase, { series, episode, shot, characters, log
   return { asset, startImage: { imageBytes: img.buffer.toString('base64'), mimeType: img.mimeType } };
 }
 
+
+// Parecido entre dos imágenes (SSIM 0..1, 1 = idénticas) con ffmpeg. null si no se pudo medir.
+async function similarity(a, b) {
+  try {
+    const os = require('os'); const path = require('path'); const fs = require('fs');
+    const { execFile } = require('child_process');
+    const ffmpeg = require('ffmpeg-static');
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vy-ssim-'));
+    const fa = path.join(dir, 'a.img'), fb = path.join(dir, 'b.img');
+    fs.writeFileSync(fa, Buffer.from(a.imageBytes, 'base64'));
+    fs.writeFileSync(fb, Buffer.from(b.imageBytes || b.buffer.toString('base64'), 'base64'));
+    const out = await new Promise((res) => execFile(ffmpeg, ['-i', fa, '-i', fb, '-lavfi', '[0]scale=256:456,format=gray[x];[1]scale=256:456,format=gray[y];[x][y]ssim', '-f', 'null', '-'], (e, so, se) => res(String(se || ''))));
+    try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {}
+    const m = /All:([0-9.]+)/.exec(out);
+    return m ? Number(m[1]) : null;
+  } catch (_) { return null; }
+}
+
 // ---- CUADRO FINAL (opcional, toma con shot.end_en) ----
 // LTX en king anima del cuadro inicial al final. El final se crea EDITANDO el cuadro inicial
 // (misma escena, mismo estilo, misma luz) para que la toma sea continua, y se guarda en
@@ -233,8 +257,25 @@ async function createEndFrame(supabase, { series, episode, shot, startImage, log
     CLEAN_FRAME
   ].filter(Boolean).join(' ');
   log('generando cuadro FINAL de la toma', shot.n, '(editando el cuadro inicial)...');
-  const img = await generateImage({ prompt, references: [Object.assign({}, startImage, { label: 'the FIRST frame of this same shot (keep its world, style and light)' })] });
-  await logSpend(supabase, { seriesId: series.id || episode.series_id, episodeId: episode.id, shotNumber: shot.n, kind: 'keyframe', model: img.model, costUsd: img.costUsd, note: 'cuadro final' });
+  const ref = [Object.assign({}, startImage, { label: 'the FIRST frame of this same shot (keep its world, style and light)' })];
+  let img = null;
+  for (let attempt = 0; attempt < 2 && !img; attempt++) {
+    const p = attempt === 0 ? prompt : prompt + ' IMPORTANT: the previous attempt looked almost identical to the reference. The final frame must look clearly DIFFERENT from the reference image: a new camera position, a new framing and the new content described in the final moment.';
+    const cand = await generateImage({ prompt: p, references: ref });
+    await logSpend(supabase, { seriesId: series.id || episode.series_id, episodeId: episode.id, shotNumber: shot.n, kind: 'keyframe', model: cand.model, costUsd: cand.costUsd, note: 'cuadro final' });
+    // Si sale casi igual al inicial (SSIM alto) la toma queda quieta: se reintenta una vez; si no, sin cuadro final.
+    const sim = await similarity(startImage, cand);
+    log(`cuadro final toma ${shot.n}: parecido con el inicial ${sim == null ? '?' : sim.toFixed(2)}`);
+    if (sim == null || sim < 0.85) img = cand;
+  }
+  if (!img) {
+    log(`toma ${shot.n}: el cuadro final salía igual al inicial → se anima solo desde el inicial`);
+    const { data: f0 } = await supabase.from('episodes').select('shots').eq('id', episode.id).single();
+    const sh0 = Array.isArray(f0 && f0.shots) ? f0.shots : [];
+    await supabase.from('episodes').update({ shots: sh0.map((x) => (x.n === shot.n ? Object.assign({}, x, { end_frame_skip: true, end_frame_url: null }) : x)) }).eq('id', episode.id);
+    shot.end_frame_skip = true;
+    return null;
+  }
   await ensureMediaBucket(supabase);
   const ext = img.mimeType.includes('jpeg') ? 'jpg' : 'png';
   const url = await uploadFile(supabase, { path: `${series.slug}/ep${episode.episode_number}/frame-${String(shot.n).padStart(2, '0')}-end-v${Date.now()}.${ext}`, buffer: img.buffer, contentType: img.mimeType });
@@ -242,7 +283,7 @@ async function createEndFrame(supabase, { series, episode, shot, startImage, log
   const { data: fresh } = await supabase.from('episodes').select('shots').eq('id', episode.id).single();
   const shots = Array.isArray(fresh && fresh.shots) ? fresh.shots : [];
   const old = (shots.find((x) => x.n === shot.n) || {}).end_frame_url;
-  const next = shots.map((x) => (x.n === shot.n ? Object.assign({}, x, { end_frame_url: url }) : x));
+  const next = shots.map((x) => (x.n === shot.n ? Object.assign({}, x, { end_frame_url: url, end_frame_skip: false }) : x));
   await supabase.from('episodes').update({ shots: next }).eq('id', episode.id);
   shot.end_frame_url = url;
   if (old && old !== url) await removeByPublicUrl(supabase, old, log);
@@ -252,6 +293,7 @@ async function createEndFrame(supabase, { series, episode, shot, startImage, log
 // Cuadro final de la toma: el guardado, o uno nuevo (fresh=true lo rehace). null si la toma no lleva final.
 async function endFrameFor(supabase, { series, episode, shot, startImage, fresh = false, log = console.log }) {
   if (!shot || !shot.end_en) return null;
+  if (!fresh && shot.end_frame_skip) return null;
   if (!fresh && shot.end_frame_url) {
     const [img] = await loadReferenceImages([shot.end_frame_url]);
     if (img) return img;
