@@ -17,7 +17,7 @@ ${topic ? `TEMA: ${topic}\n` : 'TEMA: elige tú una curiosidad REAL, sorprendent
 4. UNA SOLA HISTORIA, causa → efecto → consecuencia. Nunca una lista de datos sueltos. Cada frase empuja a la siguiente ("y entonces…", "pero…", "así que…").
 5. RE-ENGANCHE cada 15–20 s: un giro o una escalada ("Pero aquí viene el giro", "Y esto es lo que nadie esperaba"). Lo más sorprendente va al 70–80 % del video, no al principio.
 6. RITMO: alterna frases muy cortas (2–4 palabras) con frases largas. Pausas con "…" donde la voz debe respirar antes de lo sorprendente. Habla de "tú". Traduce cada cifra a algo de la vida diaria ("tres horas después ya era de noche", "media hora menos que tu día").
-7. IMAGEN = FRASE: cada toma muestra exactamente lo que dice su frase, con UNA acción visual clara y en movimiento (algo sube, cae, gira, se acerca, se ilumina). Nunca una imagen quieta ni decorativa.
+7. IMAGEN = FRASE: cada toma muestra exactamente lo que dice su frase (si la frase dice "la Luna", se VE la Luna), con UNA acción visual fuerte (algo explota, sube, cae, gira, se acerca, se ilumina) y un movimiento de cámara con energía. Nunca una imagen quieta ni decorativa. Lo que se menciona como gigante, se ve gigante en el cuadro.
 8. FINAL: responde el bucle abierto y cierra con una pregunta personal que invite a comentar ("¿Tú qué harías con…?"). Si puedes, que la última imagen se parezca a la primera, para que al repetirse el video se sienta continuo. Nada de "dale like".
 9. CERO DATOS FALSOS: cada dato lleva su fuente en continuity.sources (estudio, institución, año). Si la ciencia da un rango, usa palabras prudentes ("unas", "cerca de", "casi"). Si no se puede verificar, no entra.
 
@@ -30,7 +30,7 @@ ${topic ? `TEMA: ${topic}\n` : 'TEMA: elige tú una curiosidad REAL, sorprendent
   - action_en: la acción visual de 0 a 6 s, que ilustra la frase.
   - reaction_en: cómo queda de 6 a 8 s (casi quieto, para cortar limpio).
   - background_en: 3–4 elementos clave del lugar.
-- camera: SOLO "static camera", "slow push-in" o "slow pan".
+- camera: CON ENERGÍA (aquí no hay caras que se deformen): "fast push-in toward …", "crane up to reveal …", "slow orbit around …", "FPV drone fly-over", "camera travels alongside …", "fast dolly toward …", o "static camera, ultra-fast time-lapse". Varía el movimiento de una toma a la siguiente; cada toma debe sentirse viva y espectacular, nunca quieta.
 - Prohibido pedir: texto, letreros, papeles legibles, pantallas con letras, multitudes, peleas, carreras, manos en primer plano, espejos.
 - Sin comillas dobles dentro de los textos.
 
