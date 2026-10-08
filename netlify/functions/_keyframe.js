@@ -217,6 +217,48 @@ async function createKeyframe(supabase, { series, episode, shot, characters, log
   return { asset, startImage: { imageBytes: img.buffer.toString('base64'), mimeType: img.mimeType } };
 }
 
+// ---- CUADRO FINAL (opcional, toma con shot.end_en) ----
+// LTX en king anima del cuadro inicial al final. El final se crea EDITANDO el cuadro inicial
+// (misma escena, mismo estilo, misma luz) para que la toma sea continua, y se guarda en
+// episodes.shots[n].end_frame_url (sin tocar la tabla assets).
+async function createEndFrame(supabase, { series, episode, shot, startImage, log = console.log }) {
+  if (!shot || !shot.end_en || !startImage) return null;
+  const sb = series.story_bible || {};
+  const prompt = [
+    'Edit the reference image into the LAST frame of the same continuous vertical 9:16 video shot.',
+    (sb.visual_style || '').replace(/\.?$/, '.'),
+    'Keep exactly the same world, style, lighting, color palette, lens look and level of realism as the reference image; it is the same shot a few seconds later.',
+    `Final moment (this exact frame): ${String(shot.end_en).trim().replace(/\.?$/, '.')}`,
+    'This is ONE single continuous full-frame image, like a single movie frame, with no split screen, panels, collage, borders or inset pictures.',
+    CLEAN_FRAME
+  ].filter(Boolean).join(' ');
+  log('generando cuadro FINAL de la toma', shot.n, '(editando el cuadro inicial)...');
+  const img = await generateImage({ prompt, references: [Object.assign({}, startImage, { label: 'the FIRST frame of this same shot (keep its world, style and light)' })] });
+  await logSpend(supabase, { seriesId: series.id || episode.series_id, episodeId: episode.id, shotNumber: shot.n, kind: 'keyframe', model: img.model, costUsd: img.costUsd, note: 'cuadro final' });
+  await ensureMediaBucket(supabase);
+  const ext = img.mimeType.includes('jpeg') ? 'jpg' : 'png';
+  const url = await uploadFile(supabase, { path: `${series.slug}/ep${episode.episode_number}/frame-${String(shot.n).padStart(2, '0')}-end-v${Date.now()}.${ext}`, buffer: img.buffer, contentType: img.mimeType });
+  // Se guarda en el guion de la toma (leyendo el guion fresco para no pisar otros cambios).
+  const { data: fresh } = await supabase.from('episodes').select('shots').eq('id', episode.id).single();
+  const shots = Array.isArray(fresh && fresh.shots) ? fresh.shots : [];
+  const old = (shots.find((x) => x.n === shot.n) || {}).end_frame_url;
+  const next = shots.map((x) => (x.n === shot.n ? Object.assign({}, x, { end_frame_url: url }) : x));
+  await supabase.from('episodes').update({ shots: next }).eq('id', episode.id);
+  shot.end_frame_url = url;
+  if (old && old !== url) await removeByPublicUrl(supabase, old, log);
+  log('cuadro final listo:', url);
+  return { imageBytes: img.buffer.toString('base64'), mimeType: img.mimeType };
+}
+// Cuadro final de la toma: el guardado, o uno nuevo (fresh=true lo rehace). null si la toma no lleva final.
+async function endFrameFor(supabase, { series, episode, shot, startImage, fresh = false, log = console.log }) {
+  if (!shot || !shot.end_en) return null;
+  if (!fresh && shot.end_frame_url) {
+    const [img] = await loadReferenceImages([shot.end_frame_url]);
+    if (img) return img;
+  }
+  return createEndFrame(supabase, { series, episode, shot, startImage, log });
+}
+
 // Cuadro inicial ya guardado de una toma (para reutilizarlo al animar o regenerar el video).
 async function loadExistingKeyframe(supabase, episodeId, shotNumber) {
   const { data: frame } = await supabase
@@ -237,4 +279,4 @@ module.exports = {
   effectiveKeyframePrompt,
   keyframeReferences,
   createKeyframe,
-  loadExistingKeyframe, createLocationImage };
+  loadExistingKeyframe, createLocationImage, createEndFrame, endFrameFor };

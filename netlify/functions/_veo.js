@@ -100,11 +100,12 @@ const MODELS_WITH_REFERENCE_IMAGES = new Set(['veo_fast', 'veo_standard']);
 // los personajes de la toma para que Veo mantenga sus caras.
 // startImage: { imageBytes, mimeType } — CUADRO INICIAL (image-to-video). Veo 3.1 Lite sí lo
 // acepta: es como la memoria visual llega a Lite (la cara y el set ya vienen en el cuadro).
-async function generateVeoClip({ modelKey, prompt, aspectRatio = '9:16', durationSeconds = 8, referenceImages = [], startImage = null, provider = 'google', generateAudio = true, ltxPrompt = null, ltxNegative = null, log = console.log }) {
+async function generateVeoClip({ modelKey, prompt, aspectRatio = '9:16', durationSeconds = 8, referenceImages = [], startImage = null, endImage = null, endText = null, provider = 'google', generateAudio = true, ltxPrompt = null, ltxNegative = null, log = console.log }) {
   // Proveedor PC king: LTX-2.5 local por Tailscale, gratis (solo corre desde Cronix, ver _king.js).
   if (provider === 'king') {
     const { kingGenerateVideo } = require('./_king');
-    const { videoBuffer } = await kingGenerateVideo({ prompt: ltxPrompt || prompt, negative: ltxNegative, startImage, durationSeconds, keepAudio: !!generateAudio, log });
+    const p0 = ltxPrompt || prompt;
+    const { videoBuffer } = await kingGenerateVideo({ prompt: endImage && endText ? p0 + ' The shot ends exactly on this final moment: ' + String(endText).trim().replace(/\.?$/, '.') : p0, negative: ltxNegative, startImage, endImage, durationSeconds, keepAudio: !!generateAudio, log });
     // generateAudio = videoGeneratesAudio(story_bible): con narración TTS se quita el audio de LTX; en modo voz de LTX se conserva.
     return { videoBuffer, costUsd: 0, model: 'king:ltx2.5', provider: 'king', generateAudio: !!generateAudio };
   }

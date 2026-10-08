@@ -58,6 +58,7 @@ exports.handler = async (event) => {
     let prompt = asset.prompt;
     let referenceImages = [];
     let startImage = null;
+    let endImage = null;
     const shot = Array.isArray(episode.shots) ? episode.shots.find((x) => x.n === asset.shot_number) : null;
     if (shot) {
       const { data: characters, error: charsError } = await supabase
@@ -79,6 +80,9 @@ exports.handler = async (event) => {
           episode, shot, characters, log: (...a) => console.log(LOG, ...a)
         }));
         startImage = frame.startImage;
+        if (provider === 'king' && shot.end_en) {
+          endImage = await require('./_keyframe').endFrameFor(supabase, { series: Object.assign({ id: episode.series_id }, episode.series), episode, shot, startImage, fresh: !existingFrame, log: (...a) => console.log(LOG, ...a) });
+        }
       }
       console.log(LOG, 'prompt reconstruido desde el guion actual (toma', asset.shot_number + ').');
     }
@@ -90,7 +94,7 @@ exports.handler = async (event) => {
     let modelKey = ['veo_lite', 'veo_fast', 'veo_standard'].includes(asset.model) ? asset.model : 'veo_lite';
     if (referenceImages.length) modelKey = rules.shot_model === 'veo_standard' ? 'veo_standard' : 'veo_fast';
     console.log(LOG, 'generando con Veo (' + modelKey + ')... esto tarda un rato.');
-    const veo = await generateVeoClip({ modelKey, prompt, durationSeconds: provider === 'king' && shot ? require('./_king').kingSecondsFor(shot) : 8, referenceImages, startImage, provider, generateAudio: videoGeneratesAudio((episode.series && episode.series.story_bible) || {}), ltxPrompt: provider === 'king' && shot ? require('./_king').ltxPromptFor(shot, (episode.series && episode.series.story_bible) || {}) : null, ltxNegative: provider === 'king' && shot ? require('./_king').ltxNegativeFor(shot, (episode.series && episode.series.story_bible) || {}) : null, log: (...a) => console.log(LOG, ...a) });
+    const veo = await generateVeoClip({ modelKey, prompt, durationSeconds: provider === 'king' && shot ? require('./_king').kingSecondsFor(shot) : 8, referenceImages, startImage, endImage, endText: shot && shot.end_en, provider, generateAudio: videoGeneratesAudio((episode.series && episode.series.story_bible) || {}), ltxPrompt: provider === 'king' && shot ? require('./_king').ltxPromptFor(shot, (episode.series && episode.series.story_bible) || {}) : null, ltxNegative: provider === 'king' && shot ? require('./_king').ltxNegativeFor(shot, (episode.series && episode.series.story_bible) || {}) : null, log: (...a) => console.log(LOG, ...a) });
     const { costUsd, model } = veo;
     await logSpend(supabase, { seriesId: episode.series_id, episodeId: episode.id, shotNumber: asset.shot_number, kind: 'video', model: provider === 'fal' ? 'fal_' + modelKey : provider === 'king' ? 'ltx_king' : modelKey, costUsd, note: provider === 'fal' ? 'regenerada (fal.ai)' : provider === 'king' ? 'regenerada (PC king)' : 'regenerada' });
     console.log(LOG, 'Veo terminó, subiendo a Supabase Storage...');

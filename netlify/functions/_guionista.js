@@ -89,6 +89,7 @@ ${p.fuentes ? '9. CERO DATOS FALSOS: cada dato lleva su fuente en continuity.sou
 - Solo narrador en off: dialogue = [{ "speaker": "Narrador", "line": "…" }] en todas las tomas. Nadie habla ni mueve la boca en cuadro.
 - characters: [] (sin personajes fijos). Si sale una persona, que sea genérica, de espaldas, en silueta o de lejos, descrita en start_en.
 - Textos para la IA de video en INGLÉS y en AFIRMATIVO (lo que SÍ se ve; nunca "no", "without", "never"): camera, start_en (cuadro inicial exacto), action_en (acción de 0 a 6 s), reaction_en (cómo queda de 6 a 8 s), background_en (3–4 elementos del lugar), locations.visual.
+- CUADRO INICIAL + CUADRO FINAL (cinematografía): cada toma lleva start_en (primer cuadro exacto) y end_en (último cuadro exacto, en INGLÉS y afirmativo). La IA de video viaja del uno al otro, así que la toma TERMINA en una imagen pensada: un revelado, un cambio de escala, una transformación (p. ej. start_en "extreme macro of a dilated human pupil" → end_en "the pupil's black center fills the frame and becomes a dark abyssal seabed lit by a single submarine spotlight"). Los dos cuadros muestran EXACTAMENTE lo que dice la narración de esa toma. Cuando conviene, el end_en de una toma prepara visualmente el start_en de la siguiente (transiciones que encajan).
 - camera con energía y variada: "fast push-in toward …", "crane up to reveal …", "slow orbit around …", "FPV drone fly-over", "camera travels alongside …", "fast dolly toward …", "static camera, ultra-fast time-lapse".
 - Prohibido pedir: texto, letreros, papeles legibles, pantallas con letras, multitudes, peleas, carreras, manos en primer plano, espejos. Sin comillas dobles dentro de los textos.
 
@@ -115,7 +116,7 @@ ${p.fuentes ? '9. CERO DATOS FALSOS: cada dato lleva su fuente en continuity.sou
     "episode_number": ${episodeNumber},
     "title": "<título con curiosidad, máx. 60 caracteres>",
     "continuity": { "summary": "…", "last_cliffhanger": "<la última frase>", "hook_text": "<3–5 PALABRAS>", "sources": ["…"] },
-    "shots": [{ "n": 1, "location": "<lugar>", "characters": [], "scene_es": "…", "camera": "…", "start_en": "…", "action_en": "…", "reaction_en": "…", "background_en": "…", "dialogue": [{ "speaker": "Narrador", "line": "…" }], "sfx": "" }]
+    "shots": [{ "n": 1, "location": "<lugar>", "characters": [], "scene_es": "…", "camera": "…", "start_en": "…", "end_en": "…", "action_en": "…", "reaction_en": "…", "background_en": "…", "dialogue": [{ "speaker": "Narrador", "line": "…" }], "sfx": "" }]
   }]
 }
 

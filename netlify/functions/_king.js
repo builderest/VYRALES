@@ -159,7 +159,27 @@ async function j(url, opts) {
 }
 
 // startImage: { imageBytes (base64), mimeType }. Devuelve { videoBuffer } SIN audio.
-async function kingGenerateVideo({ prompt, negative = null, startImage, durationSeconds = 8, keepAudio = false, log = console.log }) {
+// endImage (opcional): cuadro FINAL. LTX va del cuadro inicial al final (LTXVAddGuide frame_idx=-1 en las dos
+// pasadas y LTXVCropGuides antes de escalar/decodificar). Así la toma termina exactamente donde dice el guion.
+function addEndFrame(wf, imageName, strength) {
+  wf['vy:endload'] = { class_type: 'LoadImage', inputs: { image: imageName } };
+  wf['vy:endresize'] = JSON.parse(JSON.stringify(wf['398:351'])); wf['vy:endresize'].inputs.input = ['vy:endload', 0];
+  wf['vy:endpre'] = JSON.parse(JSON.stringify(wf['398:350'])); wf['vy:endpre'].inputs.image = ['vy:endresize', 0];
+  // Pasada 1 (media resolución)
+  wf['vy:guideA'] = { class_type: 'LTXVAddGuide', inputs: { positive: ['398:365', 0], negative: ['398:365', 1], vae: ['398:385', 0], latent: ['398:357', 0], image: ['vy:endpre', 0], frame_idx: -1, strength } };
+  wf['398:377'].inputs.video_latent = ['vy:guideA', 2];
+  wf['398:388'].inputs.positive = ['vy:guideA', 0]; wf['398:388'].inputs.negative = ['vy:guideA', 1];
+  wf['vy:cropA'] = { class_type: 'LTXVCropGuides', inputs: { positive: ['vy:guideA', 0], negative: ['vy:guideA', 1], latent: ['398:367', 0] } };
+  wf['398:348'].inputs.samples = ['vy:cropA', 2];
+  // Pasada 2 (resolución completa)
+  wf['vy:guideB'] = { class_type: 'LTXVAddGuide', inputs: { positive: ['vy:cropA', 0], negative: ['vy:cropA', 1], vae: ['398:385', 0], latent: ['398:349', 0], image: ['vy:endpre', 0], frame_idx: -1, strength } };
+  wf['398:340'].inputs.video_latent = ['vy:guideB', 2];
+  wf['398:391'].inputs.positive = ['vy:guideB', 0]; wf['398:391'].inputs.negative = ['vy:guideB', 1];
+  wf['vy:cropB'] = { class_type: 'LTXVCropGuides', inputs: { positive: ['vy:guideB', 0], negative: ['vy:guideB', 1], latent: ['398:369', 0] } };
+  wf['398:374'].inputs.samples = ['vy:cropB', 2];
+}
+
+async function kingGenerateVideo({ prompt, negative = null, startImage, endImage = null, durationSeconds = 8, keepAudio = false, log = console.log }) {
   if (!startImage || !startImage.imageBytes) throw new Error('Con la PC king cada toma necesita su cuadro inicial (memoria visual).');
   if (!fs.existsSync(TEMPLATE)) throw new Error('Falta agente/ltx2_api.json (plantilla de LTX exportada desde ComfyUI).');
   const base = GEN();
@@ -181,6 +201,14 @@ async function kingGenerateVideo({ prompt, negative = null, startImage, duration
   wf[N.seedB].inputs.noise_seed = crypto.randomInt(1, 2 ** 31);
   wf[N.strength].inputs.strength = Number(process.env.VYRALES_LTX_STRENGTH || 1);
   wf[N.save].inputs.filename_prefix = 'vyrales/' + tag;
+  if (endImage && endImage.imageBytes) {
+    const fe = new FormData();
+    fe.append('image', new Blob([Buffer.from(endImage.imageBytes, 'base64')], { type: endImage.mimeType || 'image/jpeg' }), tag + '_fin.jpg');
+    fe.append('overwrite', 'true');
+    const upE = await j(base + '/upload/image', { method: 'POST', body: fe });
+    addEndFrame(wf, upE.subfolder ? upE.subfolder + '/' + upE.name : upE.name, Number(process.env.VYRALES_LTX_END_STRENGTH || 1));
+    log('[king] con cuadro FINAL');
+  }
 
   const t0 = Date.now();
   const { prompt_id } = await j(base + '/prompt', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt: wf, client_id: 'vyrales' }) });

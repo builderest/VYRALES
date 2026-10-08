@@ -289,15 +289,20 @@ exports.handler = async (event) => {
       try {
         const referenceImages = refUrls[scene.number] ? await loadReferenceImages(refUrls[scene.number]) : [];
         let startImage = null;
+        let endImage = null;
         if (useKeyframes && scene.shot) {
           const existingFrame = await loadExistingKeyframe(supabase, episode.id, scene.number);
           const frame = existingFrame || (await createKeyframe(supabase, { series, episode, shot: scene.shot, characters, log: (...a) => console.log(LOG, ...a) }));
           startImage = frame.startImage;
           console.log(LOG, `toma ${scene.number}/${total}: ${existingFrame ? 'usando el cuadro inicial ya guardado' : 'cuadro inicial creado'}.`);
+          // Cuadro FINAL (solo LTX en king y si la toma trae end_en): la toma termina donde dice el guion.
+          if (provider === 'king' && scene.shot.end_en) {
+            endImage = await require('./_keyframe').endFrameFor(supabase, { series, episode, shot: scene.shot, startImage, fresh: !existingFrame, log: (...a) => console.log(LOG, ...a) });
+          }
         }
         let veo;
         try {
-          veo = await generateVeoClip({ modelKey, prompt, durationSeconds: provider === 'king' && scene.shot ? require('./_king').kingSecondsFor(scene.shot) : 8, referenceImages, startImage, provider, generateAudio: videoGeneratesAudio(series.story_bible), ltxPrompt: provider === 'king' && scene.shot ? ltxPromptFor(scene.shot, series.story_bible) : null, ltxNegative: provider === 'king' && scene.shot ? ltxNegativeFor(scene.shot, series.story_bible) : null, log: (...a) => console.log(LOG, ...a) });
+          veo = await generateVeoClip({ modelKey, prompt, durationSeconds: provider === 'king' && scene.shot ? require('./_king').kingSecondsFor(scene.shot) : 8, referenceImages, startImage, endImage, endText: scene.shot && scene.shot.end_en, provider, generateAudio: videoGeneratesAudio(series.story_bible), ltxPrompt: provider === 'king' && scene.shot ? ltxPromptFor(scene.shot, series.story_bible) : null, ltxNegative: provider === 'king' && scene.shot ? ltxNegativeFor(scene.shot, series.story_bible) : null, log: (...a) => console.log(LOG, ...a) });
         } catch (vErr) {
           // Filtro de contenido de fal (Job T13: rechazó 5 veces el mismo cuadro; con un cuadro
           // nuevo de otra composición pasó a la primera). Se rehace el cuadro UNA vez (~$0.067,

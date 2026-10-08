@@ -477,7 +477,7 @@ async function renderEpisode({ episode, series, log = console.log, fetchFile = d
       const r = await renderClip({ cwd, input: src, out, c, subtitle, speechWindow, hookText, narrStartMin, speakerColor: spk ? SPEAKER_COLORS[speakers.indexOf(spk) % SPEAKER_COLORS.length] : null, sub, fadeIn, fadeOut, narration, muteOriginal, tailReserve });
       const dur = r.dur;
       if (r.narr && r.narr.tempo > 1.001) log(`toma ${c.shot}: narración acelerada ${r.narr.tempo.toFixed(2)}x para que quepa.`);
-      parts.push({ file: out, dur, narr: r.narr, xfade: XFADE[c.transition] && i < chosen.length ? Math.min(tSec(c), dur / 2) : 0, xname: XFADE[c.transition] || 'fade' });
+      parts.push({ file: out, dur, narr: r.narr, xfade: XFADE[c.transition] && i < chosen.length ? Math.min(tSec(c), dur / 2) : 0, xname: XFADE[c.transition] || 'fade', musicOff: !!(shot && /^(off|none|silence|silencio)$/i.test(String(shot.music || ''))) });
     }
     if (tailMode) {
       log('cierre sobre la última imagen...');
@@ -536,7 +536,12 @@ async function renderEpisode({ episode, series, log = console.log, fetchFile = d
       await fetchFile(music, path.join(cwd, 'music.audio'));
       args.push('-stream_loop', '-1', '-i', 'music.audio');
       const mv = Math.max(0, Math.min(1, Number(plan.audio.music_volume) || 0.12));
-      filters.push(`[1:a]aresample=48000,aformat=channel_layouts=stereo,volume=${mv.toFixed(2)},afade=t=in:st=0:d=1,afade=t=out:st=${Math.max(0, total - 1.5).toFixed(2)}:d=1.5[m0]`);
+      // Tomas con shot.music = "off": la música se corta en seco durante esa toma (silencio dramático).
+      const offWin = [];
+      { let t0 = 0; parts.forEach((p) => { if (p.musicOff) offWin.push([t0, t0 + p.dur - p.xfade]); t0 += p.dur - p.xfade; }); }
+      const offExpr = offWin.length ? `,volume='if(${offWin.map(([a, b]) => `between(t,${a.toFixed(2)},${b.toFixed(2)})`).join('+')},0,1)':eval=frame` : '';
+      if (offWin.length) log('música en silencio en', offWin.length, 'toma(s).');
+      filters.push(`[1:a]aresample=48000,aformat=channel_layouts=stereo,volume=${mv.toFixed(2)}${offExpr},afade=t=in:st=0:d=1,afade=t=out:st=${Math.max(0, total - 1.5).toFixed(2)}:d=1.5[m0]`);
       // Ducking estilo documental: la música baja sola mientras habla el narrador y sube en
       // las pausas. La "llave" es la pista de narración puesta en su minuto exacto.
       const windows = [];
