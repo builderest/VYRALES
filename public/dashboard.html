@@ -852,14 +852,30 @@
         };
         const platform = (key, label, steps) => {
           const done = pub[key];
-          return '<div class="border ' + (done ? 'border-cyber-emerald/50' : 'border-cyber-border') + ' rounded-lg p-2 space-y-1">' +
-            '<p class="text-[11px] font-mono font-bold ' + (done ? 'text-cyber-emerald' : 'text-white') + '">' + label + (done ? ' · PUBLICADO ' + (done.url ? '<a href="' + esc(done.url) + '" target="_blank" class="underline">ver</a>' : '') : '') + '</p>' +
-            '<div class="pb-1 border-b border-slate-800">' + apiRow(key, NET[key]) + '</div>' +
+          // Ya enviado por API aunque no cuente como "publicado" (YouTube privado, borrador de TikTok, TikTok "Solo yo").
+          const run = runs[key] || {};
+          const sent = !done && ['uploaded_private', 'draft_sent', 'published', 'tiktok_processing'].includes(run.status) ? run : null;
+          const when = (x) => x && x.at ? ' · ' + new Date(x.at).toLocaleDateString() : '';
+          const sentLabel = sent ? (sent.status === 'uploaded_private' ? 'Ya subido a YouTube como PRIVADO' : sent.status === 'draft_sent' ? 'Borrador ya enviado a TikTok' : sent.privacy === 'SELF_ONLY' ? 'Ya publicado en TikTok como “Solo yo”' : 'Ya enviado') : '';
+          const body = '<div class="pb-1 border-b border-slate-800">' + apiRow(key, NET[key]) + '</div>' +
             '<p class="text-[10px] text-slate-500">' + ((soc.accounts || {})[key] ? 'O a mano:' : 'A mano:') + '</p>' +
-            '<ol class="list-decimal ml-4 text-[11px] text-slate-300 space-y-0.5">' + steps.map(x => '<li>' + x + '</li>').join('') + '</ol>' +
-            (done
-              ? '<button onclick="markPublished(\'' + e.id + '\', \'' + key + '\', true)" class="text-[10px] font-mono text-slate-500 hover:text-white underline">Desmarcar</button>'
-              : '<button onclick="markPublished(\'' + e.id + '\', \'' + key + '\')" class="text-[10px] font-mono px-2 py-0.5 rounded border border-cyber-emerald/40 text-cyber-emerald hover:bg-cyber-emerald/10"><i class="fa-solid fa-check mr-1"></i>Ya lo publiqué</button>') +
+            '<ol class="list-decimal ml-4 text-[11px] text-slate-300 space-y-0.5">' + steps.map(x => '<li>' + x + '</li>').join('') + '</ol>';
+          if (done || sent) {
+            const url = (done && done.url) || (sent && sent.url) || '';
+            return '<div class="border ' + (done ? 'border-cyber-emerald/60 bg-cyber-emerald/5' : 'border-cyber-gold/50 bg-cyber-gold/5') + ' rounded-lg p-2 space-y-1">' +
+              '<p class="text-[11px] font-mono font-bold ' + (done ? 'text-cyber-emerald' : 'text-cyber-gold') + '">' + label + '</p>' +
+              '<p class="text-sm font-bold ' + (done ? 'text-cyber-emerald' : 'text-cyber-gold') + '"><i class="fa-solid ' + (done ? 'fa-circle-check' : 'fa-clock') + ' mr-1"></i>' + (done ? 'YA PUBLICADO' : esc(sentLabel)) + '<span class="text-[11px] font-normal text-slate-400">' + when(done || sent) + '</span></p>' +
+              (url ? '<a href="' + esc(url) + '" target="_blank" class="inline-block text-[11px] font-mono text-cyber-emerald underline">ver publicación</a>' : '') +
+              (sent && sent.status === 'uploaded_private' ? '<p class="text-[10px] text-slate-400">Hazlo público en YouTube Studio; no lo vuelvas a subir.</p>' : '') +
+              (sent && sent.status === 'draft_sent' ? '<p class="text-[10px] text-slate-400">Termina de publicarlo desde la notificación en la app de TikTok.</p>' : '') +
+              '<details class="mt-1"><summary class="cursor-pointer text-[10px] font-mono text-slate-500 hover:text-white">Publicar otra vez (crea un video DUPLICADO)</summary><div class="mt-1 space-y-1">' + body + '</div></details>' +
+              (done ? '<button onclick="markPublished(\'' + e.id + '\', \'' + key + '\', true)" class="text-[10px] font-mono text-slate-500 hover:text-white underline">Desmarcar</button>'
+                : '<button onclick="markPublished(\'' + e.id + '\', \'' + key + '\')" class="text-[10px] font-mono px-2 py-0.5 rounded border border-cyber-emerald/40 text-cyber-emerald hover:bg-cyber-emerald/10"><i class="fa-solid fa-check mr-1"></i>Ya lo publiqué</button>') +
+            '</div>';
+          }
+          return '<div class="border border-cyber-border rounded-lg p-2 space-y-1">' +
+            '<p class="text-[11px] font-mono font-bold text-white">' + label + '</p>' + body +
+            '<button onclick="markPublished(\'' + e.id + '\', \'' + key + '\')" class="text-[10px] font-mono px-2 py-0.5 rounded border border-cyber-emerald/40 text-cyber-emerald hover:bg-cyber-emerald/10"><i class="fa-solid fa-check mr-1"></i>Ya lo publiqué</button>' +
           '</div>';
         };
         const dl = (url, name) => url + (url.includes('?') ? '&' : '?') + 'download=' + encodeURIComponent(name);
@@ -1076,6 +1092,12 @@
         // Instagram vuelven a vyrales.app y esa página tiene el botón para regresar al panel.
         location.href = '/.netlify/functions/oauth-' + platform + '-start'; // la sesión (cookie) autoriza
       };
+      // ¿Ya se publicó o subió este episodio en esa red? (para no duplicar)
+      function alreadySent(ep, platform) {
+        const vr = (ep && ep.validator_report) || {};
+        const r = (vr.social_runs || {})[platform] || {};
+        return !!((vr.published || {})[platform] || ['uploaded_private', 'draft_sent', 'published', 'tiktok_processing'].includes(r.status));
+      }
       window.socialPublish = async function(epId, platform) {
         const ep = (lastLoadedData.episodes || []).find(x => x.id === epId);
         // YouTube: Privado por defecto (lo revisas y lo haces público en YouTube Studio cuando quieras).
@@ -1086,6 +1108,7 @@
           : platform === 'tiktok'
           ? 'Enviar el EP ' + ep.episode_number + ' a TikTok como BORRADOR.\n\nTe llega una notificación en la app: ahí pegas la descripción, activas “Contenido generado por IA” y publicas. ¿Enviar?'
           : 'PUBLICAR el EP ' + ep.episode_number + ' en ' + NET[platform] + ' como Reel AHORA (público), con la descripción' + (platform === 'instagram' ? ', la portada' : '') + ' y el aviso de IA en el texto.\n\nLa API de Meta NO activa la etiqueta oficial de IA: después ábrelo en la app y actívala si quieres.\nNo se puede deshacer desde aquí (se borra desde la app). ¿Publicar?';
+        if (alreadySent(ep, platform) && !await askConfirm('⚠️ Este episodio YA se publicó/subió a ' + NET[platform] + '. Si sigues, se crea un video DUPLICADO. ¿Publicar otra vez de todas formas?')) return;
         if (!await askConfirm(msg)) return;
         try {
           const res = await keyedFetch('/.netlify/functions/social-publish-background', { episode_id: epId, platform, privacy });
@@ -1105,6 +1128,7 @@
         const final = ep && (ep.assets || []).find(a => a.kind === 'final_render');
         const pk = ((ep && ep.validator_report) || {}).publish_package || {};
         if (!final) return alert('This episode has no final video.');
+        if (alreadySent(ep, 'tiktok') && !await askConfirm('⚠️ Este episodio YA se publicó/envió a TikTok. Si sigues, se crea un video DUPLICADO. ¿Abrir el panel para publicar otra vez?')) return;
         let m = document.getElementById('ttModal');
         if (m) m.remove();
         m = document.createElement('div');
