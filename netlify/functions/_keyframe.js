@@ -206,7 +206,7 @@ async function createKeyframe(supabase, { series, episode, shot, characters, log
   if (existing) {
     const { data, error } = await supabase
       .from('assets')
-      .update({ storage_path: url, prompt: flux ? fluxText : prompt, cost_usd: img.costUsd, model: flux ? 'flux_king' : 'nano_banana', approved: false, approved_at: null })
+      .update({ storage_path: url, prompt: flux ? fluxText : prompt, cost_usd: img.costUsd, model: 'nano_banana', approved: false, approved_at: null })
       .eq('id', existing.id)
       .select()
       .single();
@@ -216,7 +216,7 @@ async function createKeyframe(supabase, { series, episode, shot, characters, log
   } else {
     const { data, error } = await supabase
       .from('assets')
-      .insert({ episode_id: episode.id, kind: 'image', model: flux ? 'flux_king' : 'nano_banana', shot_number: shot.n, storage_path: url, prompt: flux ? fluxText : prompt, cost_usd: img.costUsd, approved: false })
+      .insert({ episode_id: episode.id, kind: 'image', model: 'nano_banana', shot_number: shot.n, storage_path: url, prompt: flux ? fluxText : prompt, cost_usd: img.costUsd, approved: false })
       .select()
       .single();
     if (error) throw error;
