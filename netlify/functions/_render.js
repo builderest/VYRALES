@@ -505,7 +505,8 @@ async function renderEpisode({ episode, series, log = console.log, fetchFile = d
       const out = `p${String(i).padStart(2, '0')}-shot${c.shot}.mp4`;
       const shot = shotsByN[c.shot];
       if (contVoice && i < chosen.length) c.transition = 'cut'; // el final de una toma ES el inicio de la siguiente
-      if (contVoice && exactDur && exactDur[c.shot] && !c.trim_start && !c.trim_end && !c.speed) c.target_dur = exactDur[c.shot];
+      if (contVoice && exactDur && exactDur[c.shot] && !Number(c.trim_start) && !Number(c.trim_end) && (Number(c.speed) || 1) === 1) c.target_dur = exactDur[c.shot];
+      if (contVoice && c.target_dur) log(`toma ${c.shot}: dura exacto ${c.target_dur.toFixed(2)} s (voz)`);
       const subtitle = contVoice ? '' : sub.enabled ? (c.subtitle != null && c.subtitle !== '' ? c.subtitle : dialogueOf(shot)) : '';
       const spk = speakerOf(shot);
       const tSec = (x) => Math.min(1.5, Math.max(0.2, Number(x && x.transition_s) || 0.4));
