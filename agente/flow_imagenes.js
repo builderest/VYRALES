@@ -97,8 +97,32 @@ async function imgSrcs(page) {
   return page.evaluate(() => [...new Set([...document.querySelectorAll('img')].filter((i) => i.naturalWidth >= 120 && i.naturalHeight > i.naturalWidth && !/avatar|profile|googleusercontent\.com\/a\//i.test(i.src)).map((i) => i.currentSrc || i.src))]);
 }
 
-async function generate(page, ctx, prompt, name) {
+// Sube imágenes de referencia (fotos de cara de los personajes) como "ingredientes" del pedido:
+// botón "+" del cuadro de texto → "Subir archivo…" → "Añadir a petición".
+async function addRefs(page, refs, name) {
+  const os = require('os');
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'vy-flow-ref-'));
+  for (let i = 0; i < refs.length; i++) {
+    const r = refs[i];
+    const f = path.join(tmp, `ref${i + 1}.${String(r.mimeType || '').includes('png') ? 'png' : 'jpg'}`);
+    fs.writeFileSync(f, Buffer.from(r.imageBytes, 'base64'));
+    await page.locator('button[aria-label*="ingredientes"], button[aria-label*="ingredients"]').first().click({ timeout: 15000 });
+    await sleep(1200);
+    const [fc] = await Promise.all([page.waitForEvent('filechooser', { timeout: 15000 }), page.getByText(/Subir archivo|Upload file/i).first().click()]);
+    await fc.setFiles(f);
+    // Espera a que termine de subir y queden seleccionada; luego "Añadir a petición".
+    const add = page.getByRole('button', { name: /Añadir a petición|Add to prompt/i }).first();
+    for (let k = 0; k < 30; k++) { await sleep(1000); if (await add.isEnabled().catch(() => false)) break; }
+    await shot(page, `${name}_ref${i + 1}`);
+    await add.click({ timeout: 15000 });
+    await sleep(1500);
+  }
+  fs.rmSync(tmp, { recursive: true, force: true });
+}
+
+async function generate(page, ctx, prompt, name, refs) {
   const before = new Set(await imgSrcs(page));
+  if (refs && refs.length) await addRefs(page, refs, name);
   await page.click('.ProseMirror');
   await page.keyboard.insertText(prompt);
   await sleep(800);
@@ -156,7 +180,7 @@ async function generate(page, ctx, prompt, name) {
 
 // Para el pipeline: genera UNA imagen en Flow (segundo plano; muestra Chrome solo si hay que iniciar sesión).
 // Devuelve lo mismo que _image.generateImage: { buffer, mimeType, costUsd, model }.
-async function flowImage({ prompt }) {
+async function flowImage({ prompt, refs = [] }) {
   let { ctx, page } = await openFlow(process.env.FLOW_VISIBLE === '1');
   try {
     let ok = await ensureLogin(page, 0.1);
@@ -168,7 +192,7 @@ async function flowImage({ prompt }) {
     }
     if (!ok) throw new Error('Flow: no hay sesión de Google.');
     await newProject(page);
-    const img = await generate(page, ctx, String(prompt).trim().replace(/\.?$/, '.') + ruleFor(prompt), 'pipeline');
+    const img = await generate(page, ctx, String(prompt).trim().replace(/\.?$/, '.') + (refs.length ? RULE_BASE : ruleFor(prompt)), 'pipeline', refs);
     const jpg = img.buffer[0] === 0xff && img.buffer[1] === 0xd8;
     return { buffer: img.buffer, mimeType: jpg ? 'image/jpeg' : 'image/png', costUsd: 0, model: 'flow' };
   } finally {
@@ -222,6 +246,16 @@ if (require.main === module) (async () => {
     }
     if (!ok) throw new Error('No se inició sesión de Google en 10 min.');
     if (mode === 'login') { console.log('LISTO: sesión guardada en', PROFILE); return; }
+    if (mode === 'prueba_ref') {
+      await newProject(page);
+      const url = process.argv[3] || 'https://pfwdbdkngmdmoolzflhe.supabase.co/storage/v1/object/public/media/characters/job_la_prueba/1721708b-31d5-42d0-b7a2-1fbef60075d9-1791249285259.jpg';
+      const b = Buffer.from(await (await fetch(url)).arrayBuffer());
+      const t = Date.now();
+      const img = await generate(page, ctx, 'Use the uploaded reference photo as the exact face and identity of the woman. She walks through a sunny old hacienda courtyard in a long elegant dress, cinematic medium shot, golden afternoon light.' + RULE_BASE, 'prueba_ref', [{ imageBytes: b.toString('base64'), mimeType: 'image/jpeg', label: 'face' }]);
+      fs.writeFileSync(path.join(OUT, 'prueba_ref.png'), img.buffer);
+      console.log(`LISTO en ${Math.round((Date.now() - t) / 1000)} s → _to_delete\\flow\\prueba_ref.png (${img.buffer.length} bytes)`);
+      return;
+    }
     await newProject(page);
     const prompt = 'A giant red squid floating in the dark deep ocean, its long tentacles trailing below, faint blue light from above, floating particles.' + RULE;
     const t = Date.now();
