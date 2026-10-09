@@ -37,6 +37,8 @@ module.exports = {
   grabar_demo_tiktok: { label: 'Grabar demo para TikTok', help: 'Abre el navegador en esta PC y graba el flujo Conectar TikTok → Post to TikTok (tú solo inicias sesión en TikTok y das Authorize)', special: 'grabar_demo_tiktok' },
   prueba_ltx_final: { label: 'Prueba LTX con cuadro final', help: 'LTX con cuadro inicial + final (gratis en king) para comparar contra solo inicial', special: 'prueba_ltx_final', hidden: true },
   flow_login: { label: 'Flow: iniciar sesión (una vez)', help: 'Abre Flow en el Chrome de VYRALES para que inicies sesión con tu cuenta de Google', special: 'flow_login' },
+  // "flow_cuadros:<episode_id>[:<tomas>]" — cuadros con Google Flow en una sesión + videos en king.
+  flow_cuadros: { label: 'Flow: cuadros del episodio', help: 'Genera los cuadros iniciales en Google Flow (una sesión) y rehace los videos en king', special: 'flow_cuadros', arg: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(:\d{1,2}(,\d{1,2})*)?$/i, hidden: true },
   flow_ver: { label: 'Flow: mostrar ventana', help: 'Hace la prueba de Flow con la ventana de Chrome visible', special: 'flow_ver' },
   flow_prueba: { label: 'Flow: imagen de prueba', help: 'Genera 1 imagen en Flow con tu cuenta y la guarda', special: 'flow_prueba' },
   prueba_flux_nat: { label: 'Prueba Flux naturaleza (inicio+final)', help: 'Cuadros inicial y final con Flux.2 Klein en king para tomas sin caras (gratis)', special: 'prueba_flux_nat' },
