@@ -71,7 +71,7 @@ async function fluxImage({ prompt, reference = null }) {
 // shot.image_engine = 'gemini' (escenas con varios sujetos distintos).
 function useFlux(storyBible, shot) {
   const sb = storyBible || {};
-  if (sb.image_engine !== 'king') return false;
+  if (sb.image_engine !== 'king' && sb.image_engine !== 'flow') return false;
   if (shot && shot.image_engine === 'gemini') return false;
   return !((shot && shot.characters) || []).length;
 }

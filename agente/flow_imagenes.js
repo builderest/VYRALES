@@ -31,7 +31,7 @@ async function openFlow(visible) {
   let ctx = null;
   for (const channel of ['chrome', 'msedge']) {
     try {
-      ctx = await chromium.launchPersistentContext(PROFILE, { channel, headless: false, viewport: { width: 1500, height: 900 }, acceptDownloads: true, ignoreDefaultArgs: ['--enable-automation'], args: ['--window-size=1520,1000', '--disable-blink-features=AutomationControlled'].concat(visible ? ['--window-position=40,20'] : ['--window-position=-3000,-3000', '--start-minimized']) });
+      ctx = await chromium.launchPersistentContext(PROFILE, { channel, headless: false, chromiumSandbox: true, viewport: { width: 1500, height: 900 }, acceptDownloads: true, ignoreDefaultArgs: ['--enable-automation'], args: ['--window-size=1520,1000', '--disable-blink-features=AutomationControlled'].concat(visible ? ['--window-position=40,20'] : ['--window-position=-3000,-3000']) });
       console.log('Navegador:', channel);
       break;
     } catch (e) { console.log('No pude abrir', channel, '→', String(e.message).split('\n')[0]); }
@@ -42,30 +42,46 @@ async function openFlow(visible) {
 }
 
 const shot = async (page, name) => { try { await page.screenshot({ path: path.join(OUT, name + '.png') }); } catch (_) {} };
-async function loggedIn(page) {
-  return page.evaluate(() => !!document.querySelector('a[href*="SignOutOptions"], [aria-label*="Cuenta de Google"], [aria-label*="Google Account"]')).catch(() => false);
+// ¿Estamos dentro de la app de Flow? (la página /about es la portada pública: hay que entrar con
+// "Create with Google Flow", que usa la sesión de Google si existe).
+async function inApp(page) {
+  return page.evaluate(() => !/\/about/.test(location.pathname) && /flow\.google\.com/.test(location.host) && (!!document.querySelector('a[href*="SignOutOptions"]') || /Nuevo proyecto|New project/i.test(document.body.innerText))).catch(() => false);
+}
+async function enterApp(page) {
+  await page.goto('https://flow.google.com/', { waitUntil: 'domcontentloaded' });
+  for (let i = 0; i < 6; i++) {
+    await sleep(2500);
+    if (await inApp(page)) return true;
+    if (/accounts\.google\.com/.test(page.url())) return false;
+    const cta = page.getByText(/Create with Google Flow|Crear con Google Flow|Empezar|Get started/i).first();
+    if (await cta.isVisible().catch(() => false)) { await cta.click().catch(() => {}); await sleep(5000); }
+  }
+  return inApp(page);
 }
 
 async function ensureLogin(page, waitMin) {
-  await page.goto('https://flow.google.com/', { waitUntil: 'domcontentloaded' });
-  await sleep(4000);
-  if (await loggedIn(page)) { console.log('Sesión de Google: OK'); return true; }
+  if (await enterApp(page)) { console.log('Sesión de Google en Flow: OK'); return true; }
   if (waitMin < 1) return false;
   console.log(`Inicia sesión en la ventana de Chrome que se abrió (tienes ${waitMin} min). Yo no toco tu contraseña.`);
   const t0 = Date.now();
   while (Date.now() - t0 < waitMin * 60000) {
     await sleep(5000);
-    const url = page.url();
-    if (/flow\.google\.com/.test(url) && (await loggedIn(page))) { console.log('Sesión de Google: OK (guardada para las próximas veces)'); return true; }
+    if (/flow\.google\.com/.test(page.url()) && (await inApp(page))) { console.log('Sesión de Google: OK (guardada para las próximas veces)'); return true; }
+    if (/flow\.google\.com\/about/.test(page.url())) { const cta = page.getByText(/Create with Google Flow|Crear con Google Flow/i).first(); if (await cta.isVisible().catch(() => false)) await cta.click().catch(() => {}); }
   }
   return false;
 }
 
 async function newProject(page) {
-  await page.goto('https://flow.google.com/', { waitUntil: 'domcontentloaded' });
-  await sleep(3000);
-  const btn = page.getByText(/Nuevo proyecto|New project/i).first();
-  await btn.click({ timeout: 20000 });
+  if (!(await inApp(page))) await enterApp(page);
+  await shot(page, 'inicio');
+  const cands = [page.getByRole('button', { name: /nuevo proyecto|new project/i }).first(), page.getByText(/nuevo proyecto|new project/i).first()];
+  let clicked = false;
+  for (const c of cands) { if (await c.count().catch(() => 0)) { await c.click({ timeout: 15000, force: true }).then(() => { clicked = true; }).catch(() => {}); if (clicked) break; } }
+  if (!clicked) {
+    const txt = await page.evaluate(() => document.body.innerText.slice(0, 800)).catch(() => '');
+    throw new Error('No encontré el botón Nuevo proyecto. URL ' + page.url() + ' · texto: ' + txt.replace(/\s+/g, ' '));
+  }
   await page.waitForURL(/\/project\//, { timeout: 30000 });
   await page.waitForSelector('.ProseMirror', { timeout: 30000 });
   await sleep(2000);
@@ -73,7 +89,8 @@ async function newProject(page) {
 }
 
 async function imgSrcs(page) {
-  return page.evaluate(() => [...document.querySelectorAll('img')].filter((i) => i.naturalWidth >= 300 && i.naturalHeight >= 300).map((i) => i.currentSrc || i.src));
+  // Miniaturas de la cuadrícula del proyecto (no las del chat del agente, que repiten las mismas).
+  return page.evaluate(() => [...new Set([...document.querySelectorAll('img')].filter((i) => i.naturalWidth >= 120 && i.naturalHeight > i.naturalWidth && !/avatar|profile|googleusercontent\.com\/a\//i.test(i.src)).map((i) => i.currentSrc || i.src))]);
 }
 
 async function generate(page, ctx, prompt, name) {
@@ -95,9 +112,24 @@ async function generate(page, ctx, prompt, name) {
     const now = (await imgSrcs(page)).filter((s) => !before.has(s));
     if (now.length) {
       await sleep(3000);
-      const src = now[0];
+      let src = now[0];
+      console.log('  miniatura:', src.slice(0, 200));
+      // Abrir la imagen en grande (clic en la miniatura) y tomar la versión de mayor resolución.
+      try {
+        await page.locator(`img[src="${src.replace(/"/g, '\\"')}"]`).first().click({ timeout: 8000 });
+        await sleep(4000);
+        const big = await page.evaluate(() => [...document.querySelectorAll('img')].map((i) => ({ s: i.currentSrc || i.src, w: i.naturalWidth, h: i.naturalHeight })).sort((a, b) => b.w * b.h - a.w * a.h)[0]);
+        console.log('  grande:', big && big.w + 'x' + big.h, big && big.s.slice(0, 200));
+        await shot(page, name + '_grande');
+        if (big && big.w > 600) src = big.s;
+      } catch (e) { console.log('  (no pude abrir en grande:', String(e.message).split('\n')[0], ')'); }
       let buf = null;
-      try { const r = await ctx.request.get(src); if (r.ok()) buf = Buffer.from(await r.body()); } catch (_) {}
+      // Las URLs de Google (…/asb/…) dan la ORIGINAL agregando "=s0" (sin eso llega la miniatura de 286 px).
+      if (/googleusercontent\.com|flow\.google\.com\/asb\//.test(src)) {
+        const full = src.replace(/=[a-z0-9-]+$/i, '') + '=s0';
+        try { const r = await ctx.request.get(full); if (r.ok()) { const b = Buffer.from(await r.body()); if (b.length > 60000) { buf = b; console.log('  original:', b.length, 'bytes'); } } } catch (_) {}
+      }
+      if (!buf) try { const r = await ctx.request.get(src); if (r.ok()) buf = Buffer.from(await r.body()); } catch (_) {}
       if (!buf) {
         const b64 = await page.evaluate(async (u) => { const r = await fetch(u); const b = new Uint8Array(await r.arrayBuffer()); let s = ''; for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000)); return btoa(s); }, src).catch(() => null);
         if (b64) buf = Buffer.from(b64, 'base64');
@@ -109,11 +141,35 @@ async function generate(page, ctx, prompt, name) {
     if ((Date.now() - t0) % 20000 < 4000) await shot(page, name + '_esperando');
   }
   await shot(page, name + '_timeout');
+  console.log('imgs:', JSON.stringify(await page.evaluate(() => [...document.querySelectorAll('img')].map((i) => [i.naturalWidth, i.naturalHeight, (i.currentSrc || i.src).slice(0, 140)]))));
   const txt = await page.evaluate(() => document.body.innerText.slice(-1500)).catch(() => '');
   throw new Error('Flow no devolvió imagen en 4 min. Texto en pantalla: ' + txt.replace(/\s+/g, ' ').slice(-600));
 }
 
-(async () => {
+// Para el pipeline: genera UNA imagen en Flow (segundo plano; muestra Chrome solo si hay que iniciar sesión).
+// Devuelve lo mismo que _image.generateImage: { buffer, mimeType, costUsd, model }.
+async function flowImage({ prompt }) {
+  let { ctx, page } = await openFlow(process.env.FLOW_VISIBLE === '1');
+  try {
+    let ok = await ensureLogin(page, 0.1);
+    if (!ok) {
+      console.log('Flow: falta iniciar sesión → muestro la ventana de Chrome (10 min).');
+      await ctx.close().catch(() => {});
+      ({ ctx, page } = await openFlow(true));
+      ok = await ensureLogin(page, 10);
+    }
+    if (!ok) throw new Error('Flow: no hay sesión de Google.');
+    await newProject(page);
+    const img = await generate(page, ctx, String(prompt).trim().replace(/\.?$/, '.') + RULE, 'pipeline');
+    const jpg = img.buffer[0] === 0xff && img.buffer[1] === 0xd8;
+    return { buffer: img.buffer, mimeType: jpg ? 'image/jpeg' : 'image/png', costUsd: 0, model: 'flow' };
+  } finally {
+    await ctx.close().catch(() => {});
+  }
+}
+module.exports = { flowImage };
+
+if (require.main === module) (async () => {
   const mode = process.argv[2] || 'prueba';
   // Se muestra solo si hace falta iniciar sesión, si pediste verla (modo "ver"/login) o con FLOW_VISIBLE=1.
   const wantVisible = mode === 'login' || mode === 'ver' || process.env.FLOW_VISIBLE === '1';
@@ -125,7 +181,7 @@ async function generate(page, ctx, prompt, name) {
       await ctx.close().catch(() => {});
       ({ ctx, page } = await openFlow(true));
       ok = await ensureLogin(page, 10);
-      if (ok) { await ctx.close().catch(() => {}); ({ ctx, page } = await openFlow(false)); await ensureLogin(page, 0.1); console.log('Sesión lista → vuelvo a segundo plano.'); }
+      if (ok) { await ctx.close().catch(() => {}); ({ ctx, page } = await openFlow(false)); ok = await ensureLogin(page, 0.1); console.log(ok ? 'Sesión lista → vuelvo a segundo plano.' : 'En segundo plano no entró a Flow.'); }
     }
     if (!ok) throw new Error('No se inició sesión de Google en 10 min.');
     if (mode === 'login') { console.log('LISTO: sesión guardada en', PROFILE); return; }

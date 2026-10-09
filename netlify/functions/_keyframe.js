@@ -186,7 +186,12 @@ async function createKeyframe(supabase, { series, episode, shot, characters, log
   const fluxText = shot.start_en || shot.action_en || shot.end_en || '';
   const flux = useFlux(series.story_bible, shot) && !!fluxText;
   log('generando cuadro inicial de la toma', shot.n, flux ? 'con FLUX en king (gratis)...' : 'con ' + refs.length + ' imagen(es) de referencia...');
-  const img = flux ? await fluxImage({ prompt: fluxText }) : await generateImage({ prompt, references: refs });
+  // image_engine 'flow': cuadro inicial con Google Flow (tu plan) y, si falla, FLUX en king. Ambos $0.
+  let img;
+  if (flux && series.story_bible.image_engine === 'flow') {
+    try { img = await require('../../agente/flow_imagenes').flowImage({ prompt: fluxText }); log('cuadro inicial de Google Flow'); }
+    catch (e) { log('Flow falló (' + String(e.message).slice(0, 160) + ') → FLUX en king'); img = await fluxImage({ prompt: fluxText }); }
+  } else img = flux ? await fluxImage({ prompt: fluxText }) : await generateImage({ prompt, references: refs });
   await logSpend(supabase, { seriesId, episodeId: episode.id, shotNumber: shot.n, kind: 'keyframe', model: img.model, costUsd: img.costUsd });
 
   await ensureMediaBucket(supabase);
