@@ -178,8 +178,10 @@ function shotSecondsFor(voice, shots) {
     const words = wt.map((x) => normW(x.word));
     let cursor = 0;
     const startOf = shots.map((s) => {
-      const first = normW(String(s.voice_part).split(/\s+/)[0]);
-      let k = words.indexOf(first, cursor);
+      const seq = String(s.voice_part).split(/\s+/).map(normW).filter(Boolean).slice(0, 3);
+      let k = -1;
+      for (let j = cursor; j < words.length && k < 0; j++) if (seq.every((w, q) => words[j + q] === w)) k = j;
+      if (k < 0) k = words.indexOf(seq[0], cursor);
       if (k < 0) k = cursor;
       cursor = k + 1;
       return wt[k] ? wt[k].start : 0;
@@ -195,4 +197,29 @@ function shotSecondsFor(voice, shots) {
   return shots.map((s, i) => Math.max(3, Math.min(16, Math.round((ws[i] / tot) * total))));
 }
 
-module.exports = { wordTimes, continuousMode, voiceText, textChunks, ensureFullVoice, shotSecondsFor, LEAD, TAIL };
+// Igual que shotSecondsFor pero SIN redondear: { [n]: segundos exactos } para recortar/ajustar en el render.
+function shotCutsExact(voice, shots) {
+  if (!(shots.length > 1 && shots.every((s) => s.voice_part))) return null;
+  const wt = Array.isArray(voice.words) && voice.words.length ? voice.words : wordTimes(voice.segments);
+  const words = wt.map((x) => normW(x.word));
+  let cursor = 0;
+  const startOf = shots.map((s) => {
+    // Se busca la secuencia de las 3 primeras palabras ("Los usa para"), no solo la 1ª ("los" aparece antes en "los ojos").
+    const seq = String(s.voice_part).split(/\s+/).map(normW).filter(Boolean).slice(0, 3);
+    let k = -1;
+    for (let j = cursor; j < words.length && k < 0; j++) if (seq.every((w, q) => words[j + q] === w)) k = j;
+    if (k < 0) k = words.indexOf(seq[0], cursor);
+    if (k < 0) k = cursor;
+    cursor = k + 1;
+    return wt[k] ? wt[k].start : 0;
+  });
+  const total = LEAD + Number(voice.seconds || 0) + TAIL;
+  const cuts = [0];
+  for (let i = 1; i < shots.length; i++) cuts.push(LEAD + startOf[i] - 0.15);
+  cuts.push(total);
+  const out = {};
+  shots.forEach((s, i) => { out[s.n] = Math.max(1, cuts[i + 1] - cuts[i]); });
+  return out;
+}
+
+module.exports = { shotCutsExact, wordTimes, continuousMode, voiceText, textChunks, ensureFullVoice, shotSecondsFor, LEAD, TAIL };

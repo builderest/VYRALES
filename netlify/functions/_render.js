@@ -196,8 +196,14 @@ async function renderClip({ cwd, input, out, c, subtitle, speakerColor, sub, fad
   const probe = await probeMedia(input, cwd);
   const full = probe.duration;
   const ts = Math.max(0, Math.min(Number(c.trim_start) || 0, full - 1));
-  const srcDur = Math.max(1, full - ts - Math.max(0, Number(c.trim_end) || 0));
-  const speed = Math.min(2, Math.max(0.5, Number(c.speed) || 1));
+  let srcDur = Math.max(1, full - ts - Math.max(0, Number(c.trim_end) || 0));
+  let speed = Math.min(2, Math.max(0.5, Number(c.speed) || 1));
+  // Voz continua: la toma dura EXACTO hasta que la voz llega a la siguiente (c.target_dur).
+  // Si el clip sobra se recorta; si falta, se ralentiza un poco (máx. 25 %).
+  if (Number(c.target_dur) > 0.5) {
+    const T = Number(c.target_dur);
+    if (srcDur >= T) { srcDur = T; speed = 1; } else speed = Math.max(0.75, srcDur / T);
+  }
   const dur = srcDur / speed;
 
   // La voz NO empieza dentro del fundido de entrada / fundido cruzado: ahí el audio está bajando o
@@ -487,6 +493,8 @@ async function renderEpisode({ episode, series, log = console.log, fetchFile = d
     }
     const tailMode = !!(plan.end_card.enabled && plan.end_card.mode === 'tail' && (plan.end_card.text || plan.end_card.subtext));
     const TAIL_XF = 0.3;
+    // Duraciones exactas por toma según los tiempos reales de la voz (los clips vienen en segundos enteros).
+    const exactDur = contVoice && typeof VF.shotCutsExact === 'function' ? VF.shotCutsExact(contVoice, (episode.shots || []).filter((s) => chosen.some((c) => c.shot === s.n))) : null;
     let i = 0;
     for (const c of chosen) {
       i++;
@@ -497,6 +505,7 @@ async function renderEpisode({ episode, series, log = console.log, fetchFile = d
       const out = `p${String(i).padStart(2, '0')}-shot${c.shot}.mp4`;
       const shot = shotsByN[c.shot];
       if (contVoice && i < chosen.length) c.transition = 'cut'; // el final de una toma ES el inicio de la siguiente
+      if (contVoice && exactDur && exactDur[c.shot] && !c.trim_start && !c.trim_end && !c.speed) c.target_dur = exactDur[c.shot];
       const subtitle = contVoice ? '' : sub.enabled ? (c.subtitle != null && c.subtitle !== '' ? c.subtitle : dialogueOf(shot)) : '';
       const spk = speakerOf(shot);
       const tSec = (x) => Math.min(1.5, Math.max(0.2, Number(x && x.transition_s) || 0.4));
