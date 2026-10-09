@@ -12,7 +12,7 @@ const { execFile } = require('child_process');
 const { energyScore, synthesize, tightenSpeech, wavSeconds } = require('./_tts');
 const { ensureMediaBucket, uploadFile, removeByPublicUrl } = require('./_storage');
 const { logSpend } = require('./_spend');
-const VOICE_V = 4; // v3: textos alineados con las pausas reales (DP); v2: // v2: pausas entre frases recortadas a 0.12 s (Franklin: "las pausas son muy grandes")
+const VOICE_V = 5; // v3: textos alineados con las pausas reales (DP); v2: // v2: pausas entre frases recortadas a 0.12 s (Franklin: "las pausas son muy grandes")
 const LEAD = 0.6; // la voz empieza a los 0.6 s del video
 const TAIL = 1.4; // y el video sigue 1.4 s después de la última palabra
 
@@ -90,13 +90,14 @@ function alignChunks(chunks, spans, seconds) {
     const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(INF));
     const bk = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(-1));
     dp[0][0] = 0;
+    let cumW = 0;
     for (let i = 1; i <= m; i++) {
-      const want = (w[i - 1] / W) * speech;
+      cumW += w[i - 1];
+      const E = (cumW / W) * speech; // dónde "debería" terminar este pedazo (tiempo de voz acumulado)
       for (let j = i; j <= n - (m - i); j++) {
         for (let k = i - 1; k < j; k++) {
           if (dp[i - 1][k] >= INF) continue;
-          const got = pre[j] - pre[k];
-          const c = dp[i - 1][k] + Math.pow((got - want) / Math.max(0.3, want), 2);
+          const c = dp[i - 1][k] + Math.pow(pre[j] - E, 2);
           if (c < dp[i][j]) { dp[i][j] = c; bk[i][j] = k; }
         }
       }
@@ -172,7 +173,8 @@ function shotSecondsFor(voice, shots) {
   // exactamente lo que tarda la voz en llegar a la parte de la siguiente (cortes redondeados en el
   // acumulado para no ir corriendo el desfase).
   if (shots.length > 1 && shots.every((s) => s.voice_part)) {
-    const wt = wordTimes(voice.segments);
+    // voice.words = tiempos reales por palabra (alineación forzada), si existen; si no, estimados.
+    const wt = Array.isArray(voice.words) && voice.words.length ? voice.words : wordTimes(voice.segments);
     const words = wt.map((x) => normW(x.word));
     let cursor = 0;
     const startOf = shots.map((s) => {

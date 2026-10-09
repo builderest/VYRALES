@@ -591,7 +591,7 @@ async function renderEpisode({ episode, series, log = console.log, fetchFile = d
         if (m) { const st = VF.LEAD + Number(x.start) - 0.1; numEvs.push({ start: st, end: Math.min(bodyEnd - 0.1, st + 1.7), style: 'Num', text: '{\\fad(120,250)\\blur2\\fscx60\\fscy60\\t(0,220,\\fscx110\\fscy110)\\t(220,420,\\fscx100\\fscy100)}' + NUMS[m[1].toLowerCase()] }); }
       });
       const WORD_COLORS = ['&H0000E1FF&', '&H00FFFFFF&', '&H0040FF6A&', '&H00FFE04A&'];
-      const wordEvs = sbx.subtitle_style === 'palabra' ? VF.wordTimes(segs).map((wd, k, arr) => {
+      const wordEvs = sbx.subtitle_style === 'palabra' ? (Array.isArray(contVoice.words) && contVoice.words.length ? contVoice.words : VF.wordTimes(segs)).map((wd, k, arr) => {
         const st = VF.LEAD + wd.start;
         const en = Math.min(bodyEnd - 0.1, k + 1 < arr.length ? VF.LEAD + arr[k + 1].start : VF.LEAD + wd.end + 0.4);
         const word = String(wd.word).replace(/[^\p{L}\p{N}]/gu, '').toUpperCase();
