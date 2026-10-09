@@ -130,6 +130,9 @@ function assHeader(sub) {
     `Style: EndBig,${FONT_NAME},74,&H00FFFFFF,&H000000FF,&H00000000,&H96000000,0,0,0,0,100,100,0,0,1,5,2,5,50,50,0,1`,
     `Style: EndSmall,${FONT_NAME},44,&H0000E1FF,&H000000FF,&H00000000,&H96000000,0,0,0,0,100,100,0,0,1,4,2,5,50,50,0,1`,
     // Póster (frases motivacionales): letras romanas grandes, plata y oro, arriba (el personaje queda abajo).
+    // Una palabra a la vez, grande y a colores (estilo de los Shorts virales) + número gigante del top.
+    `Style: Word,${FONT_NAME},96,&H0000E1FF,&H000000FF,&H00000000,&HA0000000,-1,0,0,0,100,100,1,0,1,8,3,2,40,40,330,1`,
+    `Style: Num,${FONT_NAME},430,&H00F0F0F0,&H000000FF,&H00FF8A1E,&H96000000,-1,0,0,0,100,100,0,0,1,14,6,5,20,20,0,1`,
     `Style: PosterSm,Cinzel,58,&H00E6E6E6,&H000000FF,&H00101010,&HA0000000,-1,0,0,0,100,100,2,0,1,3,4,8,50,50,190,1`,
     `Style: PosterBig,Cinzel,116,&H00D8D8D8,&H000000FF,&H00101010,&HA0000000,-1,0,0,0,100,100,1,0,1,4,5,8,40,40,190,1`,
     `Style: CardSmall,${FONT_NAME},40,&H00B4B4B4,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,0,0,5,70,70,0,1`,
@@ -581,12 +584,25 @@ async function renderEpisode({ episode, series, log = console.log, fetchFile = d
       const sbx = (series && series.story_bible) || {};
       const big = [...new Set((episode.shots || []).flatMap((x) => x.text_big || []))];
       const gold = [...new Set((episode.shots || []).flatMap((x) => x.text_gold || []))];
-      const evs = segs.map((x, k) => {
+      const NUMS = { uno: 1, dos: 2, tres: 3, cuatro: 4, cinco: 5, seis: 6, siete: 7, ocho: 8, nueve: 9, diez: 10 };
+      const numEvs = [];
+      segs.forEach((x) => {
+        const m = /^\s*(?:y\s+)?n[úu]mero\s+(uno|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez)\b/i.exec(x.text);
+        if (m) { const st = VF.LEAD + Number(x.start) - 0.1; numEvs.push({ start: st, end: Math.min(bodyEnd - 0.1, st + 1.7), style: 'Num', text: '{\\fad(120,250)\\blur2\\fscx60\\fscy60\\t(0,220,\\fscx110\\fscy110)\\t(220,420,\\fscx100\\fscy100)}' + NUMS[m[1].toLowerCase()] }); }
+      });
+      const WORD_COLORS = ['&H0000E1FF&', '&H00FFFFFF&', '&H0040FF6A&', '&H00FFE04A&'];
+      const wordEvs = sbx.subtitle_style === 'palabra' ? VF.wordTimes(segs).map((wd, k, arr) => {
+        const st = VF.LEAD + wd.start;
+        const en = Math.min(bodyEnd - 0.1, k + 1 < arr.length ? VF.LEAD + arr[k + 1].start : VF.LEAD + wd.end + 0.4);
+        const word = String(wd.word).replace(/[^\p{L}\p{N}]/gu, '').toUpperCase();
+        return word && en > st + 0.05 ? { start: st, end: en, style: 'Word', text: `{\\1c${WORD_COLORS[k % WORD_COLORS.length]}\\fscx118\\fscy118\\t(0,90,\\fscx100\\fscy100)}` + word } : null;
+      }).filter(Boolean) : null;
+      const evs = wordEvs ? wordEvs.concat(numEvs) : segs.map((x, k) => {
         const st = VF.LEAD + Number(x.start) - 0.05;
         const en = Math.min(bodyEnd - 0.1, k + 1 < segs.length ? VF.LEAD + Number(segs[k + 1].start) - 0.08 : VF.LEAD + Number(x.end) + 1.6);
         const text = sbx.subtitle_style === 'poster' ? posterText(x.text, big, gold) : subtitleText(x.text, Math.max(0.3, Number(x.end) - Number(x.start)), Object.assign({}, sub, { karaoke: true }), null);
         return en > st + 0.3 ? { start: st, end: en, style: sbx.subtitle_style === 'poster' ? 'PosterSm' : 'Sub', text } : null;
-      }).filter(Boolean);
+      }).filter(Boolean).concat(numEvs);
       fs.writeFileSync(path.join(cwd, 'voz.ass'), [...assHeader(sub), ...evs.map(dialogueLine), ''].join('\n'));
       const ms = Math.round(VF.LEAD * 1000);
       await run(['-y', '-i', 'joined.mp4', '-i', 'voz.wav', '-filter_complex',

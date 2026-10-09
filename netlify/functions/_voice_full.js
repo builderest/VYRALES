@@ -12,7 +12,7 @@ const { execFile } = require('child_process');
 const { energyScore, synthesize, tightenSpeech, wavSeconds } = require('./_tts');
 const { ensureMediaBucket, uploadFile, removeByPublicUrl } = require('./_storage');
 const { logSpend } = require('./_spend');
-const VOICE_V = 2; // v2: pausas entre frases recortadas a 0.12 s (Franklin: "las pausas son muy grandes")
+const VOICE_V = 4; // v3: textos alineados con las pausas reales (DP); v2: // v2: pausas entre frases recortadas a 0.12 s (Franklin: "las pausas son muy grandes")
 const LEAD = 0.6; // la voz empieza a los 0.6 s del video
 const TAIL = 1.4; // y el video sigue 1.4 s después de la última palabra
 
@@ -56,7 +56,7 @@ function textChunks(text) {
 }
 function ffmpegBin() { try { return require('ffmpeg-static'); } catch (_) { return 'ffmpeg'; } }
 function speechSpans(file, seconds) {
-  return new Promise((res) => execFile(ffmpegBin(), ['-i', file, '-af', 'silencedetect=noise=-38dB:d=0.12', '-f', 'null', '-'], (e, so, se) => {
+  return new Promise((res) => execFile(ffmpegBin(), ['-i', file, '-af', 'silencedetect=noise=-36dB:d=0.07', '-f', 'null', '-'], (e, so, se) => {
     const out = String(se || '');
     const sil = [];
     let st = null;
@@ -67,7 +67,7 @@ function speechSpans(file, seconds) {
     if (st != null) sil.push([st, seconds]);
     const spans = [];
     let t = 0;
-    for (const [s0, s1] of sil) { if (s0 - t > 0.08) spans.push([t, s0]); t = s1; }
+    for (const [s0, s1] of sil) { if (s0 - t > 0.05) spans.push([t, s0]); t = s1; }
     if (seconds - t > 0.08) spans.push([t, seconds]);
     res(spans);
   }));
@@ -78,6 +78,36 @@ function alignChunks(chunks, spans, seconds) {
   const s0 = spans.length ? spans[0][0] : 0;
   const s1 = spans.length ? spans[spans.length - 1][1] : seconds;
   if (spans.length === chunks.length) return chunks.map((text, i) => ({ text, start: spans[i][0], end: spans[i][1] }));
+  // Más tramos de voz que pedazos: se agrupan tramos seguidos para cada pedazo (programación dinámica),
+  // buscando que cada pedazo dure lo que "pesa" su texto. Así los cortes caen en las pausas reales.
+  if (spans.length > chunks.length && chunks.length > 0) {
+    const w = chunks.map((c) => c.replace(/[^\p{L}\p{N}]/gu, '').length + 2);
+    const W = w.reduce((a, b) => a + b, 0);
+    const speech = spans.reduce((a, x) => a + (x[1] - x[0]), 0);
+    const n = spans.length, m = chunks.length;
+    const pre = [0]; spans.forEach((x) => pre.push(pre[pre.length - 1] + (x[1] - x[0])));
+    const INF = 1e18;
+    const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(INF));
+    const bk = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(-1));
+    dp[0][0] = 0;
+    for (let i = 1; i <= m; i++) {
+      const want = (w[i - 1] / W) * speech;
+      for (let j = i; j <= n - (m - i); j++) {
+        for (let k = i - 1; k < j; k++) {
+          if (dp[i - 1][k] >= INF) continue;
+          const got = pre[j] - pre[k];
+          const c = dp[i - 1][k] + Math.pow((got - want) / Math.max(0.3, want), 2);
+          if (c < dp[i][j]) { dp[i][j] = c; bk[i][j] = k; }
+        }
+      }
+    }
+    if (dp[m][n] < INF) {
+      const out = [];
+      let j = n;
+      for (let i = m; i >= 1; i--) { const k = bk[i][j]; out.unshift({ text: chunks[i - 1], start: spans[k][0], end: spans[j - 1][1] }); j = k; }
+      return out;
+    }
+  }
   const w = chunks.map((c) => c.replace(/[^\p{L}\p{N}]/gu, '').length + 2);
   const tot = w.reduce((a, b) => a + b, 0) || 1;
   let t = s0;
@@ -91,6 +121,21 @@ async function ensureFullVoice(supabase, { episode, series, log = console.log, f
   if (!text) throw new Error('No hay texto para la voz (continuity.voice_text o líneas de las tomas).');
   const cur = (episode.continuity || {}).voice;
   if (!force && cur && cur.url && cur.text === text && cur.v === VOICE_V && cur.voice === (cfg.voice || '')) return cur;
+  // Misma voz y mismo texto pero alineación vieja: se re-alinea con el MISMO audio (no cambia la voz ni los tiempos del video).
+  if (!force && cur && cur.url && cur.text === text && cur.voice === (cfg.voice || '') && Number(cur.v) >= 2 && cur.v !== VOICE_V) {
+    const dir0 = fs.mkdtempSync(path.join(os.tmpdir(), 'vy-voice-'));
+    const f0 = path.join(dir0, 'v.wav');
+    fs.writeFileSync(f0, Buffer.from(await (await fetch(cur.url)).arrayBuffer()));
+    const spans0 = await speechSpans(f0, Number(cur.seconds));
+    fs.rmSync(dir0, { recursive: true, force: true });
+    const segments0 = alignChunks(textChunks(text), spans0, Number(cur.seconds)).map((x) => ({ text: x.text, start: Math.round(x.start * 100) / 100, end: Math.round(x.end * 100) / 100 }));
+    const voice0 = Object.assign({}, cur, { v: VOICE_V, segments: segments0 });
+    const { data: fr0 } = await supabase.from('episodes').select('continuity').eq('id', episode.id).single();
+    await supabase.from('episodes').update({ continuity: Object.assign({}, (fr0 && fr0.continuity) || {}, { voice: voice0 }) }).eq('id', episode.id);
+    episode.continuity = Object.assign({}, episode.continuity || {}, { voice: voice0 });
+    log(`voz continua: re-alineada (${spans0.length} tramos de voz → ${segments0.length} textos)`);
+    return voice0;
+  }
   log('voz continua: narrando TODO el texto en una sola toma de voz...');
   const style = (cfg.style || '') + ' Es UNA sola frase continua: dila de corrido, con naturalidad, sin cortes ni pausas raras; solo una pausa mínima en cada punto o coma.';
   const takes = [];
