@@ -188,7 +188,7 @@ async function createKeyframe(supabase, { series, episode, shot, characters, log
   log('generando cuadro inicial de la toma', shot.n, flux ? 'con FLUX en king (gratis)...' : 'con ' + refs.length + ' imagen(es) de referencia...');
   // image_engine 'flow': cuadro inicial con Google Flow (tu plan) y, si falla, FLUX en king. Ambos $0.
   let img;
-  if (flux && series.story_bible.image_engine === 'flow') {
+  if (flux && (shot.image_engine || series.story_bible.image_engine) === 'flow') {
     try { img = await require('../../agente/flow_imagenes').flowImage({ prompt: fluxText }); log('cuadro inicial de Google Flow'); }
     catch (e) { log('Flow falló (' + String(e.message).slice(0, 160) + ') → FLUX en king'); img = await fluxImage({ prompt: fluxText }); }
   } else img = flux ? await fluxImage({ prompt: fluxText }) : await generateImage({ prompt, references: refs });
