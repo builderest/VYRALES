@@ -97,7 +97,7 @@ function buildNarratedPromptRaw(tipo, p, episodeNumber = 1) {
 8. FINAL: responde el bucle abierto; si puedes, vuelve a la imagen o la idea del gancho para que al repetirse el video se sienta continuo. Nada de "dale like".
 ${p.reglas ? '8b. REGLAS DE ESTE TIPO: ' + p.reglas + '\n' : ''}${p.fuentes ? '9. CERO DATOS FALSOS: cada dato lleva su fuente en continuity.sources (estudio, institución, libro, año). Si hay un rango, palabras prudentes ("unas", "cerca de", "casi"). Si no se puede verificar, no entra. Nunca inventes cifras para que suene más dramático.\n' : ''}
 === REGLAS TÉCNICAS (obligatorias; el sistema valida el JSON) ===
-- 12 a 16 tomas (video de 1:40–2:30). Cada toma: UNA línea del narrador. Lo normal: 10 a 14 palabras (toma de 8 s); si la frase queda mejor más larga, hasta 28 palabras (la toma se alarga sola hasta 16 s). Nunca recortes una buena frase; tampoco rellenes. Alterna tomas cortas y largas.
+- DURACIÓN MÁXIMA 1:20 (lo que funciona en el canal, oct-2026): toda la narración suma como máximo ~180 palabras. 8 a 12 tomas. Cada toma: UNA línea del narrador. Lo normal: 10 a 14 palabras (toma de 8 s); si la frase queda mejor más larga, hasta 28 palabras (la toma se alarga sola hasta 16 s). Nunca recortes una buena frase; tampoco rellenes. Alterna tomas cortas y largas.
 - Solo narrador en off: dialogue = [{ "speaker": "Narrador", "line": "…" }] en todas las tomas. Nadie habla ni mueve la boca en cuadro.
 - characters: [] (sin personajes fijos). Si sale una persona, que sea genérica, de espaldas, en silueta o de lejos, descrita en start_en.
 - Textos para la IA de video en INGLÉS y en AFIRMATIVO (lo que SÍ se ve; nunca "no", "without", "never"): camera, start_en (cuadro inicial exacto), action_en (acción de 0 a 6 s), reaction_en (cómo queda de 6 a 8 s), background_en (3–4 elementos del lugar), locations.visual.
@@ -140,7 +140,7 @@ const buildCuriosityPrompt = (opts = {}) => buildNarratedPrompt('curiosidades', 
 
 // Frases (voz continua): quita las reglas de video narrado por tomas que no aplican y ajusta el JSON.
 function continuousVariant(raw) {
-  const drop = /^(2\. HOOK_TEXT|3\. BUCLE ABIERTO|4\. UNA SOLA HISTORIA|5\. RE-ENGANCHE|8\. FINAL|- 12 a 16 tomas|- Solo narrador en off|- VIDEOS DE VARIAS COSAS)/;
+  const drop = /^(2\. HOOK_TEXT|3\. BUCLE ABIERTO|4\. UNA SOLA HISTORIA|5\. RE-ENGANCHE|8\. FINAL|- DURACIÓN MÁXIMA|- Solo narrador en off|- VIDEOS DE VARIAS COSAS)/;
   let t = raw.split('\n').filter((l) => !drop.test(l)).join('\n');
   t = t.replace('=== REGLAS TÉCNICAS (obligatorias; el sistema valida el JSON) ===', '=== REGLAS TÉCNICAS (obligatorias; el sistema valida el JSON) ===\n- UNA SOLA VOZ para todo el video: continuity.voice_text = la frase EXACTA; todas las tomas con "dialogue": [] y con "voice_part" (su pedazo exacto de la frase, en orden). story_bible.narration.mode = "continuous" y story_bible.subtitle_style = "poster". Toma 1 con start_en; las demás solo end_en (encadenadas). Cada toma: text_big (1–3 palabras clave grandes) y text_gold (palabras en oro).');
   t = t.replace('"video_audio": "none",', '"video_audio": "none", "mode": "continuous",');
@@ -151,7 +151,7 @@ function continuousVariant(raw) {
   return t;
 }
 
-// Prompt maestro LIMPIO (Franklin, oct-2026: "solo el prompt maestro y ya"): sin temas ni frases de ejemplo
+// Prompt maestro LIMPIO (oct-2026: "solo el prompt maestro y ya"): sin temas ni frases de ejemplo
 // metidas (Claude las copiaba). Las reglas se quedan; los ejemplos entre paréntesis con comillas se quitan
 // de la parte de instrucciones (el JSON de ejemplo no se toca). La idea la escribe el usuario al final.
 function buildNarratedPrompt(tipo = 'curiosidades', { topic = '' } = {}) {
