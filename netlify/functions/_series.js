@@ -307,6 +307,7 @@ function toEpisodeRows(data) {
         ...(Array.isArray(s.text_big) ? { text_big: s.text_big } : {}),
         ...(Array.isArray(s.text_gold) ? { text_gold: s.text_gold } : {}),
         ...(s.voice_part ? { voice_part: s.voice_part } : {}),
+        ...(s.chain === false ? { chain: false } : {}),
         ...(Number(s.weight) > 0 ? { weight: Number(s.weight) } : {}),
         action_en: s.action_en || s.visual_en || '',
         reaction_en: s.reaction_en || '',

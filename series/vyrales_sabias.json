@@ -1,0 +1,214 @@
+{
+  "format_version": 3,
+  "slug": "vyrales_sabias",
+  "title": "¿Sabías esto?",
+  "genre": "curiosidades",
+  "language": "es",
+  "synopsis": "Curiosidades cortas con comparaciones increíbles, una sola voz continua.",
+  "story_bible": {
+    "tone": "Asombro rápido y visual: comparaciones increíbles mostradas literalmente.",
+    "rules": {
+      "keyframes": true,
+      "shot_model": "veo_lite",
+      "shot_seconds": 8,
+      "reference_images": false,
+      "cliffhanger_model": "veo_lite",
+      "shots_per_episode": 15,
+      "max_words_per_episode": 450,
+      "max_characters_per_shot": 2,
+      "max_dialogue_words_per_shot": 14
+    },
+    "extras": {
+      "Narrador": {
+        "who": "an off-screen narrator who is never visible on camera",
+        "voice": "a deep, resonant, authoritative adult male documentary narrator voice in neutral Latin American Spanish, like a History Channel narrator, dramatic and mysterious",
+        "voiceover": true
+      }
+    },
+    "format": "narrado_unico",
+    "end_card": {
+      "enabled": true,
+      "mode": "tail",
+      "text": "¿SABÍAS ESTO?",
+      "subtext": "Síguenos para más",
+      "voice": "Síguenos para más.",
+      "seconds": 2.5
+    },
+    "locations": {
+      "libre": {
+        "visual": "any",
+        "ambient": ""
+      }
+    },
+    "narration": {
+      "model": "gemini-3.8-flash-tts",
+      "style": "Narrador de curiosidades en español latino: voz grave y resonante con asombro, ritmo ágil y de corrido como quien cuenta algo increíble; sube la intensidad en el remate final. Sin pausas raras.",
+      "voice": "Alnilam",
+      "engine": "gemini_tts",
+      "video_audio": "none",
+      "mode": "continuous"
+    },
+    "voice_cast": {
+      "Narrador": {
+        "fx": "",
+        "auto": false,
+        "desc": "a deep, resonant, authoritative adult male documentary narrator voice in neutral Latin American Spanish, like a History Channel narrator",
+        "voice": "Alnilam"
+      }
+    },
+    "music_tracks": [
+      {
+        "at": "2026-10-08T04:06:19.138Z",
+        "url": "https://pfwdbdkngmdmoolzflhe.supabase.co/storage/v1/object/public/media/cibertales_curiosidades/music/track-1791432378606.mp3",
+        "name": "Épica documental (acción)",
+        "prompt": "Epic cinematic documentary trailer score, instrumental, no vocals. Driving taiko and orchestral percussion pulse, deep pounding bass hits, fast rhythmic staccato strings, rising brass swells and tension risers, sense of cosmic scale and discovery like a History Channel or Discovery documentary about the planet. Constant forward momentum and energy from the first second, building in intensity, powerful but with a clear mid-range space so a deep male narrator voice cuts through. Loopable, no long quiet intro, no sudden stops."
+      },
+      {
+        "at": "2026-10-08T02:57:42.987Z",
+        "url": "https://pfwdbdkngmdmoolzflhe.supabase.co/storage/v1/object/public/media/cibertales_curiosidades/music/track-1791428262481.mp3",
+        "name": "Tema de Curiosidades CIBERTALES",
+        "prompt": "Instrumental background score, no vocals, for a curiosidades vertical short series. Mood: Cercano, humano y fascinante: como contarle un secreto a un amigo. Ritmo fluido, frases cortas y largas alternadas, pausas con intención y un giro antes del final.. Cinematic and emotional, steady low intensity so a voice can speak over it, gradual build, no abrupt drops."
+      }
+    ],
+    "visual_style": "Photorealistic cinematic nature and science macro photography, vivid colors, dramatic light, shallow depth of field, vertical 9:16 framing",
+    "music_last_run": {
+      "at": "2026-10-08T04:06:19.306Z",
+      "url": "https://pfwdbdkngmdmoolzflhe.supabase.co/storage/v1/object/public/media/cibertales_curiosidades/music/track-1791432378606.mp3",
+      "status": "done"
+    }
+  },
+  "characters": [],
+  "episodes": [
+    {
+      "episode_number": 1,
+      "title": "Lenguas increíbles",
+      "continuity": {
+        "summary": "Mariposa, hipopótamo y ballena azul: sus lenguas comparadas.",
+        "voice_text": "¿Sabías que la lengua de una mariposa es tan delgada como un solo cabello, hueca como un tubo fino y podría pasarse por el ojo de una aguja? Ahora, si tomaras la lengua de un hipopótamo y la dejaras sobre un microondas, cubriría toda la superficie. Pero la lengua de la ballena azul es tan enorme que si la dejaras caer sobre un coche, el músculo de 5 toneladas aplastaría el metal, aplanándolo completamente como una tortilla."
+      },
+      "shots": [
+        {
+          "location": "libre",
+          "characters": [],
+          "scene_es": "¿Sabías que la lengua de una mariposa",
+          "reaction_en": "",
+          "background_en": "",
+          "dialogue": [],
+          "sfx": "",
+          "n": 1,
+          "voice_part": "¿Sabías que la lengua de una mariposa",
+          "camera": "extreme macro, slow push-in",
+          "start_en": "Extreme macro of a colorful monarch butterfly resting on a pink flower, its long thin proboscis still coiled like a spring under its head, soft morning light",
+          "end_en": "The same extreme macro: the butterfly has uncoiled its long thin proboscis and dips the tip into the center of the flower",
+          "action_en": "the butterfly slowly uncoils its long thin proboscis and reaches into the flower"
+        },
+        {
+          "location": "libre",
+          "characters": [],
+          "scene_es": "es tan delgada como un solo cabello, hueca como un tubo fino",
+          "reaction_en": "",
+          "background_en": "",
+          "dialogue": [],
+          "sfx": "",
+          "n": 2,
+          "voice_part": "es tan delgada como un solo cabello, hueca como un tubo fino",
+          "camera": "extreme macro, slow slide along the proboscis",
+          "end_en": "The same extreme macro, closer: the thin proboscis lies right next to a single human hair of the same thickness, and its tip is cut open showing it is a hollow tube with a tiny drop of nectar inside",
+          "action_en": "the camera slides along the thin proboscis until it sits beside a single human hair and its hollow tip is visible"
+        },
+        {
+          "location": "libre",
+          "characters": [],
+          "scene_es": "y podría pasarse por el ojo de una aguja?",
+          "reaction_en": "",
+          "background_en": "",
+          "dialogue": [],
+          "sfx": "",
+          "n": 3,
+          "voice_part": "y podría pasarse por el ojo de una aguja?",
+          "camera": "extreme macro, slow push-in",
+          "end_en": "The same extreme macro: the thin butterfly proboscis passes cleanly through the eye of a shiny steel sewing needle",
+          "action_en": "the proboscis slides through the eye of a steel sewing needle"
+        },
+        {
+          "location": "libre",
+          "characters": [],
+          "scene_es": "Ahora, si tomaras la lengua de un hipopótamo",
+          "reaction_en": "",
+          "background_en": "",
+          "dialogue": [],
+          "sfx": "",
+          "n": 4,
+          "chain": false,
+          "voice_part": "Ahora, si tomaras la lengua de un hipopótamo",
+          "camera": "low angle, slow push-in",
+          "start_en": "A huge hippopotamus standing in a muddy African river at golden hour, its enormous mouth wide open showing its big pink tongue and tusks, water dripping",
+          "end_en": "The same view closer: the hippo’s enormous wide pink tongue fills most of the frame inside its open mouth",
+          "action_en": "the camera pushes in slowly toward the hippo’s open mouth and huge pink tongue"
+        },
+        {
+          "location": "libre",
+          "characters": [],
+          "scene_es": "y la dejaras sobre un microondas, cubriría toda la superficie.",
+          "reaction_en": "",
+          "background_en": "",
+          "dialogue": [],
+          "sfx": "",
+          "n": 5,
+          "chain": false,
+          "voice_part": "y la dejaras sobre un microondas, cubriría toda la superficie.",
+          "camera": "static, slight push-in",
+          "start_en": "A clean modern kitchen counter with a white microwave oven, and an enormous wide pink hippopotamus tongue being lowered onto the top of the microwave",
+          "end_en": "The same kitchen view: the enormous pink hippo tongue lies on top of the microwave, covering its whole surface and hanging over every edge",
+          "action_en": "the huge pink tongue settles down onto the microwave and spreads over its entire top"
+        },
+        {
+          "location": "libre",
+          "characters": [],
+          "scene_es": "Pero la lengua de la ballena azul",
+          "reaction_en": "",
+          "background_en": "",
+          "dialogue": [],
+          "sfx": "",
+          "n": 6,
+          "chain": false,
+          "voice_part": "Pero la lengua de la ballena azul",
+          "camera": "slow push-in underwater",
+          "start_en": "An enormous blue whale swimming in deep blue ocean light, opening its gigantic mouth wide, the huge pink tongue visible inside",
+          "end_en": "The same underwater view closer: the gigantic pink tongue of the blue whale fills the frame inside its open mouth, light rays in the water",
+          "action_en": "the blue whale opens its mouth wider as the camera moves closer to the gigantic tongue"
+        },
+        {
+          "location": "libre",
+          "characters": [],
+          "scene_es": "es tan enorme que si la dejaras caer sobre un coche,",
+          "reaction_en": "",
+          "background_en": "",
+          "dialogue": [],
+          "sfx": "",
+          "n": 7,
+          "chain": false,
+          "voice_part": "es tan enorme que si la dejaras caer sobre un coche,",
+          "camera": "static wide street shot, slight tilt up",
+          "start_en": "A silver sedan car parked alone on an empty city street at dusk, and above it a colossal pink blue-whale tongue hanging in the air, casting a huge shadow over the car",
+          "end_en": "The same street view: the colossal pink whale tongue is falling and is just touching the roof of the silver car",
+          "action_en": "the colossal tongue drops down from the sky toward the car"
+        },
+        {
+          "location": "libre",
+          "characters": [],
+          "scene_es": "el músculo de 5 toneladas aplastaría el metal, aplanándolo completamente como una tortilla.",
+          "reaction_en": "",
+          "background_en": "",
+          "dialogue": [],
+          "sfx": "",
+          "n": 8,
+          "voice_part": "el músculo de 5 toneladas aplastaría el metal, aplanándolo completamente como una tortilla.",
+          "camera": "static wide street shot",
+          "end_en": "The same street view: the silver car is completely flattened like a tortilla under the colossal pink whale tongue, glass shards and metal pieces scattered on the street, dust in the air",
+          "action_en": "the enormous tongue crushes the car, the metal bends and the glass shatters until the car is completely flat"
+        }
+      ]
+    }
+  ]
+}
