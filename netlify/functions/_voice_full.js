@@ -121,7 +121,22 @@ async function ensureFullVoice(supabase, { episode, series, log = console.log, f
   const text = voiceText(episode);
   if (!text) throw new Error('No hay texto para la voz (continuity.voice_text o líneas de las tomas).');
   const cur = (episode.continuity || {}).voice;
-  if (!force && cur && cur.url && cur.text === text && cur.v === VOICE_V && cur.voice === (cfg.voice || '')) return cur;
+  if (!force && cur && cur.url && cur.text === text && cur.v === VOICE_V && cur.voice === (cfg.voice || '')) {
+    // Voz ya hecha pero sin tiempos reales por palabra: se alinean una vez (Whisper local en la PC).
+    if (!(Array.isArray(cur.words) && cur.words.length) && process.env.VYRALES_LOCAL_RUN) {
+      try {
+        const wavB = Buffer.from(await (await fetch(cur.url)).arrayBuffer());
+        const words = await require('./_align').alignWords(wavB, text, log);
+        if (words) {
+          const withW = Object.assign({}, cur, { words });
+          const { data: frW } = await supabase.from('episodes').select('continuity').eq('id', episode.id).single();
+          await supabase.from('episodes').update({ continuity: Object.assign({}, (frW && frW.continuity) || {}, { voice: withW }) }).eq('id', episode.id);
+          return withW;
+        }
+      } catch (e) { log('alineación de voz: no se pudo con la voz existente (' + String(e.message).slice(0, 120) + ')'); }
+    }
+    return cur;
+  }
   // Misma voz y mismo texto pero alineación vieja: se re-alinea con el MISMO audio (no cambia la voz ni los tiempos del video).
   if (!force && cur && cur.url && cur.text === text && cur.voice === (cfg.voice || '') && Number(cur.v) >= 2 && cur.v !== VOICE_V) {
     const dir0 = fs.mkdtempSync(path.join(os.tmpdir(), 'vy-voice-'));
@@ -156,7 +171,9 @@ async function ensureFullVoice(supabase, { episode, series, log = console.log, f
   const segments = alignChunks(textChunks(text), spans, seconds).map((x) => ({ text: x.text, start: Math.round(x.start * 100) / 100, end: Math.round(x.end * 100) / 100 }));
   await ensureMediaBucket(supabase);
   const url = await uploadFile(supabase, { path: `${series.slug}/ep${episode.episode_number}/voz-completa-v${Date.now()}.wav`, buffer: wav, contentType: 'audio/wav' });
-  const voice = { url, seconds, text, v: VOICE_V, voice: cfg.voice || '', segments, at: new Date().toISOString() };
+  // Tiempos reales por palabra (Whisper local en la PC); sin esto las tomas se cortaban hasta 2 s fuera de la voz.
+  const words = await require('./_align').alignWords(wav, text, log);
+  const voice = Object.assign({ url, seconds, text, v: VOICE_V, voice: cfg.voice || '', segments, at: new Date().toISOString() }, words ? { words } : {});
   const { data: fresh } = await supabase.from('episodes').select('continuity').eq('id', episode.id).single();
   await supabase.from('episodes').update({ continuity: Object.assign({}, (fresh && fresh.continuity) || {}, { voice }) }).eq('id', episode.id);
   episode.continuity = Object.assign({}, episode.continuity || {}, { voice });
