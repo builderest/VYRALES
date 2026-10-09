@@ -23,14 +23,15 @@ function loadPlaywright() {
   return require(path.join(ROOT, 'node_modules', 'playwright-core'));
 }
 
-async function openFlow() {
+// visible=false → ventana fuera de pantalla (en segundo plano, sigue siendo Chrome real).
+async function openFlow(visible) {
   const { chromium } = loadPlaywright();
   fs.mkdirSync(PROFILE, { recursive: true });
   fs.mkdirSync(OUT, { recursive: true });
   let ctx = null;
   for (const channel of ['chrome', 'msedge']) {
     try {
-      ctx = await chromium.launchPersistentContext(PROFILE, { channel, headless: false, viewport: { width: 1500, height: 900 }, acceptDownloads: true, ignoreDefaultArgs: ['--enable-automation'], args: ['--window-size=1520,1000', '--disable-blink-features=AutomationControlled'] });
+      ctx = await chromium.launchPersistentContext(PROFILE, { channel, headless: false, viewport: { width: 1500, height: 900 }, acceptDownloads: true, ignoreDefaultArgs: ['--enable-automation'], args: ['--window-size=1520,1000', '--disable-blink-features=AutomationControlled'].concat(visible ? ['--window-position=40,20'] : ['--window-position=-3000,-3000', '--start-minimized']) });
       console.log('Navegador:', channel);
       break;
     } catch (e) { console.log('No pude abrir', channel, '→', String(e.message).split('\n')[0]); }
@@ -49,6 +50,7 @@ async function ensureLogin(page, waitMin) {
   await page.goto('https://flow.google.com/', { waitUntil: 'domcontentloaded' });
   await sleep(4000);
   if (await loggedIn(page)) { console.log('Sesión de Google: OK'); return true; }
+  if (waitMin < 1) return false;
   console.log(`Inicia sesión en la ventana de Chrome que se abrió (tienes ${waitMin} min). Yo no toco tu contraseña.`);
   const t0 = Date.now();
   while (Date.now() - t0 < waitMin * 60000) {
@@ -113,10 +115,19 @@ async function generate(page, ctx, prompt, name) {
 
 (async () => {
   const mode = process.argv[2] || 'prueba';
-  const { ctx, page } = await openFlow();
+  // Se muestra solo si hace falta iniciar sesión, si pediste verla (modo "ver"/login) o con FLOW_VISIBLE=1.
+  const wantVisible = mode === 'login' || mode === 'ver' || process.env.FLOW_VISIBLE === '1';
+  let { ctx, page } = await openFlow(wantVisible);
   try {
-    const ok = await ensureLogin(page, mode === 'login' ? 10 : 3);
-    if (!ok) throw new Error('No hay sesión de Google en el Chrome de VYRALES. Corre primero: flow_login');
+    let ok = await ensureLogin(page, wantVisible ? 10 : 0.1);
+    if (!ok && !wantVisible) {
+      console.log('Falta iniciar sesión → muestro la ventana de Chrome.');
+      await ctx.close().catch(() => {});
+      ({ ctx, page } = await openFlow(true));
+      ok = await ensureLogin(page, 10);
+      if (ok) { await ctx.close().catch(() => {}); ({ ctx, page } = await openFlow(false)); await ensureLogin(page, 0.1); console.log('Sesión lista → vuelvo a segundo plano.'); }
+    }
+    if (!ok) throw new Error('No se inició sesión de Google en 10 min.');
     if (mode === 'login') { console.log('LISTO: sesión guardada en', PROFILE); return; }
     await newProject(page);
     const prompt = 'A giant red squid floating in the dark deep ocean, its long tentacles trailing below, faint blue light from above, floating particles.' + RULE;
