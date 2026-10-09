@@ -2145,6 +2145,23 @@
         if (!ep) return;
         if (blockIfMissingPhotos(ep)) return;
         const missing = (ep.shots || []).filter(sh => !frameFor(ep, sh.n) && !clipFor(ep, sh.n)).length;
+        // Series con image_engine 'flow' y tomas sin personajes: Google Flow en la PC (gratis), no Gemini por API.
+        const sbF = (lastLoadedData && lastLoadedData.series && lastLoadedData.series.story_bible) || {};
+        const useFlow = sbF.image_engine === 'flow' && !(ep.shots || []).some(sh => (sh.characters || []).length);
+        if (useFlow) {
+          if (!await askConfirm('Generar ' + missing + ' cuadros del EP ' + ep.episode_number + ' con Google Flow en la PC (tu plan, $0).\n\nCorre en segundo plano en Cronix (~1 min por cuadro). Si Google pide iniciar sesión, se abre la ventana de Chrome. ¿Continuar?')) return;
+          btn.disabled = true;
+          btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>Flow: mandando a la PC...';
+          try { await agentOrder('flow_frames:' + episodeId); } catch (err) { alert('No se pudo mandar a la PC: ' + err.message); return loadDashboard(); }
+          await pollUntil(d => {
+            const cur = (d.episodes || []).find(x => x.id === episodeId);
+            if (!cur) return false;
+            const left = (cur.shots || []).filter(sh => !frameFor(cur, sh.n) && !clipFor(cur, sh.n)).length;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>Flow: ' + (missing - left) + '/' + missing + ' cuadros...';
+            return left === 0;
+          }, 60 * 60 * 1000);
+          return loadDashboard();
+        }
         const newLocs = missingLocationsFor(ep);
         if (!await askConfirm('Generar ' + missing + ' cuadros iniciales del EP ' + ep.episode_number + ' (sin video).\n\n' +
           (newLocs.length ? 'Antes se crea la imagen fija de ' + newLocs.length + ' lugar(es) que aún no tienen (' + newLocs.join(', ') + '), una sola vez, para que todas las tomas de cada lugar compartan el mismo set.\n\n' : '') +
@@ -2580,7 +2597,7 @@
             : '<pre class="text-[11px] text-slate-300 whitespace-pre-wrap">' + esc(e.script || 'Sin guion todavía.') + '</pre>';
           const missingFrames = usesKeyframes(data.series) ? shots.filter(sh => !frameFor(e, sh.n) && !clipFor(e, sh.n)).length : 0;
           const framesBtn = (e.status === 'guion_generado' && missingFrames)
-            ? '<button onclick="generateAllFrames(this)" data-ep="' + e.id + '" class="mr-2 mb-1 px-3 py-1.5 rounded-lg bg-cyber-violet/15 border border-cyber-violet/50 text-cyber-violet text-xs font-mono hover:bg-cyber-violet/25"><i class="fa-solid fa-images mr-1"></i>Generar los ' + missingFrames + ' cuadros que faltan' + (missingLocationsFor(e).length ? ' + ' + missingLocationsFor(e).length + ' lugares' : '') + ' (~$' + ((missingFrames + missingLocationsFor(e).length) * IMAGE_PRICE_USD).toFixed(2) + ') para revisarlos</button>'
+            ? '<button onclick="generateAllFrames(this)" data-ep="' + e.id + '" class="mr-2 mb-1 px-3 py-1.5 rounded-lg bg-cyber-violet/15 border border-cyber-violet/50 text-cyber-violet text-xs font-mono hover:bg-cyber-violet/25"><i class="fa-solid fa-images mr-1"></i>Generar los ' + missingFrames + ' cuadros que faltan' + (missingLocationsFor(e).length ? ' + ' + missingLocationsFor(e).length + ' lugares' : '') + ' (' + ((((lastLoadedData && lastLoadedData.series && lastLoadedData.series.story_bible) || {}).image_engine === 'flow' && !(e.shots || []).some(sh => (sh.characters || []).length)) ? 'Google Flow, $0' : '~$' + ((missingFrames + missingLocationsFor(e).length) * IMAGE_PRICE_USD).toFixed(2)) + ') para revisarlos</button>'
             : '';
           const narrMissing = narrationCfg(data.series) ? shots.filter(sh => { const ns = narrationState(data.series, sh); return ns && !ns.ok; }).length : 0;
           const narrRun = narrationRunning(e);
@@ -2938,23 +2955,29 @@
           await loadDashboard();
           return alert('La TOMA ' + String(shotNumber).padStart(2, '0') + ' ya tiene video. Si quieres otra versión usa "Regenerar" en el panel de revisión. No se generó nada.');
         }
-        if (videoProvider === 'king') return alert('Con la PC king no hay "toma de prueba": usa "Producir" (es gratis) y rehaz solo las que salgan mal. O elige Veo arriba para probar una toma suelta.');
-        if (!skipConfirm && !await askConfirm('Generar SOLO la toma ' + shotNumber + ' del EP ' + ep.episode_number + ' con Veo.\n\nCosto: ~$' + Number(cost).toFixed(2) + ' USD (cargo real en Google Cloud). Tarda de 1 a 6 minutos. ¿Continuar?')) return;
+        const onKing = videoProvider === 'king';
+        // PC king: la toma suelta se hace en la PC (cuadro + video), gratis.
+        if (onKing && !skipConfirm && !await askConfirm('Generar SOLO la toma ' + shotNumber + ' del EP ' + ep.episode_number + ' en la PC king (cuadro + video).\n\nCosto: $0. Tarda de 3 a 8 minutos. ¿Continuar?')) return;
+        if (!onKing && !skipConfirm && !await askConfirm('Generar SOLO la toma ' + shotNumber + ' del EP ' + ep.episode_number + ' con Veo.\n\nCosto: ~$' + Number(cost).toFixed(2) + ' USD (cargo real en Google Cloud). Tarda de 1 a 6 minutos. ¿Continuar?')) return;
         const box = document.querySelector('[data-shot="' + episodeId + '-' + shotNumber + '"]');
         const btn = box && box.querySelector('button[data-kind="video"][data-mode="generate"]');
-        if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>Generando con Veo... (1–6 min)'; }
+        if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>' + (onKing ? 'Generando en la PC king... (3–8 min)' : 'Generando con Veo... (1–6 min)'); }
         try {
+          if (onKing) await agentOrder('toma_local:' + episodeId + ':' + shotNumber);
+          else {
           const res = await fetch('/.netlify/functions/generate-media-background', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(Object.assign({ series: DEFAULT_SERIES, episode_id: episodeId, shot: shotNumber }, veoModelChoice ? { model: veoModelChoice } : {}, providerBody()))
           });
           if (!res.ok && res.status !== 202) throw new Error('HTTP ' + res.status);
+          }
         } catch (err) {
           if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-flask mr-1"></i>Generar solo esta toma'; }
           return alert('No se pudo arrancar: ' + err.message);
         }
         const start = Date.now();
-        while (Date.now() - start < 9 * 60 * 1000) {
+        const maxMin = onKing ? 20 : 9;
+        while (Date.now() - start < maxMin * 60 * 1000) {
           await new Promise(r => setTimeout(r, 15000));
           try {
             const r = await fetch('/.netlify/functions/get-episodes?series=' + encodeURIComponent(DEFAULT_SERIES));
@@ -2969,7 +2992,7 @@
           } catch (_) {}
         }
         await loadDashboard();
-        alert('La toma todavía no aparece después de 9 minutos. Revisa la terminal de netlify dev: puede que haya fallado.');
+        alert('La toma todavía no aparece después de ' + maxMin + ' minutos. ' + (onKing ? 'Revisa el log del agente en la PC.' : 'Revisa la terminal de netlify dev: puede que haya fallado.'));
       };
 
       // ── Modal PROMPT: crear una novela nueva pegando el JSON de Claude ──────

@@ -22,9 +22,9 @@ async function main() {
   const { data: ep, error } = await supabase.from('episodes').select('id, episode_number, series_id, status').eq('id', episodeId).single();
   if (error || !ep) throw error || new Error('Episodio no encontrado');
   const { data: series } = await supabase.from('series').select('slug, title').eq('id', ep.series_id).single();
-  console.log(`Produciendo "${series.title}" EP ${ep.episode_number} con LTX-2.5 en king...`);
+  console.log(`Produciendo "${series.title}" EP ${ep.episode_number}${Number(process.argv[3]) ? ' (solo la toma ' + process.argv[3] + ')' : ''} con LTX-2.5 en king...`);
   const { handler } = require(path.join(ROOT, 'netlify', 'functions', 'generate-media-background'));
-  const res = await handler({ httpMethod: 'POST', body: JSON.stringify({ series: series.slug, episode_id: episodeId, provider: 'king', force: ep.status === 'generando_media' }), queryStringParameters: {}, headers: {} });
+  const res = await handler({ httpMethod: 'POST', body: JSON.stringify(Object.assign({ series: series.slug, episode_id: episodeId, provider: 'king', force: ep.status === 'generando_media' }, Number(process.argv[3]) ? { shot: Number(process.argv[3]) } : {})), queryStringParameters: {}, headers: {} });
   console.log('RESULTADO', res.statusCode, String(res.body || '').slice(0, 800));
   if (res.statusCode >= 400) process.exit(1);
 }

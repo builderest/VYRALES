@@ -15,7 +15,11 @@ const PROFILE = path.join(process.env.LOCALAPPDATA || ROOT, 'VYRALES_flow_perfil
 const OUT = path.join(ROOT, '_to_delete', 'flow');
 const PW_VERSION = '1.48.2';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const RULE = ' Vertical 9:16 portrait image. Photorealistic, cinematic nature documentary, dramatic lighting, sharp detail. No people, no hands, no text.';
+const RULE_BASE = ' Vertical 9:16 portrait image. Photorealistic, cinematic documentary, dramatic lighting, sharp detail. No text.';
+// Sin personas SOLO si la escena no las menciona (el oficial del búnker, siluetas, manos…).
+const PEOPLE_RE = /\b(person|people|man|men|woman|women|officer|soldier|silhouette|child|boy|girl|hand|hands|crowd|figure|worker|operator|pilot|scientist)\b/i;
+const ruleFor = (prompt) => RULE_BASE + (PEOPLE_RE.test(prompt) ? '' : ' No people, no hands.');
+const RULE = RULE_BASE + ' No people, no hands.';
 
 function loadPlaywright() {
   try { return require('playwright-core'); } catch (_) {}
@@ -164,7 +168,7 @@ async function flowImage({ prompt }) {
     }
     if (!ok) throw new Error('Flow: no hay sesión de Google.');
     await newProject(page);
-    const img = await generate(page, ctx, String(prompt).trim().replace(/\.?$/, '.') + RULE, 'pipeline');
+    const img = await generate(page, ctx, String(prompt).trim().replace(/\.?$/, '.') + ruleFor(prompt), 'pipeline');
     const jpg = img.buffer[0] === 0xff && img.buffer[1] === 0xd8;
     return { buffer: img.buffer, mimeType: jpg ? 'image/jpeg' : 'image/png', costUsd: 0, model: 'flow' };
   } finally {
@@ -188,7 +192,7 @@ async function flowImages(prompts, log = console.log) {
     await newProject(page);
     for (let i = 0; i < prompts.length; i++) {
       try {
-        const img = await generate(page, ctx, String(prompts[i]).trim().replace(/\.?$/, '.') + RULE, 'lote' + (i + 1));
+        const img = await generate(page, ctx, String(prompts[i]).trim().replace(/\.?$/, '.') + ruleFor(prompts[i]), 'lote' + (i + 1));
         const jpg = img.buffer[0] === 0xff && img.buffer[1] === 0xd8;
         out.push({ buffer: img.buffer, mimeType: jpg ? 'image/jpeg' : 'image/png' });
         log(`Flow ${i + 1}/${prompts.length}: lista (${img.buffer.length} bytes)`);

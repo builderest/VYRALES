@@ -39,6 +39,9 @@ module.exports = {
   flow_login: { label: 'Flow: iniciar sesión (una vez)', help: 'Abre Flow en el Chrome de VYRALES para que inicies sesión con tu cuenta de Google', special: 'flow_login' },
   // "flow_cuadros:<episode_id>[:<tomas>]" — cuadros con Google Flow en una sesión + videos en king.
   flow_cuadros: { label: 'Flow: cuadros del episodio', help: 'Genera los cuadros iniciales en Google Flow (una sesión) y rehace los videos en king', special: 'flow_cuadros', arg: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(:\d{1,2}(,\d{1,2})*)?$/i, hidden: true },
+  // "toma_local:<episode_id>:<n>" — una sola toma (cuadro + video) en king; lo pide el panel.
+  toma_local: { label: 'Una toma en king', help: 'Genera una sola toma (cuadro + video) en la PC king', special: 'toma_local', arg: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}:\d{1,2}$/i, hidden: true },
+  flow_frames: { label: 'Flow: cuadros que faltan (sin video)', help: 'Lo pide el panel: genera con Google Flow los cuadros iniciales que faltan', special: 'flow_frames', arg: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, hidden: true },
   flow_ver: { label: 'Flow: mostrar ventana', help: 'Hace la prueba de Flow con la ventana de Chrome visible', special: 'flow_ver' },
   flow_prueba: { label: 'Flow: imagen de prueba', help: 'Genera 1 imagen en Flow con tu cuenta y la guarda', special: 'flow_prueba' },
   prueba_flux_nat: { label: 'Prueba Flux naturaleza (inicio+final)', help: 'Cuadros inicial y final con Flux.2 Klein en king para tomas sin caras (gratis)', special: 'prueba_flux_nat' },
