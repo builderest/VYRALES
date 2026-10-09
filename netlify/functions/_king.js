@@ -46,11 +46,14 @@ function ltxPromptFor(shot, storyBible) {
   // "NeandertalUno" → "the first neandertal" (nombres internos que LTX no entiende).
   const clean = (t) => String(t || '').replace(/\b([A-Z][a-z]+)(Uno|Dos|Tres|Cuatro)\b/g, (_, a, b) => ({ Uno: 'the first ', Dos: 'the second ', Tres: 'the third ', Cuatro: 'the fourth ' }[b] + a.toLowerCase())).replace(/\s+/g, ' ').trim();
   if (shot.ltx_en) return clean(shot.ltx_en); // si el guion trae un prompt propio para LTX, manda ese
-  const cam = clean(shot.camera);
-  const moving = /push|pull|dolly|pan|tilt|track|zoom|orbit|crane|handheld|fpv|drone|fly|follow|glide|rise|rush/i.test(cam);
+  const MOVE_RE = /push|pull|dolly|pan|tilt|track|zoom|orbit|crane|handheld|fpv|drone|fly|follow|glide|rise|rush|slide|sink|descend|move/i;
   // Videos narrados de curiosidades (sin personajes): cámara con energía, se mueve de verdad.
   // En novelas con personas se mantiene lenta (con gente, el movimiento fuerte deforma caras e inventa fondos).
   const dynamic = sb.format === 'narrado_unico';
+  // Narrados: NUNCA cámara fija ("static" dejaba la toma como una foto quieta: EP2 depredadores T7/T11/T16).
+  const cam0 = clean(shot.camera);
+  const cam = dynamic && !MOVE_RE.test(cam0) ? [cam0.replace(/\bstatic\b/ig, '').replace(/^[,\s]+|[,\s]+$/g, '').replace(/,\s*,/g, ','), 'slow steady push-in'].filter(Boolean).join(', ') : cam0;
+  const moving = MOVE_RE.test(cam);
   void names;
   // LTX no sabe quién es "Valentina": cada nombre se cambia por lo que lleva puesto
   // ("the person in a mustard-yellow cardigan over a white t-shirt"), así sabe a quién mover y quién habla.
@@ -85,6 +88,8 @@ function ltxPromptFor(shot, storyBible) {
     moving
       ? (dynamic ? 'Camera: ' + cam + '. The camera moves clearly, smoothly and with energy through the scene, like a premium cinematic documentary shot; strong sense of depth and motion from the first second.' : 'Camera: ' + cam + ', very slow and subtle; the framing stays close to the first frame.')
       : 'Camera: ' + (cam ? cam + '. ' : '') + 'Locked-off tripod shot with the same fixed framing from the first frame to the last frame.',
+    // Narrados sin personas: todo se mueve todo el tiempo (si no, el fondo queda como foto quieta).
+    dynamic && !hasPeople ? 'Everything keeps moving for the whole clip: the animal moves its body continuously, water particles, bubbles, dust and light rays drift, waves and clouds move.' : '',
     // Ropa de cada personaje (LTX inventaba pies descalzos o cambiaba la ropa al moverse: EP3 T2/T9).
     wardrobeLine(shot),
     bg ? 'Background: ' + clean(bg).replace(/[.\s]*$/, '') + (dynamic ? '; the same place throughout the shot.' : '; it stays exactly as in the first frame.') : (dynamic ? '' : 'The background, walls, terrain and sky stay exactly as in the first frame.'),

@@ -182,8 +182,11 @@ async function createKeyframe(supabase, { series, episode, shot, characters, log
   }
   const { refs, hasLocationRef } = await keyframeReferences(shot, characters, narradoFmt ? {} : series.visual_memory);
   const prompt = effectiveKeyframePrompt(shot, characters, series.story_bible, hasLocationRef);
-  log('generando cuadro inicial de la toma', shot.n, 'con', refs.length, 'imagen(es) de referencia...');
-  const img = await generateImage({ prompt, references: refs });
+  const { fluxImage, useFlux } = require('./_flux');
+  const fluxText = shot.start_en || shot.action_en || shot.end_en || '';
+  const flux = useFlux(series.story_bible, shot) && !!fluxText;
+  log('generando cuadro inicial de la toma', shot.n, flux ? 'con FLUX en king (gratis)...' : 'con ' + refs.length + ' imagen(es) de referencia...');
+  const img = flux ? await fluxImage({ prompt: fluxText }) : await generateImage({ prompt, references: refs });
   await logSpend(supabase, { seriesId, episodeId: episode.id, shotNumber: shot.n, kind: 'keyframe', model: img.model, costUsd: img.costUsd });
 
   await ensureMediaBucket(supabase);
@@ -203,7 +206,7 @@ async function createKeyframe(supabase, { series, episode, shot, characters, log
   if (existing) {
     const { data, error } = await supabase
       .from('assets')
-      .update({ storage_path: url, prompt, cost_usd: img.costUsd, model: 'nano_banana', approved: false, approved_at: null })
+      .update({ storage_path: url, prompt: flux ? fluxText : prompt, cost_usd: img.costUsd, model: flux ? 'flux_king' : 'nano_banana', approved: false, approved_at: null })
       .eq('id', existing.id)
       .select()
       .single();
@@ -213,7 +216,7 @@ async function createKeyframe(supabase, { series, episode, shot, characters, log
   } else {
     const { data, error } = await supabase
       .from('assets')
-      .insert({ episode_id: episode.id, kind: 'image', model: 'nano_banana', shot_number: shot.n, storage_path: url, prompt, cost_usd: img.costUsd, approved: false })
+      .insert({ episode_id: episode.id, kind: 'image', model: flux ? 'flux_king' : 'nano_banana', shot_number: shot.n, storage_path: url, prompt: flux ? fluxText : prompt, cost_usd: img.costUsd, approved: false })
       .select()
       .single();
     if (error) throw error;
@@ -266,7 +269,10 @@ async function createEndFrame(supabase, { series, episode, shot, startImage, anc
   let lastSim = null;
   for (let attempt = 0; attempt < 2 && !img; attempt++) {
     const p = attempt === 0 ? prompt : prompt + (lastSim != null && lastSim < 0.5 ? ' IMPORTANT: the previous attempt changed too much. Stay much closer to the reference: same camera angle, same framing, same place; only a small step of the action.' : ' IMPORTANT: the previous attempt looked almost identical to the reference. The final frame must show the described action clearly advanced, with a slightly different framing.');
-    const cand = await generateImage({ prompt: p, references: ref });
+    const fl = require('./_flux');
+    const cand = fl.useFlux(sb, shot)
+      ? await fl.fluxImage({ prompt: 'Same scene, same lighting and style, a few seconds later: ' + String(shot.end_en).trim() + (attempt === 0 ? '' : (lastSim != null && lastSim < 0.5 ? ' Keep the same camera angle and framing; only a small step of the action.' : ' The action is clearly advanced and the framing slightly closer.')), reference: startImage })
+      : await generateImage({ prompt: p, references: ref });
     await logSpend(supabase, { seriesId: series.id || episode.series_id, episodeId: episode.id, shotNumber: shot.n, kind: 'keyframe', model: cand.model, costUsd: cand.costUsd, note: 'cuadro final' });
     // Si sale casi igual al inicial (SSIM alto) la toma queda quieta: se reintenta una vez; si no, sin cuadro final.
     const sim = await similarity(startImage, cand);
