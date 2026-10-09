@@ -54,6 +54,8 @@ function ltxPromptFor(shot, storyBible) {
   const cam0 = clean(shot.camera);
   const cam = dynamic && !MOVE_RE.test(cam0) ? [cam0.replace(/\bstatic\b/ig, '').replace(/^[,\s]+|[,\s]+$/g, '').replace(/,\s*,/g, ','), 'slow steady push-in'].filter(Boolean).join(', ') : cam0;
   const moving = MOVE_RE.test(cam);
+  // Primeros planos (ojo, dientes, ventosas): movimiento suave. Con "energía" LTX los hacía explotar (EP2 T10/T11).
+  const gentle = dynamic && /close[- ]?up|macro|eye|very slow|slow/i.test(cam + ' ' + (shot.start_en || ''));
   void names;
   // LTX no sabe quién es "Valentina": cada nombre se cambia por lo que lleva puesto
   // ("the person in a mustard-yellow cardigan over a white t-shirt"), así sabe a quién mover y quién habla.
@@ -86,10 +88,10 @@ function ltxPromptFor(shot, storyBible) {
         shot.reaction_en ? 'By the end: ' + named(shot.reaction_en) + '.' : ''
       ]),
     moving
-      ? (dynamic ? 'Camera: ' + cam + '. The camera moves clearly, smoothly and with energy through the scene, like a premium cinematic documentary shot; strong sense of depth and motion from the first second.' : 'Camera: ' + cam + ', very slow and subtle; the framing stays close to the first frame.')
+      ? (dynamic ? 'Camera: ' + cam + (gentle ? '. The camera moves slowly and smoothly; the subject stays whole, sharp and in the same place for the whole clip.' : '. The camera moves clearly, smoothly and with energy through the scene, like a premium cinematic documentary shot; strong sense of depth and motion from the first second.') : 'Camera: ' + cam + ', very slow and subtle; the framing stays close to the first frame.')
       : 'Camera: ' + (cam ? cam + '. ' : '') + 'Locked-off tripod shot with the same fixed framing from the first frame to the last frame.',
     // Narrados sin personas: todo se mueve todo el tiempo (si no, el fondo queda como foto quieta).
-    dynamic && !hasPeople ? 'Everything keeps moving for the whole clip: the animal moves its body continuously, water particles, bubbles, dust and light rays drift, waves and clouds move.' : '',
+    dynamic && !hasPeople ? (gentle ? 'Gentle natural life in the scene: the animal skin and body move softly, tiny particles drift slowly in the water.' : 'Everything keeps moving for the whole clip: the animal moves its body continuously, water particles, bubbles, dust and light rays drift, waves and clouds move.') : '',
     // Ropa de cada personaje (LTX inventaba pies descalzos o cambiaba la ropa al moverse: EP3 T2/T9).
     wardrobeLine(shot),
     bg ? 'Background: ' + clean(bg).replace(/[.\s]*$/, '') + (dynamic ? '; the same place throughout the shot.' : '; it stays exactly as in the first frame.') : (dynamic ? '' : 'The background, walls, terrain and sky stay exactly as in the first frame.'),
@@ -105,7 +107,7 @@ function ltxPromptFor(shot, storyBible) {
     // Voces fijas para todos: el que habla mueve la boca en 0–6 s (ahí el render pone su voz); si no, bocas cerradas.
     speaksOnScreen(shot, sb)
       ? 'Natural subtle body motion, consistent faces. ' + (speaker ? speaker.charAt(0).toUpperCase() + speaker.slice(1) : 'The character who speaks') + ' keeps the head and eyes turned toward whoever or whatever the action says they are talking to, from the first frame to the last frame' + (sayLine ? '. ' + sayLine + ' ' : ', and moves the lips softly and naturally as if talking quietly during the first 6 seconds, then closes the mouth. ') + 'Everyone else keeps the mouth closed. Photos, paintings and screens on the walls are still pictures. ' + soundLine + ' Clean cinematic image.'
-      : (hasPeople ? 'Natural subtle body motion, consistent faces, mouths closed. ' : (dynamic ? 'Constant, vivid, powerful motion in every part of the frame from the first second to the last: the scene feels alive and spectacular. ' : 'Smooth, continuous, natural motion. ')) + soundLine + ' Clean cinematic image.'
+      : (hasPeople ? 'Natural subtle body motion, consistent faces, mouths closed. ' : (dynamic ? (gentle ? 'Slow, smooth, continuous natural motion. ' : 'Constant, vivid, powerful motion in every part of the frame from the first second to the last: the scene feels alive and spectacular. ') : 'Smooth, continuous, natural motion. ')) + soundLine + ' Clean cinematic image.'
   ].filter(Boolean).join(' ').replace(/\.\s*\./g, '.')
     // Guiones con "no readable text, no logos": con cfg = 1 nombrar texto/letras/logos los hace aparecer.
     .replace(/,?\s*(?:with\s+|and\s+)?(?:no|without)\s+(?:any\s+)?(?:readable\s+|visible\s+|on-screen\s+)?(?:text|writing|words|letters|logos?|captions|subtitles|watermarks?)\b(?:\s*(?:,|or|and)\s*(?:no\s+)?(?:readable\s+)?(?:text|writing|words|letters|logos?|captions|subtitles|watermarks?)\b)*/gi, '')
