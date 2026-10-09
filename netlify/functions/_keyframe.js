@@ -191,6 +191,13 @@ async function createKeyframe(supabase, { series, episode, shot, characters, log
   if (flux && (shot.image_engine || series.story_bible.image_engine) === 'flow') {
     try { img = await require('../../agente/flow_imagenes').flowImage({ prompt: fluxText }); log('cuadro inicial de Google Flow'); }
     catch (e) { log('Flow falló (' + String(e.message).slice(0, 160) + ') → FLUX en king'); img = await fluxImage({ prompt: fluxText }); }
+  } else if (!flux && (shot.characters || []).length && series.story_bible.flow_characters === true && (shot.image_engine || series.story_bible.image_engine) === 'flow') {
+    // Personajes con Google Flow: se suben sus fotos de cara como "ingredientes" ($0). Si falla → Gemini.
+    try {
+      const refPrompt = 'Reference images in order: ' + refs.map((r, i) => `image ${i + 1} = ${r.label}`).join('; ') + '. ' + prompt;
+      img = await require('../../agente/flow_imagenes').flowImage({ prompt: refPrompt, refs });
+      log('cuadro inicial de Google Flow (con fotos de los personajes)');
+    } catch (e) { log('Flow con personajes falló (' + String(e.message).slice(0, 160) + ') → Gemini'); img = await generateImage({ prompt, references: refs }); }
   } else img = flux ? await fluxImage({ prompt: fluxText }) : await generateImage({ prompt, references: refs });
   await logSpend(supabase, { seriesId, episodeId: episode.id, shotNumber: shot.n, kind: 'keyframe', model: img.model, costUsd: img.costUsd });
 
