@@ -329,10 +329,10 @@ async function storeKeyframeImage(supabase, { series, episode, shotN, image, not
   const url = await uploadFile(supabase, { path: `${series.slug}/ep${episode.episode_number}/frame-${String(shotN).padStart(2, '0')}-v${Date.now()}.${ext}`, buffer: Buffer.from(image.imageBytes, 'base64'), contentType: image.mimeType || 'image/jpeg' });
   const { data: existing } = await supabase.from('assets').select('id, storage_path').eq('episode_id', episode.id).eq('kind', 'image').eq('shot_number', shotN).maybeSingle();
   if (existing) {
-    await supabase.from('assets').update({ storage_path: url, prompt: note, cost_usd: 0, model: 'chain', approved: false, approved_at: null }).eq('id', existing.id);
+    await supabase.from('assets').update({ storage_path: url, prompt: note, cost_usd: 0, model: 'nano_banana', approved: false, approved_at: null }).eq('id', existing.id).then(({ error }) => { if (error) throw error; });
     if (existing.storage_path && existing.storage_path !== url) await removeByPublicUrl(supabase, existing.storage_path, log);
   } else {
-    await supabase.from('assets').insert({ episode_id: episode.id, kind: 'image', model: 'chain', shot_number: shotN, storage_path: url, prompt: note, cost_usd: 0, approved: false });
+    await supabase.from('assets').insert({ episode_id: episode.id, kind: 'image', model: 'nano_banana', shot_number: shotN, storage_path: url, prompt: note, cost_usd: 0, approved: false }).then(({ error }) => { if (error) throw error; });
   }
   log(`toma ${shotN}: cuadro inicial = cuadro final de la toma anterior (${note})`);
   return url;

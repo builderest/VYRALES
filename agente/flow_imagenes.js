@@ -134,6 +134,10 @@ async function generate(page, ctx, prompt, name) {
         const b64 = await page.evaluate(async (u) => { const r = await fetch(u); const b = new Uint8Array(await r.arrayBuffer()); let s = ''; for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000)); return btoa(s); }, src).catch(() => null);
         if (b64) buf = Buffer.from(b64, 'base64');
       }
+      // Flow puede devolver 2 imágenes por pedido: se espera a que dejen de llegar, para que la 2ª
+      // no se tome como resultado del pedido siguiente (EP2: la toma 11 salió igual a la 10).
+      let last = (await imgSrcs(page)).length, quiet = 0;
+      for (let k = 0; k < 15 && quiet < 3; k++) { await sleep(3000); const c = (await imgSrcs(page)).length; if (c === last) quiet++; else { quiet = 0; last = c; } }
       await shot(page, name + '_2_listo');
       if (!buf) throw new Error('Vi la imagen nueva pero no pude descargarla: ' + src.slice(0, 120));
       return { buffer: buf, src };
