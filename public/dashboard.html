@@ -2978,16 +2978,15 @@
       // Tipo de prompt maestro: novela (?master=1) o un guionista de video narrado (?master=<tipo>&topic=…).
       const MASTER_HINT = {
         novela: 'Serie con personajes, episodios y cliffhangers. Completa MI IDEA al pegarlo en Claude.',
-        curiosidades: 'Video único de ciencia/espacio/cuerpo humano, 1:30+, gancho que viaja en el tiempo. Tema opcional.',
-        historia: 'Historia real contada como thriller, con fechas y lugares. Tema opcional.',
-        misterios: 'Misterio real documentado, suspenso oscuro. Tema opcional.',
-        motivacion: 'Historia real de superación, del punto más bajo a la victoria. Tema opcional.',
-        frases: 'Escribe tu FRASE exacta en el campo: una sola voz continua, tomas encadenadas y texto estilo póster.'
+        curiosidades: 'Curiosidades narradas (ciencia, espacio, cuerpo humano). Escribe tu tema al final del prompt, en MI IDEA.',
+        historia: 'Historia real contada como thriller. Escribe tu tema al final del prompt, en MI IDEA.',
+        misterios: 'Misterio real documentado. Escribe tu tema al final del prompt, en MI IDEA.',
+        motivacion: 'Historia real de superación. Escribe tu tema al final del prompt, en MI IDEA.',
+        frases: 'Una sola voz continua, tomas encadenadas y texto póster. Escribe tu frase exacta al final del prompt, en MI IDEA.'
       };
       function masterUrl() {
         const t = (document.getElementById('masterType') || {}).value || 'novela';
-        const topic = ((document.getElementById('masterTopic') || {}).value || '').trim();
-        return t === 'novela' ? '/.netlify/functions/import-series?master=1' : '/.netlify/functions/import-series?master=' + encodeURIComponent(t) + (topic ? '&topic=' + encodeURIComponent(topic) : '');
+        return t === 'novela' ? '/.netlify/functions/import-series?master=1' : '/.netlify/functions/import-series?master=' + encodeURIComponent(t);
       }
       let masterTimer = null;
       window.masterTypeChanged = function(typing) {
@@ -2995,7 +2994,6 @@
         btn.removeAttribute('data-tag');
         const t = document.getElementById('masterType').value;
         document.getElementById('masterHint').textContent = MASTER_HINT[t] || '';
-        document.getElementById('masterTopic').placeholder = t === 'frases' ? 'Tu frase exacta (obligatoria)' : 'Tema (opcional)';
         clearTimeout(masterTimer);
         masterTimer = setTimeout(prefetchMasterPrompt, typing ? 500 : 0);
       };
@@ -3020,7 +3018,6 @@
       document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') window.closeNovelModal(); });
 
       window.copyMasterPrompt = async function(btn) {
-        if (document.getElementById('masterType').value === 'frases' && !document.getElementById('masterTopic').value.trim()) return alert('Escribe primero tu frase exacta en el campo.');
         if (btn.getAttribute('data-tag')) return window.copyTag(btn);
         try {
           const res = await fetch(masterUrl());
@@ -3452,9 +3449,9 @@
             <div class="p-6 space-y-5">
                 <div class="bg-cyber-darker border border-cyber-border rounded-xl p-4">
                     <p class="text-xs font-mono text-cyber-cyan font-bold mb-1">PASO 1 · Pídele la novela a Claude</p>
-                    <p class="text-[12px] text-slate-300 mb-3">Copia el prompt maestro, pégalo en Claude y completa la parte <span class="font-mono text-cyber-gold">MI IDEA</span> (nicho, premisa, episodios, estilo). Claude te devuelve la novela completa en el formato exacto.</p>
+                    <p class="text-[12px] text-slate-300 mb-3">Elige el tipo, copia el prompt maestro, pégalo en Claude y completa la parte <span class="font-mono text-cyber-gold">MI IDEA</span> al final. Claude te devuelve la novela completa en el formato exacto.</p>
                     <div class="flex flex-col sm:flex-row gap-2 mb-2">
-                      <select id="masterType" onchange="masterTypeChanged()" class="bg-slate-950 border border-slate-700 rounded-lg px-2 py-1.5 text-xs font-mono text-white">
+                      <select id="masterType" onchange="masterTypeChanged()" class="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-2 py-1.5 text-xs font-mono text-white">
                         <option value="novela">Novela con personajes (serie)</option>
                         <option value="curiosidades">Curiosidades (narrado)</option>
                         <option value="historia">Historia (narrado)</option>
@@ -3462,7 +3459,6 @@
                         <option value="motivacion">Historias de superación (narrado)</option>
                         <option value="frases">Frases motivacionales (voz continua)</option>
                       </select>
-                      <input id="masterTopic" oninput="masterTypeChanged(true)" placeholder="Tema o frase (opcional)" class="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white">
                     </div>
                     <p id="masterHint" class="text-[11px] text-slate-500 mb-2"></p>
                     <button id="copyMasterBtn" onclick="copyMasterPrompt(this)" class="px-3 py-1.5 rounded-lg text-xs font-mono border border-cyber-violet/50 bg-cyber-violet/15 text-white hover:bg-cyber-violet/25"><i class="fa-regular fa-copy mr-1"></i>Copiar prompt maestro</button>

@@ -78,11 +78,8 @@ const TIPOS = {
   }
 };
 
-function buildNarratedPrompt(tipo = 'curiosidades', { topic = '', episodeNumber = 1 } = {}) {
-  const p = TIPOS[tipo] || TIPOS.curiosidades;
+function buildNarratedPromptRaw(tipo, p, episodeNumber = 1) {
   return `Eres un guionista profesional de videos verticales cortos (TikTok, YouTube Shorts, Reels) especializado en ${p.nombre}. Tu trabajo se mide en dos números: cuántos pasan de los primeros 3 segundos y qué porcentaje del video ven. Escribes obras maestras que nadie puede dejar de mirar.
-
-${tipo === 'frases' && topic ? 'FRASE EXACTA (va en continuity.voice_text palabra por palabra, sin cambiar nada; story_bible.narration.mode = "continuous" y story_bible.subtitle_style = "poster"): ' + topic : 'TEMA: ' + (topic || 'elige tú ' + p.temaDefault + '.')}
 
 === IDENTIDAD DE ESTE TIPO DE VIDEO ===
 - TONO: ${p.tono}
@@ -140,5 +137,38 @@ Antes de entregar, revisa toma por toma: gancho sin frases prohibidas, bucle abi
 }
 
 const buildCuriosityPrompt = (opts = {}) => buildNarratedPrompt('curiosidades', opts);
+
+// Frases (voz continua): quita las reglas de video narrado por tomas que no aplican y ajusta el JSON.
+function continuousVariant(raw) {
+  const drop = /^(2\. HOOK_TEXT|3\. BUCLE ABIERTO|4\. UNA SOLA HISTORIA|5\. RE-ENGANCHE|8\. FINAL|- 12 a 16 tomas|- Solo narrador en off|- VIDEOS DE VARIAS COSAS)/;
+  let t = raw.split('\n').filter((l) => !drop.test(l)).join('\n');
+  t = t.replace('=== REGLAS TÉCNICAS (obligatorias; el sistema valida el JSON) ===', '=== REGLAS TÉCNICAS (obligatorias; el sistema valida el JSON) ===\n- UNA SOLA VOZ para todo el video: continuity.voice_text = la frase EXACTA; todas las tomas con "dialogue": [] y con "voice_part" (su pedazo exacto de la frase, en orden). story_bible.narration.mode = "continuous" y story_bible.subtitle_style = "poster". Toma 1 con start_en; las demás solo end_en (encadenadas). Cada toma: text_big (1–3 palabras clave grandes) y text_gold (palabras en oro).');
+  t = t.replace('"video_audio": "none",', '"video_audio": "none", "mode": "continuous",');
+  t = t.replace('"format": "narrado_unico",', '"format": "narrado_unico", "subtitle_style": "poster",');
+  t = t.replace(/"continuity": \{[^\n]*\},/, '"continuity": { "summary": "…", "voice_text": "<la frase exacta>" },');
+  t = t.replace(/"shots": \[\{[^\n]*\}\]/, '"shots": [{ "n": 1, "location": "<lugar>", "characters": [], "scene_es": "…", "voice_part": "<pedazo exacto de la frase>", "camera": "…", "start_en": "…", "end_en": "…", "action_en": "…", "background_en": "…", "dialogue": [], "text_big": ["…"], "text_gold": ["…"] }, { "n": 2, "voice_part": "…", "camera": "…", "end_en": "The same view slightly closer: …", "action_en": "…", "dialogue": [] }]');
+  t = t.replace(/Antes de entregar, revisa[^\n]*/, 'Antes de entregar, revisa: la frase va EXACTA en voice_text, los voice_part la cubren completa y en orden, la primera imagen muestra la primera palabra fuerte, cada end_en es un pasito del anterior, inglés en afirmativo. Entrega solo el JSON.');
+  return t;
+}
+
+// Prompt maestro LIMPIO (Franklin, oct-2026: "solo el prompt maestro y ya"): sin temas ni frases de ejemplo
+// metidas (Claude las copiaba). Las reglas se quedan; los ejemplos entre paréntesis con comillas se quitan
+// de la parte de instrucciones (el JSON de ejemplo no se toca). La idea la escribe el usuario al final.
+function buildNarratedPrompt(tipo = 'curiosidades', { topic = '' } = {}) {
+  const p = TIPOS[tipo] || TIPOS.curiosidades;
+  const raw = buildNarratedPromptRaw(tipo, p);
+  const cut = raw.indexOf('=== JSON A ENTREGAR');
+  let body = raw;
+  if (tipo === 'frases') body = continuousVariant(raw);
+  const cut2 = body.indexOf('=== JSON A ENTREGAR');
+  const head = (cut2 > 0 ? body.slice(0, cut2) : body)
+    .replace(/\s*\((?:p\. ?ej\.\s*)?[^()]*["“][^()]*\)/g, '')
+    .replace(/\s*\((?:Franklin|idea de Franklin|pedido de Franklin)[^()]*\)/g, '')
+    .replace(/[ \t]+\n/g, '\n');
+  const idea = tipo === 'frases'
+    ? `=== MI IDEA ===\nFrase exacta (va en continuity.voice_text palabra por palabra, sin cambiar nada):\n${topic || '<escribe aquí tu frase>'}\n`
+    : `=== MI IDEA ===\nTema del video:\n${topic || '<escribe aquí tu tema>'}\n(Si no escribes tema, elige tú ${p.temaDefault}.)\n`;
+  return head + (cut2 > 0 ? body.slice(cut2) : '') + '\n\n' + idea;
+}
 
 module.exports = { TIPOS, buildNarratedPrompt, buildCuriosityPrompt };
