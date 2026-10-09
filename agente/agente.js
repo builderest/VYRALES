@@ -74,12 +74,12 @@ async function runJob(job) {
     if (def.special === 'dev_start') add(devStart() + '\n');
     else if (def.special === 'dev_stop') add(devStop() + '\n');
     else if (def.special === 'dev_restart') { add(devStop() + '\n'); await new Promise((r) => setTimeout(r, 1500)); add(devStart() + '\n'); }
-    else if (def.special === 'render_full' || def.special === 'publish_local' || def.special === 'prueba_ltx' || def.special === 'gen_local' || def.special === 'prueba_flux' || def.special === 'prueba_flux_nat' || def.special === 'regen_local' || def.special === 'prueba_ltx_voz' || def.special === 'grabar_demo_tiktok' || def.special === 'prueba_ltx_final') {
+    else if (def.special === 'render_full' || def.special === 'publish_local' || def.special === 'prueba_ltx' || def.special === 'gen_local' || def.special === 'prueba_flux' || def.special === 'prueba_flux_nat' || def.special === 'flow_login' || def.special === 'flow_prueba' || def.special === 'regen_local' || def.special === 'prueba_ltx_voz' || def.special === 'grabar_demo_tiktok' || def.special === 'prueba_ltx_final') {
       // Proceso aparte (siempre con el código más nuevo). Los argumentos ya pasaron la lista blanca.
-      const script = { render_full: 'render_local.js', publish_local: 'publish_local.js', prueba_ltx: 'prueba_ltx.js', gen_local: 'gen_local.js', prueba_flux: 'prueba_flux.js', prueba_flux_nat: 'prueba_flux_nat.js', regen_local: 'regen_local.js', prueba_ltx_voz: 'prueba_ltx_voz.js', grabar_demo_tiktok: 'grabar_demo_tiktok.js', prueba_ltx_final: 'prueba_ltx_final.js' }[def.special];
-      const maxMin = { prueba_ltx: 120, gen_local: 240, regen_local: 120, prueba_ltx_voz: 90, grabar_demo_tiktok: 45, prueba_ltx_final: 40 }[def.special] || 30;
+      const script = { render_full: 'render_local.js', publish_local: 'publish_local.js', prueba_ltx: 'prueba_ltx.js', gen_local: 'gen_local.js', prueba_flux: 'prueba_flux.js', prueba_flux_nat: 'prueba_flux_nat.js', flow_login: 'flow_imagenes.js', flow_prueba: 'flow_imagenes.js', regen_local: 'regen_local.js', prueba_ltx_voz: 'prueba_ltx_voz.js', grabar_demo_tiktok: 'grabar_demo_tiktok.js', prueba_ltx_final: 'prueba_ltx_final.js' }[def.special];
+      const maxMin = { prueba_ltx: 120, gen_local: 240, regen_local: 120, prueba_ltx_voz: 90, grabar_demo_tiktok: 45, prueba_ltx_final: 40, flow_login: 15, flow_prueba: 10 }[def.special] || 30;
       code = await new Promise((resolve) => {
-        const p = spawn(process.execPath, [path.join(__dirname, script)].concat(arg ? arg.split(':') : []), { cwd: ROOT, shell: false });
+        const p = spawn(process.execPath, [path.join(__dirname, script)].concat({ flow_login: ['login'], flow_prueba: ['prueba'] }[def.special] || []).concat(arg ? arg.split(':') : []), { cwd: ROOT, shell: false });
         const timer = setTimeout(() => { add('\n[se canceló: tardó más de ' + maxMin + ' minutos]\n'); p.kill(); }, maxMin * 60000);
         p.stdout.on('data', (d) => add(String(d)));
         p.stderr.on('data', (d) => add(String(d)));

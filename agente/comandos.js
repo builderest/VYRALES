@@ -36,6 +36,8 @@ module.exports = {
   // Graba el video demo para la revisión de TikTok (abre Edge/Chrome visible; tú inicias sesión en TikTok).
   grabar_demo_tiktok: { label: 'Grabar demo para TikTok', help: 'Abre el navegador en esta PC y graba el flujo Conectar TikTok → Post to TikTok (tú solo inicias sesión en TikTok y das Authorize)', special: 'grabar_demo_tiktok' },
   prueba_ltx_final: { label: 'Prueba LTX con cuadro final', help: 'LTX con cuadro inicial + final (gratis en king) para comparar contra solo inicial', special: 'prueba_ltx_final', hidden: true },
+  flow_login: { label: 'Flow: iniciar sesión (una vez)', help: 'Abre Flow en el Chrome de VYRALES para que inicies sesión con tu cuenta de Google', special: 'flow_login' },
+  flow_prueba: { label: 'Flow: imagen de prueba', help: 'Genera 1 imagen en Flow con tu cuenta y la guarda', special: 'flow_prueba' },
   prueba_flux_nat: { label: 'Prueba Flux naturaleza (inicio+final)', help: 'Cuadros inicial y final con Flux.2 Klein en king para tomas sin caras (gratis)', special: 'prueba_flux_nat' },
   prueba_flux: { label: 'Prueba cuadros Flux en king (3 tomas EP3)', help: 'Hace 3 cuadros iniciales del EP 3 con Flux.2 Klein en king y los pone al lado de los de Gemini (gratis)', special: 'prueba_flux' },
   prueba_ltx: { label: 'Prueba LTX-2.5 en king (3 tomas EP2)', help: 'Genera 3 tomas del EP 2 con LTX-2.5 en king y las deja junto a las de Veo en finales/prueba_ltx (gratis)', special: 'prueba_ltx' },
