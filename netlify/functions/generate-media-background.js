@@ -355,7 +355,7 @@ exports.handler = async (event) => {
         await logSpend(supabase, { seriesId: series.id, episodeId: episode.id, shotNumber: scene.number, kind: 'video', model: provider === 'fal' ? 'fal_' + modelKey : provider === 'king' ? 'ltx_king' : modelKey, costUsd, note: provider === 'fal' ? 'fal.ai' : provider === 'king' ? 'PC king (gratis)' : undefined });
         console.log(LOG, `toma ${scene.number}/${total}: Veo terminó, guardando${veo.falUrl ? ' (queda en fal.ai, sin copiar a Supabase)' : ' en Supabase Storage'}...`);
 
-        const storagePath = `${series.slug}/ep${episode.episode_number}/shot-${String(scene.number).padStart(2, '0')}.mp4`;
+        const storagePath = `${series.slug}/ep${episode.episode_number}/shot-${String(scene.number).padStart(2, '0')}-v${Date.now()}.mp4`;
         const publicUrl = await storeClip(supabase, { veo, path: storagePath });
 
         const { data: asset, error: assetError } = await supabase
