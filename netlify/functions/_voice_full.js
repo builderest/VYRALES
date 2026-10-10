@@ -179,7 +179,9 @@ async function ensureFullVoice(supabase, { episode, series, log = console.log, f
   let wav = shortPauses(tightenSpeech(best.wav, log));
   {
     const sbT = (series && series.story_bible) || {};
-    const ec = sbT.end_card && sbT.end_card.enabled ? Number(sbT.end_card.seconds) || 2.5 : 0;
+    // Cierre: dura lo que diga su voz (≈0.42 s por palabra) o sus segundos, lo que sea más largo.
+    const ecVoice = sbT.end_card && sbT.end_card.voice ? String(sbT.end_card.voice).split(/\s+/).filter(Boolean).length * 0.42 : 0;
+    const ec = sbT.end_card && sbT.end_card.enabled ? Math.max(Number(sbT.end_card.seconds) || 2.5, ecVoice) + 0.3 : 0;
     const maxTotal = Number(sbT.max_seconds) || 80;
     wav = fitTempo(wav, wavSeconds(wav), maxTotal - LEAD - TAIL - ec, log);
   }
