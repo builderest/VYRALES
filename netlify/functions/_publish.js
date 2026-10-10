@@ -24,7 +24,7 @@ function narrationOf(shots) {
 function youtubeTitle(raw, part) {
   let t = String(raw || '').replace(/#\S+/g, '').replace(/\s+/g, ' ').trim();
   if (t && t === t.toUpperCase()) t = t.charAt(0) + t.slice(1).toLowerCase();
-  const tail = ' | ' + part + ' #Shorts';
+  const tail = (part ? ' | ' + part : '') + ' #Shorts';
   return (t.slice(0, 100 - tail.length) + tail).trim();
 }
 
@@ -32,6 +32,10 @@ async function writeTexts({ series, episode, totalEpisodes }) {
   const key = process.env.GOOGLE_AI_API_KEY;
   if (!key) throw new Error('Falta GOOGLE_AI_API_KEY.');
   const lines = narrationOf(episode.shots);
+  const cont = episode.continuity || {};
+  const hook = String(cont.hook_text || '').trim();
+  const single = !(totalEpisodes > 1); // video suelto: sin "Parte 1/1"
+  const lockedTitle = cont.title_locked && episode.title ? String(episode.title).trim() : '';
   const prompt = [
     'Eres editor de redes sociales de un canal de documentales cortos verticales en español (Latinoamérica).',
     'Escribe el paquete de publicación de este episodio para TikTok, Instagram/Facebook Reels y YouTube Shorts.',
@@ -40,6 +44,9 @@ async function writeTexts({ series, episode, totalEpisodes }) {
     `Serie: ${series.title || series.slug}`,
     series.synopsis ? `Sinopsis: ${series.synopsis}` : '',
     `Episodio ${episode.episode_number} de ${totalEpisodes}: ${episode.title || ''}`,
+    hook ? `TEMA GANCHO del video (lo que más llama la atención): "${hook}". El youtube_title y el cover_text EMPIEZAN con ese tema (p. ej. "La Tercera Guerra Mundial…").` : '',
+    lockedTitle ? `Título ya elegido por el creador (úsalo tal cual como youtube_title): "${lockedTitle}"` : '',
+    single ? 'Es un video suelto (no una serie por partes): no hables de "partes" ni de "próximo episodio"; invita a seguir el canal.' : '',
     'Narración completa del episodio:',
     ...lines.map((l, i) => `${i + 1}. ${l}`),
     '',
@@ -67,15 +74,15 @@ async function writeTexts({ series, episode, totalEpisodes }) {
   const u = j.usageMetadata || {};
   const costUsd = ((u.promptTokenCount || 1500) * TEXT_PRICE.input + ((u.candidatesTokenCount || 500) + (u.thoughtsTokenCount || 0)) * TEXT_PRICE.output) / 1e6;
   const tags = (Array.isArray(out.hashtags) ? out.hashtags : []).map((t) => '#' + String(t).replace(/^#/, '').replace(/\s+/g, '')).filter((t) => t.length > 1).slice(0, 8);
-  const part = `Parte ${episode.episode_number}/${totalEpisodes}`;
+  const part = single ? '' : `Parte ${episode.episode_number}/${totalEpisodes}`;
   return {
     costUsd,
-    cover_text: String(out.cover_text || episode.title || '').toUpperCase().slice(0, 60),
+    cover_text: String(hook || out.cover_text || episode.title || '').toUpperCase().slice(0, 60),
     part,
     tiktok: [String(out.tiktok_caption || '').trim(), part, AI_DISCLOSURE, tags.slice(0, 5).join(' ')].filter(Boolean).join('\n'),
-    instagram: [String(out.instagram_caption || '').trim(), '', part + (out.next_hook ? ' · ' + String(out.next_hook).trim() : ''), '', AI_DISCLOSURE, '', tags.join(' ')].join('\n'),
-    youtube_title: youtubeTitle(out.youtube_title || out.cover_text || episode.title, part),
-    youtube: [String(out.instagram_caption || '').trim(), '', part + (out.next_hook ? ' · ' + String(out.next_hook).trim() : ''), '', AI_DISCLOSURE, '', ['#Shorts'].concat(tags.slice(0, 6)).join(' ')].join('\n'),
+    instagram: [String(out.instagram_caption || '').trim(), '', single ? '' : part + (out.next_hook ? ' · ' + String(out.next_hook).trim() : ''), '', AI_DISCLOSURE, '', tags.join(' ')].filter((x, i, a) => x !== '' || a[i - 1] !== '').join('\n'),
+    youtube_title: youtubeTitle(lockedTitle || out.youtube_title || out.cover_text || episode.title, part),
+    youtube: [String(out.instagram_caption || '').trim(), '', single ? '' : part + (out.next_hook ? ' · ' + String(out.next_hook).trim() : ''), '', AI_DISCLOSURE, '', ['#Shorts'].concat(tags.slice(0, 6)).join(' ')].filter((x, i, a) => x !== '' || a[i - 1] !== '').join('\n'),
     hashtags: tags,
     pinned_comment: String(out.pinned_comment || '').trim(),
     ai_disclosure: AI_DISCLOSURE
