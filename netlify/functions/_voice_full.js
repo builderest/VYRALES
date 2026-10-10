@@ -29,10 +29,10 @@ function shortPauses(wav) {
   } catch (_) { return wav; } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 }
 // Regla de VYRALES: el video entero dura como máximo ~1:20. Si la voz no cabe, se acelera un poco
-// (máx. 15 %, atempo conserva el tono). Devuelve el wav (igual o acelerado).
+// (máx. 5 %: más rápido suena apurado; atempo conserva el tono). Devuelve el wav (igual o acelerado).
 function fitTempo(wav, seconds, maxVoice, log) {
   if (!(maxVoice > 0) || seconds <= maxVoice) return wav;
-  const tempo = Math.min(1.15, seconds / maxVoice);
+  const tempo = Math.min(1.05, seconds / maxVoice); // más de 5 % ya suena apurado (Franklin, oct-2026)
   const { execFileSync } = require('child_process');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vy-tempo-'));
   const a = path.join(dir, 'a.wav'), b = path.join(dir, 'b.wav');
