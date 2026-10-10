@@ -50,25 +50,49 @@ const norm = (w) => String(w || '').toLowerCase().normalize('NFD').replace(/[̀-
 
 // Une las palabras del guion con las que oyó Whisper (LCS); las que no casan (p. ej. "sesenta y seis" vs "66")
 // se reparten entre la anterior y la siguiente que sí casaron.
-function matchWords(scriptWords, heard) {
+function matchWords(scriptWords, heard0) {
+  // Whisper por pedazos de 30 s puede repetir palabras o devolver tiempos que retroceden: se ordenan
+  // y se descartan los que se encimen con lo anterior.
+  const heard = [];
+  for (const h of heard0.slice().sort((a, b) => a.timestamp[0] - b.timestamp[0])) {
+    const last = heard[heard.length - 1];
+    if (last && h.timestamp[0] < last.timestamp[0] + 0.02) continue;
+    heard.push(h);
+  }
   const A = scriptWords.map(norm), B = heard.map((h) => norm(h.text));
   const n = A.length, m = B.length;
   const L = Array.from({ length: n + 1 }, () => new Int16Array(m + 1));
   for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--) L[i][j] = A[i] && A[i] === B[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
   const out = new Array(n).fill(null);
   for (let i = 0, j = 0; i < n && j < m;) {
-    if (A[i] && A[i] === B[j]) { out[i] = { word: scriptWords[i], start: heard[j].timestamp[0], end: heard[j].timestamp[1] }; i++; j++; }
+    if (A[i] && A[i] === B[j]) { out[i] = { word: scriptWords[i], start: heard[j].timestamp[0], end: heard[j].timestamp[1] == null ? heard[j].timestamp[0] + 0.3 : heard[j].timestamp[1] }; i++; j++; }
     else if (L[i + 1][j] >= L[i][j + 1]) i++; else j++;
   }
-  let matched = out.filter(Boolean).length;
+  // Palabras cortas sueltas ("la", "de") casadas lejos de sus vecinas son falsos positivos: fuera.
   for (let i = 0; i < n; i++) {
-    if (out[i]) continue;
+    if (!out[i] || A[i].length > 3) continue;
     let p = i - 1; while (p >= 0 && !out[p]) p--;
     let q = i + 1; while (q < n && !out[q]) q++;
-    const a = p >= 0 ? out[p].end : 0, b = q < n ? out[q].start : a + 0.3 * (q - p);
-    const span = q - p, k = i - p;
-    const st = a + ((b - a) * (k - 1)) / Math.max(1, span - 1), en = a + ((b - a) * k) / Math.max(1, span - 1);
-    out[i] = { word: scriptWords[i], start: Math.round(Math.min(st, en) * 100) / 100, end: Math.round(Math.max(st, en) * 100) / 100, guess: true };
+    const gapP = p >= 0 ? i - p : 0, gapQ = q < n ? q - i : 0;
+    if (gapP > 3 && gapQ > 3) out[i] = null;
+  }
+  const matched = out.filter(Boolean).length;
+  // Huecos (Whisper no oyó ese tramo, o "66" vs "sesenta y seis"): se reparten entre la palabra
+  // casada anterior y la siguiente, en proporción al largo de cada palabra.
+  for (let i = 0; i < n;) {
+    if (out[i]) { i++; continue; }
+    let q = i; while (q < n && !out[q]) q++;
+    const a = i > 0 ? out[i - 1].end : 0;
+    const b = q < n ? out[q].start : a + (q - i) * 0.35;
+    const lens = []; for (let k = i; k < q; k++) lens.push(Math.max(2, norm(scriptWords[k]).length));
+    const tot = lens.reduce((x, y) => x + y, 0);
+    let t = a;
+    for (let k = i; k < q; k++) {
+      const d = ((b - a) * lens[k - i]) / tot;
+      out[k] = { word: scriptWords[k], start: Math.round(t * 100) / 100, end: Math.round((t + d) * 100) / 100, guess: true };
+      t += d;
+    }
+    i = q;
   }
   return { words: out, matched };
 }
