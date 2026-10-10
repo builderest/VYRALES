@@ -110,7 +110,10 @@ exports.handler = async (event) => {
     }
 
     const validation = validateSeries(data);
-    const { data: existingSeries } = await supabase.from('series').select('id, story_bible').eq('slug', data.slug || '').maybeSingle();
+    const { data: existingSeries } = await supabase.from('series').select('id, title, story_bible').eq('slug', data.slug || '').maybeSingle();
+    // Videos narrados sueltos (narrado_unico): cada guion pegado es un VIDEO NUEVO dentro de su canal/serie,
+    // no un reemplazo de la serie (antes se quedaba el video viejo y el nuevo no aparecía).
+    const standalone = !!(data.story_bible && data.story_bible.format === 'narrado_unico' && existingSeries);
 
     if (!validation.ok) {
       return json(422, { error: 'La novela no pasó la validación. No se importó nada.', ...summarize(data, validation, existingSeries) });
@@ -128,7 +131,10 @@ exports.handler = async (event) => {
       // Videos narrados (documental/curiosidades): UNA sola voz para todo el video (no una por toma),
       // letras grandes palabra por palabra mientras habla, e imágenes con Google Flow. Se respeta lo que ya traiga.
       if (sb.format === 'narrado_unico') {
-        sb.narration = Object.assign({}, sb.narration);
+        // Lugares de los videos anteriores del canal se conservan (sus tomas los usan).
+        sb.locations = Object.assign({}, prev.locations || {}, sb.locations || {});
+        // La voz y el estilo que Franklin ya eligió para el canal NO cambian con un guion nuevo.
+        sb.narration = Object.assign({}, sb.narration, prev.narration && prev.narration.voice ? { voice: prev.narration.voice, style: prev.narration.style || (sb.narration || {}).style, model: prev.narration.model || (sb.narration || {}).model } : {});
         if (!sb.narration.mode) sb.narration.mode = (prev.narration && prev.narration.mode) || 'continuous';
         if (!sb.subtitle_style) sb.subtitle_style = prev.subtitle_style || 'palabra';
         if (!sb.image_engine) sb.image_engine = prev.image_engine || 'flow';
@@ -145,7 +151,7 @@ exports.handler = async (event) => {
       .upsert(
         {
           slug: data.slug,
-          title: data.title,
+          title: standalone && existingSeries.title ? existingSeries.title : data.title,
           genre: data.genre || null,
           language: data.language || 'es',
           synopsis: data.synopsis || null,
@@ -185,6 +191,15 @@ exports.handler = async (event) => {
     if (exError) throw exError;
 
     const result = { inserted: [], updated: [], protected: [] };
+    if (standalone) {
+      // Mismo título que un video ya importado y todavía editable → se actualiza ese; si no, va al final.
+      let next = Math.max(0, ...(existingEpisodes || []).map((e) => e.episode_number)) + 1;
+      const { data: titled } = await supabase.from('episodes').select('id, episode_number, title, status').eq('series_id', series.id);
+      for (const r of rows) {
+        const same = (titled || []).find((e) => String(e.title || '').trim().toLowerCase() === String(r.title || '').trim().toLowerCase() && EDITABLE_STATUSES.has(e.status));
+        r.episode_number = same ? same.episode_number : next++;
+      }
+    }
     for (const r of rows) {
       const payload = {
         series_id: series.id,
@@ -231,7 +246,7 @@ exports.handler = async (event) => {
     // Episodios que sobran (la versión nueva tiene menos) y no están en producción: se
     // archivan para que no queden guiones viejos colgando en la cola.
     const newNumbers = new Set(rows.map((r) => r.episode_number));
-    const leftovers = (existingEpisodes || []).filter((e) => !newNumbers.has(e.episode_number) && EDITABLE_STATUSES.has(e.status));
+    const leftovers = standalone ? [] : (existingEpisodes || []).filter((e) => !newNumbers.has(e.episode_number) && EDITABLE_STATUSES.has(e.status));
     for (const e of leftovers) {
       await supabase.from('episodes').update({ status: 'archivado' }).eq('id', e.id);
     }
