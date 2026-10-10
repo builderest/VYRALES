@@ -33,3 +33,12 @@ Este documento es la memoria del proyecto. Cada vez que Franklin corrige algo, l
 - Cambios pequeños, uno a la vez, medir, documentar.
 - Lo que se aprende se mete al código y al prompt maestro (`_guionista.js`), no solo al video de hoy.
 - Al renumerar tomas: los clips llevan versión en el nombre; revisar que no se pisen archivos.
+
+## 6. Qué hace el pipeline solo al darle "Producir" (oct-10)
+1. Voz continua completa (o parche si ya había voz aprobada) → acelera máx. 5 % → Whisper local da el tiempo de cada palabra (con re-escucha de tramos saltados y ventanas de 24 s).
+2. Duración de cada toma = su parte de la voz (2–15 s).
+3. Imágenes con Google Flow (personas de espaldas, un sujeto) → video en king (LTX) con cámara en movimiento.
+4. Unión: cortes exactos con la voz, letras palabra por palabra, música con ducking, etiqueta IA.
+5. QA automático (agente/_qa.js): clip más corto que su voz o congelado > 40 % → se rehace solo y se vuelve a unir.
+6. Paquete de publicación: título y portada empiezan con el tema gancho; título fijado (`continuity.title_locked`) se respeta; sin "Parte 1/1" en videos sueltos.
+7. Subidas a Supabase con reintentos (5xx sueltos).
