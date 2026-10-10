@@ -28,7 +28,8 @@ function shortPauses(wav) {
     return fs.readFileSync(b);
   } catch (_) { return wav; } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 }
-// Regla de VYRALES: el video entero dura como máximo ~1:20. Si la voz no cabe, se acelera un poco
+// Objetivo ~1:20. Si la voz no cabe, se acelera un poco (máx. 5 %); si aun así es larga NO se recorta texto:
+// las tomas se alargan solas (hasta 15 s) y el guionista agrega escenas.
 // (máx. 5 %: más rápido suena apurado; atempo conserva el tono). Devuelve el wav (igual o acelerado).
 function fitTempo(wav, seconds, maxVoice, log) {
   if (!(maxVoice > 0) || seconds <= maxVoice) return wav;
@@ -282,12 +283,12 @@ function shotSecondsFor(voice, shots) {
     const cuts = [0];
     for (let i = 1; i < shots.length; i++) cuts.push(Math.round(LEAD + startOf[i] - 0.15));
     cuts.push(Math.round(total));
-    const secs = shots.map((_, i) => Math.max(2, Math.min(16, cuts[i + 1] - cuts[i])));
+    const secs = shots.map((_, i) => Math.max(2, Math.min(15, cuts[i + 1] - cuts[i])));
     return secs;
   }
   const ws = shots.map((s) => Number(s.weight) > 0 ? Number(s.weight) : 1);
   const tot = ws.reduce((a, b) => a + b, 0) || 1;
-  return shots.map((s, i) => Math.max(3, Math.min(16, Math.round((ws[i] / tot) * total))));
+  return shots.map((s, i) => Math.max(3, Math.min(15, Math.round((ws[i] / tot) * total))));
 }
 
 // Igual que shotSecondsFor pero SIN redondear: { [n]: segundos exactos } para recortar/ajustar en el render.

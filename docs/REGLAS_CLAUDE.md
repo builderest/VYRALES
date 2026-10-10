@@ -11,12 +11,13 @@ Este documento es la memoria del proyecto. Cada vez que Franklin corrige algo, l
 ## 2. Voz (lo que más molesta si cambia)
 - **NUNCA cambiar la voz ni el estilo del narrador sin preguntar.** Franklin elige una voz y esa queda.
 - Una voz ya aprobada (`continuity.voice`, idealmente con `approved: true`) **no se regenera completa**. Si cambia el texto, el sistema rehace SOLO las frases nuevas y las pega en la voz original (`_voice_patch.js`).
-- La voz no se acelera más de 5 %. Si el video pasa de 1:20, se propone recortar texto; no se acelera ni se cambia el estilo.
+- La voz no se acelera más de 5 %. Si el video queda largo: **NO se quitan palabras**. Se agregan escenas nuevas o se alargan tomas (king hace hasta 15 s por toma). Tampoco se cambia el estilo.
 - Si hay que rehacer la voz completa, avisar primero: "la voz va a sonar distinta".
 
 ## 3. Formato
 - Videos narrados: UNA sola voz, letras grandes palabra por palabra, cortes exactos con la voz.
-- Máximo 1:20 (TikTok paga > 1:00): ~170 palabras con el narrador del búnker (~2.3 palabras/s).
+- Objetivo 1:01–1:20 (TikTok paga > 1:00): ~170 palabras con el narrador del búnker (~2.3 palabras/s). Si la historia lo necesita, más escenas antes que recortar texto.
+- Una toma dura entre 2 y 15 s (límite de LTX en king). Línea larga → toma larga o dos escenas.
 - La imagen muestra exactamente lo que dice la narración en ese momento.
 - Títulos llamativos pero verdaderos ("La noche que CASI empezó la Tercera Guerra Mundial").
 
@@ -28,6 +29,7 @@ Este documento es la memoria del proyecto. Cada vez que Franklin corrige algo, l
 - Un sujeto por imagen.
 
 ## 5. Proceso
+- OBJETIVO: pegar el guion → Generar → sale perfecto a la primera. Cada corrección de Franklin se convierte en regla de código/prompt el mismo día (no se arregla solo el video de hoy).
 - Cambios pequeños, uno a la vez, medir, documentar.
 - Lo que se aprende se mete al código y al prompt maestro (`_guionista.js`), no solo al video de hoy.
 - Al renumerar tomas: los clips llevan versión en el nombre; revisar que no se pisen archivos.
