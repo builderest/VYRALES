@@ -212,7 +212,7 @@ async function flowImage({ prompt, refs = [] }) {
 }
 // Varias imágenes en UNA sola sesión de Flow (un proyecto, sin reabrir Chrome): se mandan una tras otra.
 // prompts: [string] → [{ buffer, mimeType } | { error }] en el mismo orden.
-async function flowImages(prompts, log = console.log) {
+async function flowImages(prompts, log = console.log, onEach = null) {
   let { ctx, page } = await openFlow(process.env.FLOW_VISIBLE === '1');
   const out = [];
   try {
@@ -230,6 +230,7 @@ async function flowImages(prompts, log = console.log) {
         const img = await generate(page, ctx, String(prompts[i]).trim().replace(/\.?$/, '.') + ruleFor(prompts[i]), 'lote' + (i + 1));
         const jpg = img.buffer[0] === 0xff && img.buffer[1] === 0xd8;
         out.push({ buffer: img.buffer, mimeType: jpg ? 'image/jpeg' : 'image/png' });
+        if (onEach) { try { await onEach(i, out[out.length - 1]); } catch (e) { log('  (no se pudo guardar al momento: ' + String(e.message).slice(0, 120) + ')'); } }
         log(`Flow ${i + 1}/${prompts.length}: lista (${img.buffer.length} bytes)`);
       } catch (e) { out.push({ error: e.message }); log(`Flow ${i + 1}/${prompts.length}: FALLÓ ${String(e.message).slice(0, 200)}`); }
       await sleep(2000 + Math.random() * 2000);

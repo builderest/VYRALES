@@ -36,13 +36,13 @@ for (const line of fs.readFileSync(path.join(ROOT, '.env'), 'utf8').split(/\r?\n
   }
   const shots = all.filter((s) => !(s.characters || []).length);
   console.log('Flow: generando', shots.length, 'cuadros en una sola sesión → tomas', shots.map((s) => s.n).join(','));
-  const imgs = shots.length ? await flowImages(shots.map((s) => s.start_en || s.action_en)) : [];
+  // Cada cuadro se guarda en cuanto sale (el panel los va mostrando uno por uno).
   const done = [];
-  for (let i = 0; i < shots.length; i++) {
-    if (!imgs[i] || imgs[i].error) continue;
-    await storeKeyframeImage(supabase, { series, episode: ep, shotN: shots[i].n, image: { imageBytes: imgs[i].buffer.toString('base64'), mimeType: imgs[i].mimeType }, note: 'Google Flow' });
+  if (shots.length) await flowImages(shots.map((s) => s.start_en || s.action_en), console.log, async (i, img) => {
+    await storeKeyframeImage(supabase, { series, episode: ep, shotN: shots[i].n, image: { imageBytes: img.buffer.toString('base64'), mimeType: img.mimeType }, note: 'Google Flow' });
     done.push(shots[i].n);
-  }
+    console.log(`toma ${shots[i].n}: cuadro guardado (${done.length}/${shots.length})`);
+  });
   // El cuadro final viejo ya no corresponde: se rehace desde el nuevo inicial.
   const { data: fr } = await supabase.from('episodes').select('shots').eq('id', epId).single();
   await supabase.from('episodes').update({ shots: fr.shots.map((x) => (done.includes(x.n) ? Object.assign({}, x, { end_frame_url: null, end_frame_skip: false }) : x)) }).eq('id', epId);
