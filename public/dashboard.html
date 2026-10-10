@@ -2465,13 +2465,20 @@
         const m = seriesModels(series);
         const shots = (ep.shots && ep.shots.length) ? ep.shots : Array.from({ length: 8 }, (_, i) => ({ n: i + 1 }));
         const total = shots.length;
-        const p = { video: 0, frames: 0, locations: missingLocationsFor(ep).length * IMAGE_PRICE_USD, photos: 0, voices: 0, music: 0, texts: 0.001 };
+        const sbC = (series && series.story_bible) || {};
+        const narradoC = sbC.format === 'narrado_unico';
+        const contC = !!(sbC.narration && sbC.narration.mode === 'continuous');
+        // Narrados: no se crean imágenes de lugares; los cuadros con Flow cuestan $0.
+        const imgPrice = sbC.image_engine === 'flow' && !shots.some((sh) => (sh.characters || []).length) ? 0 : IMAGE_PRICE_USD;
+        const p = { video: 0, frames: 0, locations: narradoC ? 0 : missingLocationsFor(ep).length * IMAGE_PRICE_USD, photos: 0, voices: 0, music: 0, texts: 0.001 };
         shots.forEach((sh) => {
           if (!clipFor(ep, sh.n)) p.video += m.secs * VEO_PRICE_PER_SEC[sh.n === total ? m.cliff : m.shot];
-          if (usesKeyframes(series) && !clipFor(ep, sh.n) && !frameFor(ep, sh.n)) p.frames += IMAGE_PRICE_USD;
-          const ns = narrationState(series, sh);
+          if (usesKeyframes(series) && !clipFor(ep, sh.n) && !frameFor(ep, sh.n)) p.frames += imgPrice;
+          const ns = contC ? null : narrationState(series, sh);
           if (ns && !ns.ok) p.voices += TTS_LINE_USD * 1.5 * Math.max(1, dlgList(sh.dialogue).length); // 1.5: a veces reintenta por ritmo
         });
+        // Voz continua: UNA voz para todo el video (2 tomas de voz, se queda la mejor) ≈ $0.06; si ya existe, $0.
+        if (contC && !(ep.continuity && ep.continuity.voice && ep.continuity.voice.url)) p.voices = 0.06;
         const chars = (lastLoadedData && lastLoadedData.characters) || [];
         const used = new Set(); shots.forEach((sh) => (sh.characters || []).forEach((n) => used.add(n)));
         p.photos = chars.filter((c) => used.has(c.name) && !c.reference_image_url).length * IMAGE_PRICE_USD;
@@ -2607,7 +2614,7 @@
             : (narrMissing ? '<button onclick="genNarration(this)" data-ep="' + e.id + '" class="mr-2 mb-1 px-3 py-1.5 rounded-lg bg-cyber-emerald/15 border border-cyber-emerald/50 text-cyber-emerald text-xs font-mono hover:bg-cyber-emerald/25"><i class="fa-solid fa-microphone mr-1"></i>Generar narración: ' + narrMissing + ' toma' + (narrMissing === 1 ? '' : 's') + ' (~$' + (narrMissing * TTS_LINE_USD).toFixed(2) + ')</button>' : '') +
               (lastNarr && lastNarr.status !== 'running' && ((lastNarr.failed || []).length || lastNarr.error) ? '<span class="text-[10px] font-mono text-cyber-pink">Narración con errores: ' + esc(lastNarr.error || (lastNarr.failed || []).map(f => 'T' + f.shot + ' ' + f.error).join(' · ')) + '</span>' : '');
           const produceBtn = (nextToProduce && nextToProduce.id === e.id)
-            ? '<button onclick="produceEpisode(\'' + e.id + '\')" class="px-3 py-1.5 rounded-lg bg-cyber-pink/20 border border-cyber-pink/50 text-cyber-pink text-xs font-mono hover:bg-cyber-pink/30"><i class="fa-solid fa-bolt mr-1"></i>Producir este episodio con ' + seriesModels(lastLoadedData.series).shot.replace('veo_', 'Veo ') + ' (~$' + estimateEpisodeCost(e).toFixed(2) + ')</button>'
+            ? '<button onclick="produceEpisode(\'' + e.id + '\')" class="px-3 py-1.5 rounded-lg bg-cyber-pink/20 border border-cyber-pink/50 text-cyber-pink text-xs font-mono hover:bg-cyber-pink/30"><i class="fa-solid fa-bolt mr-1"></i>Producir este episodio ' + (videoProvider === 'king' ? 'en tu PC (LTX)' : 'con ' + seriesModels(lastLoadedData.series).shot.replace('veo_', 'Veo ')) + ' (~$' + estimateEpisodeCost(e).toFixed(2) + ')</button>'
             : '';
           return (
             '<details data-ep-id="' + e.id + '"' + (openEps.has(String(e.id)) ? ' open' : '') + ' class="bg-cyber-darker rounded-lg border border-cyber-border open:border-cyber-cyan/50">' +
