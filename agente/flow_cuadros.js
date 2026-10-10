@@ -22,9 +22,21 @@ for (const line of fs.readFileSync(path.join(ROOT, '.env'), 'utf8').split(/\r?\n
   const { data: series } = await supabase.from('series').select('id, slug').eq('id', ep.series_id).single();
   const hasFrame = (n) => (ep.assets || []).some((a) => (a.kind === 'image' || a.kind === 'video_clip') && a.shot_number === n);
   const want = list ? list.split(',').map(Number) : (ep.shots || []).map((s) => s.n).filter((n) => !solo || !hasFrame(n));
-  const shots = (ep.shots || []).filter((s) => want.includes(s.n) && (s.start_en || s.action_en));
+  const all = (ep.shots || []).filter((s) => want.includes(s.n) && (s.start_en || s.action_en));
+  // Tomas con personajes: una por una con sus fotos de cara como referencia (createKeyframe → Flow con ingredientes).
+  const conPersonajes = all.filter((s) => (s.characters || []).length);
+  if (conPersonajes.length) {
+    const { createKeyframe } = require(path.join(ROOT, 'netlify', 'functions', '_keyframe'));
+    const { data: fullSeries } = await supabase.from('series').select('id, slug, story_bible, visual_memory').eq('id', ep.series_id).single();
+    const { data: characters } = await supabase.from('characters').select('name, fixed_prompt_tag, profile, reference_image_url').eq('series_id', ep.series_id);
+    for (const sh of conPersonajes) {
+      try { await createKeyframe(supabase, { series: fullSeries, episode: ep, shot: sh, characters, log: (...x) => console.log(...x) }); console.log(`toma ${sh.n}: cuadro con personajes listo`); }
+      catch (e) { console.log(`toma ${sh.n}: FALLÓ ${String(e.message).slice(0, 200)}`); }
+    }
+  }
+  const shots = all.filter((s) => !(s.characters || []).length);
   console.log('Flow: generando', shots.length, 'cuadros en una sola sesión → tomas', shots.map((s) => s.n).join(','));
-  const imgs = await flowImages(shots.map((s) => s.start_en || s.action_en));
+  const imgs = shots.length ? await flowImages(shots.map((s) => s.start_en || s.action_en)) : [];
   const done = [];
   for (let i = 0; i < shots.length; i++) {
     if (!imgs[i] || imgs[i].error) continue;
@@ -35,7 +47,7 @@ for (const line of fs.readFileSync(path.join(ROOT, '.env'), 'utf8').split(/\r?\n
   const { data: fr } = await supabase.from('episodes').select('shots').eq('id', epId).single();
   await supabase.from('episodes').update({ shots: fr.shots.map((x) => (done.includes(x.n) ? Object.assign({}, x, { end_frame_url: null, end_frame_skip: false }) : x)) }).eq('id', epId);
   console.log('Cuadros de Flow guardados:', done.join(',') || 'ninguno');
-  if (!done.length) process.exit(1);
+  if (!done.length && !conPersonajes.length) process.exit(1);
   if (solo) { console.log('LISTO: cuadros hechos con Flow ($0). Revísalos en el panel.'); return; }
   console.log('Ahora los videos en king...');
   execFileSync(process.execPath, [path.join(__dirname, 'regen_local.js'), epId, done.join(',')], { cwd: ROOT, stdio: 'inherit' });

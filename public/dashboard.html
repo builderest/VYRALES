@@ -2147,7 +2147,7 @@
         const missing = (ep.shots || []).filter(sh => !frameFor(ep, sh.n) && !clipFor(ep, sh.n)).length;
         // Series con image_engine 'flow' y tomas sin personajes: Google Flow en la PC (gratis), no Gemini por API.
         const sbF = (lastLoadedData && lastLoadedData.series && lastLoadedData.series.story_bible) || {};
-        const useFlow = sbF.image_engine === 'flow' && !(ep.shots || []).some(sh => (sh.characters || []).length);
+        const useFlow = sbF.image_engine === 'flow' && (sbF.flow_characters === true || !(ep.shots || []).some(sh => (sh.characters || []).length));
         if (useFlow) {
           if (!await askConfirm('Generar ' + missing + ' cuadros del EP ' + ep.episode_number + ' con Google Flow en la PC (tu plan, $0).\n\nCorre en segundo plano en Cronix (~1 min por cuadro). Si Google pide iniciar sesión, se abre la ventana de Chrome. ¿Continuar?')) return;
           btn.disabled = true;
@@ -2597,7 +2597,7 @@
             : '<pre class="text-[11px] text-slate-300 whitespace-pre-wrap">' + esc(e.script || 'Sin guion todavía.') + '</pre>';
           const missingFrames = usesKeyframes(data.series) ? shots.filter(sh => !frameFor(e, sh.n) && !clipFor(e, sh.n)).length : 0;
           const framesBtn = (e.status === 'guion_generado' && missingFrames)
-            ? '<button onclick="generateAllFrames(this)" data-ep="' + e.id + '" class="mr-2 mb-1 px-3 py-1.5 rounded-lg bg-cyber-violet/15 border border-cyber-violet/50 text-cyber-violet text-xs font-mono hover:bg-cyber-violet/25"><i class="fa-solid fa-images mr-1"></i>Generar los ' + missingFrames + ' cuadros que faltan' + (missingLocationsFor(e).length ? ' + ' + missingLocationsFor(e).length + ' lugares' : '') + ' (' + ((((lastLoadedData && lastLoadedData.series && lastLoadedData.series.story_bible) || {}).image_engine === 'flow' && !(e.shots || []).some(sh => (sh.characters || []).length)) ? 'Google Flow, $0' : '~$' + ((missingFrames + missingLocationsFor(e).length) * IMAGE_PRICE_USD).toFixed(2)) + ') para revisarlos</button>'
+            ? '<button onclick="generateAllFrames(this)" data-ep="' + e.id + '" class="mr-2 mb-1 px-3 py-1.5 rounded-lg bg-cyber-violet/15 border border-cyber-violet/50 text-cyber-violet text-xs font-mono hover:bg-cyber-violet/25"><i class="fa-solid fa-images mr-1"></i>Generar los ' + missingFrames + ' cuadros que faltan' + (missingLocationsFor(e).length ? ' + ' + missingLocationsFor(e).length + ' lugares' : '') + ' (' + ((((lastLoadedData && lastLoadedData.series && lastLoadedData.series.story_bible) || {}).image_engine === 'flow' && ((((lastLoadedData && lastLoadedData.series && lastLoadedData.series.story_bible) || {}).flow_characters === true) || !(e.shots || []).some(sh => (sh.characters || []).length))) ? 'Google Flow, $0' : '~$' + ((missingFrames + missingLocationsFor(e).length) * IMAGE_PRICE_USD).toFixed(2)) + ') para revisarlos</button>'
             : '';
           const narrMissing = narrationCfg(data.series) ? shots.filter(sh => { const ns = narrationState(data.series, sh); return ns && !ns.ok; }).length : 0;
           const narrRun = narrationRunning(e);

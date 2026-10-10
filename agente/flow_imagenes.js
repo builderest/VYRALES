@@ -92,6 +92,8 @@ async function newProject(page) {
   console.log('Proyecto:', page.url());
 }
 
+// Clave estable de una imagen de Flow: el id del medio (la firma de la URL cambia cada vez que se refresca).
+const mediaKey = (src) => { const m = /\/image\/([0-9a-f-]{36})/i.exec(src) || /\/asb\/([^=?]+)/.exec(src); return m ? m[1] : String(src).split('?')[0]; };
 async function imgSrcs(page) {
   // Miniaturas de la cuadrícula del proyecto (no las del chat del agente, que repiten las mismas).
   return page.evaluate(() => [...new Set([...document.querySelectorAll('img')].filter((i) => i.naturalWidth >= 120 && i.naturalHeight > i.naturalWidth && !/avatar|profile|googleusercontent\.com\/a\//i.test(i.src)).map((i) => i.currentSrc || i.src))]);
@@ -107,9 +109,17 @@ async function addRefs(page, refs, name) {
     const f = path.join(tmp, `ref${i + 1}.${String(r.mimeType || '').includes('png') ? 'png' : 'jpg'}`);
     fs.writeFileSync(f, Buffer.from(r.imageBytes, 'base64'));
     await page.locator('button[aria-label*="ingredientes"], button[aria-label*="ingredients"]').first().click({ timeout: 15000 });
-    await sleep(1200);
-    const [fc] = await Promise.all([page.waitForEvent('filechooser', { timeout: 15000 }), page.getByText(/Subir archivo|Upload file/i).first().click()]);
-    await fc.setFiles(f);
+    await sleep(1500);
+    await shot(page, `${name}_menu${i + 1}`);
+    // 1º: si ya hay un <input type=file> en la página, se le pasa el archivo directo.
+    const inputs = page.locator('input[type="file"]');
+    if (await inputs.count()) await inputs.first().setInputFiles(f);
+    else {
+      const up = page.locator('text=/Subir archivo|Upload file|Upload/i').last();
+      console.log('  (botón subir:', await up.count(), ')');
+      const [fc] = await Promise.all([page.waitForEvent('filechooser', { timeout: 15000 }), up.click({ force: true })]);
+      await fc.setFiles(f);
+    }
     // Espera a que termine de subir y queden seleccionada; luego "Añadir a petición".
     const add = page.getByRole('button', { name: /Añadir a petición|Add to prompt/i }).first();
     for (let k = 0; k < 30; k++) { await sleep(1000); if (await add.isEnabled().catch(() => false)) break; }
@@ -121,8 +131,9 @@ async function addRefs(page, refs, name) {
 }
 
 async function generate(page, ctx, prompt, name, refs) {
-  const before = new Set(await imgSrcs(page));
-  if (refs && refs.length) await addRefs(page, refs, name);
+  if (refs && refs.length) { await addRefs(page, refs, name); await sleep(2000); }
+  // Lo que ya hay (incluidas las fotos de referencia recién subidas) NO cuenta como resultado.
+  const before = new Set((await imgSrcs(page)).map(mediaKey));
   await page.click('.ProseMirror');
   await page.keyboard.insertText(prompt);
   await sleep(800);
@@ -137,7 +148,7 @@ async function generate(page, ctx, prompt, name, refs) {
       const c = page.getByRole('button', { name: /^(Generar|Confirmar|Sí|Continuar|Generate|Confirm)$/i }).first();
       if (await c.isVisible().catch(() => false)) { await c.click().catch(() => {}); confirmed = true; console.log('  (confirmé la generación)'); }
     }
-    const now = (await imgSrcs(page)).filter((s) => !before.has(s));
+    const now = (await imgSrcs(page)).filter((s) => !before.has(mediaKey(s)));
     if (now.length) {
       await sleep(3000);
       let src = now[0];
