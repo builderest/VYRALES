@@ -28,6 +28,21 @@ function shortPauses(wav) {
     return fs.readFileSync(b);
   } catch (_) { return wav; } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 }
+// Regla de VYRALES: el video entero dura como máximo ~1:20. Si la voz no cabe, se acelera un poco
+// (máx. 15 %, atempo conserva el tono). Devuelve el wav (igual o acelerado).
+function fitTempo(wav, seconds, maxVoice, log) {
+  if (!(maxVoice > 0) || seconds <= maxVoice) return wav;
+  const tempo = Math.min(1.15, seconds / maxVoice);
+  const { execFileSync } = require('child_process');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vy-tempo-'));
+  const a = path.join(dir, 'a.wav'), b = path.join(dir, 'b.wav');
+  fs.writeFileSync(a, wav);
+  try {
+    execFileSync(ffmpegBin(), ['-y', '-loglevel', 'error', '-i', a, '-af', 'atempo=' + tempo.toFixed(3), b], { stdio: 'pipe' });
+    log(`voz continua: ${seconds.toFixed(1)} s no cabe en 1:20 → acelerada ${tempo.toFixed(2)}x`);
+    return fs.readFileSync(b);
+  } catch (_) { return wav; } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+}
 // Tiempo de cada palabra (dentro de cada pedazo, repartido por el largo de la palabra).
 function wordTimes(segments) {
   const out = [];
@@ -161,7 +176,13 @@ async function ensureFullVoice(supabase, { episode, series, log = console.log, f
     takes.push(r);
   }
   const best = energyScore(takes[1].wav) > energyScore(takes[0].wav) ? takes[1] : takes[0];
-  const wav = shortPauses(tightenSpeech(best.wav, log));
+  let wav = shortPauses(tightenSpeech(best.wav, log));
+  {
+    const sbT = (series && series.story_bible) || {};
+    const ec = sbT.end_card && sbT.end_card.enabled ? Number(sbT.end_card.seconds) || 2.5 : 0;
+    const maxTotal = Number(sbT.max_seconds) || 80;
+    wav = fitTempo(wav, wavSeconds(wav), maxTotal - LEAD - TAIL - ec, log);
+  }
   const seconds = Math.round(wavSeconds(wav) * 100) / 100;
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vy-voice-'));
   const f = path.join(dir, 'v.wav');
