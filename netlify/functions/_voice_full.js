@@ -43,6 +43,14 @@ function fitTempo(wav, seconds, maxVoice, log) {
     return fs.readFileSync(b);
   } catch (_) { return wav; } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 }
+function atempoWav(wav, tempo) {
+  const { execFileSync } = require('child_process');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vy-at-'));
+  const a = path.join(dir, 'a.wav'), b = path.join(dir, 'b.wav');
+  fs.writeFileSync(a, wav);
+  try { execFileSync(ffmpegBin(), ['-y', '-loglevel', 'error', '-i', a, '-af', 'atempo=' + Number(tempo).toFixed(3), b], { stdio: 'pipe' }); return fs.readFileSync(b); }
+  catch (_) { return wav; } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+}
 // Tiempo de cada palabra (dentro de cada pedazo, repartido por el largo de la palabra).
 function wordTimes(segments) {
   const out = [];
@@ -167,6 +175,39 @@ async function ensureFullVoice(supabase, { episode, series, log = console.log, f
     log(`voz continua: re-alineada (${spans0.length} tramos de voz → ${segments0.length} textos)`);
     return voice0;
   }
+  // Cambió el texto de un video que YA tiene voz: se rehacen SOLO las frases que cambiaron y se pegan en
+  // el audio aprobado (la IA de voz suena distinta en cada toma; Franklin no quiere que cambie la voz).
+  let patched = null;
+  if (!force && cur && cur.url && cur.text && cur.voice === (cfg.voice || '') && process.env.VYRALES_LOCAL_RUN) {
+    try {
+      const oldWav = Buffer.from(await (await fetch(cur.url)).arrayBuffer());
+      const nOld = String(cur.text).split(/\s+/).filter(Boolean).length;
+      const oldWords = Array.isArray(cur.words) && cur.words.length === nOld ? cur.words : await require('./_align').alignWords(oldWav, cur.text, log);
+      patched = await require('./_voice_patch').patchVoice({ oldWav, oldWords, oldText: cur.text, newText: text, cfg, tempo: Number(cur.tempo) || 1, atempo: atempoWav, log });
+      if (patched) {
+        await logSpend(supabase, { seriesId: series.id, episodeId: episode.id, shotNumber: 0, kind: 'narration', model: 'tts_parche', costUsd: patched.costUsd, note: 'parche de voz' });
+        log(`parche de voz: ${patched.changed}/${patched.total} frases nuevas; el resto es la voz original`);
+      }
+    } catch (e) { log('parche de voz: no se pudo (' + String(e.message).slice(0, 160) + ') → voz nueva completa'); patched = null; }
+  }
+  if (patched) {
+    const wavP = patched.wav;
+    const secondsP = Math.round(wavSeconds(wavP) * 100) / 100;
+    const dirP = fs.mkdtempSync(path.join(os.tmpdir(), 'vy-voice-'));
+    const fP = path.join(dirP, 'v.wav');
+    fs.writeFileSync(fP, wavP);
+    const spansP = await speechSpans(fP, secondsP);
+    fs.rmSync(dirP, { recursive: true, force: true });
+    const segmentsP = alignChunks(textChunks(text), spansP, secondsP).map((x) => ({ text: x.text, start: Math.round(x.start * 100) / 100, end: Math.round(x.end * 100) / 100 }));
+    await ensureMediaBucket(supabase);
+    const urlP = await uploadFile(supabase, { path: `${series.slug}/ep${episode.episode_number}/voz-completa-v${Date.now()}.wav`, buffer: wavP, contentType: 'audio/wav' });
+    const wordsP = await require('./_align').alignWords(wavP, text, log);
+    const voiceP = Object.assign({ url: urlP, seconds: secondsP, text, v: VOICE_V, voice: cfg.voice || '', segments: segmentsP, tempo: Number(cur.tempo) || 1, patched_from: cur.url, at: new Date().toISOString() }, wordsP ? { words: wordsP } : {});
+    const { data: frP } = await supabase.from('episodes').select('continuity').eq('id', episode.id).single();
+    await supabase.from('episodes').update({ continuity: Object.assign({}, (frP && frP.continuity) || {}, { voice: voiceP }) }).eq('id', episode.id);
+    episode.continuity = Object.assign({}, episode.continuity || {}, { voice: voiceP });
+    return voiceP;
+  }
   log('voz continua: narrando TODO el texto en una sola toma de voz...');
   const style = (cfg.style || '') + ' Es UNA sola frase continua: dila de corrido, con naturalidad, sin cortes ni pausas raras; solo una pausa mínima en cada punto o coma.';
   const takes = [];
@@ -177,13 +218,16 @@ async function ensureFullVoice(supabase, { episode, series, log = console.log, f
   }
   const best = energyScore(takes[1].wav) > energyScore(takes[0].wav) ? takes[1] : takes[0];
   let wav = shortPauses(tightenSpeech(best.wav, log));
+  let usedTempo = 1;
   {
     const sbT = (series && series.story_bible) || {};
     // Cierre: dura lo que diga su voz (≈0.42 s por palabra) o sus segundos, lo que sea más largo.
     const ecVoice = sbT.end_card && sbT.end_card.voice ? String(sbT.end_card.voice).split(/\s+/).filter(Boolean).length * 0.42 : 0;
     const ec = sbT.end_card && sbT.end_card.enabled ? Math.max(Number(sbT.end_card.seconds) || 2.5, ecVoice) + 0.3 : 0;
     const maxTotal = Number(sbT.max_seconds) || 80;
-    wav = fitTempo(wav, wavSeconds(wav), maxTotal - LEAD - TAIL - ec, log);
+    const raw = wavSeconds(wav);
+    wav = fitTempo(wav, raw, maxTotal - LEAD - TAIL - ec, log);
+    usedTempo = Math.round((raw / Math.max(0.1, wavSeconds(wav))) * 1000) / 1000;
   }
   const seconds = Math.round(wavSeconds(wav) * 100) / 100;
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vy-voice-'));
@@ -196,7 +240,7 @@ async function ensureFullVoice(supabase, { episode, series, log = console.log, f
   const url = await uploadFile(supabase, { path: `${series.slug}/ep${episode.episode_number}/voz-completa-v${Date.now()}.wav`, buffer: wav, contentType: 'audio/wav' });
   // Tiempos reales por palabra (Whisper local en la PC); sin esto las tomas se cortaban hasta 2 s fuera de la voz.
   const words = await require('./_align').alignWords(wav, text, log);
-  const voice = Object.assign({ url, seconds, text, v: VOICE_V, voice: cfg.voice || '', segments, at: new Date().toISOString() }, words ? { words } : {});
+  const voice = Object.assign({ url, seconds, text, v: VOICE_V, voice: cfg.voice || '', segments, tempo: usedTempo, at: new Date().toISOString() }, words ? { words } : {});
   const { data: fresh } = await supabase.from('episodes').select('continuity').eq('id', episode.id).single();
   await supabase.from('episodes').update({ continuity: Object.assign({}, (fresh && fresh.continuity) || {}, { voice }) }).eq('id', episode.id);
   episode.continuity = Object.assign({}, episode.continuity || {}, { voice });
