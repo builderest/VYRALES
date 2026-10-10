@@ -76,6 +76,17 @@ function matchWords(scriptWords, heard0) {
     const gapP = p >= 0 ? i - p : 0, gapQ = q < n ? q - i : 0;
     if (gapP > 3 && gapQ > 3) out[i] = null;
   }
+  // Coherencia de tiempos: un ancla que va hacia atrás, o que exige hablar a más de 7 palabras/s
+  // (o empezar mucho después del inicio), es un casamiento falso de Whisper → fuera.
+  {
+    let pi = -1, pt = 0;
+    for (let i = 0; i < n; i++) {
+      if (!out[i]) continue;
+      const t = out[i].start;
+      const bad = pi < 0 ? t > 1.5 + i * 0.7 : (t < pt || ((i - pi) >= 3 && (i - pi) / Math.max(0.01, t - pt) > 7) || (t - pt) > 2.5 + (i - pi) * 0.9);
+      if (bad) out[i] = null; else { pi = i; pt = t; }
+    }
+  }
   const matched = out.filter(Boolean).length;
   // Huecos (Whisper no oyó ese tramo, o "66" vs "sesenta y seis"): se reparten entre la palabra
   // casada anterior y la siguiente, en proporción al largo de cada palabra.
@@ -107,6 +118,19 @@ async function alignWords(wavBuffer, text, log = console.log) {
     let heard = (r.chunks || []).filter((c) => c && c.timestamp && c.timestamp[0] != null);
     const scriptWords = String(text).split(/\s+/).filter(Boolean);
     let { words, matched } = matchWords(scriptWords, heard);
+    // Si casó poco, se vuelve a escuchar TODO en ventanas fijas de 24 s (con 4 s de traslape).
+    if (matched < scriptWords.length * 0.9) {
+      const W = 24, O = 4, total = audio.length / 16000, extra = [];
+      for (let a = 0; a < total; a += W - O) {
+        const seg = audio.subarray(Math.floor(a * 16000), Math.min(audio.length, Math.ceil((a + W) * 16000)));
+        if (seg.length < 8000) break;
+        const r3 = await asr(seg, { language: 'spanish', task: 'transcribe', return_timestamps: 'word' });
+        for (const c of (r3.chunks || [])) if (c && c.timestamp && c.timestamp[0] != null && (a === 0 || c.timestamp[0] >= O / 2)) extra.push({ text: c.text, timestamp: [Math.round((c.timestamp[0] + a) * 100) / 100, Math.round(((c.timestamp[1] == null ? c.timestamp[0] + 0.3 : c.timestamp[1]) + a) * 100) / 100] });
+      }
+      const m2 = matchWords(scriptWords, extra);
+      log(`alineación de voz: segunda escucha por ventanas → ${m2.matched}/${scriptWords.length} (antes ${matched})`);
+      if (m2.matched > matched) { heard = extra; words = m2.words; matched = m2.matched; }
+    }
     // Whisper a veces se salta un pedazo entero (~20 s): se vuelve a transcribir SOLO ese tramo y se re-casa.
     for (let pass = 0; pass < 2; pass++) {
       const holes = [];
