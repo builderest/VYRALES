@@ -27,5 +27,19 @@ async function main() {
   const res = await handler({ httpMethod: 'POST', body: JSON.stringify(Object.assign({ series: series.slug, episode_id: episodeId, provider: 'king', force: ep.status === 'generando_media' }, Number(process.argv[3]) ? { shot: Number(process.argv[3]) } : {})), queryStringParameters: {}, headers: {} });
   console.log('RESULTADO', res.statusCode, String(res.body || '').slice(0, 800));
   if (res.statusCode >= 400) process.exit(1);
+  // Control de calidad automático: si alguna toma salió corta o congelada, se rehace sola y se vuelve a unir.
+  if (!Number(process.argv[3])) {
+    try {
+      const { handler: regen } = require(path.join(ROOT, 'netlify', 'functions', 'regen-shot-background'));
+      const redone = await require('./_qa').qaShots({ supabase, epId: episodeId, handler: regen, log: (...x) => console.log(...x) });
+      if (redone.length) {
+        const { mergeEpisodeVideo } = require(path.join(ROOT, 'netlify', 'functions', '_merge'));
+        const { data: fresh } = await supabase.from('episodes').select('*, assets(*)').eq('id', episodeId).single();
+        const { data: sr } = await supabase.from('series').select('id, slug, title, genre, story_bible').eq('id', ep.series_id).single();
+        const m = await mergeEpisodeVideo(supabase, { episode: fresh, series: sr, log: (...x) => console.log(...x) });
+        console.log('QA: video final unido de nuevo:', m.asset && m.asset.storage_path);
+      }
+    } catch (e) { console.log('QA: no se pudo (' + String(e.message).slice(0, 200) + ')'); }
+  }
 }
 main().catch((err) => { console.error('ERROR:', err.message || err); process.exit(1); });

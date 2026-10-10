@@ -25,10 +25,15 @@ async function uploadClip(supabase, { path: storagePath, buffer }) {
 
 // Subida genérica (imágenes de referencia de personajes, etc.). Devuelve la URL pública.
 async function uploadFile(supabase, { path: storagePath, buffer, contentType }) {
-  const { error } = await supabase.storage.from(BUCKET).upload(storagePath, buffer, {
-    contentType,
-    upsert: true
-  });
+  // Reintentos: Supabase a veces responde 5xx sueltos (oct-2026: un 520 tumbó una toma entera).
+  let error = null;
+  for (let k = 0; k < 4; k++) {
+    ({ error } = await supabase.storage.from(BUCKET).upload(storagePath, buffer, { contentType, upsert: true }));
+    if (!error) break;
+    const st = Number(error.status || error.statusCode) || 0;
+    if (st && st < 500 && st !== 429) break;
+    await new Promise((r) => setTimeout(r, 2000 * (k + 1)));
+  }
   if (error) throw error;
 
   const { data } = supabase.storage.from(BUCKET).getPublicUrl(storagePath);

@@ -87,7 +87,7 @@ function buildNarratedPromptRaw(tipo, p, episodeNumber = 1) {
 - ESTRUCTURA: ${p.estructura}
 
 === CÓMO SE ESCRIBE UNA OBRA MAESTRA ===
-1. GANCHO (toma 1, 0–3 s): máximo 12 palabras; empieza YA, sin saludo ni contexto. Prohibido: "¿Sabías que…?", "Hoy te voy a contar", "Increíble", "No vas a creer", "Imagina que…", "Mira…". La imagen de la toma 1 ya está en movimiento y muestra lo que dice la frase.
+1. GANCHO (toma 1, 0–3 s): máximo 12 palabras; empieza YA, sin saludo ni contexto. Prohibido: "¿Sabías que…?", "Hoy te voy a contar", "Increíble", "No vas a creer", "Imagina que…", "Mira…". La imagen de la toma 1 ya está en movimiento y muestra lo que dice la frase. La PRIMERA palabra fuerte de la narración es el TEMA más llamativo del video (p. ej. "La Tercera Guerra Mundial estuvo a punto de empezar…"): lo que más atrapa va primero, no la fecha ni el contexto.
 2. HOOK_TEXT: 3 a 5 palabras en MAYÚSCULAS que aparecen en pantalla los primeros 3 segundos (para quien ve sin sonido).
 3. BUCLE ABIERTO (tomas 2–3): una pregunta que solo se responde al final. El cerebro no suelta una pregunta abierta.
 4. UNA SOLA HISTORIA de causa → efecto → consecuencia. Nunca una lista de datos sueltos. Cada frase empuja a la siguiente ("y entonces…", "pero…").
@@ -131,7 +131,7 @@ ${p.reglas ? '8b. REGLAS DE ESTE TIPO: ' + p.reglas + '\n' : ''}${p.fuentes ? '9
   "characters": [],
   "episodes": [{
     "episode_number": ${episodeNumber},
-    "title": "<título con curiosidad, máx. 60 caracteres>",
+    "title": "<empieza con el tema más llamativo; verdadero, sin exagerar lo que no pasó; máx. 60 caracteres>",
     "continuity": { "summary": "…", "last_cliffhanger": "<la última frase>", "hook_text": "<3–5 PALABRAS>", "sources": ["…"] },
     "shots": [{ "n": 1, "location": "<lugar>", "characters": [], "scene_es": "…", "camera": "…", "start_en": "…", "end_en": "…", "action_en": "…", "reaction_en": "…", "background_en": "…", "dialogue": [{ "speaker": "Narrador", "line": "…" }], "sfx": "" }]
   }]

@@ -31,33 +31,9 @@ async function main() {
     const r = await handler({ httpMethod: 'POST', body: JSON.stringify({ assetId: asset.id, provider: 'king', new_frame: frame }) });
     if (r.statusCode >= 400) { console.log(`TOMA ${n}: FALLÓ ${String(r.body).slice(0, 300)}`); fallas.push(n); } else console.log(`TOMA ${n}: lista ✅`);
   }
-  // Voz continua: antes de unir, revisar que cada clip alcance lo que dura su parte de la voz.
-  // Un clip corto se ralentiza o se queda congelado; se rehace solo (hasta 15 s) para que salga bien a la primera.
-  try {
-    const VF = require(path.join(ROOT, 'netlify', 'functions', '_voice_full'));
-    const { data: sr2 } = await supabase.from('series').select('id, slug, title, genre, story_bible').eq('id', ep.series_id).single();
-    if (VF.continuousMode(sr2.story_bible)) {
-      const { data: e2 } = await supabase.from('episodes').select('*, assets(*)').eq('id', epId).single();
-      const voice = await VF.ensureFullVoice(supabase, { episode: e2, series: sr2, log: (...x) => console.log(...x) });
-      const exact = VF.shotCutsExact(voice, e2.shots || []) || {};
-      const secs = VF.shotSecondsFor(voice, e2.shots || []);
-      const ffmpeg = require(path.join(ROOT, 'node_modules', 'ffmpeg-static'));
-      const { execFile } = require('child_process');
-      const durOf = (url) => new Promise((res) => execFile(ffmpeg, ['-i', url], { timeout: 60000 }, (e, so, se) => { const m = /Duration: (\d+):(\d+):([\d.]+)/.exec(String(se)); res(m ? (+m[1]) * 3600 + (+m[2]) * 60 + parseFloat(m[3]) : 0); }));
-      const { data: fr2 } = await supabase.from('episodes').select('shots').eq('id', epId).single();
-      await supabase.from('episodes').update({ shots: (fr2.shots || []).map((x, i) => Object.assign({}, x, { seconds: Math.min(15, Math.max(secs[i] || 2, Math.ceil((exact[x.n] || 0) + 0.3))) })) }).eq('id', epId);
-      for (const sh of e2.shots || []) {
-        const clip = (e2.assets || []).filter((a) => a.kind === 'video_clip' && a.shot_number === sh.n).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))[0];
-        if (!clip || !exact[sh.n]) continue;
-        const d = await durOf(clip.storage_path);
-        if (d && d < exact[sh.n] * 0.8) {
-          console.log(`TOMA ${sh.n}: el clip dura ${d.toFixed(1)} s y su voz ${exact[sh.n].toFixed(1)} s → la rehago más larga`);
-          const r = await handler({ httpMethod: 'POST', body: JSON.stringify({ assetId: clip.id, provider: 'king', new_frame: false }) });
-          console.log(r.statusCode >= 400 ? `TOMA ${sh.n}: FALLÓ ${String(r.body).slice(0, 200)}` : `TOMA ${sh.n}: lista ✅`);
-        }
-      }
-    }
-  } catch (e) { console.log('revisión de largos: no se pudo (' + String(e.message).slice(0, 200) + ')'); }
+  // Control de calidad automático (duración contra la voz + clips congelados).
+  try { await require('./_qa').qaShots({ supabase, epId, handler, log: (...x) => console.log(...x) }); }
+  catch (e) { console.log('QA: no se pudo (' + String(e.message).slice(0, 200) + ')'); }
   console.log('\nUniendo el video final de nuevo...');
   const { mergeEpisodeVideo } = require(path.join(ROOT, 'netlify', 'functions', '_merge'));
   const { data: fresh } = await supabase.from('episodes').select('*, assets(*)').eq('id', epId).single();
