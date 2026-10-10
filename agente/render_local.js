@@ -62,7 +62,7 @@ async function main() {
     const dir = path.join(FINALES, series.slug);
     fs.mkdirSync(dir, { recursive: true });
     const name = fileNameFor(series.slug, ep.episode_number);
-    const dest = path.join(dir, name);
+    let dest = path.join(dir, name);
     const tmp = dest + '.part.mp4';
     // Subida a 1080x1920: las tomas de Veo vienen en 720x1280 y YouTube/TikTok comprimen MUCHO
     // más fuerte los videos de 720p (un Short en 720p se ve borroso). Escalado lanczos + nitidez
@@ -71,7 +71,20 @@ async function main() {
     await run(['-y', '-i', result.file, '-vf', 'scale=1080:1920:flags=lanczos,unsharp=5:5:0.4:5:5:0.0',
       '-c:v', 'libx264', '-preset', process.env.VYRALES_X264_PRESET, '-crf', '18', '-profile:v', 'high', '-pix_fmt', 'yuv420p',
       '-c:a', 'copy', '-movflags', '+faststart', tmp], path.dirname(result.file));
-    fs.renameSync(tmp, dest); // el archivo aparece completo de una vez (nunca a medias)
+    // El archivo aparece completo de una vez (nunca a medias). Si el viejo está abierto en un reproductor
+    // (Windows lo bloquea: EPERM), se reintenta y si sigue bloqueado se guarda como "-nuevo".
+    let renamed = false;
+    for (let k = 0; k < 4 && !renamed; k++) {
+      try { fs.renameSync(tmp, dest); renamed = true; }
+      catch (e) { if (!/EPERM|EBUSY|EACCES/.test(e.code || e.message)) throw e; await new Promise((r) => setTimeout(r, 3000)); }
+    }
+    if (!renamed) {
+      const alt = dest.replace(/\.mp4$/, '-nuevo.mp4');
+      try { fs.rmSync(alt, { force: true }); } catch (_) {}
+      fs.renameSync(tmp, alt);
+      console.log(`AVISO: ${name} está abierto en otro programa; el video nuevo quedó como ${path.basename(alt)}`);
+      dest = alt;
+    }
     // Marca de qué versión del video final es (si se vuelve a unir en Netlify, la PC lo rehace).
     fs.writeFileSync(dest.replace(/\.mp4$/, '.json'), JSON.stringify({
       episode_id: ep.id, series: series.slug, episode_number: ep.episode_number,
