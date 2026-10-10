@@ -314,7 +314,9 @@ exports.handler = async (event) => {
           let existingFrame = await loadExistingKeyframe(supabase, episode.id, scene.number);
           // Voz continua: el cuadro inicial de esta toma ES el final de la anterior (un solo movimiento).
           // shot.chain === false: CORTE a otra escena (otro tema); empieza con su propio cuadro inicial.
-          if (continuous && !existingFrame && prevEnd && scene.shot.chain !== false) {
+          // Documentales (narrado_unico): una toma con su propio start_en es un CORTE, no se encadena.
+          const docCut = series.story_bible && series.story_bible.format === 'narrado_unico' && series.story_bible.subtitle_style !== 'poster' && !!(scene.shot.start_en && scene.shot.start_en.trim());
+          if (continuous && !existingFrame && prevEnd && scene.shot.chain !== false && !docCut) {
             await require('./_keyframe').storeKeyframeImage(supabase, { series, episode, shotN: scene.number, image: prevEnd, log: (...a) => console.log(LOG, ...a) });
             existingFrame = { startImage: prevEnd, chained: true };
           }
@@ -325,14 +327,14 @@ exports.handler = async (event) => {
           if (provider === 'king' && scene.shot.end_en) {
             // Ancla = primer cuadro de ESTA cadena de tomas (se reinicia en cada corte chain:false).
             if (continuous) {
-              if (scene.number === 1 || scene.shot.chain === false) firstStart = startImage;
+              if (scene.number === 1 || scene.shot.chain === false || docCut) firstStart = startImage;
               else if (!firstStart) {
                 // retomando a medias: buscar hacia atrás el inicio de la cadena
                 let k = scene.number; while (k > 1 && ((allScenes.find((x) => x.number === k) || {}).shot || {}).chain !== false) k--;
                 const fk = await loadExistingKeyframe(supabase, episode.id, k); firstStart = fk && fk.startImage;
               }
             }
-            endImage = await require('./_keyframe').endFrameFor(supabase, { series, episode, shot: scene.shot, startImage, anchorImage: continuous && scene.number > 1 && scene.shot.chain !== false ? firstStart : null, fresh: !existingFrame || !!existingFrame.chained, log: (...a) => console.log(LOG, ...a) });
+            endImage = await require('./_keyframe').endFrameFor(supabase, { series, episode, shot: scene.shot, startImage, anchorImage: continuous && !docCut && scene.number > 1 && scene.shot.chain !== false ? firstStart : null, fresh: !existingFrame || !!existingFrame.chained, log: (...a) => console.log(LOG, ...a) });
           }
         }
         let veo;

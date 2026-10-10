@@ -125,6 +125,14 @@ exports.handler = async (event) => {
       sb.narration = sb.narration || prev.narration || { engine: 'gemini_tts', cast: true, video_audio: 'none', voice: 'Algenib', model: TTS_MODEL_DEFAULT };
       const chars = (d.characters || []).map((c) => ({ name: c.name, role: c.role, fixed_prompt_tag: c.fixed_prompt_tag, profile: Object.assign({ key: c.key }, c.profile || {}) }));
       sb.voice_cast = buildVoiceCast({ episodes: d.episodes || [], characters: chars, storyBible: sb, existing: sb.voice_cast || prev.voice_cast || {} });
+      // Videos narrados (documental/curiosidades): UNA sola voz para todo el video (no una por toma),
+      // letras grandes palabra por palabra mientras habla, e imágenes con Google Flow. Se respeta lo que ya traiga.
+      if (sb.format === 'narrado_unico') {
+        sb.narration = Object.assign({}, sb.narration);
+        if (!sb.narration.mode) sb.narration.mode = (prev.narration && prev.narration.mode) || 'continuous';
+        if (!sb.subtitle_style) sb.subtitle_style = prev.subtitle_style || 'palabra';
+        if (!sb.image_engine) sb.image_engine = prev.image_engine || 'flow';
+      }
       return sb;
     }
     if (body.dry_run) {

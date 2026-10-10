@@ -184,7 +184,16 @@ async function ensureFullVoice(supabase, { episode, series, log = console.log, f
 
 // Duración de cada toma para que el video entero dure lo que la voz (+ entrada y salida).
 // shot.weight (opcional) da más tiempo a una toma. LTX: 3–16 s enteros.
+// Cada toma necesita su parte de la voz (voice_part). Guiones narrados viejos la traen como línea del Narrador.
+function withParts(shots) {
+  return (shots || []).map((s) => {
+    if (s.voice_part) return s;
+    const d = (Array.isArray(s.dialogue) ? s.dialogue : s.dialogue ? [s.dialogue] : []).map((x) => x && x.line).filter(Boolean).join(' ');
+    return d ? Object.assign({}, s, { voice_part: d.replace(/\s*…\s*/g, ' ').trim() }) : s;
+  });
+}
 function shotSecondsFor(voice, shots) {
+  shots = withParts(shots);
   const total = LEAD + Number(voice.seconds || 0) + TAIL;
   // Sincronía: si las tomas dicen qué parte de la frase cubren (shot.voice_part), cada toma dura
   // exactamente lo que tarda la voz en llegar a la parte de la siguiente (cortes redondeados en el
@@ -216,6 +225,7 @@ function shotSecondsFor(voice, shots) {
 
 // Igual que shotSecondsFor pero SIN redondear: { [n]: segundos exactos } para recortar/ajustar en el render.
 function shotCutsExact(voice, shots) {
+  shots = withParts(shots);
   if (!(shots.length > 1 && shots.every((s) => s.voice_part))) return null;
   const wt = Array.isArray(voice.words) && voice.words.length ? voice.words : wordTimes(voice.segments);
   const words = wt.map((x) => normW(x.word));
