@@ -103,9 +103,30 @@ async function alignWords(wavBuffer, text, log = console.log) {
     const t0 = Date.now();
     const asr = await loadAsr(log);
     const r = await asr(wavTo16k(wavBuffer), { language: 'spanish', task: 'transcribe', return_timestamps: 'word', chunk_length_s: 30, stride_length_s: 5 });
-    const heard = (r.chunks || []).filter((c) => c && c.timestamp && c.timestamp[0] != null);
+    const audio = wavTo16k(wavBuffer);
+    let heard = (r.chunks || []).filter((c) => c && c.timestamp && c.timestamp[0] != null);
     const scriptWords = String(text).split(/\s+/).filter(Boolean);
-    const { words, matched } = matchWords(scriptWords, heard);
+    let { words, matched } = matchWords(scriptWords, heard);
+    // Whisper a veces se salta un pedazo entero (~20 s): se vuelve a transcribir SOLO ese tramo y se re-casa.
+    for (let pass = 0; pass < 2; pass++) {
+      const holes = [];
+      for (let i = 0; i < words.length;) {
+        if (!words[i].guess) { i++; continue; }
+        let q = i; while (q < words.length && words[q].guess) q++;
+        if (q - i >= 5) holes.push([Math.max(0, (words[i - 1] || { end: 0 }).end - 0.3), (words[q] || { start: audio.length / 16000 }).start + 0.3]);
+        i = q;
+      }
+      if (!holes.length) break;
+      for (const [a, b] of holes) {
+        const seg = audio.subarray(Math.floor(a * 16000), Math.min(audio.length, Math.ceil(b * 16000)));
+        if (seg.length < 16000) continue;
+        const r2 = await asr(seg, { language: 'spanish', task: 'transcribe', return_timestamps: 'word', chunk_length_s: 30, stride_length_s: 5 });
+        const extra = (r2.chunks || []).filter((c) => c && c.timestamp && c.timestamp[0] != null).map((c) => ({ text: c.text, timestamp: [Math.round((c.timestamp[0] + a) * 100) / 100, Math.round(((c.timestamp[1] == null ? c.timestamp[0] + 0.3 : c.timestamp[1]) + a) * 100) / 100] }));
+        heard = heard.filter((h) => h.timestamp[0] < a || h.timestamp[0] > b).concat(extra);
+      }
+      ({ words, matched } = matchWords(scriptWords, heard));
+      log(`alineación de voz: re-escuché ${holes.length} tramo(s) que Whisper se saltó → ${matched}/${scriptWords.length}`);
+    }
     log(`alineación de voz (Whisper local): ${matched}/${scriptWords.length} palabras casadas en ${Math.round((Date.now() - t0) / 1000)} s`);
     if (matched < scriptWords.length * 0.6) { log('alineación de voz: muy pocas palabras casadas → uso la estimación'); return null; }
     return words;

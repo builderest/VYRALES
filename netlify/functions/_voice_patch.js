@@ -52,13 +52,33 @@ async function patchVoice({ oldWav, oldWords, oldText, newText, cfg, tempo = 1, 
   if (!changed) return null;
   if (changed > Math.ceil(m * 0.5)) { log(`parche de voz: cambiaron ${changed}/${m} frases (demasiadas) → voz nueva completa`); return null; }
   const old = parseWav(oldWav), sr = old.sr;
-  const sec = (t) => Math.max(0, Math.min(old.pcm.length, Math.round(t * sr)));
+  const idx = (t) => Math.max(0, Math.min(old.pcm.length, Math.round(t * sr)));
+  // Punto MÁS SILENCIOSO cerca de t (ventana ±w s): ahí se corta, nunca encima de una palabra
+  // (cortar por los tiempos de Whisper repetía el final de una frase al empezar la otra).
+  const quietest = (t, w = 0.3) => {
+    const a = idx(t - w), b = idx(t + w), win = Math.max(1, Math.round(0.02 * sr));
+    let best = idx(t), bestE = Infinity;
+    for (let i = a; i + win <= b; i += Math.round(win / 2)) {
+      let e = 0; for (let k = i; k < i + win; k++) e += old.pcm[k] * old.pcm[k];
+      if (e < bestE) { bestE = e; best = i + Math.round(win / 2); }
+    }
+    return best;
+  };
+  // Borde entre la frase i y la i+1 del audio viejo: el silencio entre las dos.
+  const edgeAfter = (i) => {
+    if (i >= A.length - 1) return old.pcm.length;
+    const endI = oldWords[A[i].b].end, startN = oldWords[A[i + 1].a].start;
+    return quietest((endI + startN) / 2, Math.max(0.05, Math.min(0.3, (startN - endI) / 2 + 0.05)));
+  };
+  const edgeBefore = (i) => (i <= 0 ? idx(Math.max(0, oldWords[A[0].a].start - 0.15)) : edgeAfter(i - 1));
   const pieces = [];
   const gap = (s) => new Int16Array(Math.round(s * sr));
-  for (let j = 0; j < m; j++) {
+  for (let j = 0; j < m;) {
     if (keep[j] >= 0) {
-      const s = A[keep[j]], w0 = oldWords[s.a], w1 = oldWords[s.b];
-      pieces.push(old.pcm.subarray(sec(w0.start - 0.06), sec(w1.end + 0.12)));
+      // Tramo continuo del audio viejo (frases seguidas que no cambiaron): se copia de una sola vez.
+      let k = j; while (k + 1 < m && keep[k + 1] === keep[k] + 1) k++;
+      pieces.push(old.pcm.subarray(edgeBefore(keep[j]), edgeAfter(keep[k])));
+      j = k + 1;
     } else {
       log(`parche de voz: rehaciendo SOLO la frase ${j + 1}: "${B[j].text.slice(0, 80)}"`);
       const style = (cfg.style || '') + ' Es una frase suelta dentro de una narración ya grabada: mismo tono, misma energía y mismo ritmo que el resto.';
@@ -66,10 +86,12 @@ async function patchVoice({ oldWav, oldWords, oldText, newText, cfg, tempo = 1, 
       let w = tightenSpeech(r.wav, log);
       if (tempo && Math.abs(tempo - 1) > 0.005 && atempo) w = atempo(w, tempo);
       const p = parseWav(w);
+      if (pieces.length) pieces.push(gap(0.22));
       pieces.push(resample(p.pcm, p.sr, sr));
+      pieces.push(gap(0.22));
       pieces.costUsd = (pieces.costUsd || 0) + (r.costUsd || 0);
+      j++;
     }
-    if (j < m - 1) pieces.push(gap(0.28));
   }
   const total = pieces.reduce((a, p) => a + p.length, 0), out = new Int16Array(total);
   let o = 0; for (const p of pieces) { out.set(p, o); o += p.length; }
