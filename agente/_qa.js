@@ -74,7 +74,7 @@ Responde SOLO este JSON: {"tomas":[{"n":1,"image_ok":true,"action_ok":true,"haze
 async function rewriteShot(sh, reason, log) {
   const { runClaude, parseJson } = require('./_claude');
   const prompt = `Eres el director de fotografía de un documental hecho con LTX (modelo de video que parte de una imagen fija y HACE todo lo que lee).
-Una toma salió mal dos veces. Reescribe SOLO la cámara, la acción y el final para que no vuelva a pasar.
+Una toma salió mal. Reescribe SOLO la cámara, la acción y el final para que no vuelva a pasar (si ya se reescribió antes, cambia de enfoque: otro movimiento de cámara, una acción más simple).
 
 Narración: "${lineOf(sh)}"
 La imagen inicial muestra: ${sh.start_en || ''}
@@ -122,7 +122,17 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
       if (d && fz > d * 0.4) why = `está quieto ${fz.toFixed(1)} de ${d.toFixed(1)} s`;
     }
     if (!why) continue;
-    log(`QA toma ${sh.n}: ${why} → la rehago`);
+    log(`QA toma ${sh.n}: ${why} → la rehago con prompt nuevo`);
+    if (/quieto/.test(why)) {
+      try {
+        const fix = await rewriteShot(sh, 'El video salió casi congelado: ' + why + '. Necesita un movimiento claro y visible del sujeto principal.', log);
+        if (fix) {
+          const { data: fr } = await supabase.from('episodes').select('shots').eq('id', epId).single();
+          await supabase.from('episodes').update({ shots: (fr.shots || []).map((x) => x.n === sh.n ? Object.assign({}, x, fix, { prompt_override: null, ltx_en: null, qa_rewrite_from: { camera: x.camera, action_en: x.action_en, reaction_en: x.reaction_en } }) : x) }).eq('id', epId);
+          log(`QA toma ${sh.n}: prompt nuevo → cámara "${fix.camera}" · ${fix.action_en}`);
+        }
+      } catch (e) { log(`QA toma ${sh.n}: no pude reescribir (${String(e.message).slice(0, 120)})`); }
+    }
     const r = await handler({ httpMethod: 'POST', body: JSON.stringify({ assetId: clip.id, provider: 'king', new_frame: false }) });
     if (r.statusCode >= 400) log(`QA toma ${sh.n}: FALLÓ ${String(r.body).slice(0, 200)}`); else { log(`QA toma ${sh.n}: lista ✅`); redone.push(sh.n); }
   }
@@ -142,18 +152,20 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
     for (const it of items) {
       const r = res[it.sh.n]; if (!r) continue;
       const bad = r.image_ok === false || r.action_ok === false || r.haze === true || r.broken === true;
-      // Hasta 3 intentos por toma, cada uno con una estrategia DISTINTA (repetir lo mismo da el mismo error, ej. T6 Toba):
-      //   1) mismo prompt con movimiento reforzado · 2) Claude reescribe cámara/acción según lo que vio el QA ·
-      //   3) reescritura + imagen nueva (solo sin personajes). Después queda para revisión humana.
+      // Hasta 3 intentos por toma; en TODOS Claude reescribe cámara/acción/final con lo que vio el QA (repetir el mismo
+      // prompt daba el mismo error, ej. T6 Toba). Imagen nueva si no cuadra o desde el 2º intento (solo sin personajes).
+      // Después de 3 queda para revisión humana.
       const tries = it.sh.qa ? (Number(it.sh.qa.tries) || (it.sh.qa.redone ? 1 : 0)) : 0;
       const already = tries >= 3;
       qaOf[it.sh.n] = { clip_id: it.clip.id, ok: !bad, image_ok: r.image_ok !== false, action_ok: r.action_ok !== false, haze: !!r.haze, broken: !!r.broken, reason: String(r.reason || '').slice(0, 300), at: new Date().toISOString(), redone: tries > 0, tries };
       if (bad && !already) {
         const freeFrame = !(it.sh.characters || []).length; // cuadro nuevo solo por el camino gratis (Flow/FLUX)
-        const newFrame = freeFrame && (r.image_ok === false || tries >= 2);
-        const rewrite = tries >= 1;
+        // Franklin (oct-11): si se rehace con el MISMO prompt, sale el mismo error → SIEMPRE se reescribe el prompt
+        // (Claude guionista, con lo que vio el QA) y la imagen se cambia si no cuadra o desde el 2º intento.
+        const newFrame = freeFrame && (r.image_ok === false || tries >= 1);
+        const rewrite = true;
         todo.push({ n: it.sh.n, clip: it.clip, newFrame, boost: r.action_ok === false, rewrite, reason: r.reason || '', sh: it.sh });
-        log(`QA visual toma ${it.sh.n}: ${r.reason || 'no pasó'} → intento ${tries + 1}/3: ${rewrite ? 'Claude reescribe el prompt' : 'movimiento reforzado'}${newFrame ? ' + cuadro nuevo' : ''}`);
+        log(`QA visual toma ${it.sh.n}: ${r.reason || 'no pasó'} → intento ${tries + 1}/3: Claude reescribe el prompt${newFrame ? ' + imagen nueva' : ''}`);
       } else if (bad) log(`QA visual toma ${it.sh.n}: sigue con problema (${r.reason || ''}) → queda marcada para que la veas`);
     }
     const saveQa = async (extra = {}) => {
