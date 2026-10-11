@@ -236,7 +236,7 @@ async function tiktokDirectPost(supabase, { videoBuffer, post, log = console.log
 // contraseña o quites la app). Llaves: META_APP_ID, META_APP_SECRET (Opcional META_PAGE_ID si
 // administras varias Páginas).
 const FB_GRAPH = 'https://graph.facebook.com/v25.0';
-const META_SCOPES = 'pages_show_list,pages_read_engagement,pages_manage_posts,instagram_basic,instagram_content_publish,business_management' + (process.env.META_INSIGHTS === '0' ? '' : ',instagram_manage_insights,read_insights'); // insights (vistas en /analitica.html). Franklin los añadió al caso de uso de la app (oct-10). Si Meta vuelve a dar 'Invalid Scopes', poner META_INSIGHTS=0
+const META_SCOPES = 'pages_show_list,pages_read_engagement,pages_manage_posts,instagram_basic,instagram_content_publish,business_management' + (process.env.META_INSIGHTS === '0' ? '' : ',read_insights') + (process.env.META_IG_INSIGHTS === '1' ? ',instagram_manage_insights' : ''); // insights (vistas en /analitica.html). Franklin los añadió al caso de uso de la app (oct-10). instagram_manage_insights dio 'Invalid Scopes' (no está en el caso de uso): solo con META_IG_INSIGHTS=1 cuando se añada. Si read_insights falla, META_INSIGHTS=0
 const metaId = () => process.env.META_APP_ID || need('INSTAGRAM_APP_ID');
 const metaSecret = () => process.env.META_APP_SECRET || need('INSTAGRAM_APP_SECRET');
 function metaAuthUrl() {
