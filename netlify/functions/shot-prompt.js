@@ -13,7 +13,7 @@ const { buildShotPrompt } = require('./_series');
 const { buildKeyframePrompt } = require('./_keyframe');
 
 const json = (statusCode, body) => ({ statusCode, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-const FIELD = { video: 'prompt_override', keyframe: 'keyframe_prompt_override' };
+const FIELD = { video: 'prompt_override', keyframe: 'keyframe_prompt_override', ltx: 'ltx_en' };
 
 async function load(supabase, episodeId) {
   const { data: episode, error } = await supabase
@@ -36,6 +36,11 @@ function originalPrompt(kind, shot, characters, series) {
     const hasLoc = !!(vm.locations && vm.locations[shot.location] && vm.locations[shot.location].url);
     return buildKeyframePrompt(shot, characters, series.story_bible, hasLoc);
   }
+  if (kind === 'ltx') {
+    // El automático se arma SIN overrides viejos (prompt_override de Veo, ltx_en) para mostrar lo que generan los campos.
+    const base = Object.assign({}, shot); delete base.ltx_en; delete base.prompt_override;
+    return require('./_king').ltxPromptFor(base, series.story_bible);
+  }
   return buildShotPrompt(shot, characters, series.story_bible);
 }
 
@@ -43,7 +48,8 @@ exports.handler = async (event) => {
   try {
     const supabase = getSupabaseClient();
     const input = event.httpMethod === 'GET' ? event.queryStringParameters || {} : JSON.parse(event.body || '{}');
-    const kind = input.kind === 'keyframe' ? 'keyframe' : 'video';
+    // kind 'ltx': el prompt REAL que se manda a LTX en king (ltxPromptFor). Lo editado se guarda en shot.ltx_en y se usa tal cual.
+    const kind = input.kind === 'keyframe' ? 'keyframe' : (input.kind === 'ltx' || input.prov === 'king') ? 'ltx' : 'video';
     const n = Number(input.shot);
     if (!input.episode_id || !n) return json(400, { error: 'Faltan episode_id o shot.' });
 
@@ -67,12 +73,13 @@ exports.handler = async (event) => {
     if (input.reset) {
       const copy = Object.assign({}, shot);
       delete copy[FIELD[kind]];
+      if (kind === 'ltx') delete copy.prompt_override; // "Restaurar automático" también quita el prompt viejo de Veo
       next[idx] = copy;
     } else {
       const prompt = String(input.prompt || '').trim();
       if (prompt.length < 20) return json(400, { error: 'El prompt está vacío o es demasiado corto.' });
       if (prompt.length > 6000) return json(400, { error: 'El prompt es demasiado largo (máx. 6000 caracteres).' });
-      next[idx] = Object.assign({}, shot, { [FIELD[kind]]: prompt === original ? undefined : prompt });
+      next[idx] = Object.assign({}, shot, { [FIELD[kind]]: prompt === original ? undefined : prompt }, kind === 'ltx' ? { prompt_override: null, clip_stale: true } : {});
       if (prompt === original) delete next[idx][FIELD[kind]];
     }
     const { error } = await supabase.from('episodes').update({ shots: next }).eq('id', episode.id);

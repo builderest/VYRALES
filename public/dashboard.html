@@ -2093,7 +2093,7 @@
         const price = o.kind === 'video' ? (o.cost ? Number(o.cost) : null) : IMAGE_PRICE_USD;
         document.getElementById('pmTitle').textContent = title;
         document.getElementById('pmSubtitle').textContent = o.kind === 'video'
-          ? (o.prov === 'king' ? 'Se rehace con LTX en tu PC king (gratis). Si editas este texto, LTX lo usa como descripción de la escena (más la ropa, el fondo y la cámara de la toma).' : 'Prompt que recibirá Veo para esta toma.')
+          ? (o.prov === 'king' ? 'Este es el prompt COMPLETO que recibe LTX en tu PC king (gratis). Si lo editas, LTX usa exactamente este texto. "Restaurar automático" vuelve a armarlo desde los campos de la toma.' : 'Prompt que recibirá Veo para esta toma.')
           : o.kind === 'character' ? 'Prompt de la foto de cara (Gemini). Se adjuntan las fotos ya hechas de otros personajes SOLO como referencia de estilo, para que todas salgan iguales. Se guarda y se reutiliza en todos los cuadros.'
           : (o.kind === 'keyframe' ? 'Prompt del cuadro inicial (Gemini). Se le adjuntan las fotos de cara y la imagen fija del lugar.' : 'Prompt de la imagen fija del lugar (Gemini).');
         const gen = document.getElementById('pmGenerate');
@@ -2110,7 +2110,7 @@
             ? '/.netlify/functions/character-prompt?character_id=' + encodeURIComponent(o.characterId)
             : o.kind === 'location'
             ? '/.netlify/functions/location-image?series=' + encodeURIComponent(DEFAULT_SERIES) + '&location_key=' + encodeURIComponent(o.locationKey)
-            : '/.netlify/functions/shot-prompt?episode_id=' + encodeURIComponent(o.episodeId) + '&shot=' + o.n + '&kind=' + o.kind;
+            : '/.netlify/functions/shot-prompt?episode_id=' + encodeURIComponent(o.episodeId) + '&shot=' + o.n + '&kind=' + o.kind + (o.kind === 'video' && o.prov === 'king' ? '&prov=king' : '');
           const res = await fetch(url);
           const out = await res.json();
           if (!res.ok) throw new Error(out.error || ('HTTP ' + res.status));
@@ -2136,7 +2136,7 @@
           ? (isOriginal ? { character_id: o.characterId, reset: true } : { character_id: o.characterId, prompt: text })
           : o.kind === 'location'
           ? (isOriginal ? { series: DEFAULT_SERIES, location_key: o.locationKey, reset_prompt: true } : { series: DEFAULT_SERIES, location_key: o.locationKey, prompt: text })
-          : (isOriginal ? { episode_id: o.episodeId, shot: o.n, kind: o.kind, reset: true } : { episode_id: o.episodeId, shot: o.n, kind: o.kind, prompt: text });
+          : Object.assign(isOriginal ? { episode_id: o.episodeId, shot: o.n, kind: o.kind, reset: true } : { episode_id: o.episodeId, shot: o.n, kind: o.kind, prompt: text }, o.kind === 'video' && o.prov === 'king' ? { prov: 'king' } : {});
         const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
         const out = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(out.error || ('HTTP ' + res.status));
@@ -2311,9 +2311,9 @@
               '<label class="mt-2 block text-center text-[11px] font-mono px-2 py-1.5 rounded border border-cyber-violet/50 text-cyber-violet bg-cyber-violet/10 hover:bg-cyber-violet/20 cursor-pointer"><i class="fa-solid fa-upload mr-1"></i>Subir mi propia imagen<input type="file" accept="image/*" id="se_file" class="hidden"></label></div>' +
             '<div>' +
               ta('start_en', '🖼 IMAGEN (prompt)', '45–80 palabras: plano y lente, sujeto con detalles, lugar, luz, ambiente', 5) +
-              ta('action_en', '🎬 MOVIMIENTO 0–6 s', '25–45 palabras: UN movimiento simple; qué se mueve, hacia dónde, qué se queda quieto', 3) +
+              ta('action_en', '🎬 MOVIMIENTO 0–6 s', '25–45 palabras: UN movimiento simple que se vea; qué se mueve y hacia dónde (no escribas lo que se queda quieto: LTX congela todo)', 3) +
               ta('reaction_en', '⏹ CÓMO TERMINA 6–8 s', '12–25 palabras', 2) +
-              '<div class="grid md:grid-cols-2 gap-3">' + ta('background_en', 'FONDO', '3–4 elementos que no cambian', 2) + ta('camera', 'CÁMARA', 'slow push-in, crane up…', 2) + '</div>' +
+              '<div class="grid md:grid-cols-2 gap-3">' + ta('background_en', 'FONDO', '3–4 cosas del lugar, solo nombradas (sin static/fixed/frozen)', 2) + ta('camera', 'CÁMARA', 'slow push-in, crane up…', 2) + '</div>' +
               ta('end_en', 'CUADRO FINAL', 'solo planos abiertos ("The same view: …"); vacío = sin cuadro final', 2) +
               '<p id="se_msg" class="text-[11px] font-mono mt-2 text-slate-400"></p>' +
             '</div></div>' +
