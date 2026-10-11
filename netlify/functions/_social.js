@@ -236,7 +236,7 @@ async function tiktokDirectPost(supabase, { videoBuffer, post, log = console.log
 // contraseña o quites la app). Llaves: META_APP_ID, META_APP_SECRET (Opcional META_PAGE_ID si
 // administras varias Páginas).
 const FB_GRAPH = 'https://graph.facebook.com/v25.0';
-const META_SCOPES = 'pages_show_list,pages_read_engagement,pages_manage_posts,instagram_basic,instagram_content_publish,business_management';
+const META_SCOPES = 'pages_show_list,pages_read_engagement,pages_manage_posts,instagram_basic,instagram_content_publish,business_management,instagram_manage_insights,read_insights'; // insights: vistas en /analitica.html
 const metaId = () => process.env.META_APP_ID || need('INSTAGRAM_APP_ID');
 const metaSecret = () => process.env.META_APP_SECRET || need('INSTAGRAM_APP_SECRET');
 function metaAuthUrl() {
@@ -341,7 +341,7 @@ async function facebookPublishReel(supabase, { videoUrl, caption, log = console.
 // por API queda PRIVADO (regla de Google para proyectos sin verificar). Se cambia a Público en
 // YouTube Studio con un toque. Docs: developers.google.com/youtube/v3/docs/videos/insert
 // Llaves: YOUTUBE_CLIENT_ID, YOUTUBE_CLIENT_SECRET.
-const YT_SCOPES = 'https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly';
+const YT_SCOPES = 'https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/yt-analytics.readonly'; // analytics: página /analitica.html
 function youtubeAuthUrl() {
   const q = new URLSearchParams({ client_id: need('YOUTUBE_CLIENT_ID'), redirect_uri: REDIRECT('youtube'), response_type: 'code', scope: YT_SCOPES, access_type: 'offline', prompt: 'consent', include_granted_scopes: 'true', state: makeState('youtube') });
   return `https://accounts.google.com/o/oauth2/v2/auth?${q}`;
