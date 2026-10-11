@@ -87,6 +87,23 @@ async function runJob(job) {
         // Cancelar desde el panel / Claude: agent_jobs.status = 'cancelar' → se corta el proceso.
         const cancelPoll = setInterval(async () => { try { const { data: st } = await sb.from('agent_jobs').select('status').eq('id', job.id).single(); if (st && st.status === 'cancelar') { add('\n[cancelado a pedido]\n'); clearInterval(cancelPoll); p.kill(); } } catch (_) {} }, 15000);
         p.on('close', () => clearInterval(cancelPoll));
+        // VIGILANTE (oct-11, EP2 se trabó 30 min al unir la toma 11): si el trabajo pasa 30 min SIN escribir nada,
+        // se corta y se vuelve a encolar UNA vez (gen_local/regen_local retoman donde quedaron: lo hecho no se pierde).
+        let lastLen = out.length, lastAt = Date.now();
+        const STALL_MIN = Number(process.env.VYRALES_STALL_MIN) || 30;
+        const stallPoll = setInterval(async () => {
+          if (out.length !== lastLen) { lastLen = out.length; lastAt = Date.now(); return; }
+          if (Date.now() - lastAt < STALL_MIN * 60000 || /^(claude_|prueba_|flow_login|grabar_)/.test(job.command)) return; // Claude escribiendo un guion largo puede callar mucho rato
+          clearInterval(stallPoll);
+          // ¿Ya se reintentó? (otro trabajo igual cortado por el vigilante en las últimas 6 h) → no se encola más.
+          let again = /^(gen_local|regen_local|render_full|voz_ingles|qa_tomas|flow_frames):/.test(job.command);
+          if (again) { try { const { data: prevJ } = await sb.from('agent_jobs').select('id, output').eq('command', job.command).neq('id', job.id).gte('created_at', new Date(Date.now() - 6 * 3600000).toISOString()); again = !(prevJ || []).some((x) => /VIGILANTE/.test(String(x.output || ''))); } catch (_) {} }
+          add('\n[VIGILANTE: ' + STALL_MIN + ' min sin avanzar → lo corto' + (again ? ' y lo vuelvo a encolar una vez]\n' : ']\n'));
+          await flush(true).catch(() => {});
+          p.kill();
+          if (again) { try { await sb.from('agent_jobs').insert({ command: job.command }); } catch (_) {} }
+        }, 60000);
+        p.on('close', () => clearInterval(stallPoll));
         p.stdout.on('data', (d) => add(String(d)));
         p.stderr.on('data', (d) => add(String(d)));
         p.on('error', (e) => { add('ERROR: ' + e.message + '\n'); resolve(1); });

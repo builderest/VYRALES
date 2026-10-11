@@ -29,7 +29,8 @@ const XFADE = { crossfade: 'fade', dissolve: 'dissolve', slide: 'slideleft', sli
 
 function run(args, cwd) {
   return new Promise((resolve, reject) => {
-    execFile(ffmpegPath, args, { cwd, maxBuffer: 1024 * 1024 * 100 }, (err, stdout, stderr) => {
+    // timeout: un ffmpeg nunca debe quedarse colgado para siempre (oct-11: EP2 trabado al unir). 40 min alcanza para el largo completo.
+    execFile(ffmpegPath, args, { cwd, maxBuffer: 1024 * 1024 * 100, timeout: (Number(process.env.VYRALES_FFMPEG_MIN) || 40) * 60000, killSignal: 'SIGKILL' }, (err, stdout, stderr) => {
       if (err) { err.stderr = stderr; return reject(err); }
       resolve({ stdout, stderr });
     });

@@ -131,3 +131,8 @@ Este documento es la memoria del proyecto. Cada vez que Franklin corrige algo, l
 - Franklin: "siempre la más épica del video, con texto llamativo". `portada_yt:<ep>[:<videoId>]` ($0). Claude ve todos los cuadros en hojas de contacto y elige 2: tema PRINCIPAL, sujeto grande, drama, nada fuera de época. Escribe 2–4 palabras ES/EN (1 palabra en amarillo, sin repetir el título). Se arman las 2 portadas (1280x720 para el largo), Claude elige la de más clics y se sube con thumbnails.set.
 - Se hace sola al publicar un largo en YouTube (publish_local). La versión en inglés queda en continuity.thumbnail.en_url (portada por idioma: en Studio → Idiomas).
 - Con 2 palabras de texto: una por línea (más grandes).
+
+## Trabajos trabados (oct-11)
+- El EP2 se quedó 30 min parado al unir la toma 11 (un paso sin límite de tiempo). Antes el único límite era maxMin (10 h).
+- Ahora: VIGILANTE en agente.js. Si un trabajo pasa 30 min sin escribir nada, se corta y se reencola UNA vez (gen_local/regen_local/render_full/voz_ingles/qa_tomas/flow_frames retoman lo hecho). Cada ffmpeg tiene un límite de 40 min. Cancelar a mano: agent_jobs.status = 'cancelar'.
+- El log del panel ahora guarda siempre la última línea (antes, si llegaban dos líneas en menos de 1 s, la segunda no se guardaba y parecía trabado donde no era).
