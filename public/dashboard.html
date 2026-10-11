@@ -1679,6 +1679,7 @@
       // Narración del episodio en el panel de revisión: reproductor si ya existe, o "Generando..." mientras se hace.
       // Video en inglés = el MISMO video final, mudo, con la pista inglesa (voz EN + música) sincronizada.
       // Así no se sube otro archivo de cientos de MB; en YouTube es un solo video con dos pistas de audio.
+      window.openVideoEn = openVideoEn;
       function openVideoEn(btn) {
         const old = document.getElementById('vyEnModal'); if (old) old.remove();
         const m = document.createElement('div'); m.id = 'vyEnModal';
