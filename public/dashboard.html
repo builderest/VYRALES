@@ -1663,6 +1663,23 @@
         return html + '</div>';
       }
 
+      // Narración del episodio en el panel de revisión: reproductor si ya existe, o "Generando..." mientras se hace.
+      function narrationBoxHtml(episode) {
+        const v = ((episode && episode.continuity) || {}).voice;
+        if (v && v.url) {
+          return '<div class="mb-2 flex flex-wrap items-center gap-2 bg-cyber-darker border border-cyber-emerald/40 rounded-lg p-2 text-xs font-mono text-cyber-emerald">' +
+            '<i class="fa-solid fa-headphones"></i><span class="font-bold">Escuchar narración</span>' +
+            '<span class="text-slate-400">(' + Math.floor((v.seconds || 0) / 60) + ' min ' + Math.round((v.seconds || 0) % 60) + ' s)</span>' +
+            '<audio controls preload="none" src="' + esc(v.url) + '" class="h-8 w-full sm:w-auto sm:min-w-[320px]"></audio></div>';
+        }
+        const jobs = (lastLoadedData && lastLoadedData.agent_jobs) || [];
+        const working = episode && (episode.status === 'generando_media' || jobs.some(j => String(j.command).includes(episode.id) && /^(gen_local|voz_continua):/.test(j.command)));
+        if (working && isContinuous(lastLoadedData && lastLoadedData.series)) {
+          return '<div class="mb-2 bg-cyber-darker border border-cyber-emerald/30 rounded-lg p-2 text-xs font-mono text-cyber-emerald"><i class="fa-solid fa-spinner fa-spin mr-1"></i>Generando narración... (aparece aquí para escucharla apenas esté lista)</div>';
+        }
+        return '';
+      }
+
       function renderFinalRenderPanel(episode) {
         renderCopyTexts(episode);
         renderPublishBox(episode);
@@ -1677,7 +1694,7 @@
 
         if (finalRender) {
           panel.classList.remove('hidden');
-          panel.innerHTML =
+          panel.innerHTML = narrationBoxHtml(episode) +
             '<div class="flex items-center gap-3 bg-cyber-darker border border-cyber-emerald/40 rounded-lg p-2">' +
               '<video src="' + esc(vyMedia(finalRender.storage_path)) + '" controls preload="none"' + posterFor({ episode_id: episode.id, shot_number: 1 }, ((episode.validator_report || {}).publish_package || {}).cover_url) + ' class="w-20 h-32 object-cover rounded bg-black"></video>' +
               '<div class="text-xs font-mono">' +
@@ -1691,14 +1708,15 @@
             '</div>';
         } else if (clips.length > 0) {
           panel.classList.remove('hidden');
-          panel.innerHTML =
+          panel.innerHTML = narrationBoxHtml(episode) +
             '<button id="mergeBtn" onclick="mergeEpisode(\'' + episode.id + '\')" class="px-3 py-2 rounded-lg bg-cyber-cyan/10 border border-cyber-cyan/30 text-cyber-cyan text-xs font-mono hover:bg-cyber-cyan/20">' +
               '<i class="fa-solid fa-film mr-1"></i> Unir las ' + clips.length + ' tomas en un solo video final' +
             '</button>' +
             ' <button onclick="vyEditor.open(\'' + episode.id + '\')" class="px-3 py-2 rounded-lg bg-cyber-gold/10 border border-cyber-gold/40 text-cyber-gold text-xs font-mono hover:bg-cyber-gold/20"><i class="fa-solid fa-scissors mr-1"></i>Abrir editor</button>';
         } else {
-          panel.classList.add('hidden');
-          panel.innerHTML = '';
+          const nb = narrationBoxHtml(episode);
+          panel.classList.toggle('hidden', !nb);
+          panel.innerHTML = nb;
         }
       }
 
@@ -2785,8 +2803,9 @@
             const cost = Math.max(0.01, takes * secs / 80 * 0.03);
             if (v && v.url) {
               const same = String(v.text || '').replace(/\s+/g, ' ').trim() === txt;
-              return '<span class="mr-2 mb-1 inline-flex items-center gap-2 px-2 py-1 rounded-lg border border-cyber-emerald/40 text-[10px] font-mono text-cyber-emerald"><i class="fa-solid fa-microphone"></i>Voz continua · ' + Math.round(v.seconds || 0) + ' s<audio controls preload="none" src="' + esc(v.url) + '" class="h-7 max-w-[220px]"></audio>' + (same ? '' : '<span class="text-cyber-gold">⚠ el texto cambió: al producir se ajustan solo las frases cambiadas (misma voz)</span>') + '</span>';
+              return '<span class="mr-2 mb-1 inline-flex items-center gap-2 px-2 py-1 rounded-lg border border-cyber-emerald/40 text-[10px] font-mono text-cyber-emerald"><i class="fa-solid fa-headphones"></i>Escuchar narración · ' + Math.round(v.seconds || 0) + ' s<audio controls preload="none" src="' + esc(v.url) + '" class="h-7 max-w-[220px]"></audio>' + (same ? '' : '<span class="text-cyber-gold">⚠ el texto cambió: al producir se ajustan solo las frases cambiadas (misma voz)</span>') + '</span>';
             }
+            if (busyJob && /^(gen_local|voz_continua):/.test(busyJob.command)) return '<span class="mr-2 mb-1 px-3 py-1.5 rounded-lg border border-cyber-emerald/50 text-cyber-emerald text-xs font-mono"><i class="fa-solid fa-spinner fa-spin mr-1"></i>Generando narración...</span>';
             return '<button onclick="genContinuousVoice(this)" data-ep="' + e.id + '" data-cost="' + cost.toFixed(2) + '" data-secs="' + Math.round(secs) + '" class="mr-2 mb-1 px-3 py-1.5 rounded-lg bg-cyber-emerald/15 border border-cyber-emerald/50 text-cyber-emerald text-xs font-mono hover:bg-cyber-emerald/25" title="Una sola voz para todo el video, con el narrador del canal. Se hace en tu PC y se alinea palabra por palabra."><i class="fa-solid fa-microphone mr-1"></i>Generar voz continua (una sola voz, ~' + Math.round(secs / 60 * 10) / 10 + ' min, ~$' + cost.toFixed(2) + ')</button>';
           })();
           const narrBtn = contHtml ? contHtml : narrRun
@@ -3440,6 +3459,7 @@
             null;
 
           renderStats(data);
+          lastLoadedData = data; // la caja de narración necesita la serie y los trabajos de la PC de esta carga
           renderFinalRenderPanel(inReview);
           document.querySelectorAll('.demo-shot-card').forEach(el => el.remove());
 
