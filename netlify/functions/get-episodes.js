@@ -81,10 +81,14 @@ exports.handler = async (event) => {
       .from('channels')
       .select('id', { count: 'exact', head: true });
 
+    // Órdenes de la PC en curso (para que los botones sigan "trabajando" aunque recargues el panel).
+    let agentJobs = [];
+    try { const { data: aj } = await supabase.from('agent_jobs').select('command, status, created_at').in('status', ['pending', 'running']).order('created_at').limit(20); agentJobs = aj || []; } catch (_) {}
     return {
       statusCode: 200,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        agent_jobs: agentJobs,
         series,
         all_series: allSeries || [],
         episodes,

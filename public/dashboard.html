@@ -2579,6 +2579,8 @@
       function missingLocationsFor(ep) {
         const series = lastLoadedData && lastLoadedData.series;
         if (!usesKeyframes(series)) return [];
+        // Videos narrados: no usan imagen fija de lugar (cada toma tiene su propia imagen).
+        if (series.story_bible && series.story_bible.format === 'narrado_unico') return [];
         const defs = (series.story_bible && series.story_bible.locations) || {};
         const mem = (series.visual_memory && series.visual_memory.locations) || {};
         const set = new Set();
@@ -2737,7 +2739,11 @@
               ).join('')
             : '<pre class="text-[11px] text-slate-300 whitespace-pre-wrap">' + esc(e.script || 'Sin guion todavía.') + '</pre>';
           const missingFrames = usesKeyframes(data.series) ? shots.filter(sh => sh.frame_stale || (!frameFor(e, sh.n) && !clipFor(e, sh.n))).length : 0;
-          const framesBtn = (e.status === 'guion_generado' && missingFrames)
+          // ¿La PC está trabajando en este episodio? (cuadros con Flow, producir, rehacer…) → spinner fijo hasta que termine.
+          const busyJob = ((data.agent_jobs || []).find(j => String(j.command).includes(e.id) && /^(flow_frames|flow_cuadros|gen_local|regen_local|toma_local|claude_revisar|claude_detalle):/.test(j.command)));
+          const busyLabel = busyJob ? (busyJob.status === 'pending' ? 'En la fila de la PC (espera su turno)…' : /^flow_/.test(busyJob.command) ? 'Google Flow en tu PC: haciendo cuadros… (faltan ' + missingFrames + ')' : /^claude_/.test(busyJob.command) ? 'Claude en tu PC: escribiendo prompts…' : 'Tu PC está produciendo los videos de este episodio…') : '';
+          const busyBtn = busyJob ? '<span class="mr-2 mb-1 inline-block px-3 py-1.5 rounded-lg bg-cyber-gold/10 border border-cyber-gold/50 text-cyber-gold text-xs font-mono"><i class="fa-solid fa-spinner fa-spin mr-1"></i>' + busyLabel + '</span>' : '';
+          const framesBtn = busyJob ? busyBtn : (e.status === 'guion_generado' && missingFrames)
             ? '<button onclick="generateAllFrames(this)" data-ep="' + e.id + '" class="mr-2 mb-1 px-3 py-1.5 rounded-lg bg-cyber-violet/15 border border-cyber-violet/50 text-cyber-violet text-xs font-mono hover:bg-cyber-violet/25"><i class="fa-solid fa-images mr-1"></i>Generar los ' + missingFrames + ' cuadros que faltan' + (missingLocationsFor(e).length ? ' + ' + missingLocationsFor(e).length + ' lugares' : '') + ' (' + ((((lastLoadedData && lastLoadedData.series && lastLoadedData.series.story_bible) || {}).image_engine === 'flow' && ((((lastLoadedData && lastLoadedData.series && lastLoadedData.series.story_bible) || {}).flow_characters === true) || !(e.shots || []).some(sh => (sh.characters || []).length))) ? 'Google Flow, $0' : '~$' + ((missingFrames + missingLocationsFor(e).length) * IMAGE_PRICE_USD).toFixed(2)) + ') para revisarlos</button>'
             : '';
           const narrMissing = narrationCfg(data.series) ? shots.filter(sh => { const ns = narrationState(data.series, sh); return ns && !ns.ok; }).length : 0;
@@ -2747,7 +2753,7 @@
             ? '<span class="mr-2 mb-1 px-3 py-1.5 rounded-lg border border-cyber-emerald/50 text-cyber-emerald text-xs font-mono"><i class="fa-solid fa-spinner fa-spin mr-1"></i>Generando narración ' + (narrRun.done || 0) + '/' + (narrRun.total || '?') + '</span>'
             : (narrMissing ? '<button onclick="genNarration(this)" data-ep="' + e.id + '" class="mr-2 mb-1 px-3 py-1.5 rounded-lg bg-cyber-emerald/15 border border-cyber-emerald/50 text-cyber-emerald text-xs font-mono hover:bg-cyber-emerald/25"><i class="fa-solid fa-microphone mr-1"></i>Generar narración: ' + narrMissing + ' toma' + (narrMissing === 1 ? '' : 's') + ' (~$' + (narrMissing * TTS_LINE_USD).toFixed(2) + ')</button>' : '') +
               (lastNarr && lastNarr.status !== 'running' && ((lastNarr.failed || []).length || lastNarr.error) ? '<span class="text-[10px] font-mono text-cyber-pink">Narración con errores: ' + esc(lastNarr.error || (lastNarr.failed || []).map(f => 'T' + f.shot + ' ' + f.error).join(' · ')) + '</span>' : '');
-          const produceBtn = (nextToProduce && nextToProduce.id === e.id)
+          const produceBtn = (!busyJob && nextToProduce && nextToProduce.id === e.id)
             ? '<button onclick="produceEpisode(\'' + e.id + '\')" class="px-3 py-1.5 rounded-lg bg-cyber-pink/20 border border-cyber-pink/50 text-cyber-pink text-xs font-mono hover:bg-cyber-pink/30"><i class="fa-solid fa-bolt mr-1"></i>Producir este episodio ' + (videoProvider === 'king' ? 'en tu PC (LTX)' : 'con ' + seriesModels(lastLoadedData.series).shot.replace('veo_', 'Veo ')) + ' (~$' + estimateEpisodeCost(e).toFixed(2) + ')</button>'
             : '';
           return (
@@ -3379,6 +3385,9 @@
           renderVeoMode(data.series);
           renderCast(data);
           renderArc(data);
+          // Mientras la PC trabaja, el panel se refresca solo cada 20 s (progreso de cuadros/videos y el spinner sigue).
+          clearTimeout(window.__busyRefresh);
+          if ((data.agent_jobs || []).length) window.__busyRefresh = setTimeout(() => { if (!document.hidden) loadDashboard(); }, 20000);
           renderContinuity(data);
           renderPipeline(data);
           renderRules(data);
