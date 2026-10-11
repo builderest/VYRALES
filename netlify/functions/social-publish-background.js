@@ -44,8 +44,25 @@ async function runPublish({ supabase, epId, platform, privacy, loadVideo, qualit
     if (error || !ep) throw error || new Error('Episodio no encontrado.');
     const final = (ep.assets || []).find((a) => a.kind === 'final_render' && a.storage_path);
     if (!final) throw new Error('El episodio no tiene video final.');
-    const pk = (ep.validator_report || {}).publish_package;
+    let pk = (ep.validator_report || {}).publish_package;
     if (!pk || pk.status !== 'done') throw new Error('Primero dale "Preparar textos y portada".');
+    // Short que lleva al LARGO (Franklin, oct-11): en TODAS las redes va el enlace al video largo de YouTube,
+    // justo debajo de "entra al enlace que te dejo aquí abajo" y en el comentario fijado.
+    const parentId = (ep.continuity || {}).parent_episode_id;
+    if (parentId && (pk.cta_to_long || (ep.continuity || {}).kind === 'short_cta')) {
+      const { data: par } = await supabase.from('episodes').select('validator_report').eq('id', parentId).single();
+      const pvr = (par && par.validator_report) || {};
+      const yt = ((pvr.published || {}).youtube) || ((pvr.social_runs || {}).youtube) || {};
+      const longUrl = yt.url || (yt.video_id ? 'https://youtu.be/' + yt.video_id : '');
+      if (longUrl) {
+        const line = '👉 Historia completa: ' + longUrl;
+        const add = (t) => { t = String(t || ''); if (!t || t.includes(longUrl)) return t; const i = t.indexOf('👇'); if (i < 0) return line + '\n' + t; const end = t.indexOf('\n', i); return end < 0 ? t + '\n' + line : t.slice(0, end) + '\n' + line + t.slice(end); };
+        pk = Object.assign({}, pk, { tiktok: add(pk.tiktok), instagram: add(pk.instagram), facebook: add(pk.facebook || pk.instagram), youtube: add(pk.youtube),
+          pinned_comment: String(pk.pinned_comment || '').replace(/\(pega aquí el enlace del video largo\)/, longUrl) || line });
+        log('enlace al video largo agregado a los textos:', longUrl);
+        if (yt.privacy === 'private' || /uploaded_private/.test(String(yt.status || ''))) log('AVISO: el video largo sigue en PRIVADO en YouTube; el enlace no funcionará para el público hasta que lo hagas público.');
+      } else log('AVISO: el video largo todavía no está en YouTube → este Short sale sin enlace (súbelo primero).');
+    }
     await save({ status: 'running' });
     // TikTok Direct Post: el panel guarda lo que el usuario eligió (privacidad, interruptores,
     // divulgación, etiqueta de IA) en validator_report.tiktok_post justo antes de publicar.
