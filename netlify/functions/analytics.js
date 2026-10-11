@@ -26,10 +26,8 @@ function summary(d) {
   return lines.join('\n');
 }
 
-async function ideas(sb, body) {
-  const key = process.env.GOOGLE_AI_API_KEY;
-  if (!key) throw new Error('Falta GOOGLE_AI_API_KEY.');
-  const d = await getData(sb, false);
+async function ideasPrompt(sb, body, data) {
+  const d = data || await getData(sb, false);
   const focus = String(body.focus || '').slice(0, 200);
   const prompt = [
     'Eres estratega de contenido de VYRALES: canal en español (Latinoamérica y EE. UU.) de documentales cortos verticales (YouTube Shorts, TikTok, Reels), hechos con IA, narrados por una sola voz solemne con pausas dramáticas.',
@@ -43,6 +41,12 @@ async function ideas(sb, body) {
     '{"ideas":[{"titulo":"título de YouTube, máx 70 caracteres","gancho":"primera frase exacta del narrador","tema":"uno de los temas","por_que":"1 frase con el dato en que se basa","duracion_s":75,"tags":["3 palabras clave"],"nuevo":false}]}',
     'Exactamente 6 ideas.'
   ].filter(Boolean).join('\n');
+  return prompt;
+}
+async function ideas(sb, body) {
+  const key = process.env.GOOGLE_AI_API_KEY;
+  if (!key) throw new Error('Falta GOOGLE_AI_API_KEY.');
+  const prompt = await ideasPrompt(sb, body);
   const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${TEXT_MODEL}:generateContent`, {
     method: 'POST', headers: { 'x-goog-api-key': key, 'Content-Type': 'application/json' },
     body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: 'application/json', temperature: 0.9 } })
@@ -57,6 +61,8 @@ async function ideas(sb, body) {
   return { ideas: (out.ideas || []).slice(0, 8), costUsd, at: new Date().toISOString() };
 }
 
+exports.ideasPrompt = ideasPrompt;
+exports.collectData = (sb) => getData(sb, true);
 exports.handler = async (event) => {
   const sb = getSupabaseClient();
   try {
@@ -64,6 +70,17 @@ exports.handler = async (event) => {
       const bad = checkDashboardKey(event);
       if (bad) return json(401, { error: bad });
       const body = JSON.parse(event.body || '{}');
+      const agentOnline = async () => { const { data: st } = await sb.from('agent_state').select('last_seen').eq('id', 1).maybeSingle(); return !!(st && st.last_seen && Date.now() - new Date(st.last_seen).getTime() < 90000); };
+      // GRATIS PRIMERO (Franklin, oct-11): las ideas las escribe Claude en la PC con el plan ($0). Gemini (de pago) solo si lo pides con paid:true.
+      if (body.action === 'ideas' && !body.paid) {
+        if (!(await agentOnline())) return json(200, { offline: true });
+        const job = 'ideas-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+        const { uploadFile } = require('./_storage');
+        await uploadFile(sb, { path: `guiones/${job}.req.json`, buffer: Buffer.from(JSON.stringify({ focus: String(body.focus || '').slice(0, 200), at: new Date().toISOString() })), contentType: 'application/json' });
+        const { error } = await sb.from('agent_jobs').insert({ command: 'claude_ideas:' + job });
+        if (error) return json(500, { error: error.message });
+        return json(200, { queued: true, job });
+      }
       if (body.action === 'ideas') return json(200, await ideas(sb, body));
       if (body.action === 'claude_script') { // guion con Claude en la PC (plan de Claude, $0): pedido → Storage + orden al agente
         const job = String(body.job || '').replace(/[^a-z0-9-]/gi, '').slice(0, 60);

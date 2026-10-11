@@ -19,7 +19,11 @@ for (const line of fs.readFileSync(path.join(ROOT, '.env'), 'utf8').split(/\r?\n
   const { flowImages } = require('./flow_imagenes');
   const supabase = getSupabaseClient();
   // Revisor IMAGEN = NARRACIÓN (una vez por episodio): corrige los start_en que no muestran lo que dice el narrador.
-  try { await require(path.join(ROOT, 'netlify', 'functions', '_visual_check')).reviewEpisode(supabase, { episodeId: epId, log: console.log }); }
+  // GRATIS: el revisor usa Claude en esta PC (tu plan); Gemini (de pago) solo si Claude no está disponible.
+  let llm = null; try { const C = require('./_claude'); if (C.claudePath()) llm = C.claudeLlm(console.log); } catch (_) {}
+  try { await require(path.join(ROOT, 'netlify', 'functions', '_visual_check')).reviewEpisode(supabase, { episodeId: epId, llm, engine: llm ? 'claude' : 'gemini', log: console.log }); }
+  catch (e) { if (llm) { console.log('Revisor con Claude falló (' + String(e.message).slice(0, 120) + ') → intento con Gemini'); try { await require(path.join(ROOT, 'netlify', 'functions', '_visual_check')).reviewEpisode(supabase, { episodeId: epId, log: console.log }); } catch (e2) { console.log('Revisor de imágenes: no se pudo (' + String(e2.message).slice(0, 160) + ')'); } } else throw e; }
+  try {} 
   catch (e) { console.log('Revisor de imágenes: no se pudo (' + String(e.message).slice(0, 160) + ') — sigo con los prompts tal cual.'); }
   const { data: ep } = await supabase.from('episodes').select('id, episode_number, series_id, shots, assets(kind, shot_number)').eq('id', epId).single();
   const { data: series } = await supabase.from('series').select('id, slug').eq('id', ep.series_id).single();

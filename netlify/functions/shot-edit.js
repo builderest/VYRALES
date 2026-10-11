@@ -26,7 +26,7 @@ exports.handler = async (event) => {
 
     if (event.httpMethod === 'GET') {
       return json(200, { n, line: lineOf(shot), fields: Object.fromEntries(FIELDS.map((f) => [f, shot[f] || ''])), frame_stale: !!shot.frame_stale, clip_stale: !!shot.clip_stale,
-        overrides: { image: !!shot.keyframe_prompt_override, video: !!shot.prompt_override }, frame: (last('image') || {}).storage_path || null, clip: (last('video_clip') || {}).storage_path || null, clip_id: (last('video_clip') || {}).id || null });
+        overrides: { image: !!shot.keyframe_prompt_override, video: !!shot.prompt_override }, detail_proposal: shot.detail_proposal || null, frame: (last('image') || {}).storage_path || null, clip: (last('video_clip') || {}).storage_path || null, clip_id: (last('video_clip') || {}).id || null });
     }
     const bad = checkDashboardKey(event);
     if (bad) return json(401, { error: bad });
@@ -36,6 +36,15 @@ exports.handler = async (event) => {
       await sb.from('episodes').update({ shots: (fr.shots || []).map((s) => (s.n === n ? Object.assign({}, s, patch) : s)) }).eq('id', ep.id);
     };
 
+    if (body.action === 'detail' && !body.paid) { // GRATIS: Claude en la PC con tu plan; el resultado llega a shot.detail_proposal
+      const { data: stt } = await sb.from('agent_state').select('last_seen').eq('id', 1).maybeSingle();
+      if (!(stt && stt.last_seen && Date.now() - new Date(stt.last_seen).getTime() < 90000)) return json(200, { offline: true });
+      const at = new Date().toISOString();
+      await saveShot({ detail_request: { at, fields: Object.fromEntries(FIELDS.map((k) => [k, clean((body.fields || {})[k] != null ? body.fields[k] : shot[k])])) } });
+      const { error: qe } = await sb.from('agent_jobs').insert({ command: 'claude_detalle:' + ep.id + ':' + n });
+      if (qe) return json(500, { error: qe.message });
+      return json(200, { queued: true, at });
+    }
     if (body.action === 'detail') {
       const { checkVisuals } = require('./_visual_check');
       const aspect = series.story_bible && series.story_bible.aspect === '16:9' ? '16:9' : '9:16';

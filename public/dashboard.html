@@ -2272,7 +2272,7 @@
               '<p id="se_msg" class="text-[11px] font-mono mt-2 text-slate-400"></p>' +
             '</div></div>' +
           '<div class="flex flex-wrap gap-2 mt-4 justify-end">' +
-            '<button id="se_ai" class="px-3 py-2 rounded-lg border border-cyber-gold/50 text-cyber-gold bg-cyber-gold/10 hover:bg-cyber-gold/20 text-xs font-mono" title="Propone prompts súper detallados desde la narración (no guarda)"><i class="fa-solid fa-wand-magic-sparkles mr-1"></i>Detallar con IA (~$0.005)</button>' +
+            '<button id="se_ai" class="px-3 py-2 rounded-lg border border-cyber-gold/50 text-cyber-gold bg-cyber-gold/10 hover:bg-cyber-gold/20 text-xs font-mono" title="Claude en tu PC (tu plan, $0) propone prompts súper detallados desde la narración (no guarda)"><i class="fa-solid fa-wand-magic-sparkles mr-1"></i>Detallar con IA ($0)</button>' +
             '<button id="se_save" class="px-3 py-2 rounded-lg border border-cyber-border text-slate-200 hover:border-cyber-cyan text-xs font-mono"><i class="fa-solid fa-floppy-disk mr-1"></i>Guardar</button>' +
             (d.clip_id ? '<button id="se_vid" class="px-3 py-2 rounded-lg border border-cyber-emerald/50 text-cyber-emerald bg-cyber-emerald/10 hover:bg-cyber-emerald/20 text-xs font-mono" title="Mantiene la imagen y rehace el video con el movimiento nuevo (LTX, $0)"><i class="fa-solid fa-film mr-1"></i>Guardar + rehacer solo el video</button>' : '') +
             '<button id="se_img" class="px-3 py-2 rounded-lg bg-gradient-to-r from-cyber-cyan to-cyber-violet text-black font-bold text-xs font-mono" title="Imagen nueva con este prompt y, si ya había video, también el video"><i class="fa-solid fa-rotate mr-1"></i>Guardar + nueva imagen y video</button>' +
@@ -2284,10 +2284,19 @@
         const save = async () => { const k = (() => { try { return localStorage.getItem('vyrales_key'); } catch (_) { return null; } })();
           const r = await fetch('/.netlify/functions/shot-edit', { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, k ? { 'x-vyrales-key': k } : {}), body: JSON.stringify({ episode_id: episodeId, shot: n, fields: fields() }) });
           const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status); return j; };
-        document.getElementById('se_ai').onclick = async (ev) => { const b = ev.currentTarget; b.disabled = true; msg('<i class="fa-solid fa-spinner fa-spin mr-1"></i>La IA está detallando la toma desde la narración...');
+        document.getElementById('se_ai').onclick = async (ev) => { const b = ev.currentTarget; b.disabled = true; msg('<i class="fa-solid fa-spinner fa-spin mr-1"></i>Claude (en tu PC, $0) está detallando la toma desde la narración... (~1 min)');
           try { const k = (() => { try { return localStorage.getItem('vyrales_key'); } catch (_) { return null; } })();
-            const r = await fetch('/.netlify/functions/shot-edit', { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, k ? { 'x-vyrales-key': k } : {}), body: JSON.stringify({ episode_id: episodeId, shot: n, action: 'detail', fields: fields() }) });
-            const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status);
+            const post = (extra) => fetch('/.netlify/functions/shot-edit', { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, k ? { 'x-vyrales-key': k } : {}), body: JSON.stringify(Object.assign({ episode_id: episodeId, shot: n, action: 'detail', fields: fields() }, extra || {})) });
+            let r = await post(); let j = await r.json(); if (!r.ok) throw new Error(j.error || r.status);
+            if (j.offline) {
+              if (!confirm('Tu PC (Cronix) no responde ahora, así que Claude no puede detallar gratis.\n\n¿Usar Gemini por API (~$0.005) solo esta vez?')) { msg('Cancelado. Prende la PC y vuelve a darle.'); b.disabled = false; return; }
+              r = await post({ paid: true }); j = await r.json(); if (!r.ok) throw new Error(j.error || r.status);
+            } else if (j.queued) {
+              let got = null; const t0 = Date.now();
+              while (!got && Date.now() - t0 < 4 * 60000) { await new Promise(ok => setTimeout(ok, 4000)); const g = await (await fetch('/.netlify/functions/shot-edit?episode_id=' + episodeId + '&shot=' + n, { cache: 'no-store' })).json(); if (g.detail_proposal && g.detail_proposal.req_at === j.at) got = g.detail_proposal; }
+              if (!got) throw new Error('Claude no respondió en 4 min (¿la PC está ocupada con otra tarea? mira la Terminal).');
+              j = got;
+            }
             Object.entries(j.fields || {}).forEach(([k2, v]) => { const el = document.getElementById('se_' + k2); if (el && v != null && String(v).trim()) el.value = v; });
             check(); msg((j.problema ? '⚠ ' + esc(j.problema) + '<br>' : '') + 'Propuesta lista (aún NO guardada). Revísala y dale Guardar o Regenerar.', 'text-cyber-gold');
           } catch (err) { msg('No se pudo: ' + esc(err.message), 'text-cyber-pink'); } b.disabled = false; };

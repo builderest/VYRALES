@@ -79,6 +79,44 @@ async function job(id) {
   }
 }
 
+// "Detallar con IA" de una toma (gratis): lee shot.detail_request y deja shot.detail_proposal.
+async function detalle(epId, n) {
+  const { getSupabaseClient } = require(path.join(ROOT, 'netlify', 'functions', '_supabase'));
+  const { checkVisuals } = require(path.join(ROOT, 'netlify', 'functions', '_visual_check'));
+  const sb = getSupabaseClient();
+  const { data: ep } = await sb.from('episodes').select('shots, series_id').eq('id', epId).single();
+  const { data: series } = await sb.from('series').select('title, slug, story_bible').eq('id', ep.series_id).single();
+  const shot = (ep.shots || []).find((s) => s.n === Number(n));
+  const req = shot.detail_request || {};
+  console.log('Detallando la toma', n, 'con Claude...');
+  const vc = await checkVisuals({ series, shots: [Object.assign({}, shot, req.fields || {})], rewriteStart: 'all', llm: claudeLlm(console.log), aspect: series.story_bible && series.story_bible.aspect === '16:9' ? '16:9' : '9:16', log: () => {} });
+  const c = vc.changes[0] || {};
+  const prop = { at: new Date().toISOString(), req_at: req.at || null, problema: c.ok === false ? c.problema : '', fields: { start_en: c.start_en, action_en: c.action_en, reaction_en: c.reaction_en, background_en: c.background_en, end_en: c.end_en } };
+  const { data: fr } = await sb.from('episodes').select('shots').eq('id', epId).single();
+  await sb.from('episodes').update({ shots: fr.shots.map((s) => (s.n === Number(n) ? Object.assign({}, s, { detail_proposal: prop }) : s)) }).eq('id', epId);
+  console.log('LISTO: propuesta guardada (el panel la muestra para que la revises).');
+}
+// "Generar nuevas ideas" de /analitica.html (gratis).
+async function ideas(job) {
+  const { getSupabaseClient } = require(path.join(ROOT, 'netlify', 'functions', '_supabase'));
+  const { uploadFile } = require(path.join(ROOT, 'netlify', 'functions', '_storage'));
+  const A = require(path.join(ROOT, 'netlify', 'functions', 'analytics'));
+  const sb = getSupabaseClient();
+  const save = (obj) => uploadFile(sb, { path: `guiones/${job}.json`, buffer: Buffer.from(JSON.stringify(obj)), contentType: 'application/json' });
+  try {
+    const { data: u } = sb.storage.from('media').getPublicUrl(`guiones/${job}.req.json`);
+    const req = await (await fetch(u.publicUrl + '?t=' + Date.now())).json();
+    console.log('Ideas con Claude (leyendo tus estadísticas reales)...');
+    const prompt = await A.ideasPrompt(sb, req, await A.collectData(sb));
+    const out = parseJson(await runClaude(prompt, { log: console.log }));
+    await save({ ok: true, ideas: (out.ideas || []).slice(0, 8), costUsd: 0, model: 'Claude (tu plan)', at: new Date().toISOString() });
+    console.log('LISTO:', (out.ideas || []).length, 'ideas');
+  } catch (e) { console.log('ERROR:', e.message); await save({ ok: false, error: e.message, at: new Date().toISOString() }).catch(() => {}); process.exit(1); }
+}
+
 const mode = process.argv[2];
+if (mode === 'detalle') { detalle(process.argv[3], process.argv[4]).catch((e) => { console.error('ERROR:', e.message || e); process.exit(1); }); }
+else if (mode === 'ideas') { ideas(String(process.argv[3] || '').replace(/[^a-z0-9-]/gi, '')); }
+else
 (mode === 'diag' ? diag() : mode === 'login' ? Promise.resolve(login()) : job(String(mode || '').replace(/[^a-z0-9-]/gi, '')))
   .catch((e) => { console.error('ERROR:', e.message || e); process.exit(1); });
