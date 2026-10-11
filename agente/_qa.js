@@ -234,6 +234,31 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
       if (r.statusCode >= 400) log(`QA visual toma ${t.n}: FALLÓ ${String(r.body).slice(0, 200)}`); else { await bumpTry(t.n, t.boost); log(`QA visual toma ${t.n}: rehecha ✅`); if (!redone.includes(t.n)) redone.push(t.n); }
     }
   }
+  // Verificación inmediata de lo que se rehízo en esta pasada: si ya quedó bien, la tarjeta pasa a "✓ corregida"
+  // (guardando cuál era el problema); si no, queda pendiente para la siguiente pasada (con su intento ya contado).
+  if (process.env.VYRALES_QA_VISUAL !== '0' && redone.length) {
+    try {
+      const { data: ep3 } = await supabase.from('episodes').select('shots, assets(*)').eq('id', epId).single();
+      const items3 = [];
+      for (const n of redone) {
+        const sh = (ep3.shots || []).find((x) => x.n === n);
+        const clip = (ep3.assets || []).filter((a) => a.kind === 'video_clip' && a.shot_number === n).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))[0];
+        if (sh && clip) items3.push({ sh, clip, url: clip.storage_path, dur: await durationOf(clip.storage_path) });
+      }
+      log(`QA: verificando ${items3.length} toma(s) recién rehechas...`);
+      const res3 = await visionReview(items3, log);
+      const { data: fr } = await supabase.from('episodes').select('shots').eq('id', epId).single();
+      const upd = {};
+      for (const it of items3) {
+        const r = res3[it.sh.n]; if (!r) continue;
+        const ok = !(r.image_ok === false || r.action_ok === false || r.haze === true || r.broken === true);
+        const prev = it.sh.qa || {};
+        upd[it.sh.n] = Object.assign({}, prev, { clip_id: it.clip.id, ok, image_ok: r.image_ok !== false, action_ok: r.action_ok !== false, haze: !!r.haze, broken: !!r.broken, reason: ok ? '' : String(r.reason || '').slice(0, 300), fixed_from: ok ? (prev.reason || prev.force_reason || 'tenía un problema') : prev.fixed_from, force: false, force_any: false, at: new Date().toISOString() });
+        log(`QA toma ${it.sh.n}: ${ok ? 'quedó bien ✓' : 'todavía no (' + (r.reason || '') + ')'}`);
+      }
+      await supabase.from('episodes').update({ shots: (fr.shots || []).map((x) => upd[x.n] ? Object.assign({}, x, { qa: upd[x.n] }) : x) }).eq('id', epId);
+    } catch (e) { log('QA: no pude verificar las rehechas (' + String(e.message).slice(0, 120) + ')'); }
+  }
   // Tomas que Claude decidió PARTIR: se parten de la última a la primera (así la renumeración no mueve las pendientes),
   // con la MISMA narración, y se piden sus cuadros (Flow, $0) + videos (king) → flow_frames en modo solo.
   if (splits.length) {

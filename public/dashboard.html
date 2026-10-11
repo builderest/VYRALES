@@ -1429,6 +1429,8 @@
                   // La revisión guardada es de OTRO clip (este ya es el rehecho): todavía no se revisó el nuevo.
                   const qaHtml = !qa ? '' : (qa.clip_id && qa.clip_id !== asset.id)
                     ? '<p class="text-[10px] text-cyber-cyan" title="El control de calidad rehízo esta toma; la nueva versión se revisa en la siguiente pasada">⟳ QA: rehecha (antes: ' + esc(qa.reason || 'tenía un problema') + ')</p>'
+                    : qa.ok && qa.fixed_from
+                    ? '<p class="text-[10px] text-cyber-emerald" title="El control de calidad la rehízo y la volvió a revisar: ya está bien">✓ QA: corregida' + (qa.tries ? ' (intento ' + qa.tries + ')' : '') + ' — antes: ' + esc(qa.fixed_from) + '</p>'
                     : qa.ok
                     ? '<p class="text-[10px] text-cyber-emerald" title="Revisada por el control de calidad (Claude mira inicio, mitad y final contra la narración)">✓ QA: revisada</p>'
                     : '<p class="text-[10px] ' + (qa.redone && (Number(qa.tries) || 1) >= 3 ? 'text-cyber-pink' : 'text-cyber-gold') + '" title="Control de calidad automático">' + (qa.redone && (Number(qa.tries) || 1) >= 3 ? '⚠ QA: 3 intentos y sigue con problema (revísala): ' : qa.redone ? '⟳ QA: se reintenta con otro prompt: ' : '⟳ QA: se rehace sola: ') + esc(qa.reason || [qa.image_ok ? '' : 'la imagen no cuadra', qa.action_ok ? '' : 'no se ve la acción', qa.haze ? 'humo de relleno' : '', qa.broken ? 'algo deforme' : ''].filter(Boolean).join(', ')) + '</p>';
