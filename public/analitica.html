@@ -357,7 +357,7 @@
     const d0 = new Date(daily[0].day + 'T12:00:00'), d1 = new Date(daily[daily.length - 1].day + 'T12:00:00');
     return `<div class="panel"><div class="card-title"><span class="t">${label}</span><span class="v">${field === 'subs' && total > 0 ? '+' : ''}${fmt(total)}</span></div>
       <div class="chart"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><defs><linearGradient id="gA" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#49d8ff" stop-opacity=".3"/><stop offset="100%" stop-color="#49d8ff" stop-opacity="0"/></linearGradient></defs>${grid}<line x1="0" x2="${W}" y1="${y(0)}" y2="${y(0)}" stroke="rgba(124,156,255,.22)"/>${marks}</svg></div>
-      <div class="axis-labels"><span>${d0.toLocaleDateString('es', { day: 'numeric', month: 'short' })}</span><span>${d1.toLocaleDateString('es', { day: 'numeric', month: 'short' })}</span></div></div>`;
+      <div class="axis-labels"><span>${d0.toLocaleDateString('es', { day: 'numeric', month: 'short' })}</span><span>${d1.toLocaleDateString('es', { day: 'numeric', month: 'short' })} · YouTube Analytics va 1–2 días atrasado</span></div></div>`;
   }
 
   function chartPerVideo(list){
@@ -400,7 +400,7 @@
       <div class="scatter-wrap"><svg>${[25, 50, 75].map((f) => `<line x1="0" x2="100%" y1="${f}%" y2="${f}%" stroke="rgba(124,156,255,.08)"/><line y1="0" y2="100%" x1="${f}%" x2="${f}%" stroke="rgba(124,156,255,.08)"/>`).join('')}${dots}</svg>
         <div class="badge-ring"><b>${pts.length ? (hasAn ? Math.round(avg) + '%' : avg.toFixed(1) + '%') : '—'}</b><span>${hasAn ? 'VISTO<br>PROMEDIO' : 'LIKES POR<br>VISTA'}</span></div></div>
       <div class="axis-labels"><span>menos ${hasAn ? 'retención' : 'interés'}</span><span>↑ más vistas · más ${hasAn ? 'retención' : 'interés'} →</span></div>
-      ${hasAn ? '' : '<p class="muted" style="margin-top:6px">Cuando actives YouTube Analytics, este gráfico usa el % visto real (lo que más pesa en Shorts).</p>'}</div>`;
+      ${hasAn ? (list.length > pts.length ? '<p class="muted" style="margin-top:6px">' + (list.length - pts.length) + ' video(s) muy recientes aún sin % visto (YouTube tarda 1–2 días).</p>' : '') : '<p class="muted" style="margin-top:6px">Cuando actives YouTube Analytics, este gráfico usa el % visto real (lo que más pesa en Shorts).</p>'}</div>`;
   }
 
   function bucketCard(title, list, keyFn, order){
