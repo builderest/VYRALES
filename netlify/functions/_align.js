@@ -108,12 +108,12 @@ function matchWords(scriptWords, heard0) {
   return { words: out, matched };
 }
 
-async function alignWords(wavBuffer, text, log = console.log) {
+async function alignWords(wavBuffer, text, log = console.log, lang = 'spanish') {
   if (!process.env.VYRALES_LOCAL_RUN) return null;
   try {
     const t0 = Date.now();
     const asr = await loadAsr(log);
-    const r = await asr(wavTo16k(wavBuffer), { language: 'spanish', task: 'transcribe', return_timestamps: 'word', chunk_length_s: 30, stride_length_s: 5 });
+    const r = await asr(wavTo16k(wavBuffer), { language: lang, task: 'transcribe', return_timestamps: 'word', chunk_length_s: 30, stride_length_s: 5 });
     const audio = wavTo16k(wavBuffer);
     let heard = (r.chunks || []).filter((c) => c && c.timestamp && c.timestamp[0] != null);
     const scriptWords = String(text).split(/\s+/).filter(Boolean);
@@ -124,7 +124,7 @@ async function alignWords(wavBuffer, text, log = console.log) {
       for (let a = 0; a < total; a += W - O) {
         const seg = audio.subarray(Math.floor(a * 16000), Math.min(audio.length, Math.ceil((a + W) * 16000)));
         if (seg.length < 8000) break;
-        const r3 = await asr(seg, { language: 'spanish', task: 'transcribe', return_timestamps: 'word' });
+        const r3 = await asr(seg, { language: lang, task: 'transcribe', return_timestamps: 'word' });
         for (const c of (r3.chunks || [])) if (c && c.timestamp && c.timestamp[0] != null && (a === 0 || c.timestamp[0] >= O / 2)) extra.push({ text: c.text, timestamp: [Math.round((c.timestamp[0] + a) * 100) / 100, Math.round(((c.timestamp[1] == null ? c.timestamp[0] + 0.3 : c.timestamp[1]) + a) * 100) / 100] });
       }
       const m2 = matchWords(scriptWords, extra);
@@ -144,7 +144,7 @@ async function alignWords(wavBuffer, text, log = console.log) {
       for (const [a, b] of holes) {
         const seg = audio.subarray(Math.floor(a * 16000), Math.min(audio.length, Math.ceil(b * 16000)));
         if (seg.length < 16000) continue;
-        const r2 = await asr(seg, { language: 'spanish', task: 'transcribe', return_timestamps: 'word', chunk_length_s: 30, stride_length_s: 5 });
+        const r2 = await asr(seg, { language: lang, task: 'transcribe', return_timestamps: 'word', chunk_length_s: 30, stride_length_s: 5 });
         const extra = (r2.chunks || []).filter((c) => c && c.timestamp && c.timestamp[0] != null).map((c) => ({ text: c.text, timestamp: [Math.round((c.timestamp[0] + a) * 100) / 100, Math.round(((c.timestamp[1] == null ? c.timestamp[0] + 0.3 : c.timestamp[1]) + a) * 100) / 100] }));
         heard = heard.filter((h) => h.timestamp[0] < a || h.timestamp[0] > b).concat(extra);
       }
