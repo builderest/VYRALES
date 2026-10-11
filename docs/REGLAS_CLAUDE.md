@@ -145,3 +145,4 @@ Este documento es la memoria del proyecto. Cada vez que Franklin corrige algo, l
 
 - Panel: un video VERTICAL en pantalla completa (botón ⛶ o visor) se muestra dentro de un marco de teléfono del tamaño de un celular, no a lo ancho del monitor (Franklin, oct-11).
 - Cambio a mano de una frase: `short_reusar:<ep>:2=5` (frase 2 → toma 5 del largo; `2=5+6` para dos tomas). Solo rehace esa frase y vuelve a unir. Queda como lección en la memoria.
+- El dedo 👇 del cierre colgaba ffmpeg porque finger.png estaba MAL FORMADO (ffmpeg 6/7: "chunk too big" → bucle infinito con -loop 1). Se re-guardó limpio con PIL (oct-11). Si se cambia la imagen, comprobar con ffmpeg antes de subirla.
