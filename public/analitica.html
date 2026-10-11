@@ -602,13 +602,15 @@
     const box = $('ideas'); if (!box) return;
     if (!res || !res.ideas || !res.ideas.length) { box.innerHTML = '<div class="empty">Dale al botón: la IA lee tus estadísticas reales y propone 6 videos (5 de lo que ya te funciona + 1 prueba).</div>'; return; }
     $('ideasAt').textContent = new Date(res.at).toLocaleString('es', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
-    box.innerHTML = res.ideas.map((i, n) => `<div class="panel idea">
+    const showAll = !!renderIdeas._all;
+    box.innerHTML = res.ideas.map((i, n) => `<div class="panel idea"${n >= 4 && !showAll ? ' style="display:none"' : ''}>
         <div class="topic-top"><span class="ai-label">${SPARK}${esc(String(i.tema || '').toUpperCase())}</span><span class="muted">~${i.duracion_s || 75} s</span></div>
-        <h3>${esc(i.titulo)}</h3>
+        <h3>${esc(String(i.titulo || '').replace(/\s*#Shorts\b/gi, ''))}</h3>
         <div class="hook">“${esc(i.gancho)}”</div>
         <div class="why">${esc(i.por_que)}</div>
         <div class="idea-bottom"><div class="tags">${i.nuevo ? '<span class="tag-pill new">PRUEBA</span>' : ''}${(i.tags || []).slice(0, 3).map((t) => `<span class="tag-pill">${esc(t)}</span>`).join('')}</div>
-          <span class="setup-actions"><button class="btn-sm" data-copy="${n}" title="Texto para pegarle a Claude">Copiar idea</button><button class="btn-sm" data-claude="${n}" style="border-color:rgba(61,220,151,.5);color:var(--green)" title="Un Short vertical (~1 min) escrito por Claude en tu PC ($0)">Crear Short ($0)</button><button class="btn-sm" data-largo="${n}" style="border-color:rgba(255,107,214,.6);color:var(--pink)" title="Video largo de YouTube (8–15 min, horizontal) + 3–5 Shorts verticales con llamada a la acción al video completo. Claude en tu PC ($0, ~25 min)">Crear Largo + Shorts ($0)</button></span></div></div>`).join('');
+          <span class="setup-actions"><button class="btn-sm" data-copy="${n}" title="Texto para pegarle a Claude">Copiar idea</button><button class="btn-sm" data-claude="${n}" style="border-color:rgba(61,220,151,.5);color:var(--green)" title="Un Short vertical (~1 min) escrito por Claude en tu PC ($0)">Crear Short ($0)</button><button class="btn-sm" data-largo="${n}" style="border-color:rgba(255,107,214,.6);color:var(--pink)" title="Video largo de YouTube (8–15 min, horizontal) + 3–5 Shorts verticales con llamada a la acción al video completo. Claude en tu PC ($0, ~25 min)">Crear Largo + Shorts ($0)</button></span></div></div>`).join('') + (res.ideas.length > 4 ? `<button class="generar-btn" id="ideasMore" style="padding:9px">${showAll ? 'MOSTRAR MENOS' : 'MOSTRAR MÁS (' + (res.ideas.length - 4) + ')'}</button>` : '');
+    if ($('ideasMore')) $('ideasMore').onclick = () => { renderIdeas._all = !renderIdeas._all; renderIdeas(res); };
     box.querySelectorAll('[data-script]').forEach((b) => b.onclick = () => createScript(res.ideas[+b.dataset.script]));
     box.querySelectorAll('[data-claude]').forEach((b) => b.onclick = () => createScript(res.ideas[+b.dataset.claude], 'claude'));
     box.querySelectorAll('[data-largo]').forEach((b) => b.onclick = () => createLargo(res.ideas[+b.dataset.largo]));
