@@ -1677,13 +1677,44 @@
       }
 
       // Narración del episodio en el panel de revisión: reproductor si ya existe, o "Generando..." mientras se hace.
+      // Video en inglés = el MISMO video final, mudo, con la pista inglesa (voz EN + música) sincronizada.
+      // Así no se sube otro archivo de cientos de MB; en YouTube es un solo video con dos pistas de audio.
+      function openVideoEn(btn) {
+        const old = document.getElementById('vyEnModal'); if (old) old.remove();
+        const m = document.createElement('div'); m.id = 'vyEnModal';
+        m.className = 'fixed inset-0 z-[9999] bg-black/85 flex items-center justify-center p-4';
+        m.innerHTML = '<div class="bg-cyber-darker border border-cyber-cyan/40 rounded-xl p-3 max-w-4xl w-full">' +
+          '<div class="flex justify-between items-center mb-2 text-xs font-mono text-cyber-cyan"><span>' + esc(btn.dataset.title || '') + '</span>' +
+          '<span><a href="' + esc(btn.dataset.audio) + '" target="_blank" class="hover:underline mr-3">descargar audio inglés</a><button id="vyEnClose" class="text-slate-300 hover:text-white">✕</button></span></div>' +
+          '<video id="vyEnV" src="' + esc(btn.dataset.src) + '" muted controls playsinline class="w-full max-h-[75vh] rounded"></video>' +
+          '<audio id="vyEnA" src="' + esc(btn.dataset.audio) + '" preload="auto"></audio></div>';
+        document.body.appendChild(m);
+        const v = m.querySelector('#vyEnV'), a = m.querySelector('#vyEnA');
+        const sync = () => { if (Math.abs(a.currentTime - v.currentTime) > 0.25) a.currentTime = v.currentTime; };
+        v.addEventListener('play', () => { sync(); a.play().catch(() => {}); });
+        v.addEventListener('pause', () => a.pause());
+        v.addEventListener('seeked', sync);
+        v.addEventListener('waiting', () => a.pause());
+        v.addEventListener('playing', () => { sync(); a.play().catch(() => {}); });
+        v.addEventListener('ratechange', () => { a.playbackRate = v.playbackRate; });
+        v.addEventListener('volumechange', () => { a.volume = v.volume; if (!v.muted) { a.muted = false; v.muted = true; } });
+        const t = setInterval(() => { if (!v.paused) sync(); }, 1000);
+        const close = () => { clearInterval(t); v.pause(); a.pause(); m.remove(); };
+        m.querySelector('#vyEnClose').onclick = close;
+        m.addEventListener('click', (e) => { if (e.target === m) close(); });
+      }
+
       function narrationBoxHtml(episode) {
         const v = ((episode && episode.continuity) || {}).voice;
         if (v && v.url) {
-          return '<span class="inline-flex flex-wrap items-center gap-2 align-middle mr-1 my-1 bg-cyber-darker border border-cyber-emerald/40 rounded-lg px-2 py-1 text-xs font-mono text-cyber-emerald">' +
-            '<i class="fa-solid fa-headphones"></i><span class="font-bold">Escuchar narración</span>' +
-            '<span class="text-slate-400">(' + Math.floor((v.seconds || 0) / 60) + ' min ' + Math.round((v.seconds || 0) % 60) + ' s)</span>' +
-            '<audio controls preload="none" src="' + esc(v.url) + '" class="h-8 w-[260px] max-w-full"></audio></span> ';
+          // Dos idiomas (Franklin, oct-11): narración en español y en inglés, cada una con su reproductor.
+          const en = ((episode && episode.continuity) || {}).english;
+          const box = (flag, label, url, secs) => '<span class="inline-flex flex-wrap items-center gap-2 align-middle mr-1 my-1 bg-cyber-darker border border-cyber-emerald/40 rounded-lg px-2 py-1 text-xs font-mono text-cyber-emerald">' +
+            '<i class="fa-solid fa-headphones"></i><span class="font-bold">' + flag + ' ' + label + '</span>' +
+            (secs ? '<span class="text-slate-400">(' + Math.floor(secs / 60) + ' min ' + Math.round(secs % 60) + ' s)</span>' : '') +
+            '<audio controls preload="none" src="' + esc(url) + '" class="h-8 w-[230px] max-w-full"></audio></span> ';
+          return box('🇪🇸', 'Narración español' + (v.one_take ? ' · una toma' : ''), v.url, v.seconds || 0) +
+            (en && en.voice_url ? box('🇺🇸', 'Narración inglés', en.voice_url, v.seconds || 0) : '');
         }
         const jobs = (lastLoadedData && lastLoadedData.agent_jobs) || [];
         const working = episode && (episode.status === 'generando_media' || jobs.some(j => String(j.command).includes(episode.id) && /^(gen_local|voz_continua):/.test(j.command)));
@@ -1712,7 +1743,8 @@
               '<video src="' + esc(vyMedia(finalRender.storage_path)) + '" controls preload="none"' + posterFor({ episode_id: episode.id, shot_number: 1 }, ((episode.validator_report || {}).publish_package || {}).cover_url) + ' class="w-20 h-32 object-cover rounded bg-black"></video>' +
               '<div class="text-xs font-mono">' +
                 '<p class="text-cyber-emerald font-bold"><i class="fa-solid fa-check-circle mr-1"></i>Video final del episodio #' + episode.episode_number + ' listo (' + clips.length + ' tomas unidas).</p>' +
-                '<button type="button" onclick="openMedia(this)" data-src="' + esc(finalRender.storage_path) + '" data-kind="video" data-title="EP ' + episode.episode_number + ' · Video final" class="text-cyber-cyan hover:underline"><i class="fa-solid fa-circle-play mr-1"></i>Ver / descargar</button>' +
+                '<button type="button" onclick="openMedia(this)" data-src="' + esc(finalRender.storage_path) + '" data-kind="video" data-title="EP ' + episode.episode_number + ' · Video final" class="text-cyber-cyan hover:underline"><i class="fa-solid fa-circle-play mr-1"></i>🇪🇸 Ver en español</button>' +
+                (((episode.continuity || {}).english || {}).audio_url ? ' · <button type="button" onclick="openVideoEn(this)" data-src="' + esc(finalRender.storage_path) + '" data-audio="' + esc(episode.continuity.english.audio_url) + '" data-title="EP ' + episode.episode_number + ' · Video final en inglés" class="text-cyber-cyan hover:underline"><i class="fa-solid fa-circle-play mr-1"></i>🇺🇸 Ver en inglés' + (String(episode.continuity.english.at || '') < String(finalRender.created_at || '') ? ' <span class="text-cyber-gold">(audio de una versión anterior)</span>' : '') + '</button>' : '') +
                 ' · <button onclick="vyEditor.open(\'' + episode.id + '\')" class="text-cyber-gold hover:underline"><i class="fa-solid fa-scissors mr-1"></i>Editar episodio</button>' +
                 ' · <button onclick="goPublish(\'' + episode.id + '\')" class="text-cyber-pink hover:underline font-bold"><i class="fa-solid fa-bullhorn mr-1"></i>Publicar</button>' +
                 ' · <button onclick="mergeEpisode(\'' + episode.id + '\')" class="text-slate-400 hover:text-cyber-cyan underline">Unir sin editar</button>' +

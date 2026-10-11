@@ -390,4 +390,4 @@ function shotCutsExact(voice, shots) {
   return out;
 }
 
-module.exports = { shotCutsExact, wordTimes, continuousMode, voiceText, textChunks, ensureFullVoice, shotSecondsFor, LEAD, TAIL };
+module.exports = { shotCutsExact, wordTimes, continuousMode, voiceText, textChunks, ensureFullVoice, shotSecondsFor, repeatedPhrase, shortPauses, speechSpans, alignChunks, VOICE_V, LEAD, TAIL };

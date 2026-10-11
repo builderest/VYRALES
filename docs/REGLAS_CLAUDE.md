@@ -113,3 +113,9 @@ Este documento es la memoria del proyecto. Cada vez que Franklin corrige algo, l
 - (oct-11) agente/voz_ingles.js <ep>: pista de audio en inglés (traducción Claude con duración por frase, voz EN una toma, Whisper EN alinea, cada frase se coloca donde empieza la española con atempo ≤1.3, render con esa voz y se extrae el audio m4a para YouTube Studio). Resultado en episodes.continuity.english.
 - (oct-11) YouTube: cada subida lleva título y descripción en español (por defecto) y en inglés (localizations.en). El paquete de textos genera youtube_title_en / youtube_en; si falta, usa continuity.english del episodio.
 - (oct-11) YouTube playlists: cada subida se agrega a las playlists de su serie (story_bible.youtube_playlists) + las del TEMA (orígenes/historia/curiosidades por palabras clave). Requiere el permiso youtube.force-ssl (reconectar YouTube una vez). Playlists: Curiosidades | Mind-Blowing Facts, Historia Real | True History, Orígenes Humanos | Human Origins.
+
+## Voz de una toma: que de verdad quede puesta (oct-11)
+- Una prueba de voz (media/pruebas/...) NO es la voz del episodio. Después de que Franklin aprueba una prueba, hay que INSTALARLA: `voz_instalar:<ep>:<url>` (solo revisa) y luego `voz_instalar:<ep>:<url>:guardar`. Reusa el audio ya pagado ($0). Revisa que no repita frases y que cada toma alcance su parte de la voz. La voz anterior queda en continuity.voice_prev y se actualiza shots[].seconds.
+- Antes de publicar, verificar que continuity.voice.one_take es true (o que la voz es la que Franklin aprobó), no solo que el video existe.
+- Render: si a una toma le falta video para cubrir su voz, se ralentiza hasta 40 % (antes 25 %); si no, la voz se adelanta y todo lo que sigue queda desfasado. Las tomas aprobadas no se rehacen por esto.
+- voz_ingles reusa la traducción y la toma inglesa si el guion no cambió ($0). Solo vuelve a colocar las frases sobre la voz española nueva. `voz_ingles:<ep>:nueva` fuerza rehacer todo.

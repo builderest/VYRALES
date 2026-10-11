@@ -201,10 +201,11 @@ async function renderClip({ cwd, input, out, c, subtitle, speakerColor, sub, fad
   let srcDur = Math.max(1, full - ts - Math.max(0, Number(c.trim_end) || 0));
   let speed = Math.min(2, Math.max(0.5, Number(c.speed) || 1));
   // Voz continua: la toma dura EXACTO hasta que la voz llega a la siguiente (c.target_dur).
-  // Si el clip sobra se recorta; si falta, se ralentiza un poco (máx. 25 %).
+  // Si el clip sobra se recorta; si falta, se ralentiza (máx. 40 %: si no, la voz se adelanta al video y todo lo
+  // que sigue queda desfasado; Toba con voz de una toma: T36 6 s→8.8 s y T87 9 s→12.7 s, ambas aprobadas por Franklin).
   if (Number(c.target_dur) > 0.5) {
     const T = Number(c.target_dur);
-    if (srcDur >= T) { srcDur = T; speed = 1; } else speed = Math.max(0.75, srcDur / T);
+    if (srcDur >= T) { srcDur = T; speed = 1; } else speed = Math.max(0.6, srcDur / T);
   }
   const dur = srcDur / speed;
 

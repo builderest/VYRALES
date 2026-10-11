@@ -35,6 +35,20 @@ const wc = (t) => String(t).split(/\s+/).filter(Boolean).length;
   const es = shots.map((s) => { const n = wc(lineOf(s)); const a = W[wi], b = W[Math.min(W.length - 1, wi + n - 1)]; wi += n; return { n: s.n, es: lineOf(s), start: a ? a.start : 0, end: b ? b.end : 0 }; });
   es.forEach((x, i) => { x.slot = (i + 1 < es.length ? es[i + 1].start : voice.seconds) - x.start; });
 
+  // Si ya hay voz inglesa para este mismo guion (p. ej. solo cambió la voz española), se REUSA la traducción y el
+  // audio inglés ($0) y solo se vuelve a colocar cada frase en su nuevo lugar. "voz_ingles:<ep>:nueva" fuerza todo de nuevo.
+  const prevEn = ep.continuity && ep.continuity.english;
+  const reuse = process.argv[3] !== 'nueva' && prevEn && prevEn.voice_url && Array.isArray(prevEn.lines) && prevEn.lines.length === es.length && es.every((x, i) => Number(prevEn.lines[i].n) === x.n && (!prevEn.lines[i].es || prevEn.lines[i].es === x.es));
+  let tr, lines, r;
+  const cfg = (series.story_bible && series.story_bible.narration) || {};
+  if (reuse) {
+    console.log('Reuso la traducción y la voz inglesa ya hechas ($0); solo las vuelvo a colocar sobre la voz española nueva.');
+    tr = { title_en: prevEn.title || '', description_en: prevEn.description || '' };
+    const enBy0 = Object.fromEntries(prevEn.lines.map((l) => [Number(l.n), String(l.en || '').trim()]));
+    lines = es.map((x) => Object.assign(x, { en: enBy0[x.n] || '' }));
+    const wav0 = Buffer.from(await (await fetch(prevEn.raw_url || prevEn.voice_url)).arrayBuffer()); // raw_url = la toma inglesa original (voice_url ya viene colocada)
+    r = { wav: wav0, seconds: F('_tts').wavSeconds(wav0), costUsd: 0 };
+  } else {
   // 1) Traducción
   console.log(`Traduciendo ${es.length} frases al inglés con Claude ($0)...`);
   const prompt = `Translate this Spanish documentary narration into natural, human, engaging English, as a professional English-speaking documentary narrator would say it (not word for word, no robotic phrasing).
@@ -44,19 +58,20 @@ Also write an English YouTube title (max 90 characters, same hook as the Spanish
 Spanish title: ${ep.title || ''}
 Lines (JSON): ${JSON.stringify(es.map((x) => ({ n: x.n, es: x.es, max_words: Math.max(3, Math.floor(x.slot * 2.6)) })))}
 Reply ONLY with JSON: {"title_en":"...","description_en":"...","lines":[{"n":1,"en":"..."}]}`;
-  const tr = parseJson(await runClaude(prompt, { timeoutMin: 20, log: console.log }));
+  tr = parseJson(await runClaude(prompt, { timeoutMin: 20, log: console.log }));
   const enBy = Object.fromEntries((tr.lines || []).map((l) => [Number(l.n), String(l.en || '').trim()]));
-  const lines = es.map((x) => Object.assign(x, { en: enBy[x.n] || '' }));
+  lines = es.map((x) => Object.assign(x, { en: enBy[x.n] || '' }));
   if (lines.some((x) => !x.en)) throw new Error('Faltan traducciones en ' + lines.filter((x) => !x.en).map((x) => x.n).join(','));
 
   // 2) Voz inglesa en una sola toma
-  const cfg = (series.story_bible && series.story_bible.narration) || {};
-  const enText = lines.map((x) => x.en).join(' ');
+  const enText0 = lines.map((x) => x.en).join(' ');
   console.log(`Voz en inglés: ${wc(enText)} palabras en UNA toma (voz ${cfg.voice})...`);
   const { synthesize } = F('_tts');
-  const r = await synthesize({ text: enText, voice: cfg.voice, style: 'Speak in natural American English, warm, calm and captivating, like a premium documentary narrator; steady pace.', model: cfg.model, log: console.log });
+  r = await synthesize({ text: enText0, voice: cfg.voice, style: 'Speak in natural American English, warm, calm and captivating, like a premium documentary narrator; steady pace.', model: cfg.model, log: console.log });
   await F('_spend').logSpend(sb, { seriesId: series.id, episodeId: ep.id, shotNumber: 0, kind: 'narration', model: 'tts_' + r.model, costUsd: r.costUsd, note: 'voz en inglés (una toma)' });
   console.log(`  listo: ${Math.round(r.seconds)} s · $${r.costUsd.toFixed(3)}`);
+  }
+  const enText = lines.map((x) => x.en).join(' ');
 
   // 3) Alinear y colocar cada frase en su lugar del español
   const words = await F('_align').alignWords(r.wav, enText, console.log, 'english');
@@ -99,7 +114,7 @@ Reply ONLY with JSON: {"title_en":"...","description_en":"...","lines":[{"n":1,"
   const keyA = `${series.slug}/ep${ep.episode_number}/audio-en-v${Date.now()}.m4a`;
   const urlA = await F('_storage').uploadFile(sb, { path: keyA, buffer: fs.readFileSync(audioOut), contentType: 'audio/mp4' });
   const { data: fr } = await sb.from('episodes').select('continuity').eq('id', ep.id).single();
-  await sb.from('episodes').update({ continuity: Object.assign({}, fr.continuity, { english: { voice_url: urlV, audio_url: urlA, title: tr.title_en || '', description: tr.description_en || '', lines: lines.map((x) => ({ n: x.n, en: x.en })), at: new Date().toISOString() } }) }).eq('id', ep.id);
+  await sb.from('episodes').update({ continuity: Object.assign({}, fr.continuity, { english: { raw_url: (reuse ? (prevEn.raw_url || null) : await F('_storage').uploadFile(sb, { path: keyV.replace(/\.wav$/, '-toma.wav'), buffer: r.wav, contentType: 'audio/wav' })), voice_url: urlV, audio_url: urlA, title: tr.title_en || '', description: tr.description_en || '', lines: lines.map((x) => ({ n: x.n, es: x.es, en: x.en })), at: new Date().toISOString() } }) }).eq('id', ep.id);
   console.log('LISTO. Pista de audio en inglés:', urlA);
   console.log('Título EN:', tr.title_en);
 })().catch((e) => { console.error('ERROR:', e.message); process.exit(1); });
