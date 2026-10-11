@@ -160,4 +160,13 @@ async function alignWords(wavBuffer, text, log = console.log) {
   }
 }
 
-module.exports = { alignWords, matchWords, wavTo16k };
+// Transcribe un WAV y devuelve el texto escuchado (para detectar frases repetidas por el TTS).
+async function hearText(wavBuffer, log = console.log) {
+  if (!process.env.VYRALES_LOCAL_RUN) return null;
+  try {
+    const asr = await loadAsr(log);
+    const r = await asr(wavTo16k(wavBuffer), { language: 'spanish', task: 'transcribe', chunk_length_s: 30, stride_length_s: 5 });
+    return String((r && r.text) || '');
+  } catch (e) { log('hearText: falló (' + String(e.message).slice(0, 120) + ')'); return null; }
+}
+module.exports = { alignWords, matchWords, wavTo16k, hearText };

@@ -66,6 +66,23 @@ function wordTimes(segments) {
 }
 const normW = (x) => String(x).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9ñ]/g, '');
 
+// ¿El audio dice una frase de 5+ palabras dos veces cuando el texto la dice una sola? Devuelve la frase o null.
+async function repeatedPhrase(wav, text, log) {
+  const heard = await require('./_align').hearText(wav, log);
+  if (!heard) return null;
+  const norm = (x) => String(x).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zñ0-9 ]+/g, ' ').split(/\s+/).filter(Boolean);
+  const h = norm(heard), tw = norm(text).join(' ');
+  const N = 5, seen = new Map();
+  for (let i = 0; i + N <= h.length; i++) {
+    const g = h.slice(i, i + N).join(' ');
+    if (seen.has(g) && i - seen.get(g) >= N) {
+      const count = tw.split(g).length - 1; // veces que el guion dice esa frase
+      if (count < 2) return g;
+    }
+    if (!seen.has(g)) seen.set(g, i);
+  }
+  return null;
+}
 const continuousMode = (sb) => !!(sb && sb.narration && sb.narration.engine === 'gemini_tts' && sb.narration.mode === 'continuous');
 function voiceText(episode) {
   const c = (episode && episode.continuity) || {};
@@ -231,6 +248,19 @@ async function ensureFullVoice(supabase, { episode, series, log = console.log, f
       let r = null;
       for (let k = 1; k <= 3 && !r; k++) { try { r = await synthesize({ text: t, voice: cfg.voice, style, model: cfg.model, log }); } catch (e) { log(`  pedazo ${i + 1}: intento ${k} falló (${String(e.message).slice(0, 100)})`); if (k === 3) throw e; } }
       await logSpend(supabase, { seriesId: series.id, episodeId: episode.id, shotNumber: 0, kind: 'narration', model: 'tts_' + r.model, costUsd: r.costUsd, note: 'voz continua larga ' + (i + 1) + '/' + chunks.length });
+      // El TTS a veces REPITE una frase al final de un pedazo (Toba largo: "Lo que vieron fue lo contrario de una
+      // catástrofe" dos veces). Whisper escucha el pedazo; si hay una frase de 5+ palabras repetida que el guion no
+      // repite, se vuelve a generar ese pedazo (máx. 2 veces más, ~$0.03 cada una).
+      for (let again = 0; again < 2; again++) {
+        const rep = await repeatedPhrase(r.wav, t, log);
+        if (!rep) break;
+        log(`  pedazo ${i + 1}: el TTS repitió "${rep}" → lo vuelvo a generar`);
+        try {
+          const r2 = await synthesize({ text: t, voice: cfg.voice, style, model: cfg.model, log });
+          await logSpend(supabase, { seriesId: series.id, episodeId: episode.id, shotNumber: 0, kind: 'narration', model: 'tts_' + r2.model, costUsd: r2.costUsd, note: 'voz larga ' + (i + 1) + ' (repetición)' });
+          r = r2;
+        } catch (e) { log(`  pedazo ${i + 1}: no pude regenerarlo (${String(e.message).slice(0, 80)})`); break; }
+      }
       const w = parseWav(shortPauses(tightenSpeech(r.wav, () => {})));
       sr = sr || w.sr; pcs.push(w.pcm, new Int16Array(Math.round(sr * 0.35)));
       log(`  pedazo ${i + 1}/${chunks.length} listo`);

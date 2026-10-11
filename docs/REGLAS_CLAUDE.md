@@ -108,3 +108,4 @@ Este documento es la memoria del proyecto. Cada vez que Franklin corrige algo, l
 - media/memoria/reglas.json: reglas profesionales que Claude consolida con `claude_aprender` (se encola solo tras un ✗ y al final de cada pasada de QA). Máx. 40, generales, lo de Franklin manda.
 - TODAS las llamadas creativas a Claude (agente/_claude.js runClaude) anteponen esa memoria; con Gemini, _visual_check la antepone. Panel: botón "🧠 Memoria" para verla, borrar o agregar reglas.
 - Sembrada con 12 reglas del largo de Toba.
+- (oct-11) Voz larga: el TTS repitió una frase al final de un pedazo (Toba 7:33–7:39). Ahora cada pedazo se escucha con Whisper y si hay una frase de 5+ palabras repetida que el guion no repite, se regenera ese pedazo (máx. 2 veces). En Toba se cortó la repetición a mano (voz 663 s).
