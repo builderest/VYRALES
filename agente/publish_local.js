@@ -16,7 +16,7 @@ const FINALES = process.env.VYRALES_FINALES_DIR || path.join(ROOT, 'finales');
 
 async function main() {
   const [epId, platform, privacy] = process.argv.slice(2);
-  if (!/^[0-9a-f-]{36}$/i.test(epId || '') || !['tiktok', 'youtube'].includes(platform)) throw new Error('Uso: node agente/publish_local.js <episode_id> <tiktok|youtube> [private]');
+  if (!/^[0-9a-f-]{36}$/i.test(epId || '') || !['tiktok', 'youtube', 'facebook', 'instagram'].includes(platform)) throw new Error('Uso: node agente/publish_local.js <episode_id> <tiktok|youtube|facebook|instagram> [private]');
   const { getSupabaseClient } = require(path.join(ROOT, 'netlify', 'functions', '_supabase'));
   const { runPublish } = require(path.join(ROOT, 'netlify', 'functions', 'social-publish-background'));
   const supabase = getSupabaseClient();

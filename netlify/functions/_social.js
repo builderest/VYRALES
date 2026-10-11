@@ -281,13 +281,19 @@ async function metaAccount(supabase, platform) {
 }
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-async function instagramPublishReel(supabase, { videoUrl, coverUrl, caption, log = console.log }) {
+async function instagramPublishReel(supabase, { videoUrl, videoBuffer = null, coverUrl, caption, log = console.log }) {
   const acc = await metaAccount(supabase, 'instagram');
-  const params = { media_type: 'REELS', video_url: videoUrl, caption: String(caption || '').slice(0, 2200), share_to_feed: 'true', access_token: acc.access_token };
+  // videoBuffer (desde la PC, calidad completa): subida "resumable" directa a Instagram. Si no, Instagram baja video_url.
+  const params = Object.assign({ media_type: 'REELS', caption: String(caption || '').slice(0, 2200), share_to_feed: 'true', access_token: acc.access_token }, videoBuffer ? { upload_type: 'resumable' } : { video_url: videoUrl });
   if (coverUrl) params.cover_url = coverUrl;
   const c = await jsonFetch(`${FB_GRAPH}/${acc.account_id}/media`, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(params) });
   if (!c.res.ok || !c.body.id) throw new Error('Instagram rechazó el Reel: ' + graphErr(c.body));
   const containerId = c.body.id;
+  if (videoBuffer) {
+    log('[instagram] subiendo', (videoBuffer.length / 1048576).toFixed(1), 'MB en calidad completa...');
+    const up = await jsonFetch(c.body.uri || `https://rupload.facebook.com/ig-api-upload/${FB_GRAPH.split('/').pop()}/${containerId}`, { method: 'POST', headers: { Authorization: `OAuth ${acc.access_token}`, offset: '0', file_size: String(videoBuffer.length), 'Content-Type': 'application/octet-stream' }, body: videoBuffer });
+    if (!up.res.ok || (up.body && up.body.success === false)) throw new Error('Instagram no aceptó el archivo: ' + graphErr(up.body));
+  }
   log('[instagram] contenedor', containerId, '— esperando que Instagram procese el video...');
   let status = '';
   for (let i = 0; i < 72; i++) {
@@ -305,14 +311,17 @@ async function instagramPublishReel(supabase, { videoUrl, coverUrl, caption, log
   return { mediaId: p.body.id, permalink };
 }
 
-async function facebookPublishReel(supabase, { videoUrl, caption, log = console.log }) {
+async function facebookPublishReel(supabase, { videoUrl, videoBuffer = null, caption, log = console.log }) {
   const acc = await metaAccount(supabase, 'facebook');
   const post = (params) => jsonFetch(`${FB_GRAPH}/${acc.account_id}/video_reels`, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(Object.assign({ access_token: acc.access_token }, params)) });
   const st = await post({ upload_phase: 'start' });
   if (!st.res.ok || !st.body.video_id) throw new Error('Facebook rechazó el inicio del Reel: ' + graphErr(st.body));
   const videoId = st.body.video_id;
-  log('[facebook] video', videoId, '— Facebook baja el archivo desde Supabase...');
-  const up = await jsonFetch(`https://rupload.facebook.com/video-upload/v25.0/${videoId}`, { method: 'POST', headers: { Authorization: `OAuth ${acc.access_token}`, file_url: videoUrl } });
+  // videoBuffer (desde la PC): se manda el archivo en calidad completa; si no, Facebook lo baja de Supabase.
+  log('[facebook] video', videoId, videoBuffer ? '— subiendo ' + (videoBuffer.length / 1048576).toFixed(1) + ' MB en calidad completa...' : '— Facebook baja el archivo desde Supabase...');
+  const up = await jsonFetch(`https://rupload.facebook.com/video-upload/v25.0/${videoId}`, videoBuffer
+    ? { method: 'POST', headers: { Authorization: `OAuth ${acc.access_token}`, offset: '0', file_size: String(videoBuffer.length), 'Content-Type': 'application/octet-stream' }, body: videoBuffer }
+    : { method: 'POST', headers: { Authorization: `OAuth ${acc.access_token}`, file_url: videoUrl } });
   if (!up.res.ok || (up.body && up.body.success === false)) throw new Error('Facebook no pudo bajar el video: ' + graphErr(up.body));
   const fin = await post({ video_id: videoId, upload_phase: 'finish', video_state: 'PUBLISHED', description: String(caption || '').slice(0, 2200) });
   if (!fin.res.ok || fin.body.success === false) throw new Error('Facebook no publicó el Reel: ' + graphErr(fin.body));

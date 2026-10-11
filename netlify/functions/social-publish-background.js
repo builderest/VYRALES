@@ -13,15 +13,15 @@ const LOG = '[social]';
 const { checkDashboardKey } = require('./_auth');
 
 // Plataformas que pueden subir el video desde la PC (archivo en calidad completa de VYRALE/finales).
-// Facebook/Instagram todavía usan el enlace público de Supabase (la PC no es pública).
-const PC_PLATFORMS = ['tiktok', 'youtube'];
+// Facebook/Instagram también (oct-11): la PC les manda el archivo directo (rupload), así ya no van en 480–720p.
+const PC_PLATFORMS = ['tiktok', 'youtube', 'facebook', 'instagram'];
 
 // ¿La PC tiene el video final en calidad completa de ESTA versión y el agente está en línea?
 async function pcFullQuality(supabase, epId, final) {
   const { data: st } = await supabase.from('agent_state').select('last_seen, info').eq('id', 1).maybeSingle();
   if (!st || !st.last_seen || Date.now() - new Date(st.last_seen).getTime() > 15000) return null;
-  const f = ((st.info && st.info.files && st.info.files.finales) || []).find((x) => x.episode_id === epId);
-  return f && f.source === final.storage_path ? f : null;
+  const f = ((st.info && st.info.files && st.info.files.finales) || []).find((x) => x.episode_id === epId && x.source === final.storage_path);
+  return f || null;
 }
 
 // Núcleo: lo usa esta función (Netlify) y agente/publish_local.js (PC).
@@ -127,11 +127,17 @@ async function runPublish({ supabase, epId, platform, privacy, loadVideo, qualit
         if (!want.size) log('YouTube: ninguna playlist coincide con este video');
       } catch (e) { log('YouTube: playlists no disponibles (' + String(e.message).slice(0, 120) + ')'); }
     } else if (platform === 'facebook') {
-      const r = await facebookPublishReel(supabase, { videoUrl: final.storage_path, caption: pk.facebook || pk.instagram, log });
+      // Calidad completa desde la PC; si Meta rechaza el archivo, se reintenta con el enlace de Supabase (720p).
+      let r;
+      try { r = await facebookPublishReel(supabase, { videoUrl: final.storage_path, videoBuffer: quality === 'completa' ? await loadVideo(final) : null, caption: pk.facebook || pk.instagram, log }); }
+      catch (e) { if (quality !== 'completa') throw e; log('facebook: la subida en calidad completa falló (' + String(e.message).slice(0, 160) + ') → reintento con el enlace'); r = await facebookPublishReel(supabase, { videoUrl: final.storage_path, caption: pk.facebook || pk.instagram, log }); }
       await save({ status: 'published', url: r.permalink, video_id: r.videoId, pending: !!r.pending }, { url: r.permalink, via: 'api' });
       log('Facebook: Reel publicado ✅', r.permalink);
     } else {
-      const r = await instagramPublishReel(supabase, { videoUrl: final.storage_path, coverUrl: pk.cover_url, caption: pk.instagram, log });
+      // Calidad completa desde la PC; si Meta rechaza el archivo, se reintenta con el enlace de Supabase (720p).
+      let r;
+      try { r = await instagramPublishReel(supabase, { videoUrl: final.storage_path, videoBuffer: quality === 'completa' ? await loadVideo(final) : null, coverUrl: pk.cover_url, caption: pk.instagram, log }); }
+      catch (e) { if (quality !== 'completa') throw e; log('instagram: la subida en calidad completa falló (' + String(e.message).slice(0, 160) + ') → reintento con el enlace'); r = await instagramPublishReel(supabase, { videoUrl: final.storage_path, coverUrl: pk.cover_url, caption: pk.instagram, log }); }
       await save({ status: 'published', url: r.permalink, media_id: r.mediaId }, { url: r.permalink, via: 'api' });
       log('Instagram: Reel publicado ✅', r.permalink);
     }
