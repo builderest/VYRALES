@@ -15,6 +15,16 @@ const t0=Date.now();
 const r=await synthesize({text,voice:cfg.voice,style,model:cfg.model,log:console.log});
 console.log('listo en',Math.round((Date.now()-t0)/1000),'s · duración',r.seconds,'s · costo',r.costUsd.toFixed(3),'· modelo',r.model);
 
+// ¿Salió COMPLETA? Whisper local escucha el audio y lo compara con el guion palabra por palabra.
+process.env.VYRALES_LOCAL_RUN=process.env.VYRALES_LOCAL_RUN||'1';
+const nW=text.split(/\s+/).filter(Boolean).length;
+const words=await require(F+'/_align').alignWords(r.wav,text,console.log);
+if(words){const ok=words.filter(w=>!w.guess);const last=ok[ok.length-1];const lastIdx=words.lastIndexOf(last);
+ const third=Math.floor(words.length/3);const rate=(a,b)=>{const x=words[a],y=words[b-1];return x&&y&&y.end>x.start?Math.round((b-a)/((y.end-x.start)/60)):0;};
+ console.log('VERIFICACIÓN: '+ok.length+'/'+nW+' palabras escuchadas ('+Math.round(ok.length/nW*100)+'%) · última palabra escuchada #'+(lastIdx+1)+' de '+nW+': "'+words.slice(Math.max(0,lastIdx-5),lastIdx+1).map(w=>w.word||w.text).join(' ')+'"');
+ console.log('VELOCIDAD (palabras/min): inicio '+rate(0,third)+' · medio '+rate(third,2*third)+' · final '+rate(2*third,words.length)+' (si el final es mucho más rápido, se aceleró)');
+ console.log(ok.length>=nW*0.95&&lastIdx>=nW-3?'RESULTADO: COMPLETA ✅':'RESULTADO: INCOMPLETA o con huecos ⚠');
+}else console.log('VERIFICACIÓN: no se pudo alinear (Whisper) — revisar a oído; duración esperada ~667 s');
 const key='pruebas/voz_una_toma_'+Date.now()+'.wav';
 const up=await sb.storage.from('media').upload(key,r.wav,{contentType:'audio/wav',upsert:true});
 if(up.error) console.log('upload error',up.error.message); else console.log('URL',sb.storage.from('media').getPublicUrl(key).data.publicUrl);
