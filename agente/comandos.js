@@ -46,6 +46,7 @@ module.exports = {
   claude_login: { label: 'Claude: iniciar sesión', help: 'Abre una ventana de Claude Code en la PC para iniciar sesión una vez con tu plan', special: 'claude_login' },
   // "claude_guion:<job>" — lo pide /analitica.html (botón Crear guion con Claude).
   claude_guion: { label: 'Claude: escribir guion', help: 'Escribe el guion de una idea con Claude en la PC ($0)', special: 'claude_guion', arg: /^[a-z0-9-]{6,60}$/i, hidden: true },
+  claude_largo: { label: 'Claude: guion largo + Shorts', help: 'Escribe un video largo (8–15 min) y sus Shorts con Claude en la PC ($0)', special: 'claude_largo', arg: /^[a-z0-9-]{6,60}$/i, hidden: true },
   flow_prueba_lote: { label: 'Flow: prueba de lote', help: 'Experimento: varias imágenes sin esperar cada una', special: 'flow_prueba_lote' },
   flow_prueba_ref: { label: 'Flow: prueba con foto de referencia', help: 'Genera 1 imagen en Flow usando una foto de cara como referencia', special: 'flow_prueba_ref' },
   publish_pkg: { label: 'Rehacer paquete de publicación', help: 'Textos + portada del episodio (≈$0.001)', special: 'publish_pkg', arg: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, hidden: true },

@@ -23,7 +23,8 @@ function runClaude(prompt, { timeoutMin = 12, log = () => {} } = {}) {
   const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'vy-claude-'));
   const env = Object.assign({}, process.env);
   delete env.ANTHROPIC_API_KEY; delete env.ANTHROPIC_AUTH_TOKEN; // usar el PLAN, nunca la API
-  const args = ['-p', 'Sigue al pie de la letra las instrucciones del texto que recibiste por la entrada estándar y responde SOLO con el JSON pedido, sin explicaciones ni bloques de código.', '--output-format', 'json', '--disallowedTools', 'Bash,Edit,Write,MultiEdit,NotebookEdit,WebFetch,WebSearch,Task'];
+  if (!env.CLAUDE_CODE_MAX_OUTPUT_TOKENS) env.CLAUDE_CODE_MAX_OUTPUT_TOKENS = '32000'; // guiones largos
+  const args = ['-p', 'Sigue al pie de la letra las instrucciones del texto que recibiste por la entrada estándar y responde SOLO con el JSON pedido, sin explicaciones ni bloques de código.', '--output-format', 'stream-json', '--verbose', '--disallowedTools', 'Bash,Edit,Write,MultiEdit,NotebookEdit,WebFetch,WebSearch,Task'];
   return new Promise((resolve, reject) => {
     // claude.cmd (npm en Windows) necesita shell: los argumentos con espacios van entre comillas (si no, se parten).
     const viaShell = /\.cmd$/i.test(exe);
@@ -38,14 +39,21 @@ function runClaude(prompt, { timeoutMin = 12, log = () => {} } = {}) {
     p.on('close', (code) => {
       clearTimeout(timer);
       try { fs.rmSync(cwd, { recursive: true, force: true }); } catch (_) {}
-      let j = null; try { j = JSON.parse(out); } catch (_) {}
+      // stream-json: una línea JSON por evento. Las respuestas largas llegan en VARIOS mensajes (Claude sigue
+      // cuando llega al máximo de salida) y "result" trae solo el último → se juntan todos los textos en orden.
+      let j = null; const texts = [];
+      for (const ln of out.split(/\r?\n/)) {
+        let ev = null; try { ev = JSON.parse(ln); } catch (_) { continue; }
+        if (ev.type === 'assistant' && ev.message && Array.isArray(ev.message.content)) ev.message.content.forEach((c) => { if (c.type === 'text' && c.text) texts.push(c.text); });
+        if (ev.type === 'result') j = ev;
+      }
       if (j && j.is_error) return reject(new Error('Claude: ' + String(j.result || j.subtype || 'error').slice(0, 300)));
       if (code !== 0 && !j) {
         const msg = (err || out).slice(-400);
         if (/log ?in|login|authenticat|Invalid API key|credit/i.test(msg)) return reject(new Error('Claude Code no tiene sesión iniciada en esta PC (botón "Claude: iniciar sesión"). Detalle: ' + msg));
         return reject(new Error('Claude terminó con código ' + code + ': ' + msg));
       }
-      const text = j ? String(j.result || '') : out;
+      const text = texts.length ? texts.join('') : (j ? String(j.result || '') : out);
       log(`  Claude respondió (${text.length} caracteres${j && j.duration_ms ? ', ' + Math.round(j.duration_ms / 1000) + ' s' : ''})`);
       resolve(text);
     });

@@ -185,4 +185,58 @@ function buildNarratedPrompt(tipo = 'curiosidades', { topic = '' } = {}) {
   return head + (cut2 > 0 ? body.slice(cut2) : '') + '\n\n' + idea;
 }
 
-module.exports = { TIPOS, buildNarratedPrompt, buildCuriosityPrompt };
+// VIDEO LARGO (8–15 min, YouTube horizontal) + SHORTS VERTICALES QUE LLEVAN AL LARGO (Franklin, oct-11:
+// "enfocar el canal en la historia completa que mantenga al oyente pegado"; los Shorts/Reels/TikTok son el
+// tráiler con llamada a la acción). Paso 1 = la HISTORIA (narración + qué se ve en cada toma, en español);
+// los prompts detallados en inglés para Flow/LTX los escribe después el revisor (_visual_check), por capítulos.
+function buildLongPrompt(tipo = 'historia', { topic = '' } = {}) {
+  const p = TIPOS[tipo] || TIPOS.historia;
+  const voz = (buildNarratedPromptRaw(tipo, p).match(/=== VOZ HUMANA[\s\S]*?(?=\n=== REGLAS TÉCNICAS)/) || [''])[0];
+  return `Eres uno de los mejores guionistas de documentales del mundo: escribes historias reales que la gente escucha completas, sin poder despegarse, como un gran narrador que se sienta frente a ti y te cuenta lo que pasó. Especialidad: ${p.nombre}. Tu trabajo se mide en una sola cosa: que el espectador se quede hasta el último segundo.
+
+=== IDENTIDAD ===
+- TONO: ${p.tono}
+- LA MISMA VOZ DE PRINCIPIO A FIN: un solo narrador, siempre con la misma personalidad, el mismo registro y la misma forma de hablar en el video largo y en los Shorts. Nunca cambia de estilo entre capítulos.
+
+${voz}
+=== EL VIDEO LARGO (YouTube, horizontal, 8 a 15 minutos) ===
+- Cuenta la HISTORIA COMPLETA: antes, durante y después, con las personas reales, sus decisiones, la evidencia (quién lo descubrió, cómo se sabe) y lo que significa hoy para el espectador.
+- Duración objetivo ~11 minutos: unas 1,500 palabras de narración (el narrador habla ~2.3 palabras por segundo). Mínimo 1,150 palabras, máximo 2,000.
+- ESTRUCTURA:
+  1. APERTURA EN FRÍO (30–45 s): el momento más tenso de toda la historia, contado en presente, sin contexto. La primera frase empieza con el tema más llamativo.
+  2. LA PROMESA (10–20 s): qué va a descubrir el espectador si se queda ("y lo que encontraron después lo cambió todo").
+  3. 6 a 8 CAPÍTULOS de 60–120 s. Cada capítulo tiene título corto, avanza la historia (causa → efecto) y TERMINA con una pregunta abierta o un giro que obliga a seguir viendo.
+  4. EL CLÍMAX al 70–80 % del video.
+  5. RESOLUCIÓN Y LEGADO: qué pasó después y por qué te importa hoy.
+  6. CIERRE: vuelve a la imagen de la apertura, una pregunta al espectador para que comente y una invitación natural a suscribirse (una sola frase, sin rogar).
+- RETENCIÓN: un re-enganche cada 30–60 s (un dato que sorprende, un giro, una pregunta). Nunca resumas lo que ya se dijo. Nada de relleno ni de listas de datos.
+- CERO DATOS FALSOS: cada dato con su fuente en "sources". Si hay un rango, usa palabras prudentes ("cerca de", "unos"). Si no se puede verificar, no entra.
+
+=== TOMAS DEL VIDEO LARGO ===
+- 80 a 120 tomas en total, repartidas en los capítulos. Cada toma = UNA línea del narrador de 8 a 30 palabras (4–13 s de voz) + lo que se ve.
+- "visual_es": qué se ve EXACTAMENTE, en español, concreto y filmable, mostrando lo que dice SU línea (si la línea habla de gente, se ve gente: grupos pequeños, de espaldas o de perfil; cifras → metáfora visual clara; lugar, época, fauna y flora correctas). Cada toma se ve distinta. Sin texto escrito en la imagen.
+- "camera": movimiento en inglés (slow push-in, crane up to reveal, tracking shot alongside…), nunca fija.
+
+=== SHORTS QUE LLEVAN AL VIDEO LARGO (vertical, para YouTube Shorts, TikTok, Reels y Facebook) ===
+- 3 a 5 Shorts. Cada uno cuenta UN momento poderoso de la historia completo por sí mismo (45–70 s, 110–160 palabras), con un gancho brutal en la primera frase, la MISMA voz del narrador, y deja al espectador queriendo saber el resto.
+- La ÚLTIMA línea de cada Short es la llamada a la acción, natural y con intriga, por ejemplo "La historia completa, con lo que pasó después, está en nuestro canal." (varíala en cada Short).
+- 8 a 14 tomas por Short, mismas reglas de visual_es y camera.
+
+=== JSON A ENTREGAR (solo el JSON, sin explicaciones) ===
+{
+  "title": "<título del video largo: empieza con el tema más llamativo, máx. 70 caracteres, verdadero>",
+  "hook_text": "<3–5 PALABRAS EN MAYÚSCULAS para la miniatura>",
+  "description": "<descripción de YouTube, 3–5 líneas, con capítulos y tiempos aproximados>",
+  "sources": ["…"],
+  "chapters": [{ "title": "…", "shots": [{ "line": "…", "visual_es": "…", "camera": "…" }] }],
+  "shorts": [{ "title": "<título del Short, máx. 60 caracteres>", "hook_text": "<3–5 PALABRAS>", "shots": [{ "line": "…", "visual_es": "…", "camera": "…" }], "pinned_comment": "<comentario fijado que manda al video completo>" }]
+}
+
+Antes de entregar, léelo todo en voz alta en tu cabeza: ¿suena a un narrador humano? ¿cada capítulo termina con ganas de seguir? ¿cada visual_es muestra lo que dice su línea? ¿cada Short funciona solo y termina con la llamada a la acción? Entrega solo el JSON.
+
+=== LA HISTORIA ===
+${topic || '<tema>'}
+`;
+}
+
+module.exports = { TIPOS, buildNarratedPrompt, buildCuriosityPrompt, buildLongPrompt };

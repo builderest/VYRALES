@@ -37,7 +37,7 @@ async function gemini(prompt, temperature) {
 
 // rewriteStart: 'all' (guion nuevo, aún sin cuadros) | 'failing' (ya hay cuadros: solo se rehace la imagen de las que fallan).
 // llm(prompt) → { out (JSON ya parseado), costUsd }. Por defecto Gemini por API; en la PC se usa Claude con tu plan ($0).
-async function checkVisuals({ series, shots, rewriteStart = 'failing', framed = null, llm = null, log = console.log }) {
+async function checkVisuals({ series, shots, rewriteStart = 'failing', framed = null, llm = null, aspect = '9:16', context = '', log = console.log }) {
   // fija = esa toma ya tiene una imagen buena generada con su start_en (no se toca salvo que falle).
   const isFixed = (sh) => rewriteStart !== 'all' && (!framed || framed.has(sh.n)) && !sh.frame_stale;
   const rows = (shots || []).map((sh) => ({ n: sh.n, imagen_ya_generada: isFixed(sh), narracion: lineOf(sh), camera: sh.camera || '', start_en: sh.start_en || '', action_en: sh.action_en || '', reaction_en: sh.reaction_en || '', background_en: sh.background_en || '', end_en: sh.end_en || '' })).filter((r) => r.narracion || r.start_en);
@@ -50,6 +50,8 @@ async function checkVisuals({ series, shots, rewriteStart = 'failing', framed = 
       : 'TAREA 2 — Escribe un start_en nuevo, súper detallado, para las tomas que FALLAN y para TODAS las que tienen imagen_ya_generada=false (conserva el mismo sujeto si ya estaba bien). Las que tienen imagen_ya_generada=true y están bien: devuelve su start_en tal cual.',
     'TAREA 3 — Para TODAS las tomas escribe action_en, reaction_en, background_en y end_en súper detallados y coherentes con su start_en final, para que el video haga un movimiento simple y creíble sin inventar nada.',
     RULES,
+    aspect === '16:9' ? '- FORMATO HORIZONTAL 16:9 (video largo de YouTube): composición panorámica, el sujeto puede ir a un tercio y el paisaje respira a los lados.' : '- FORMATO VERTICAL 9:16 (Shorts): el sujeto principal ocupa el centro y el cuadro alto.',
+    context ? 'Contexto de la historia: ' + context : '',
     '',
     `Serie: ${(series && (series.title || series.slug)) || ''}`,
     'Tomas (JSON):', JSON.stringify(rows), '',
