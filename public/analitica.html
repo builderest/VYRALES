@@ -299,6 +299,7 @@
           <button class="generar-btn" id="genBtn">${SPARK} GENERAR NUEVAS IDEAS (CLAUDE EN TU PC, $0)</button>
           <div id="ideas" style="display:flex;flex-direction:column;gap:10px;margin-top:10px"></div>
         </div>
+        <div class="panel" id="largosBox" style="display:none"><div class="card-title"><span class="t">VIDEOS LARGOS EN PROCESO</span></div><div id="largos"></div></div>
         <div class="panel">
           <div class="card-title"><span class="t">TOP 5 MÁS VIRALES${TAB === 'todos' ? '' : ' · ' + TAB.toUpperCase()}</span><span class="muted">${list.length} en total</span></div>
           ${videoList(list, 5)}
@@ -310,6 +311,7 @@
     $('genBtn').onclick = genIdeas;
     if ($('moreBtn')) $('moreBtn').onclick = () => openModal(list);
     renderIdeas(store.get('vy_an_ideas'));
+    renderLargos();
     bindTips($('content'));
   }
 
@@ -545,6 +547,53 @@
     };
   }
 
+  // ---------- video largo + Shorts (Claude en la PC, ~25 min) ----------
+  async function createLargo(idea){
+    const k = key();
+    try {
+      const r = await fetch('/.netlify/functions/analytics', { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, k ? { 'x-vyrales-key': k } : {}), body: JSON.stringify({ action: 'claude_largo', idea }) });
+      const j = await r.json(); if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+      const list = store.get('vy_largos') || []; list.unshift({ job: j.job, titulo: idea.titulo, at: Date.now() }); store.set('vy_largos', list.slice(0, 10));
+      toast(j.online ? 'Claude empezó el video largo en tu PC (~25 min)' : 'La PC no responde: empieza cuando vuelva');
+      renderLargos();
+    } catch (err) { alert('No se pudo pedir el video largo: ' + err.message); }
+  }
+  async function renderLargos(){
+    const list = store.get('vy_largos') || []; const box = $('largosBox'); if (!box) return;
+    box.style.display = list.length ? '' : 'none'; if (!list.length) return;
+    $('largos').innerHTML = list.map((x) => `<div class="vid" id="lg_${x.job}"><span class="info"><span class="ttl">${esc(x.titulo || x.job)}</span><span class="meta" id="lgs_${x.job}">revisando…</span></span><span id="lgb_${x.job}"></span></div>`).join('');
+    for (const x of list) {
+      try {
+        const g = await (await fetch('/.netlify/functions/analytics?script=' + x.job, { cache: 'no-store' })).json();
+        const st = $('lgs_' + x.job), bt = $('lgb_' + x.job); if (!st) continue;
+        if (g.pending || g.partial) { st.textContent = g.partial ? 'historia escrita · Claude detalla los prompts…' : 'Claude está escribiendo la historia… (' + Math.round((Date.now() - x.at) / 60000) + ' min)'; continue; }
+        if (!g.ok) { st.innerHTML = '<span style="color:var(--red)">falló: ' + esc(g.error || '') + '</span>'; bt.innerHTML = `<button class="btn-sm" data-x="${x.job}">Quitar</button>`; bt.firstChild.onclick = () => { store.set('vy_largos', list.filter((y) => y.job !== x.job)); renderLargos(); }; continue; }
+        st.textContent = `${g.minutes} min · ${g.long.shots.length} tomas · ${(g.shorts || []).length} Shorts`;
+        bt.innerHTML = `<button class="btn-sm" style="border-color:rgba(61,220,151,.5);color:var(--green)">Ver y crear en el panel</button>`;
+        bt.firstChild.onclick = () => showLargo(x, g);
+      } catch (_) {}
+    }
+    if (list.some((x) => Date.now() - x.at < 60 * 60000)) { clearTimeout(renderLargos._t); renderLargos._t = setTimeout(renderLargos, 30000); }
+  }
+  function showLargo(x, g){
+    const L = g.long; let chap = 0;
+    const longHtml = L.shots.map((s) => { const head = s.chapter && s.chapter !== chap ? (chap = s.chapter, `<div style="color:var(--cyan);font-weight:800;margin:10px 0 4px">CAPÍTULO ${s.chapter}: ${esc(s.chapter_title || '')}</div>`) : ''; return head + `<div style="font-size:12.5px;margin:2px 0">${esc((s.dialogue || []).map((d) => d.line).join(' '))}</div>`; }).join('');
+    const shortsHtml = (g.shorts || []).map((s, i) => `<div class="panel" style="padding:8px 10px;margin-top:8px"><b style="color:var(--pink)">SHORT ${i + 1}: ${esc(s.title)}</b>${s.shots.map((t) => `<div style="font-size:12px;margin-top:2px">${esc((t.dialogue || []).map((d) => d.line).join(' '))}</div>`).join('')}</div>`).join('');
+    scriptModal(L.title, `<div class="muted" style="margin-bottom:8px">${g.minutes} min · ${L.shots.length} tomas · ${(g.shorts || []).length} Shorts con llamada a la acción · Claude (tu plan) · $0</div>
+      <div class="setup-actions" style="margin-bottom:10px"><button class="btn-sm" id="lgCreate" style="border-color:rgba(61,220,151,.5);color:var(--green)">Crear largo + Shorts en el panel</button></div>
+      <div class="panel" style="padding:10px 12px">${longHtml}</div>${shortsHtml}`);
+    $('lgCreate').onclick = async () => {
+      const b = $('lgCreate'); b.disabled = true; b.textContent = 'Creando…';
+      try {
+        const r = await fetch('/.netlify/functions/import-largo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ job: x.job }) });
+        const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status);
+        store.set('vy_largos', (store.get('vy_largos') || []).filter((y) => y.job !== x.job));
+        alert('✔ Listo: el video largo está en "Historias completas" (EP ' + j.long_episode + ') y los ' + j.shorts + ' Shorts en el canal vertical.');
+        location.href = '/?series=' + encodeURIComponent(j.long_slug);
+      } catch (err) { b.disabled = false; b.textContent = 'Crear largo + Shorts en el panel'; alert('No se pudo crear: ' + err.message); }
+    };
+  }
+
   // ---------- ideas IA ----------
   function claudePrompt(i){
     return `Escríbeme el prompt de VYRALES (documental narrado, una sola voz continua, ~${i.duracion_s || 75} s, video que se entiende solo) para este video:\nTítulo: ${i.titulo}\nGancho (primera frase del narrador): ${i.gancho}\nTema: ${i.tema}\nPor qué: ${i.por_que}`;
@@ -559,9 +608,10 @@
         <div class="hook">“${esc(i.gancho)}”</div>
         <div class="why">${esc(i.por_que)}</div>
         <div class="idea-bottom"><div class="tags">${i.nuevo ? '<span class="tag-pill new">PRUEBA</span>' : ''}${(i.tags || []).slice(0, 3).map((t) => `<span class="tag-pill">${esc(t)}</span>`).join('')}</div>
-          <span class="setup-actions"><button class="btn-sm" data-copy="${n}" title="Texto para pegarle a Claude">Copiar idea</button><button class="btn-sm" data-claude="${n}" style="border-color:rgba(61,220,151,.5);color:var(--green)" title="Claude escribe el guion completo en tu PC con tu plan de Claude ($0)">Crear guion con Claude ($0)</button><button class="btn-sm" data-script="${n}" style="border-color:rgba(255,107,214,.35);color:var(--text-dim)" title="Respaldo si la PC está apagada: Gemini por API">Gemini (de pago ~$0.16)</button></span></div></div>`).join('');
+          <span class="setup-actions"><button class="btn-sm" data-copy="${n}" title="Texto para pegarle a Claude">Copiar idea</button><button class="btn-sm" data-claude="${n}" style="border-color:rgba(61,220,151,.5);color:var(--green)" title="Un Short vertical (~1 min) escrito por Claude en tu PC ($0)">Crear Short ($0)</button><button class="btn-sm" data-largo="${n}" style="border-color:rgba(255,107,214,.6);color:var(--pink)" title="Video largo de YouTube (8–15 min, horizontal) + 3–5 Shorts verticales con llamada a la acción al video completo. Claude en tu PC ($0, ~25 min)">Crear Largo + Shorts ($0)</button></span></div></div>`).join('');
     box.querySelectorAll('[data-script]').forEach((b) => b.onclick = () => createScript(res.ideas[+b.dataset.script]));
     box.querySelectorAll('[data-claude]').forEach((b) => b.onclick = () => createScript(res.ideas[+b.dataset.claude], 'claude'));
+    box.querySelectorAll('[data-largo]').forEach((b) => b.onclick = () => createLargo(res.ideas[+b.dataset.largo]));
     box.querySelectorAll('[data-copy]').forEach((b) => b.onclick = async () => {
       const txt = claudePrompt(res.ideas[+b.dataset.copy]);
       try { await navigator.clipboard.writeText(txt); toast('Copiado: pégaselo a Claude'); } catch (_) { window.prompt('Copia este texto:', txt); }

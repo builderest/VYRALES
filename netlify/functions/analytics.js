@@ -82,6 +82,18 @@ exports.handler = async (event) => {
         return json(200, { queued: true, job });
       }
       if (body.action === 'ideas') return json(200, await ideas(sb, body));
+      if (body.action === 'claude_largo') { // VIDEO LARGO + SHORTS con Claude en la PC ($0, ~25 min)
+        const job = 'largo-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+        const idea = body.idea || {};
+        const tipo = /guerra|batalla|historia|humanos antiguos/i.test(idea.tema || '') ? 'historia' : /misterio/i.test(idea.tema || '') ? 'misterios' : 'curiosidades';
+        const topic = [idea.titulo, idea.gancho ? 'Gancho sugerido: ' + idea.gancho : '', idea.por_que ? 'Por qué (dato del canal): ' + idea.por_que : '', 'Cuenta la historia COMPLETA, real y verificable, con las personas, la evidencia y lo que significa hoy.'].filter(Boolean).join('\n');
+        const { uploadFile } = require('./_storage');
+        await uploadFile(sb, { path: `guiones/${job}.req.json`, buffer: Buffer.from(JSON.stringify({ tipo, topic, idea, at: new Date().toISOString() })), contentType: 'application/json' });
+        const online = await agentOnline();
+        const { error } = await sb.from('agent_jobs').insert({ command: 'claude_largo:' + job });
+        if (error) return json(500, { error: error.message });
+        return json(200, { queued: true, job, online, titulo: idea.titulo || '' });
+      }
       if (body.action === 'claude_script') { // guion con Claude en la PC (plan de Claude, $0): pedido → Storage + orden al agente
         const job = String(body.job || '').replace(/[^a-z0-9-]/gi, '').slice(0, 60);
         if (job.length < 6) return json(400, { error: 'Falta job.' });
