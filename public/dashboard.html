@@ -1386,6 +1386,16 @@
 
       // index/total: posición en el episodio. Se muestra el NÚMERO REAL de la toma (antes salía
       // la posición entre los clips existentes: con la 13 faltando, la 20 aparecía como "19 / 19").
+      // Tomas partidas (una misma frase en varias imágenes): se muestran como "TOMA 4 · PARTE 2/3", debajo de su toma madre.
+      window.shotLabel = function(ep, n) {
+        const sh = ((ep && ep.shots) || []).slice().sort((a, b) => a.n - b.n);
+        let base = 0, label = 'TOMA ' + String(n).padStart(2, '0'), child = false;
+        for (const x of sh) {
+          if (!x.split_part || x.split_part === 1) base++;
+          if (x.n === n) { label = 'TOMA ' + String(base).padStart(2, '0') + (x.split_of ? ' · PARTE ' + x.split_part + '/' + x.split_of : ''); child = !!(x.split_part && x.split_part > 1); break; }
+        }
+        return { label, child };
+      };
       function renderShotCard(asset, index, total) {
         const shotNo = asset.shot_number || (index + 1);
         const isCliff = shotNo === total;
@@ -1400,7 +1410,7 @@
               '<div class="relative aspect-[9/16] bg-slate-950 overflow-hidden flex items-center justify-center text-slate-600 text-xs font-mono text-center p-4">' +
                 (asset.storage_path ? ('<video src="' + esc(vyMedia(asset.storage_path)) + '" controls preload="none"' + posterFor(asset) + ' playsinline class="w-full h-full object-cover absolute inset-0 bg-black"' + narrAttrsFor(asset) + '></video>') : 'Sin preview aún') +
                 '<div class="absolute top-3 left-3 right-3 flex justify-between items-center text-[10px] font-mono">' +
-                  '<span class="bg-black/80 text-cyber-cyan border border-cyber-cyan/30 px-2 py-0.5 rounded">TOMA ' + String(shotNo).padStart(2, '0') + ' / ' + total + '</span>' +
+                  '<span class="bg-black/80 text-cyber-cyan border border-cyber-cyan/30 px-2 py-0.5 rounded">' + (function() { const e0 = ((lastLoadedData && lastLoadedData.episodes) || []).find(e => (e.assets || []).some(x => x.id === asset.id)); return e0 ? shotLabel(e0, shotNo).label : 'TOMA ' + String(shotNo).padStart(2, '0') + ' / ' + total; })() + '</span>' +
                   '<span class="bg-cyber-emerald/90 text-black font-bold px-2 py-0.5 rounded">' + modelLabel + ' (' + cost + ')</span>' +
                 '</div>' +
               '</div>' +
@@ -2411,7 +2421,7 @@
                 '<p class="text-[10px] font-mono text-slate-500">' + uses + ' tomas · ' + (mem.url ? (mem.source === 'uploaded' ? 'imagen subida' : 'imagen generada') : 'sin imagen') + '</p>' +
                 '<p class="text-[10px] text-slate-400 line-clamp-3">' + esc(loc.visual || '') + '</p>' +
                 '<div class="flex flex-wrap gap-1.5 pt-1">' +
-                  '<button onclick="openPromptEditor(this)" data-kind="location" data-loc="' + esc(k) + '" data-mode="generate" class="text-[10px] font-mono px-2 py-0.5 rounded border border-cyber-violet/40 text-cyber-violet bg-cyber-violet/10 hover:bg-cyber-violet/20"><i class="fa-solid fa-wand-magic-sparkles mr-1"></i>' + (mem.url ? 'Regenerar' : 'Generar') + ' (~$' + IMAGE_PRICE_USD.toFixed(2) + ')</button>' +
+                  '<button onclick="openPromptEditor(this)" data-kind="location" data-loc="' + esc(k) + '" data-mode="generate" class="text-[10px] font-mono px-2 py-0.5 rounded border border-cyber-violet/40 text-cyber-violet bg-cyber-violet/10 hover:bg-cyber-violet/20"><i class="fa-solid fa-wand-magic-sparkles mr-1"></i>' + (mem.url ? 'Regenerar' : 'Generar') + (((lastLoadedData.series.story_bible || {}).image_engine === 'flow') ? ' (Flow, $0)' : ' (~$' + IMAGE_PRICE_USD.toFixed(2) + ')') + '</button>' +
                   '<button onclick="pickLocationImage(this)" data-loc="' + esc(k) + '" class="text-[10px] font-mono px-2 py-0.5 rounded border border-cyber-cyan/40 text-cyber-cyan hover:bg-cyber-cyan/10"><i class="fa-solid fa-upload mr-1"></i>Subir</button>' +
                   '<button onclick="openPromptEditor(this)" data-kind="location" data-loc="' + esc(k) + '" data-mode="save" class="text-[10px] font-mono px-2 py-0.5 rounded border border-slate-700 text-slate-400 hover:text-white"><i class="fa-solid fa-pen mr-1"></i>Prompt</button>' +
                   (mem.url ? '<button onclick="removeLocationImage(this)" data-loc="' + esc(k) + '" class="text-[10px] font-mono px-2 py-0.5 rounded text-slate-500 hover:text-cyber-pink"><i class="fa-solid fa-trash"></i></button>' : '') +
@@ -2464,6 +2474,17 @@
       async function generateLocationImage(key, prompt) {
         const before = lastLoadedData && lastLoadedData.series.visual_memory && lastLoadedData.series.visual_memory.locations && lastLoadedData.series.visual_memory.locations[key];
         const prevUrl = before ? before.url : null;
+        const sbL = (lastLoadedData && lastLoadedData.series && lastLoadedData.series.story_bible) || {};
+        if (sbL.image_engine === 'flow') {
+          // GRATIS: el lugar se hace con Google Flow en tu PC. Si editaste el prompt, primero se guarda.
+          try {
+            if (prompt) await fetch('/.netlify/functions/location-image', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ series: DEFAULT_SERIES, location_key: key, prompt }) });
+            await agentOrder('flow_lugar:' + DEFAULT_SERIES + ':' + key);
+          } catch (err) { return alert('No se pudo mandar a la PC: ' + err.message); }
+          document.getElementById('locationsSubtitle').innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>Google Flow en tu PC: lugar "' + esc(key) + '" ($0)...';
+          await pollUntil(d => { const m = d.series && d.series.visual_memory && d.series.visual_memory.locations && d.series.visual_memory.locations[key]; return m && m.url && m.url !== prevUrl; }, 8 * 60 * 1000);
+          return loadDashboard();
+        }
         try {
           const res = await fetch('/.netlify/functions/location-image-background', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -2657,8 +2678,8 @@
                   const shotCost = (m.secs * VEO_PRICE_PER_SEC[model] + (kf && !frame ? IMAGE_PRICE_USD : 0) + (kf && !frame && locMissing ? IMAGE_PRICE_USD : 0) + voiceCost).toFixed(2);
                   const effectivePrompt = sh.prompt_override || sh.prompt_preview || '';
                   return (
-                    '<div class="border-l-2 ' + (isCliff ? 'border-cyber-pink' : 'border-cyber-border') + ' pl-3 py-1.5" data-shot="' + e.id + '-' + sh.n + '">' +
-                      '<p class="text-[10px] font-mono text-slate-500">TOMA ' + String(sh.n).padStart(2, '0') + (isCliff ? ' · CLIFFHANGER' : '') + ' · Veo ' + VEO_LABEL[model] + ' · ' + esc(sh.location) + ' · ' + esc((sh.characters || []).join(', ')) + (sh.camera ? ' · ' + esc(sh.camera) : '') + '</p>' +
+                    '<div class="border-l-2 ' + (shotLabel(e, sh.n).child ? 'ml-6 border-cyber-gold/50 ' : (isCliff ? 'border-cyber-pink ' : 'border-cyber-border ')) + 'pl-3 py-1.5" data-shot="' + e.id + '-' + sh.n + '">' +
+                      '<p class="text-[10px] font-mono text-slate-500">' + (shotLabel(e, sh.n).child ? '↳ ' : '') + shotLabel(e, sh.n).label + (isCliff ? ' · CLIFFHANGER' : '') + ' · Veo ' + VEO_LABEL[model] + ' · ' + esc(sh.location) + ' · ' + esc((sh.characters || []).join(', ')) + (sh.camera ? ' · ' + esc(sh.camera) : '') + '</p>' +
                       '<p class="text-[12px] text-slate-200">' + esc(sh.scene_es) + '</p>' +
                       (sh.dialogue || []).map(d => '<p class="text-[11px] text-cyber-cyan font-mono">— ' + esc(d.speaker) + ': ' + esc(d.line) + '</p>').join('') +
                       (function() {
@@ -2692,7 +2713,9 @@
                                 ? '<button type="button" onclick="openMedia(this)" data-src="' + esc(frame.storage_path) + '" data-kind="image" data-title="EP ' + e.episode_number + ' · Toma ' + sh.n + ' · cuadro inicial" class="relative" title="Ver cuadro inicial"><img src="' + esc(frame.storage_path) + '" class="h-16 w-9 object-cover rounded border border-cyber-border hover:border-cyber-cyan"></button>'
                                 : '') +
                               (canGenerateShots && !clip
-                                ? '<button onclick="openPromptEditor(this)" data-kind="keyframe" data-ep="' + e.id + '" data-n="' + sh.n + '" data-mode="generate" class="text-[10px] font-mono px-2 py-0.5 rounded border border-cyber-violet/40 text-cyber-violet bg-cyber-violet/10 hover:bg-cyber-violet/20"><i class="fa-solid fa-image mr-1"></i>' + (frame ? 'Regenerar cuadro' : '1 · Generar cuadro') + ' · TOMA ' + String(sh.n).padStart(2, '0') + ' (~$' + (IMAGE_PRICE_USD * (locMissing ? 2 : 1)).toFixed(2) + (locMissing ? ', incluye lugar' : '') + ')</button>'
+                                ? (((data.series.story_bible || {}).image_engine === 'flow' && (((data.series.story_bible || {}).flow_characters === true) || !(sh.characters || []).length))
+                                  ? '<button onclick="openShotEditor(\'' + e.id + '\',' + sh.n + ')" class="text-[10px] font-mono px-2 py-0.5 rounded border border-cyber-emerald/40 text-cyber-emerald bg-cyber-emerald/10 hover:bg-cyber-emerald/20" title="Abre la toma: revisa la imagen y su prompt y dale Nueva imagen (Google Flow en tu PC, $0)"><i class="fa-solid fa-image mr-1"></i>' + (frame ? 'Regenerar cuadro' : '1 · Generar cuadro') + ' · TOMA ' + String(sh.n).padStart(2, '0') + ' (Google Flow, $0)</button>'
+                                  : '<button onclick="openPromptEditor(this)" data-kind="keyframe" data-ep="' + e.id + '" data-n="' + sh.n + '" data-mode="generate" class="text-[10px] font-mono px-2 py-0.5 rounded border border-cyber-violet/40 text-cyber-violet bg-cyber-violet/10 hover:bg-cyber-violet/20"><i class="fa-solid fa-image mr-1"></i>' + (frame ? 'Regenerar cuadro' : '1 · Generar cuadro') + ' · TOMA ' + String(sh.n).padStart(2, '0') + ' (~$' + (IMAGE_PRICE_USD * (locMissing ? 2 : 1)).toFixed(2) + (locMissing ? ', incluye lugar' : '') + ')</button>')
                                 : '') +
                             '</div>'
                           : '') +

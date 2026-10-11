@@ -8,7 +8,7 @@
   # _merge.js lo encuentre en producción.
   external_node_modules = ["ffmpeg-static"]
   # Fuente de los subtítulos y tarjetas del editor (_render.js).
-  included_files = ["netlify/functions/assets/fonts/**"]
+  included_files = ["netlify/functions/assets/fonts/**", "netlify/functions/assets/finger.png"]
 
 # daily-trigger YA NO corre programado: la produccion la dispara Franklin a mano (de noche)
 # y los guiones de cada novela se escriben completos de una vez (arco entero) e importan

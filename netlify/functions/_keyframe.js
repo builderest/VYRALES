@@ -127,7 +127,13 @@ async function createLocationImage(supabase, { seriesId, slug, storyBible, key, 
   const old = cur && cur.visual_memory && cur.visual_memory.locations && cur.visual_memory.locations[key];
   const finalPrompt = (prompt && String(prompt).trim()) || (old && old.prompt_override) || buildLocationPrompt(key, storyBible);
   log('generando imagen fija del lugar', key, '...');
-  const img = await generateImage({ prompt: finalPrompt });
+  // GRATIS PRIMERO: series con Google Flow → el lugar se hace con Flow en la PC ($0); Gemini solo fuera de la PC.
+  let img;
+  if (process.env.VYRALES_LOCAL_RUN && storyBible && storyBible.image_engine === 'flow') {
+    const f = await require('../../agente/flow_imagenes').flowImage({ prompt: finalPrompt, aspect: storyBible.aspect === '16:9' ? '16:9' : '9:16' });
+    img = { buffer: f.buffer, mimeType: f.mimeType, costUsd: 0, model: 'flow' };
+    log('lugar hecho con Google Flow ($0)');
+  } else img = await generateImage({ prompt: finalPrompt });
   await logSpend(supabase, { seriesId, kind: 'location', model: img.model, costUsd: img.costUsd, note: key });
   await ensureMediaBucket(supabase);
   const ext = img.mimeType.includes('jpeg') ? 'jpg' : 'png';
@@ -189,7 +195,8 @@ async function createKeyframe(supabase, { series, episode, shot, characters, log
   // image_engine 'flow': cuadro inicial con Google Flow (tu plan) y, si falla, FLUX en king. Ambos $0.
   let img;
   if (flux && (shot.image_engine || series.story_bible.image_engine) === 'flow') {
-    try { img = await require('../../agente/flow_imagenes').flowImage({ prompt: fluxText }); log('cuadro inicial de Google Flow'); }
+    const aspect = (episode && episode.continuity && episode.continuity.aspect) || (series.story_bible && series.story_bible.aspect) || '9:16';
+    try { img = await require('../../agente/flow_imagenes').flowImage({ prompt: fluxText, aspect }); log('cuadro inicial de Google Flow' + (aspect === '16:9' ? ' (16:9)' : '')); }
     catch (e) { log('Flow falló (' + String(e.message).slice(0, 160) + ') → FLUX en king'); img = await fluxImage({ prompt: fluxText }); }
   } else if (!flux && (shot.characters || []).length && series.story_bible.flow_characters === true && (shot.image_engine || series.story_bible.image_engine) === 'flow') {
     // Personajes con Google Flow: se suben sus fotos de cara como "ingredientes" ($0). Si falla → Gemini.

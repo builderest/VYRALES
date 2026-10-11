@@ -219,7 +219,7 @@ ${voz}
 
 === SHORTS QUE LLEVAN AL VIDEO LARGO (vertical, para YouTube Shorts, TikTok, Reels y Facebook) ===
 - 3 a 5 Shorts. Cada uno cuenta UN momento poderoso de la historia completo por sí mismo (45–70 s, 110–160 palabras), con un gancho brutal en la primera frase, la MISMA voz del narrador, y deja al espectador queriendo saber el resto.
-- La ÚLTIMA línea de cada Short es la llamada a la acción, natural y con intriga, por ejemplo "La historia completa, con lo que pasó después, está en nuestro canal." (varíala en cada Short).
+- La ÚLTIMA línea de cada Short es SIEMPRE, palabra por palabra: "Si quieres ver la historia completa, entra al enlace que te dejo aquí abajo." (regla fija del canal: así habla una persona; en pantalla sale un dedo señalando hacia abajo). Nada de frases tipo "lo contamos completo en el video largo de nuestro canal", que suenan a robot.
 - 8 a 14 tomas por Short, mismas reglas de visual_es y camera.
 
 === JSON A ENTREGAR (solo el JSON, sin explicaciones) ===

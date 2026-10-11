@@ -194,7 +194,8 @@ async function generate(page, ctx, prompt, name, refs) {
 
 // Para el pipeline: genera UNA imagen en Flow (segundo plano; muestra Chrome solo si hay que iniciar sesión).
 // Devuelve lo mismo que _image.generateImage: { buffer, mimeType, costUsd, model }.
-async function flowImage({ prompt, refs = [] }) {
+async function flowImage({ prompt, refs = [], aspect = null }) {
+  if (aspect) { ASPECT = aspect === '16:9' ? '16:9' : '9:16'; RULE_BASE = ruleBaseFor(); }
   let { ctx, page } = await openFlow(process.env.FLOW_VISIBLE === '1');
   try {
     let ok = await ensureLogin(page, 0.1);

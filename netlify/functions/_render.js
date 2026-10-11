@@ -300,7 +300,7 @@ async function renderCard({ cwd, out, lines, seconds, sub }) {
 
 // Cierre sobre la última imagen del episodio: zoom lento, un poco más oscura, texto grande y
 // (si la serie tiene narrador con voz fija) la voz del narrador diciendo el texto.
-async function renderTail({ cwd, from, out, lines, seconds, voice, sub }) {
+async function renderTail({ cwd, from, out, lines, seconds, voice, sub, finger = false }) {
   const dur = Math.max(1.5, Math.min(7, voice ? 0.4 + voice.seconds + 0.6 : Number(seconds) || 2.5));
   const png = path.basename(out, '.mp4') + '.png';
   await run(['-y', '-sseof', '-0.15', '-i', from, '-frames:v', '1', '-update', '1', png], cwd);
@@ -313,12 +313,20 @@ async function renderTail({ cwd, from, out, lines, seconds, voice, sub }) {
   const vf = `scale=${W * 2}:${H * 2},zoompan=z='1+0.06*on/${frames}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${frames}:s=${W}x${H}:fps=${FPS},eq=brightness=-0.12,setsar=1,ass=${assName}:fontsdir=fonts`;
   const args = ['-y', '-i', png];
   let fc;
+  // Dedo 👇 que rebota (Shorts que llevan al video completo: "entra al enlace que te dejo aquí abajo").
+  const fingerOn = finger && fs.existsSync(path.join(cwd, 'finger.png'));
+  const fw = Math.round(Math.min(W, H) * 0.26);
+  const vchain = fingerOn
+    ? `[0:v]${vf}[bg];[1:v]scale=${fw}:${fw},format=rgba[fg];[bg][fg]overlay=x=(W-w)/2:y=${Math.round(H * 0.62)}+${Math.round(H * 0.018)}*sin(2*PI*2*t):shortest=1[v]`
+    : `[0:v]${vf}[v]`;
+  if (fingerOn) args.push('-loop', '1', '-i', 'finger.png');
+  const ai = fingerOn ? 2 : 1;
   if (voice) {
     args.push('-i', voice.file);
-    fc = `[0:v]${vf}[v];[1:a]aresample=48000,aformat=channel_layouts=stereo,adelay=400|400,apad[a]`;
+    fc = `${vchain};[${ai}:a]aresample=48000,aformat=channel_layouts=stereo,adelay=400|400,apad[a]`;
   } else {
     args.push('-f', 'lavfi', '-i', 'anullsrc=channel_layout=stereo:sample_rate=48000');
-    fc = `[0:v]${vf}[v];[1:a]anull[a]`;
+    fc = `${vchain};[${ai}:a]anull[a]`;
   }
   await run([...args, '-filter_complex', fc, '-map', '[v]', '-map', '[a]', '-t', dur.toFixed(3), ...VIDEO_OUT, ...AUDIO_OUT, out], cwd);
   return { dur, narr: voice ? { start: 0.4, seconds: voice.seconds, file: voice.file, tempo: 1 } : null };
@@ -463,9 +471,12 @@ async function renderEpisode({ episode, series, log = console.log, fetchFile = d
   W = wide ? 1280 : 720; H = wide ? 720 : 1280;
   if (wide) log('video HORIZONTAL 16:9 (1280x720)');
   const plan = resolvePlan(episode);
+  // Short que lleva al video largo: cierre fijo con el dedo 👇 (la última frase del narrador ya invita al enlace).
+  const ctaShort = !!(episode.continuity && (episode.continuity.kind === 'short_cta' || episode.continuity.cta_to_long));
   // Cierre propio de la serie (ej. curiosidades: "Síguenos para más curiosidades"), si el editor no lo cambió.
   const sbEnd = series && series.story_bible && series.story_bible.end_card;
   if (sbEnd && !(episode.edit_plan && episode.edit_plan.end_card)) plan.end_card = Object.assign({}, plan.end_card, sbEnd);
+  if (ctaShort) plan.end_card = { enabled: true, mode: 'tail', text: 'HISTORIA COMPLETA', subtext: 'en el enlace de aquí abajo', voice: '', seconds: 3 };
   const sub = Object.assign({}, plan.subtitles, { margin_v: Math.min(1150, Math.max(20, Number(plan.subtitles.margin_v) || 180)) });
   // Series con story_bible.subtitle_style = 'poster' (frases motivacionales): texto tipo póster en vez del karaoke.
   if (series && series.story_bible && series.story_bible.subtitle_style === 'poster') { sub.style = 'poster'; sub.karaoke = false; }
@@ -491,6 +502,7 @@ async function renderEpisode({ episode, series, log = console.log, fetchFile = d
     fs.mkdirSync(path.join(cwd, 'fonts'));
     fs.copyFileSync(findFont(), path.join(cwd, 'fonts', FONT_FILE));
     { const cz = path.join(path.dirname(findFont()), 'Cinzel-Bold.ttf'); if (fs.existsSync(cz)) fs.copyFileSync(cz, path.join(cwd, 'fonts', 'Cinzel-Bold.ttf')); }
+    { const fg = path.join(path.dirname(findFont()), '..', 'finger.png'); if (ctaShort && fs.existsSync(fg)) fs.copyFileSync(fg, path.join(cwd, 'finger.png')); }
     // parts: { file, dur, xfade (segundos de fundido cruzado CON la pieza siguiente) }
     const parts = [];
 
@@ -549,7 +561,7 @@ async function renderEpisode({ episode, series, log = console.log, fetchFile = d
       // Voz del cierre: el narrador TTS de la serie (también en modo voz de LTX, que no tiene narrador).
       const cfg = narrationConfig(sbx) || (sbx.narration && sbx.narration.engine === 'ltx' ? Object.assign({}, sbx.narration, { engine: 'gemini_tts' }) : null);
       const voice = cfg && plan.end_card.voice ? await endVoice({ cwd, text: plan.end_card.voice, cfg, log }) : null;
-      const t = await renderTail({ cwd, from: lastPart.file, out: 'p99-end.mp4', lines: [plan.end_card.text, plan.end_card.subtext], seconds: plan.end_card.seconds, voice, sub });
+      const t = await renderTail({ cwd, from: lastPart.file, out: 'p99-end.mp4', lines: [plan.end_card.text, plan.end_card.subtext], seconds: plan.end_card.seconds, voice, sub, finger: ctaShort });
       lastPart.xfade = Math.min(TAIL_XF, lastPart.dur / 2);
       lastPart.xname = 'fade';
       parts.push({ file: 'p99-end.mp4', dur: t.dur, narr: t.narr, xfade: 0 });

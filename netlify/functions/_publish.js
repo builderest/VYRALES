@@ -75,16 +75,20 @@ async function writeTexts({ series, episode, totalEpisodes }) {
   const costUsd = ((u.promptTokenCount || 1500) * TEXT_PRICE.input + ((u.candidatesTokenCount || 500) + (u.thoughtsTokenCount || 0)) * TEXT_PRICE.output) / 1e6;
   const tags = (Array.isArray(out.hashtags) ? out.hashtags : []).map((t) => '#' + String(t).replace(/^#/, '').replace(/\s+/g, '')).filter((t) => t.length > 1).slice(0, 8);
   const part = single ? '' : `Parte ${episode.episode_number}/${totalEpisodes}`;
+  // Shorts que llevan al video largo: la llamada a la acción también en los textos (Franklin: "entra al enlace que te dejo aquí abajo").
+  const ctaLong = !!(cont.cta_to_long || cont.kind === 'short_cta');
+  const CTA = '👇 Si quieres ver la historia completa, entra al enlace que te dejo aquí abajo.';
   return {
     costUsd,
+    cta_to_long: ctaLong ? CTA : null,
     cover_text: String(hook || out.cover_text || episode.title || '').toUpperCase().slice(0, 60),
     part,
-    tiktok: [String(out.tiktok_caption || '').trim(), part, AI_DISCLOSURE, tags.slice(0, 5).join(' ')].filter(Boolean).join('\n'),
-    instagram: [String(out.instagram_caption || '').trim(), '', single ? '' : part + (out.next_hook ? ' · ' + String(out.next_hook).trim() : ''), '', AI_DISCLOSURE, '', tags.join(' ')].filter((x, i, a) => x !== '' || a[i - 1] !== '').join('\n'),
+    tiktok: [String(out.tiktok_caption || '').trim(), ctaLong ? CTA : '', part, AI_DISCLOSURE, tags.slice(0, 5).join(' ')].filter(Boolean).join('\n'),
+    instagram: [String(out.instagram_caption || '').trim(), ctaLong ? '\n' + CTA : '', '', single ? '' : part + (out.next_hook ? ' · ' + String(out.next_hook).trim() : ''), '', AI_DISCLOSURE, '', tags.join(' ')].filter((x, i, a) => x !== '' || a[i - 1] !== '').join('\n'),
     youtube_title: youtubeTitle(lockedTitle || out.youtube_title || out.cover_text || episode.title, part),
     youtube: [String(out.instagram_caption || '').trim(), '', single ? '' : part + (out.next_hook ? ' · ' + String(out.next_hook).trim() : ''), '', AI_DISCLOSURE, '', ['#Shorts'].concat(tags.slice(0, 6)).join(' ')].filter((x, i, a) => x !== '' || a[i - 1] !== '').join('\n'),
     hashtags: tags,
-    pinned_comment: String(out.pinned_comment || '').trim(),
+    pinned_comment: ctaLong ? '👇 La historia completa está aquí: (pega aquí el enlace del video largo)' : String(out.pinned_comment || '').trim(),
     ai_disclosure: AI_DISCLOSURE
   };
 }
