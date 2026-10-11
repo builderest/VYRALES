@@ -47,6 +47,17 @@ async function main() {
   const r = await runPublish({ supabase, epId, platform, privacy: privacy === 'public' ? 'public' : privacy === 'private' ? 'private' : undefined, loadVideo, quality: 'completa', log: (...a) => console.log(...a) });
   if (!r.ok) throw new Error(r.error);
   console.log('LISTO: publicado desde la PC en calidad completa.');
+  // Documental largo en YouTube: portada épica automática (Claude elige el cuadro y el texto; portada_yt.js).
+  if (platform === 'youtube') {
+    const { data: e2 } = await supabase.from('episodes').select('continuity, validator_report').eq('id', epId).single();
+    const vid = (((e2.validator_report || {}).social_runs || {}).youtube || {}).video_id;
+    if (vid && (e2.continuity || {}).kind === 'largo') {
+      console.log('Haciendo la portada de YouTube...');
+      const { spawnSync } = require('child_process');
+      const pr = spawnSync(process.execPath, [path.join(__dirname, 'portada_yt.js'), epId, vid], { encoding: 'utf8', timeout: 25 * 60000 });
+      console.log(String(pr.stdout || '').split(/\r?\n/).filter((l) => /Elegidas|Ganadora|Portada|portada|ERROR/.test(l)).join('\n'));
+    }
+  }
 }
 
 main().catch((err) => { console.error('ERROR:', err.message || err); process.exit(1); });

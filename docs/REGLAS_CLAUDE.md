@@ -126,3 +126,8 @@ Este documento es la memoria del proyecto. Cada vez que Franklin corrige algo, l
 - Franklin: "solo los Shorts con letras grandes". El documental LARGO (continuity.kind = 'largo') se renderiza SIN texto en pantalla.
 - En YouTube el largo lleva pistas de subtítulos CC en español e inglés (_captions.js). YouTube las muestra según el idioma del espectador. Se suben solas al publicar, o con `subtitulos:<ep>[:<videoId>]`. Tiempos: voz ES por palabra / voz EN colocada (english.words) + LEAD.
 - YouTube no deja reemplazar el archivo de un video: si se rehace, se sube uno nuevo y Franklin borra el viejo en Studio (yo no borro).
+
+## Portada de YouTube (oct-11)
+- Franklin: "siempre la más épica del video, con texto llamativo". `portada_yt:<ep>[:<videoId>]` ($0). Claude ve todos los cuadros en hojas de contacto y elige 2: tema PRINCIPAL, sujeto grande, drama, nada fuera de época. Escribe 2–4 palabras ES/EN (1 palabra en amarillo, sin repetir el título). Se arman las 2 portadas (1280x720 para el largo), Claude elige la de más clics y se sube con thumbnails.set.
+- Se hace sola al publicar un largo en YouTube (publish_local). La versión en inglés queda en continuity.thumbnail.en_url (portada por idioma: en Studio → Idiomas).
+- Con 2 palabras de texto: una por línea (más grandes).

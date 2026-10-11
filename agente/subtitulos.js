@@ -9,7 +9,7 @@ const sb=require(F+'/_supabase').getSupabaseClient();
 const {data:ep}=await sb.from('episodes').select('*').eq('id',epId).single();
 const C=require(F+'/_captions');
 const subs=await C.ensureSubtitles(sb,ep,console.log);
-const vid=vid0||(((ep.validator_report||{}).publish_package||{}).video_id);
+const vid=vid0||((((ep.validator_report||{}).social_runs||{}).youtube||{}).video_id);
 if(!vid){console.log('Sin video de YouTube todavía: las pistas quedan guardadas y se suben al publicar.');return;}
 await C.uploadSubtitles(sb,{videoId:vid,subs,log:console.log});
 console.log('LISTO: subtítulos en https://youtu.be/'+vid);
