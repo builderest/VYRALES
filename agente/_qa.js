@@ -34,9 +34,10 @@ function grab(url, t) {
 }
 // Movimiento medido: diferencia media entre cuadros (gris 64x36, 4 fps). Calibrado en Toba: ~1 congelado, 3–6 poco
 // (a veces solo la cámara), 8–15 movimiento claro.
-function motionStep(url) {
+// center = solo el centro del cuadro (donde suele estar el sujeto): si el borde se mueve y el centro no, el sujeto está quieto.
+function motionStep(url, center = false) {
   const ffmpeg = require(path.join(ROOT, 'node_modules', 'ffmpeg-static'));
-  return new Promise((res) => execFile(ffmpeg, ['-v', 'error', '-i', url, '-vf', 'fps=4,scale=64:36,format=gray', '-f', 'rawvideo', '-'], { encoding: 'buffer', timeout: 90000, maxBuffer: 1 << 26 }, (e, raw) => {
+  return new Promise((res) => execFile(ffmpeg, ['-v', 'error', '-i', url, '-vf', (center ? 'crop=iw/2:ih/2,' : '') + 'fps=4,scale=64:36,format=gray', '-f', 'rawvideo', '-'], { encoding: 'buffer', timeout: 90000, maxBuffer: 1 << 26 }, (e, raw) => {
     if (e || !raw) return res(null);
     const N = 64 * 36, n = Math.floor(raw.length / N); if (n < 2) return res(null);
     let tot = 0; for (let k = 1; k < n; k++) { let d = 0; for (let i = 0; i < N; i++) d += Math.abs(raw[k * N + i] - raw[(k - 1) * N + i]); tot += d / N; }
@@ -59,7 +60,8 @@ async function visionReview(items, log) {
       if (fr.some((b) => !b)) continue;
       fr.forEach((b, k) => files.push({ name: `t${it.sh.n}_${k + 1}.jpg`, buffer: b }));
       const mv = await motionStep(it.url);
-      desc.push(`TOMA ${it.sh.n}: imágenes t${it.sh.n}_1.jpg … t${it.sh.n}_5.jpg (de inicio a final, en orden).\n  Narración: "${lineOf(it.sh)}"\n  Debe mostrar: ${it.sh.start_en || it.sh.visual_es || ''}\n  Acción pedida: ${it.sh.action_en || ''}\n  Movimiento medido en píxeles: ${mv == null ? 'desconocido' : mv} (≈1 congelado, 3–6 poco o solo cámara, 8+ claro)`);
+      const mvc = await motionStep(it.url, true);
+      desc.push(`TOMA ${it.sh.n}: imágenes t${it.sh.n}_1.jpg … t${it.sh.n}_5.jpg (de inicio a final, en orden).\n  Narración: "${lineOf(it.sh)}"\n  Debe mostrar: ${it.sh.start_en || it.sh.visual_es || ''}\n  Acción pedida: ${it.sh.action_en || ''}\n  Movimiento medido en píxeles: todo el cuadro ${mv == null ? '?' : mv}, solo el centro ${mvc == null ? '?' : mvc} (≈1 congelado, 3–6 poco o solo cámara, 8+ claro)`);
     }
     if (!desc.length) continue;
     const prompt = `Eres el control de calidad de un documental. Usa la herramienta Read para mirar TODAS las imágenes que se nombran abajo (están en la carpeta actual). Para cada toma compara inicio, mitad y final con la narración.
@@ -69,7 +71,9 @@ ${desc.join('\n\n')}
 Para cada toma decide (sé justo: marca false solo si el problema se ve claro):
 - image_ok: la imagen muestra el sujeto principal que dice la narración (no otra cosa distinta).
 - action_ok: SE VE la acción pedida en el sujeto principal. Sé ESTRICTO: compara la posición de 2 objetos concretos del sujeto (ej. "roca grande arriba a la izquierda") entre la imagen 1 y la 5 RESPECTO a lo que los rodea. Si solo cambia el encuadre (zoom, giro o inclinación de cámara) y los objetos siguen igual entre sí, es false. Si la imagen muestra algo que debería estar en movimiento (derrumbe, caída, explosión, corriente) y entre 1 y 5 no avanza, es false. Si el movimiento medido es menor que 6, desconfía y mira con más cuidado. Solo para acciones sutiles por naturaleza (una luz que brilla, alguien leyendo) basta con que se note algo.
-- evidence: en una frase, qué objeto comparaste y dónde estaba en la imagen 1 y en la 5.
+  El SUJETO PRINCIPAL es lo que nombra la narración (la columna de humo, las rocas, el grupo, la ola). Si lo que se mueve es el fondo, las nubes de alrededor o los bordes, pero el sujeto principal queda igual (misma forma, mismo tamaño, mismos bultos en el mismo sitio), action_ok es false.
+  Ejemplos reales que pasaron mal y NO deben aprobarse: una columna de erupción vista desde el espacio cuya forma no cambia mientras las nubes alrededor se mueven; rocas de un derrumbe que no caen mientras la cámara se inclina; una cámara de magma donde solo avanza la cámara.
+- evidence: en una frase, qué parte del SUJETO PRINCIPAL comparaste y cómo estaba en la imagen 1 y en la 5.
 - haze: aparece humo, neblina o bruma blanca que NO tiene que ver con la narración (true = problema).
 - broken: algo deforme, caras o manos rotas, letras/texto inventado, cosas que aparecen o desaparecen (true = problema).
 - reason: una frase corta en español con lo que viste (vacío si todo bien).
@@ -102,6 +106,7 @@ Reglas:
 - La imagen tiene que mostrar EXACTAMENTE lo que dice la narración.
 - La cámara hace UN movimiento corto y suave que mantiene TODO lo importante dentro del cuadro hasta el final. En "camera" escribe SOLO el movimiento (ej. "slow lateral drift to the left"); nunca "no zoom", "held", "unchanged", "same framing" (LTX hace lo que lee). Si el problema fue que solo se movía la cámara, que se metió o hizo zoom de más, usa un movimiento mínimo y pon el movimiento en el SUJETO.
 - La acción (25–45 palabras, inglés) describe SOLO lo que se mueve en el sujeto principal, con verbos visibles y una dirección. Nunca uses still, steady, stay, remain, fixed, motionless, frozen, static, suspended.
+- Si el sujeto es humo, una columna de erupción, nubes o polvo: usa verbos de turbulencia visibles (billows, churns, rolls, swells and expands outward, grows taller) para que su forma CAMBIE durante la toma.
 - No nombres objetos que no estén en la imagen. No humo ni neblina de relleno (solo si la narración trata de eso).
 - El final (12–25 palabras, inglés) es el estado final de ESE mismo movimiento, con el sujeto todavía en cuadro.
 ${allowImage ? '- Puedes cambiar la imagen: "start_en" (45–80 palabras, inglés) describe el cuadro inicial en el momento JUSTO ANTES o DURANTE el movimiento (nunca "frozen mid-fall"), plano y lente, sujeto con detalles, lugar, luz.' : '- No cambies la imagen (no devuelvas start_en).'}
