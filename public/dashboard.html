@@ -1408,10 +1408,15 @@
                 '<div class="flex justify-between text-slate-400">' +
                   '<span>Estado: <strong class="' + (asset.approved ? 'text-cyber-emerald' : 'text-cyber-gold') + '">' + (asset.approved ? 'APROBADO' : 'PENDIENTE') + '</strong></span>' +
                 '</div>' +
+                (function() { const ep0 = ((lastLoadedData && lastLoadedData.episodes) || []).find(e => (e.assets || []).some(x => x.id === asset.id)); const sh0 = ep0 && (ep0.shots || []).find(x => x.n === shotNo); if (!sh0) return '';
+                  const ln = (sh0.voice_part || (sh0.dialogue || []).map(d => d.line).join(' ') || '').trim();
+                  return (ln ? '<p class="text-[11px] text-slate-300 leading-snug" title="Lo que dice el narrador en esta toma: la imagen debe mostrar esto">🎙 ' + esc(ln) + '</p>' : '') +
+                    (sh0.frame_stale ? '<p class="text-[10px] text-cyber-gold">⚠ imagen vieja: su prompt cambió, se rehace al generar cuadros</p>' : sh0.clip_stale ? '<p class="text-[10px] text-cyber-gold">⚠ video viejo: se rehace con la imagen/movimiento nuevos</p>' : ''); })() +
               '</div>' +
             '</div>' +
             '<div class="p-3 bg-slate-900/80 border-t border-cyber-border flex items-center justify-between gap-2">' +
               approveBtn +
+              '<button onclick="openShotEditor(null,' + shotNo + ',\'' + asset.id + '\')" class="px-2 py-1.5 rounded bg-cyber-cyan/10 hover:bg-cyber-cyan/20 text-cyber-cyan border border-cyber-cyan/40 text-[10px] font-mono transition-all" title="Editar la toma completa: imagen, prompt de la imagen y movimiento"><i class="fa-solid fa-pen-to-square"></i></button>' +
               (asset.storage_path ? '<button onclick="openMedia(this)" data-src="' + esc(asset.storage_path) + '" data-kind="video"' + narrAttrsFor(asset) + ' data-title="Toma ' + String(index + 1).padStart(2, '0') + '" class="px-2.5 py-1.5 rounded bg-cyber-cyan/10 hover:bg-cyber-cyan/20 text-cyber-cyan border border-cyber-cyan/30 text-xs font-mono transition-all" title="Ver en grande / descargar"><i class="fa-solid fa-expand"></i></button>' : '') +
               '<button onclick="regenShot(\'' + asset.id + '\', \'king\')" class="px-2 py-1.5 rounded bg-cyber-emerald/15 hover:bg-cyber-emerald/25 text-cyber-emerald border border-cyber-emerald/40 text-[10px] font-mono transition-all" title="Rehacer con LTX en tu PC (gratis)"><i class="fa-solid fa-rotate mr-1"></i>LTX</button>' +
               '<button onclick="regenShot(\'' + asset.id + '\', \'fal\')" class="px-2 py-1.5 rounded bg-cyber-pink/20 hover:bg-cyber-pink/30 text-cyber-pink border border-cyber-pink/40 text-[10px] font-mono transition-all" title="Rehacer con Veo (fal.ai, ~$0.24)"><i class="fa-solid fa-rotate mr-1"></i>Veo</button>' +
@@ -2237,6 +2242,74 @@
         return true;
       }
 
+      // ── EDITOR DE TOMA COMPLETA (oct-11): narración + imagen + prompt de la imagen + movimiento → guardar / regenerar ──
+      window.openShotEditor = async function(episodeId, n, clipId) {
+        if (!episodeId) { const e0 = ((lastLoadedData && lastLoadedData.episodes) || []).find(e => (e.assets || []).some(a => a.id === clipId)); episodeId = e0 && e0.id; }
+        if (!episodeId) return alert('No encontré el episodio de esta toma.');
+        let m = document.getElementById('shotEdModal');
+        if (!m) { m = document.createElement('div'); m.id = 'shotEdModal'; m.className = 'fixed inset-0 z-[80] bg-black/75 backdrop-blur-sm flex items-center justify-center p-3'; document.body.appendChild(m); m.addEventListener('click', ev => { if (ev.target === m) m.remove(); }); }
+        m.innerHTML = '<div class="bg-cyber-card border border-cyber-border rounded-xl p-5 text-slate-300 font-mono text-sm"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Cargando toma ' + n + '...</div>';
+        let d;
+        try { const r = await fetch('/.netlify/functions/shot-edit?episode_id=' + episodeId + '&shot=' + n, { cache: 'no-store' }); d = await r.json(); if (!r.ok) throw new Error(d.error || r.status); }
+        catch (err) { m.remove(); return alert('No se pudo abrir la toma: ' + err.message); }
+        const F = d.fields || {};
+        const ta = (id, label, help, rows) => '<label class="block text-[11px] font-mono text-slate-400 mt-3">' + label + ' <span class="text-slate-600">' + help + '</span></label><textarea id="se_' + id + '" rows="' + rows + '" class="w-full mt-1 bg-cyber-darker border border-cyber-border rounded-lg p-2 text-[12px] text-slate-100 font-mono focus:border-cyber-cyan outline-none">' + esc(F[id] || '') + '</textarea>';
+        const words = (id) => { const el = document.getElementById('se_' + id); return el ? el.value.trim().split(/\s+/).filter(Boolean).length : 0; };
+        m.innerHTML = '<div class="bg-cyber-card border border-cyber-border rounded-xl w-full max-w-5xl max-h-[92vh] overflow-y-auto p-5">' +
+          '<div class="flex items-center justify-between mb-3"><h3 class="font-display font-bold text-white tracking-wider">EDITAR TOMA ' + String(n).padStart(2, '0') + '</h3><button onclick="document.getElementById(\'shotEdModal\').remove()" class="text-slate-400 hover:text-white text-sm font-mono">✕ Cerrar</button></div>' +
+          '<div class="p-3 rounded-lg border border-cyber-cyan/30 bg-cyber-cyan/5 text-[13px] text-slate-100">🎙 <b>Narración:</b> ' + esc(d.line || '(sin narración)') + '<div class="text-[10px] text-slate-500 mt-1">La imagen tiene que mostrar EXACTAMENTE esto, y el movimiento tiene que ser la acción de esta frase.</div></div>' +
+          '<div class="grid md:grid-cols-[230px_1fr] gap-4 mt-3">' +
+            '<div><div class="aspect-[9/16] bg-slate-950 rounded-lg overflow-hidden border border-cyber-border relative">' + (d.frame ? '<img src="' + esc(vyMedia(d.frame)) + '" class="w-full h-full object-cover">' : '<div class="absolute inset-0 flex items-center justify-center text-[11px] text-slate-600">sin imagen</div>') +
+              (d.frame_stale ? '<div class="absolute bottom-0 inset-x-0 bg-black/80 text-cyber-gold text-[10px] p-1 text-center">⚠ imagen vieja (el prompt cambió)</div>' : '') + '</div>' +
+              (d.clip ? '<video src="' + esc(vyMedia(d.clip)) + '" controls preload="none" class="w-full mt-2 rounded-lg border border-cyber-border"></video>' : '') +
+              '<label class="mt-2 block text-center text-[11px] font-mono px-2 py-1.5 rounded border border-cyber-violet/50 text-cyber-violet bg-cyber-violet/10 hover:bg-cyber-violet/20 cursor-pointer"><i class="fa-solid fa-upload mr-1"></i>Subir mi propia imagen<input type="file" accept="image/*" id="se_file" class="hidden"></label></div>' +
+            '<div>' +
+              ta('start_en', '🖼 IMAGEN (prompt)', '45–80 palabras: plano y lente, sujeto con detalles, lugar, luz, ambiente', 5) +
+              ta('action_en', '🎬 MOVIMIENTO 0–6 s', '25–45 palabras: UN movimiento simple; qué se mueve, hacia dónde, qué se queda quieto', 3) +
+              ta('reaction_en', '⏹ CÓMO TERMINA 6–8 s', '12–25 palabras', 2) +
+              '<div class="grid md:grid-cols-2 gap-3">' + ta('background_en', 'FONDO', '3–4 elementos que no cambian', 2) + ta('camera', 'CÁMARA', 'slow push-in, crane up…', 2) + '</div>' +
+              ta('end_en', 'CUADRO FINAL', 'solo planos abiertos ("The same view: …"); vacío = sin cuadro final', 2) +
+              '<p id="se_msg" class="text-[11px] font-mono mt-2 text-slate-400"></p>' +
+            '</div></div>' +
+          '<div class="flex flex-wrap gap-2 mt-4 justify-end">' +
+            '<button id="se_ai" class="px-3 py-2 rounded-lg border border-cyber-gold/50 text-cyber-gold bg-cyber-gold/10 hover:bg-cyber-gold/20 text-xs font-mono" title="Propone prompts súper detallados desde la narración (no guarda)"><i class="fa-solid fa-wand-magic-sparkles mr-1"></i>Detallar con IA (~$0.005)</button>' +
+            '<button id="se_save" class="px-3 py-2 rounded-lg border border-cyber-border text-slate-200 hover:border-cyber-cyan text-xs font-mono"><i class="fa-solid fa-floppy-disk mr-1"></i>Guardar</button>' +
+            (d.clip_id ? '<button id="se_vid" class="px-3 py-2 rounded-lg border border-cyber-emerald/50 text-cyber-emerald bg-cyber-emerald/10 hover:bg-cyber-emerald/20 text-xs font-mono" title="Mantiene la imagen y rehace el video con el movimiento nuevo (LTX, $0)"><i class="fa-solid fa-film mr-1"></i>Guardar + rehacer solo el video</button>' : '') +
+            '<button id="se_img" class="px-3 py-2 rounded-lg bg-gradient-to-r from-cyber-cyan to-cyber-violet text-black font-bold text-xs font-mono" title="Imagen nueva con este prompt y, si ya había video, también el video"><i class="fa-solid fa-rotate mr-1"></i>Guardar + nueva imagen y video</button>' +
+          '</div></div>';
+        const msg = (t, c) => { const el = document.getElementById('se_msg'); if (el) { el.className = 'text-[11px] font-mono mt-2 ' + (c || 'text-slate-400'); el.innerHTML = t; } };
+        const fields = () => Object.fromEntries(['start_en', 'action_en', 'reaction_en', 'background_en', 'camera', 'end_en'].map(k => [k, document.getElementById('se_' + k).value]));
+        const check = () => { const w1 = words('start_en'), w2 = words('action_en'); msg('Imagen: ' + w1 + ' palabras' + (w1 < 35 ? ' <span class="text-cyber-gold">(corta: LTX y Flow inventan más)</span>' : '') + ' · Movimiento: ' + w2 + ' palabras' + (w2 < 18 ? ' <span class="text-cyber-gold">(corto)</span>' : '')); };
+        ['start_en', 'action_en'].forEach(k => document.getElementById('se_' + k).addEventListener('input', check)); check();
+        const save = async () => { const k = (() => { try { return localStorage.getItem('vyrales_key'); } catch (_) { return null; } })();
+          const r = await fetch('/.netlify/functions/shot-edit', { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, k ? { 'x-vyrales-key': k } : {}), body: JSON.stringify({ episode_id: episodeId, shot: n, fields: fields() }) });
+          const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status); return j; };
+        document.getElementById('se_ai').onclick = async (ev) => { const b = ev.currentTarget; b.disabled = true; msg('<i class="fa-solid fa-spinner fa-spin mr-1"></i>La IA está detallando la toma desde la narración...');
+          try { const k = (() => { try { return localStorage.getItem('vyrales_key'); } catch (_) { return null; } })();
+            const r = await fetch('/.netlify/functions/shot-edit', { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, k ? { 'x-vyrales-key': k } : {}), body: JSON.stringify({ episode_id: episodeId, shot: n, action: 'detail', fields: fields() }) });
+            const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status);
+            Object.entries(j.fields || {}).forEach(([k2, v]) => { const el = document.getElementById('se_' + k2); if (el && v != null && String(v).trim()) el.value = v; });
+            check(); msg((j.problema ? '⚠ ' + esc(j.problema) + '<br>' : '') + 'Propuesta lista (aún NO guardada). Revísala y dale Guardar o Regenerar.', 'text-cyber-gold');
+          } catch (err) { msg('No se pudo: ' + esc(err.message), 'text-cyber-pink'); } b.disabled = false; };
+        document.getElementById('se_save').onclick = async () => { try { const j = await save(); msg('✔ Guardado.' + (j.imgChanged ? ' La imagen quedó marcada para rehacer.' : '') + (j.vidChanged && !j.imgChanged ? ' El video quedó marcado para rehacer.' : ''), 'text-cyber-emerald'); loadDashboard(); } catch (err) { msg('No se pudo guardar: ' + esc(err.message), 'text-cyber-pink'); } };
+        document.getElementById('se_img').onclick = async () => { try { await save(); m.remove(); await loadDashboard(); generateKeyframe(episodeId, n); } catch (err) { msg('No se pudo: ' + esc(err.message), 'text-cyber-pink'); } };
+        const vb = document.getElementById('se_vid'); if (vb) vb.onclick = async () => { try { await save(); m.remove(); await loadDashboard(); runRegenShot(d.clip_id, 'king'); } catch (err) { msg('No se pudo: ' + esc(err.message), 'text-cyber-pink'); } };
+        document.getElementById('se_file').onchange = async (ev) => {
+          const file = ev.target.files && ev.target.files[0]; if (!file) return;
+          msg('<i class="fa-solid fa-spinner fa-spin mr-1"></i>Subiendo tu imagen...');
+          try {
+            const img = await new Promise((ok, no) => { const i = new Image(); i.onload = () => ok(i); i.onerror = no; i.src = URL.createObjectURL(file); });
+            const sc = Math.min(1, 1920 / Math.max(img.width, img.height)); const c = document.createElement('canvas'); c.width = Math.round(img.width * sc); c.height = Math.round(img.height * sc);
+            c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+            const b64 = c.toDataURL('image/jpeg', 0.9).split(',')[1];
+            const k = (() => { try { return localStorage.getItem('vyrales_key'); } catch (_) { return null; } })();
+            const r = await fetch('/.netlify/functions/shot-edit', { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, k ? { 'x-vyrales-key': k } : {}), body: JSON.stringify({ episode_id: episodeId, shot: n, image_base64: b64, mime: 'image/jpeg' }) });
+            const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status);
+            msg('✔ Tu imagen quedó como cuadro de esta toma.' + (j.clip_stale && d.clip_id ? ' Dale "Guardar + rehacer solo el video" para animarla.' : ''), 'text-cyber-emerald'); loadDashboard();
+          } catch (err) { msg('No se pudo subir: ' + esc(err.message), 'text-cyber-pink'); }
+        };
+      };
+
       async function generateKeyframe(episodeId, n) {
         const ep = await freshEpisodeOrBlock(episodeId);
         if (!ep) return;
@@ -2576,6 +2649,8 @@
                         '</div>';
                       })() +
                       '<div class="flex flex-wrap items-center gap-2 mt-1.5">' +
+                        '<button onclick="openShotEditor(\'' + e.id + '\',' + sh.n + ')" class="text-[10px] font-mono px-2 py-0.5 rounded border border-cyber-cyan/50 text-cyber-cyan bg-cyber-cyan/10 hover:bg-cyber-cyan/20" title="Ver y editar la imagen, su prompt y el movimiento de esta toma; regenerar"><i class="fa-solid fa-pen-to-square mr-1"></i>Editar toma</button>' +
+                        (sh.frame_stale ? '<span class="text-[10px] font-mono px-1.5 py-0.5 rounded border border-cyber-gold/50 text-cyber-gold" title="El prompt de la imagen cambió: la imagen actual es vieja y se rehace al Generar cuadros">⚠ imagen por rehacer</span>' : (sh.clip_stale ? '<span class="text-[10px] font-mono px-1.5 py-0.5 rounded border border-cyber-gold/50 text-cyber-gold">⚠ video por rehacer</span>' : '')) +
                         (sh.prompt_override ? '<span class="text-[10px] font-mono px-1.5 py-0.5 rounded border border-cyber-violet/40 text-cyber-violet"><i class="fa-solid fa-pen mr-1"></i>prompt editado</span>' : '') +
                         (effectivePrompt
                           ? '<details class="w-full"><summary class="cursor-pointer text-[10px] font-mono text-cyber-violet hover:underline list-none inline-block"><i class="fa-solid fa-terminal mr-1"></i>Ver prompt de Veo · <span class="text-white font-bold">TOMA ' + String(sh.n).padStart(2, '0') + '</span></summary>' +

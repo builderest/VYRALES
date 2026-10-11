@@ -306,7 +306,9 @@
   const speakerOf = (n) => (dialogueList(n)[0] || {}).speaker || '';
   const speedOf = (c) => Math.min(2, Math.max(0.5, Number(c.speed) || 1));
   const srcLen = () => 8; // las tomas de Veo duran 8 s
-  const clipDur = (c) => Math.max(1, srcLen() - (Number(c.trim_start) || 0) - (Number(c.trim_end) || 0)) / speedOf(c);
+  // Voz continua: la toma dura EXACTO lo que la voz pide (igual que el render) si no se recortó a mano.
+  const contDur = (c) => (st.cont && st.cont.cuts && st.cont.cuts[c.shot] && !Number(c.trim_start) && !Number(c.trim_end) && speedOf(c) === 1 ? Number(st.cont.cuts[c.shot]) : 0);
+  const clipDur = (c) => contDur(c) || Math.max(1, srcLen() - (Number(c.trim_start) || 0) - (Number(c.trim_end) || 0)) / speedOf(c);
   const transS = (c) => Math.min(1.5, Math.max(0.2, Number(c.transition_s) || 0.4));
 
   function normalizePlan(p) {
@@ -333,12 +335,12 @@
     inc.forEach((c, k) => {
       const a = clipAsset(c.shot);
       const tr = k < inc.length - 1 ? c.transition : 'cut';
-      const narr = narrOf(c, a, OVERLAP(tr) ? transS(c) : 0);
+      const narr = st.cont ? null : narrOf(c, a, OVERLAP(tr) ? transS(c) : 0);
       const start0 = Number(c.trim_start) || 0;
       push({ type: 'clip', shot: c.shot, url: window.vyMedia ? window.vyMedia(a.storage_path) : a.storage_path, start: start0, end: srcLen() - (Number(c.trim_end) || 0), speed: speedOf(c), zoom: !!c.zoom, narr,
         subWin: narr ? [start0 + NARR_START * speedOf(c), start0 + (NARR_START + narr.seconds / narr.tempo) * speedOf(c)] : null,
-        volume: narr && narr.mute ? 0 : (c.volume == null ? 1 : Number(c.volume)), subtitle: p.subtitles.enabled ? (c.subtitle || dialogueOf(c.shot)) : '', speaker: speakerOf(c.shot),
-        overlay: c.overlay || '', dur: clipDur(c), transition: k < inc.length - 1 ? c.transition : 'cut', transition_s: transS(c), label: 'TOMA ' + String(c.shot).padStart(2, '0') });
+        volume: st.cont ? 0 : narr && narr.mute ? 0 : (c.volume == null ? 1 : Number(c.volume)), subtitle: st.cont ? '' : p.subtitles.enabled ? (c.subtitle || dialogueOf(c.shot)) : '', speaker: speakerOf(c.shot), cont: !!contDur(c),
+        overlay: c.overlay || '', dur: clipDur(c), transition: st.cont ? 'cut' : k < inc.length - 1 ? c.transition : 'cut', transition_s: transS(c), label: 'TOMA ' + String(c.shot).padStart(2, '0') });
     });
     if (p.end_card.enabled && (p.end_card.text || p.end_card.subtext)) push({ type: 'card', key: 'end', lines: [p.end_card.text, p.end_card.subtext], dur: Number(p.end_card.seconds) || 2, label: 'Final' });
     return seq;
@@ -715,10 +717,46 @@
     if (fOut && tLeft < fOut) fade = Math.max(fade, (item.transition === 'fade_black' ? 1 : 0.5) * (1 - tLeft / fOut));
     $('edFade').style.opacity = st.playing ? fade : 0;
   }
+  // Texto grande de la voz continua (lo mismo que quema el render: una palabra a la vez, en MAYÚSCULAS, a colores).
+  const WORD_CSS = ['#FFE100', '#FFFFFF', '#6AFF40', '#4AE0FF'];
+  function contOverlay(g) {
+    const sub = $('edSub'); const C = st.cont;
+    const ws = C.words || []; const L = C.lead || 0.6;
+    let k = -1; for (let i = 0; i < ws.length; i++) { if (L + ws[i].start <= g) k = i; else break; }
+    const w = k >= 0 ? ws[k] : null;
+    const end = w ? (k + 1 < ws.length ? L + ws[k + 1].start : L + w.end + 0.4) : 0;
+    const word = w && g < end ? String(w.word).replace(/[^\p{L}\p{N}]/gu, '').toUpperCase() : '';
+    sub.classList.toggle('hidden', !word || C.style !== 'palabra');
+    if (!word) return;
+    sub.style.fontSize = (96 * K) + 'px'; sub.style.bottom = (330 * K) + 'px'; sub.style.fontWeight = '900'; sub.style.letterSpacing = (1 * K) + 'px';
+    sub.style.color = WORD_CSS[k % WORD_CSS.length];
+    sub.style.textShadow = `0 0 ${3 * K}px #000, ${3 * K}px ${3 * K}px 0 #000, -${3 * K}px -${3 * K}px 0 #000, ${3 * K}px -${3 * K}px 0 #000, -${3 * K}px ${3 * K}px 0 #000`;
+    const age = g - (L + w.start); sub.style.transform = age < 0.09 ? `scale(${1.18 - 0.18 * age / 0.09})` : 'scale(1)';
+    sub.textContent = word;
+  }
+  // Tiempo global dentro del video (voz continua): reloj real desde que empezó la toma.
+  function contTime(item) { return item.t0 + Math.max(0, (performance.now() - (item._wall || performance.now())) / 1000); }
+  function contSyncVoice(g) {
+    const na = $('edNarr'); const C = st.cont; const want = g - (C.lead || 0.6);
+    if (want < 0) { if (!na.paused) na.pause(); return; }
+    if (na.paused && st.playing) { try { na.currentTime = want; } catch (_) {} na.play().catch(() => {}); duck(true); }
+    else if (Math.abs(na.currentTime - want) > (IS_TOUCH ? 0.45 : 0.25)) { try { na.currentTime = want; } catch (_) {} }
+  }
   function onTime() {
     const item = st.seq[st.idx];
     if (!item || item.type !== 'clip') return;
     const v = $('edVideo');
+    if (st.cont && item.cont) {
+      const g = st.playing ? contTime(item) : item.t0 + (v.currentTime - item.start);
+      showOverlay(Object.assign({}, item, { subtitle: '' }), v.currentTime);
+      contOverlay(g);
+      if (st.playing) contSyncVoice(g);
+      if (st.scrubShot !== item.shot) { st.scrubShot = item.shot; paintScrub(); const si = st.plan.clips.findIndex((x) => x.shot === item.shot); if (si >= 0 && si !== st.sel) { st.sel = si; if (st.playing) markSelected(); else renderClips(); } }
+      $('edScrub').value = v.currentTime; $('edScrubTime').textContent = (g - item.t0).toFixed(2) + 's / ' + item.dur.toFixed(2) + 's';
+      movePlayhead();
+      if (st.playing && g >= item.t0 + item.dur - 0.02) next();
+      return;
+    }
     showOverlay(item, v.currentTime);
     if (item.narr && st.playing && !item._narrOn) {
       const tOut = (v.currentTime - item.start) / item.speed;
@@ -756,7 +794,7 @@
     clearTimeout(st.timer);
     st.idx = i;
     const item = st.seq[i];
-    $('edNarr').pause(); duck(false);
+    if (!st.cont) { $('edNarr').pause(); duck(false); }
     if (item) item._narrOn = false;
     const v = $('edVideo'); const card = $('edCard');
     if (!item) { stop(); return; }
@@ -773,8 +811,16 @@
     const nextClip = st.seq.slice(i + 1).find((x) => x.type === 'clip');
     if (nextClip && $('edPre').getAttribute('src') !== nextClip.url) { $('edPre').setAttribute('src', nextClip.url); $('edPre').load(); }
     if (item.narr) { const na = $('edNarr'); if (na.getAttribute('src') !== item.narr.url) { na.setAttribute('src', item.narr.url); na.load(); } }
+    if (st.cont && $('edNarr').getAttribute('src') !== st.cont.url) { $('edNarr').setAttribute('src', st.cont.url); $('edNarr').load(); }
     // iPhone ignora .volume (siempre suena a 1): las tomas que deben ir sin su audio se silencian con .muted.
-    const go = () => { v.currentTime = item.start; v.muted = !(item.volume > 0.01); v.volume = Math.min(1, item.volume); v.playbackRate = item.speed; if (st.playing) v.play().catch(() => {}); };
+    const go = () => {
+      v.currentTime = item.start; v.muted = !(item.volume > 0.01); v.volume = Math.min(1, item.volume);
+      // Voz continua: si el clip es más corto que lo que pide la voz, se reproduce un poco más lento (como el render, máx. 25 %).
+      v.playbackRate = item.cont && v.duration ? Math.min(1, Math.max(0.75, (v.duration - item.start) / item.dur)) : item.speed;
+      item._wall = performance.now();
+      if (item.cont) { clearInterval(st.contTick); st.contTick = setInterval(() => { if (st.playing && st.seq[st.idx] === item) onTime(); else clearInterval(st.contTick); }, 50); }
+      if (st.playing) v.play().catch(() => {});
+    };
     if (v.getAttribute('src') !== item.url) { v.setAttribute('src', item.url); v.addEventListener('loadedmetadata', go, { once: true }); v.load(); } else go();
   }
   function next() {
@@ -867,6 +913,7 @@
     const out = await res.json();
     if (!res.ok) return alert(out.error || 'No se pudo cargar el plan de edición.');
     st.plan = normalizePlan(out.plan);
+    st.cont = out.cont && out.cont.url ? out.cont : null;
     if (!out.saved) {
       st.plan.title_card.text = (d.series && d.series.title) || '';
       st.plan.title_card.subtext = 'Episodio ' + st.ep.episode_number + (st.ep.title ? ' · ' + st.ep.title : '');
@@ -874,7 +921,7 @@
     st.dirty = false; st.undo = []; st.redo = []; st.base = JSON.stringify(st.plan); st.lastSnap = 0;
     $('edTitle').textContent = 'Editor · EP ' + st.ep.episode_number + (st.ep.title ? ' — ' + st.ep.title : '');
     const n = (st.ep.assets || []).filter((a) => a.kind === 'video_clip').length;
-    $('edStatus').textContent = n + ' de ' + (st.ep.shots || []).length + ' tomas con video.' + (out.saved ? ' Plan guardado cargado.' : ' Plan nuevo (aún sin guardar).');
+    $('edStatus').textContent = n + ' de ' + (st.ep.shots || []).length + ' tomas con video.' + (out.saved ? ' Plan guardado cargado.' : ' Plan nuevo (aún sin guardar).') + (st.cont ? ' · Voz continua: cada toma dura lo que dice la voz y el texto sale grande palabra por palabra (igual que el render).' : '');
     fillGlobals(); renderClips(); updateUndoBtns();
     $('edModal').classList.remove('hidden');
     document.body.style.overflow = 'hidden';

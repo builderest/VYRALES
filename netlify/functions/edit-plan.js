@@ -59,7 +59,22 @@ exports.handler = async (event) => {
       return json(404, { error: 'Episodio no encontrado.' });
     }
     await require('./_render').withTotalEpisodes(supabase, ep);
-    if (event.httpMethod === 'GET') return json(200, { plan: resolvePlan(ep), saved: !!ep.edit_plan });
+    if (event.httpMethod === 'GET') {
+      // VOZ CONTINUA: el editor muestra lo MISMO que saldrá en el render: cada toma dura lo que la voz pide
+      // (cortes exactos) y el texto sale grande palabra por palabra al ritmo de la voz real.
+      let cont = null;
+      try {
+        const { data: ex } = await supabase.from('episodes').select('continuity').eq('id', ep.id).single();
+        const { data: sr } = await supabase.from('series').select('story_bible').eq('id', ep.series_id).single();
+        const VF = require('./_voice_full');
+        const v = ex && ex.continuity && ex.continuity.voice;
+        if (v && v.url && VF.continuousMode(sr && sr.story_bible)) {
+          const shots = (ep.shots || []).slice().sort((a, b) => a.n - b.n);
+          cont = { url: v.url, seconds: v.seconds, lead: VF.LEAD, words: Array.isArray(v.words) ? v.words.map((w) => ({ word: w.word, start: w.start, end: w.end })) : [], cuts: VF.shotCutsExact(v, shots) || null, style: (sr.story_bible && sr.story_bible.subtitle_style) || 'palabra' };
+        }
+      } catch (e) { console.warn('[edit-plan] voz continua:', e.message); }
+      return json(200, { plan: resolvePlan(ep), saved: !!ep.edit_plan, cont });
+    }
     if (event.httpMethod !== 'POST') return json(405, { error: 'Method not allowed' });
     const plan = input.reset ? null : sanitize(input.plan);
     const { error: upErr } = await supabase.from('episodes').update({ edit_plan: plan }).eq('id', ep.id);

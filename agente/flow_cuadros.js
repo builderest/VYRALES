@@ -41,7 +41,7 @@ for (const line of fs.readFileSync(path.join(ROOT, '.env'), 'utf8').split(/\r?\n
   console.log('Flow: generando', shots.length, 'cuadros en una sola sesión → tomas', shots.map((s) => s.n).join(','));
   // Cada cuadro se guarda en cuanto sale (el panel los va mostrando uno por uno).
   const done = [];
-  if (shots.length) await flowImages(shots.map((s) => s.start_en || s.action_en), console.log, async (i, img) => {
+  if (shots.length) await flowImages(shots.map((s) => (s.keyframe_prompt_override && s.keyframe_prompt_override.trim()) || s.start_en || s.action_en), console.log, async (i, img) => {
     await storeKeyframeImage(supabase, { series, episode: ep, shotN: shots[i].n, image: { imageBytes: img.buffer.toString('base64'), mimeType: img.mimeType }, note: 'Google Flow' });
     done.push(shots[i].n);
     console.log(`toma ${shots[i].n}: cuadro guardado (${done.length}/${shots.length})`);
