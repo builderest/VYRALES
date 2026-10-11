@@ -38,6 +38,7 @@ function analyticsProblem(r) {
   const msg = JSON.stringify(r.body.error || r.body).slice(0, 300);
   if (/has not been used|is disabled|SERVICE_DISABLED/i.test(msg)) return { reason: 'api_disabled', msg: 'Activa "YouTube Analytics API" en Google Cloud (mismo proyecto de la app) y luego reconecta YouTube.' };
   if (r.status === 403 || r.status === 401) return { reason: 'scope', msg: 'Falta el permiso de estadísticas: dale "Reconectar YouTube".' };
+  if (r.status >= 500) return { reason: 'temporal', msg: 'Google no respondió ahora mismo (error temporal de YouTube Analytics). Dale "Actualizar" en un minuto.' };
   return { reason: 'error', msg };
 }
 
@@ -68,7 +69,8 @@ async function youtube(sb) {
   const end = day(new Date());
   const start28 = day(new Date(Date.now() - 27 * 86400000));
   const startAll = day(new Date(c.snippet.publishedAt));
-  const A = (q) => getJson('https://youtubeanalytics.googleapis.com/v2/reports?ids=channel==MINE&' + q, H);
+  // Google a veces responde 500 "backendError" suelto: se reintenta hasta 3 veces antes de rendirse.
+  const A = async (q) => { let r; for (let k = 0; k < 3; k++) { r = await getJson('https://youtubeanalytics.googleapis.com/v2/reports?ids=channel==MINE&' + q, H); if (r.status < 500) return r; await new Promise((ok) => setTimeout(ok, 1500 * (k + 1))); } return r; };
   const daily = await A(`startDate=${start28}&endDate=${end}&metrics=views,estimatedMinutesWatched,subscribersGained,subscribersLost&dimensions=day&sort=day`);
   if (!daily.ok) { out.analytics = Object.assign({ ok: false }, analyticsProblem(daily)); return out; }
   const [perVideo, traffic, totals] = await Promise.all([
