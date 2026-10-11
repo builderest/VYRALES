@@ -113,7 +113,7 @@ Reglas:
 ${allowImage ? '- Puedes cambiar la imagen: "start_en" (45–80 palabras, inglés) describe el cuadro inicial en el momento JUSTO ANTES o DURANTE el movimiento (nunca "frozen mid-fall"), plano y lente, sujeto con detalles, lugar, luz.' : '- No cambies la imagen (no devuelvas start_en).'}
 ${allowSplit ? '- Si la narración nombra 2 a 4 cosas visualmente distintas que no caben en una sola imagen, PARTE la toma: "split" = lista de pedazos; cada "line" es un trozo EXACTO y seguido de la narración (todas juntas forman la narración palabra por palabra, mínimo 3 palabras cada una) con su propia imagen y movimiento. Si no hace falta, no la partas.' : ''}
 Responde SOLO uno de estos JSON:
-{"camera":"...","action_en":"...","reaction_en":"..."${allowImage ? ',"start_en":"..."' : ''}}
+{"camera":"...","action_en":"...","reaction_en":"..."${allowImage ? ',"start_en":"...","background_en":"3–4 cosas del lugar de la NUEVA imagen, solo nombradas"' : ''}}
 ${allowSplit ? 'o {"split":[{"line":"...","start_en":"...","camera":"...","action_en":"...","reaction_en":"..."}]}' : ''}`;
   const j = parseJson(await runClaude(prompt, { timeoutMin: 6, log }));
   if (allowSplit && j && Array.isArray(j.split) && j.split.length >= 2) {
@@ -125,7 +125,7 @@ ${allowSplit ? 'o {"split":[{"line":"...","start_en":"...","camera":"...","actio
   }
   if (!j || !j.action_en || !j.camera) return null;
   const out = { camera: String(j.camera).slice(0, 160), action_en: String(j.action_en).slice(0, 500), reaction_en: String(j.reaction_en || '').slice(0, 300) };
-  if (allowImage && j.start_en && String(j.start_en).split(/\s+/).length >= 25) out.start_en = String(j.start_en).slice(0, 900);
+  if (allowImage && j.start_en && String(j.start_en).split(/\s+/).length >= 25) { out.start_en = String(j.start_en).slice(0, 900); out.background_en = String(j.background_en || '').slice(0, 300); }
   return out;
 }
 
@@ -164,7 +164,7 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
         const fix = await rewriteShot(sh, 'El video salió casi congelado: ' + why + '. Necesita un movimiento claro y visible del sujeto principal.', log);
         if (fix) {
           const { data: fr } = await supabase.from('episodes').select('shots').eq('id', epId).single();
-          await supabase.from('episodes').update({ shots: (fr.shots || []).map((x) => x.n === sh.n ? Object.assign({}, x, fix, { prompt_override: null, ltx_en: null, keyframe_prompt_override: fix.start_en ? null : x.keyframe_prompt_override, qa_rewrite_from: { camera: x.camera, action_en: x.action_en, reaction_en: x.reaction_en, start_en: x.start_en } }) : x) }).eq('id', epId);
+          await supabase.from('episodes').update({ shots: (fr.shots || []).map((x) => x.n === sh.n ? Object.assign({}, x, fix, fix.start_en ? { end_en: '', end_frame_url: null, end_frame_skip: false } : {}, { prompt_override: null, ltx_en: null, keyframe_prompt_override: fix.start_en ? null : x.keyframe_prompt_override, qa_rewrite_from: { camera: x.camera, action_en: x.action_en, reaction_en: x.reaction_en, start_en: x.start_en } }) : x) }).eq('id', epId);
           log(`QA toma ${sh.n}: prompt nuevo → cámara "${fix.camera}" · ${fix.action_en}`);
         }
       } catch (e) { log(`QA toma ${sh.n}: no pude reescribir (${String(e.message).slice(0, 120)})`); }
