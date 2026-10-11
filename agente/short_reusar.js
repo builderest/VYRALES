@@ -102,8 +102,8 @@ for(const s of sShots){
   const vurl=await uploadFile(sb,{path:key+'.mp4',buffer:fs.readFileSync(path.join(cwd,out)),contentType:'video/mp4'});
   const iurl=await uploadFile(sb,{path:key+'.jpg',buffer:fs.readFileSync(path.join(cwd,'F'+s.n+'.jpg')),contentType:'image/jpeg'});
   const note='del largo: toma '+map[s.n].join('+');
-  rows.push({episode_id:epId,kind:'video_clip',model:'from_long',shot_number:s.n,storage_path:vurl,prompt:note,cost_usd:0,created_at:now,updated_at:now});
-  rows.push({episode_id:epId,kind:'image',model:'from_long',shot_number:s.n,storage_path:iurl,prompt:note,cost_usd:0,created_at:now,updated_at:now});
+  rows.push({episode_id:epId,kind:'video_clip',model:lClips[map[s.n][0]].model,shot_number:s.n,storage_path:vurl,prompt:note,cost_usd:0,created_at:now,updated_at:now});
+  rows.push({episode_id:epId,kind:'image',model:lImgs[map[s.n][0]].model,shot_number:s.n,storage_path:iurl,prompt:note,cost_usd:0,created_at:now,updated_at:now});
   console.log(`frase ${s.n}: ${note} → vertical lista`);
 }
 const ins=await sb.from('assets').insert(rows);if(ins.error)throw new Error('assets: '+ins.error.message);
