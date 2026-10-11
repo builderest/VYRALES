@@ -2012,7 +2012,37 @@
             (el.getAttribute('data-narr') ? ' data-narr="' + esc(el.getAttribute('data-narr')) + '" data-narr-secs="' + esc(el.getAttribute('data-narr-secs') || '') + '" data-mute="' + esc(el.getAttribute('data-mute') || '0') + '"' : '') + '></video>';
         document.getElementById('mediaModal').classList.remove('hidden');
         document.body.style.overflow = 'hidden';
+        // Video vertical (Short / toma 9:16): se ve DENTRO de un teléfono, del tamaño de un celular, no a lo ancho de
+        // la pantalla de la PC (Franklin, oct-11: "debe mostrarse como el celular").
+        const mv = body.querySelector('video');
+        if (mv) mv.addEventListener('loadedmetadata', () => { if (mv.videoHeight > mv.videoWidth) phoneWrap(mv); }, { once: true });
       };
+      function phoneWrap(v) {
+        if (v.closest('.vy-phone')) return;
+        const ph = document.createElement('div');
+        ph.className = 'vy-phone relative mx-auto bg-black rounded-[2.6rem] border-[12px] border-neutral-900 shadow-2xl overflow-hidden';
+        ph.style.height = 'min(86vh, 860px)'; ph.style.aspectRatio = '9 / 16'; ph.style.boxShadow = '0 0 0 2px #3f3f46, 0 25px 60px rgba(0,0,0,.6)';
+        ph.innerHTML = '<div class="absolute top-2 left-1/2 -translate-x-1/2 w-24 h-6 bg-neutral-900 rounded-full z-10"></div>';
+        v.parentNode.insertBefore(ph, v);
+        ph.appendChild(v);
+        v.className = 'w-full h-full object-cover bg-black';
+        v.setAttribute('controlsList', 'nofullscreen');
+      }
+      // Pantalla completa nativa de un video VERTICAL (botón ⛶ del reproductor o doble clic en una tarjeta): en vez de
+      // llenar el monitor, se abre el visor con forma de teléfono.
+      document.addEventListener('fullscreenchange', () => {
+        const el = document.fullscreenElement;
+        if (!el || el.tagName !== 'VIDEO' || !(el.videoHeight > el.videoWidth)) return;
+        const src = el.currentSrc || el.getAttribute('src'); const t = el.currentTime || 0;
+        document.exitFullscreen().catch(() => {});
+        el.pause();
+        const fake = document.createElement('span');
+        fake.setAttribute('data-src', src); fake.setAttribute('data-kind', 'video'); fake.setAttribute('data-title', 'Vista de celular');
+        ['data-narr', 'data-narr-secs', 'data-mute'].forEach((k) => { if (el.getAttribute(k)) fake.setAttribute(k, el.getAttribute(k)); });
+        window.openMedia(fake);
+        const nv = document.querySelector('#mediaBody video');
+        if (nv && t) nv.addEventListener('loadedmetadata', () => { try { nv.currentTime = t; } catch (_) {} }, { once: true });
+      });
 
       window.closeMedia = function() {
         const modal = document.getElementById('mediaModal');
