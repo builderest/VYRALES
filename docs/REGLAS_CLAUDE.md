@@ -136,3 +136,9 @@ Este documento es la memoria del proyecto. Cada vez que Franklin corrige algo, l
 - El EP2 se quedó 30 min parado al unir la toma 11 (un paso sin límite de tiempo). Antes el único límite era maxMin (10 h).
 - Ahora: VIGILANTE en agente.js. Si un trabajo pasa 30 min sin escribir nada, se corta y se reencola UNA vez (gen_local/regen_local/render_full/voz_ingles/qa_tomas/flow_frames retoman lo hecho). Cada ffmpeg tiene un límite de 40 min. Cancelar a mano: agent_jobs.status = 'cancelar'.
 - El log del panel ahora guarda siempre la última línea (antes, si llegaban dos líneas en menos de 1 s, la segunda no se guardaba y parecía trabado donde no era).
+
+## Shorts que salen de un largo (oct-11)
+- Franklin: el Short conserva SU narración, pero usa las tomas YA HECHAS del largo. No se gasta tiempo generando video nuevo. Los Shorts sueltos (sin largo) sí se generan con LTX + QA normal.
+- `short_reusar:<short_ep>` (gen_local lo hace solo si continuity.parent_episode_id tiene tomas). Claude ve las hojas de contacto del largo y elige, por frase, la toma (o 2 seguidas) que MUESTRA lo que se dice. Su QA: revisa cada frase con su cuadro y, si no cuadra, elige otra toma del largo (2 vueltas). Nunca regenera.
+- Vertical: el video del largo grande al centro y el mismo desenfocado arriba/abajo. Assets con model 'from_long'. _qa.js se salta estos Shorts (continuity.reused_from_long).
+- VYRALES_SHORT_NUEVO=1 fuerza generar tomas nuevas.

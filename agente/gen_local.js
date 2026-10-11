@@ -22,6 +22,21 @@ async function main() {
   const { data: ep, error } = await supabase.from('episodes').select('id, episode_number, series_id, status').eq('id', episodeId).single();
   if (error || !ep) throw error || new Error('Episodio no encontrado');
   const { data: series } = await supabase.from('series').select('slug, title').eq('id', ep.series_id).single();
+  // Short que sale de un video LARGO ya hecho (Franklin, oct-11): no se generan tomas nuevas; se usan las del largo
+  // con la narración del Short (short_reusar.js). Los Shorts sueltos (sin largo) se generan normal con LTX + QA.
+  if (!Number(process.argv[3])) {
+    const { data: e1 } = await supabase.from('episodes').select('continuity').eq('id', episodeId).single();
+    const parent = e1 && e1.continuity && e1.continuity.parent_episode_id;
+    if (parent && process.env.VYRALES_SHORT_NUEVO !== '1') {
+      const { count } = await supabase.from('assets').select('id', { count: 'exact', head: true }).eq('episode_id', parent).eq('kind', 'video_clip');
+      if (count > 0) {
+        console.log('Este Short sale de un video largo ya hecho → uso sus tomas (sin generar video nuevo).');
+        const { spawnSync } = require('child_process');
+        const r = spawnSync(process.execPath, [path.join(__dirname, 'short_reusar.js'), episodeId], { stdio: 'inherit', timeout: 60 * 60000 });
+        process.exit(r.status == null ? 1 : r.status);
+      }
+    }
+  }
   console.log(`Produciendo "${series.title}" EP ${ep.episode_number}${Number(process.argv[3]) ? ' (solo la toma ' + process.argv[3] + ')' : ''} con LTX-2.5 en king...`);
   const { handler } = require(path.join(ROOT, 'netlify', 'functions', 'generate-media-background'));
   const res = await handler({ httpMethod: 'POST', body: JSON.stringify(Object.assign({ series: series.slug, episode_id: episodeId, provider: 'king', force: ep.status === 'generando_media' }, Number(process.argv[3]) ? { shot: Number(process.argv[3]) } : {})), queryStringParameters: {}, headers: {} });

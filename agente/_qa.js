@@ -136,6 +136,10 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
   for (const k of Object.keys(require.cache)) if (/[\\/]netlify[\\/]functions[\\/](_king|regen-shot-background|_keyframe|_visual_check)\.js$/.test(k)) delete require.cache[k];
   handler = require(path.join(ROOT, 'netlify', 'functions', 'regen-shot-background')).handler;
   const VF = require(path.join(ROOT, 'netlify', 'functions', '_voice_full'));
+  // Short armado con las tomas del LARGO (short_reusar.js): no se rehacen tomas con LTX; su QA es elegir otra
+  // toma del largo (lo hace short_reusar con Claude). Franklin, oct-11.
+  { const { data: e0 } = await supabase.from('episodes').select('continuity').eq('id', epId).single();
+    if (e0 && e0.continuity && e0.continuity.reused_from_long) { log('QA: Short hecho con tomas del largo → su revisión la hace short_reusar (no se rehace con LTX)'); return []; } }
   const redone = [];
   const splits = []; // tomas que Claude decide partir (se aplican al final)
   const { data: ep } = await supabase.from('episodes').select('*, assets(*)').eq('id', epId).single();
