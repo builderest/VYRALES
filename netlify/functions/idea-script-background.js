@@ -30,6 +30,31 @@ async function write(model, price, prompt) {
   return { data, costUsd: ((u.promptTokenCount || 5000) * price.input + ((u.candidatesTokenCount || 5000) + (u.thoughtsTokenCount || 0)) * price.output) / 1e6, model };
 }
 
+function ideaPrompt(idea) {
+  const tipo = tipoFor(idea.tema);
+  const topic = [
+    idea.titulo ? `Título: ${idea.titulo}` : '',
+    idea.gancho ? `Gancho sugerido (primera frase del narrador; mejóralo si puedes, sin perder el tema): ${idea.gancho}` : '',
+    idea.por_que ? `Por qué este tema (dato del canal): ${idea.por_que}` : '',
+    `Duración objetivo: ${Math.max(60, Math.min(110, Number(idea.duracion_s) || 80))} s. Video que se entiende solo (no es parte de una serie).`
+  ].filter(Boolean).join('\n');
+  return { tipo, prompt: buildNarratedPrompt(tipo, { topic }) };
+}
+
+// Revisor (prompts detallados) + validación. llm = null → Gemini por API; o Claude en la PC.
+async function finishScript(data, { idea = {}, tipo, llm = null }) {
+  const ep = data && data.episodes && data.episodes[0];
+  if (!ep || !Array.isArray(ep.shots) || !ep.shots.length) throw new Error('El guion salió sin tomas.');
+  const vc = await checkVisuals({ series: { title: data.title || (TIPOS[tipo] || {}).title }, shots: ep.shots, rewriteStart: 'all', llm, log: () => {} });
+  ep.shots = applyChanges(ep.shots, vc.changes);
+  ep.continuity = Object.assign({}, ep.continuity || {}, { visual_checked: new Date().toISOString(), from_idea: idea.titulo || '' });
+  const { handler: imp } = require('./import-series');
+  const v = await imp({ httpMethod: 'POST', queryStringParameters: {}, body: JSON.stringify({ series: data, dry_run: true }) });
+  return { validation: JSON.parse(v.body || '{}'), reviewCost: vc.costUsd };
+}
+
+exports.ideaPrompt = ideaPrompt;
+exports.finishScript = finishScript;
 exports.handler = async (event) => {
   const bad = checkDashboardKey(event);
   if (bad) return { statusCode: 401, body: bad };
@@ -40,29 +65,13 @@ exports.handler = async (event) => {
   const save = (obj) => uploadFile(supabase, { path: `guiones/${job}.json`, buffer: Buffer.from(JSON.stringify(obj)), contentType: 'application/json' });
   try {
     const idea = body.idea || {};
-    const tipo = tipoFor(idea.tema);
-    const topic = [
-      idea.titulo ? `Título: ${idea.titulo}` : '',
-      idea.gancho ? `Gancho sugerido (primera frase del narrador; mejóralo si puedes, sin perder el tema): ${idea.gancho}` : '',
-      idea.por_que ? `Por qué este tema (dato del canal): ${idea.por_que}` : '',
-      `Duración objetivo: ${Math.max(60, Math.min(110, Number(idea.duracion_s) || 80))} s. Video que se entiende solo (no es parte de una serie).`
-    ].filter(Boolean).join('\n');
-    const prompt = buildNarratedPrompt(tipo, { topic });
+    const { tipo, prompt } = ideaPrompt(idea);
     let r;
     try { r = await write(WRITER, WRITER_PRICE, prompt); }
     catch (e) { console.warn('[idea-script] escritor principal falló, uso', FALLBACK, e.message); r = await write(FALLBACK, FALLBACK_PRICE, prompt); }
     const data = r.data;
-    const ep = data && data.episodes && data.episodes[0];
-    if (!ep || !Array.isArray(ep.shots) || !ep.shots.length) throw new Error('El guion salió sin tomas.');
-    // Prompts súper detallados + imagen = narración (aún no hay cuadros → se reescriben todas las imágenes).
-    const vc = await checkVisuals({ series: { title: data.title || TIPOS[tipo].title }, shots: ep.shots, rewriteStart: 'all', log: () => {} });
-    ep.shots = applyChanges(ep.shots, vc.changes);
-    ep.continuity = Object.assign({}, ep.continuity || {}, { visual_checked: new Date().toISOString(), from_idea: idea.titulo || '' });
-    // Validación igual que el modal PROMPT (no importa nada).
-    const { handler: imp } = require('./import-series');
-    const v = await imp({ httpMethod: 'POST', queryStringParameters: {}, body: JSON.stringify({ series: data, dry_run: true }) });
-    const validation = JSON.parse(v.body || '{}');
-    const costUsd = r.costUsd + vc.costUsd;
+    const { validation, reviewCost } = await finishScript(data, { idea, tipo });
+    const costUsd = r.costUsd + reviewCost;
     await logSpend(supabase, { kind: 'text', model: r.model, costUsd, note: 'guion desde idea: ' + String(idea.titulo || '').slice(0, 60) });
     await save({ ok: true, tipo, model: r.model, costUsd, validation, series: data, at: new Date().toISOString() });
   } catch (err) {

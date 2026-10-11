@@ -36,7 +36,8 @@ async function gemini(prompt, temperature) {
 }
 
 // rewriteStart: 'all' (guion nuevo, aún sin cuadros) | 'failing' (ya hay cuadros: solo se rehace la imagen de las que fallan).
-async function checkVisuals({ series, shots, rewriteStart = 'failing', framed = null, log = console.log }) {
+// llm(prompt) → { out (JSON ya parseado), costUsd }. Por defecto Gemini por API; en la PC se usa Claude con tu plan ($0).
+async function checkVisuals({ series, shots, rewriteStart = 'failing', framed = null, llm = null, log = console.log }) {
   // fija = esa toma ya tiene una imagen buena generada con su start_en (no se toca salvo que falle).
   const isFixed = (sh) => rewriteStart !== 'all' && (!framed || framed.has(sh.n)) && !sh.frame_stale;
   const rows = (shots || []).map((sh) => ({ n: sh.n, imagen_ya_generada: isFixed(sh), narracion: lineOf(sh), camera: sh.camera || '', start_en: sh.start_en || '', action_en: sh.action_en || '', reaction_en: sh.reaction_en || '', background_en: sh.background_en || '', end_en: sh.end_en || '' })).filter((r) => r.narracion || r.start_en);
@@ -54,7 +55,7 @@ async function checkVisuals({ series, shots, rewriteStart = 'failing', framed = 
     'Tomas (JSON):', JSON.stringify(rows), '',
     'Devuelve SOLO este JSON con TODAS las tomas en orden: {"shots":[{"n":1,"ok":true,"problema":"","start_en":"…","action_en":"…","reaction_en":"…","background_en":"…","end_en":""}]} (ok=false y problema = 1 frase en español cuando la imagen original no mostraba lo que dice el narrador).'
   ].join('\n');
-  const { out, costUsd } = await gemini(prompt, 0.4);
+  const { out, costUsd } = llm ? await llm(prompt) : await gemini(prompt, 0.4);
   const byN = Object.fromEntries(rows.map((r) => [r.n, r]));
   const changes = (out.shots || []).filter((x) => x && byN[Number(x.n)]).map((x) => {
     const o = byN[Number(x.n)];
@@ -82,7 +83,7 @@ function applyChanges(shots, changes, { frames = false } = {}) {
 }
 
 // Revisa y GUARDA un episodio (shots + continuity.visual_checked). Devuelve los cambios.
-async function reviewEpisode(supabase, { episodeId, force = false, log = console.log }) {
+async function reviewEpisode(supabase, { episodeId, force = false, llm = null, engine = 'gemini', log = console.log }) {
   const { data: ep, error } = await supabase.from('episodes').select('id, series_id, shots, continuity, assets(kind, shot_number)').eq('id', episodeId).single();
   if (error) throw new Error(error.message);
   const cont = ep.continuity || {};
@@ -91,13 +92,13 @@ async function reviewEpisode(supabase, { episodeId, force = false, log = console
   const framed = new Set((ep.assets || []).filter((a) => a.kind === 'image').map((a) => a.shot_number));
   const hasFrames = framed.size > 0;
   log('Revisor de imágenes: comparando cada imagen con su narración y detallando los prompts...');
-  const { changes, costUsd } = await checkVisuals({ series, shots: ep.shots, rewriteStart: hasFrames ? 'failing' : 'all', framed, log });
+  const { changes, costUsd } = await checkVisuals({ series, shots: ep.shots, rewriteStart: hasFrames ? 'failing' : 'all', framed, llm, log });
   const shots = applyChanges(ep.shots, changes, { frames: hasFrames });
   await supabase.from('episodes').update({ shots, continuity: Object.assign({}, cont, { visual_checked: new Date().toISOString() }) }).eq('id', episodeId);
-  try { const { logSpend } = require('./_spend'); await logSpend(supabase, { seriesId: ep.series_id, episodeId, kind: 'text', model: TEXT_MODEL, costUsd, note: 'revisor imagen=narración' }); } catch (_) {}
+  try { const { logSpend } = require('./_spend'); await logSpend(supabase, { seriesId: ep.series_id, episodeId, kind: 'text', model: engine === 'claude' ? 'claude_plan' : TEXT_MODEL, costUsd, note: 'revisor imagen=narración' }); } catch (_) {}
   const fixed = changes.filter((c) => c.startChanged).length;
   log(`Revisor de imágenes: ${fixed} imagen(es) corregida(s), ${changes.length} toma(s) con prompts detallados · $${costUsd.toFixed(4)}`);
   return { changes, costUsd };
 }
 
-module.exports = { checkVisuals, applyChanges, reviewEpisode, RULES };
+module.exports = { checkVisuals, applyChanges, reviewEpisode, RULES, lineOf };

@@ -42,6 +42,10 @@ module.exports = {
   // "toma_local:<episode_id>:<n>" — una sola toma (cuadro + video) en king; lo pide el panel.
   toma_local: { label: 'Una toma en king', help: 'Genera una sola toma (cuadro + video) en la PC king', special: 'toma_local', arg: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}:\d{1,2}$/i, hidden: true },
   diag_python: { label: 'Diagnóstico Python', help: 'Revisa si hay Python en la PC', special: 'diag_python' },
+  claude_diag: { label: 'Claude: instalar / revisar', help: 'Revisa si Claude Code está instalado en la PC (si no, lo instala) y prueba tu plan', special: 'claude_diag' },
+  claude_login: { label: 'Claude: iniciar sesión', help: 'Abre una ventana de Claude Code en la PC para iniciar sesión una vez con tu plan', special: 'claude_login' },
+  // "claude_guion:<job>" — lo pide /analitica.html (botón Crear guion con Claude).
+  claude_guion: { label: 'Claude: escribir guion', help: 'Escribe el guion de una idea con Claude en la PC ($0)', special: 'claude_guion', arg: /^[a-z0-9-]{6,60}$/i, hidden: true },
   flow_prueba_lote: { label: 'Flow: prueba de lote', help: 'Experimento: varias imágenes sin esperar cada una', special: 'flow_prueba_lote' },
   flow_prueba_ref: { label: 'Flow: prueba con foto de referencia', help: 'Genera 1 imagen en Flow usando una foto de cara como referencia', special: 'flow_prueba_ref' },
   publish_pkg: { label: 'Rehacer paquete de publicación', help: 'Textos + portada del episodio (≈$0.001)', special: 'publish_pkg', arg: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, hidden: true },
