@@ -643,8 +643,27 @@ async function renderEpisode({ episode, series, log = console.log, fetchFile = d
       if ((episode.continuity || {}).kind === 'largo') evs.length = 0;
       fs.writeFileSync(path.join(cwd, 'voz.ass'), [...assHeader(sub), ...evs.map(dialogueLine), ''].join('\n'));
       const ms = Math.round(VF.LEAD * 1000);
-      await run(['-y', '-i', 'joined.mp4', '-i', 'voz.wav', '-filter_complex',
-        `[0:v]ass=voz.ass:fontsdir=fonts[v];[1:a]aresample=48000,aformat=channel_layouts=stereo,dynaudnorm=f=150:g=9:p=0.9:m=8,volume='if(lt(t,0.45),1.45,if(lt(t,0.9),1.45-0.45*(t-0.45)/0.45,1))':eval=frame,adelay=${ms}|${ms},apad[vo];[0:a][vo]amix=inputs=2:duration=first:dropout_transition=0:normalize=0[a]`,
+      // Shorts que llevan al largo: cuando el narrador dice "entra al enlace que te dejo aquí abajo", aparece el dedo 👇
+      // rebotando abajo (Franklin, oct-11). Empieza en la primera palabra de la última frase (la del enlace).
+      let fingerFc = '', fingerIn = [];
+      if (ctaShort && fs.existsSync(path.join(cwd, 'finger.png')) && Array.isArray(contVoice.words) && contVoice.words.length) {
+        const nw = (x) => String(x).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9ñ]/g, '');
+        const lastShot = shotsByN[chosen[chosen.length - 1].shot];
+        const seq = String((lastShot && (lastShot.voice_part || dialogueOf(lastShot))) || '').split(/\s+/).map(nw).filter(Boolean).slice(0, 3);
+        const W2 = contVoice.words.map((w) => nw(w.word));
+        let k = -1;
+        for (let j = W2.length - seq.length; j >= 0 && k < 0; j--) if (seq.length && seq.every((w, q) => W2[j + q] === w)) k = j;
+        if (k < 0) { const e = W2.lastIndexOf('enlace'); if (e >= 0) k = Math.max(0, e - 6); }
+        if (k >= 0) {
+          const st = (VF.LEAD + Number(contVoice.words[k].start)).toFixed(2);
+          const fw = Math.round(Math.min(W, H) * 0.24);
+          fingerIn = ['-i', 'finger.png'];
+          fingerFc = `;[2:v]scale=${fw}:${fw},format=rgba,loop=loop=-1:size=1:start=0,fps=${FPS},trim=duration=${total.toFixed(3)},setpts=PTS-STARTPTS[fg];[v0][fg]overlay=x=(W-w)/2:y=${Math.round(H * 0.70)}+${Math.round(H * 0.018)}*sin(2*PI*2*t):enable='gte(t,${st})':eof_action=pass[v]`;
+          log('dedo 👇 desde el segundo', st, '(frase del enlace).');
+        }
+      }
+      await run(['-y', '-i', 'joined.mp4', '-i', 'voz.wav', ...fingerIn, '-filter_complex',
+        `[0:v]ass=voz.ass:fontsdir=fonts${fingerFc ? '[v0]' : '[v]'};[1:a]aresample=48000,aformat=channel_layouts=stereo,dynaudnorm=f=150:g=9:p=0.9:m=8,volume='if(lt(t,0.45),1.45,if(lt(t,0.9),1.45-0.45*(t-0.45)/0.45,1))':eval=frame,adelay=${ms}|${ms},apad[vo];[0:a][vo]amix=inputs=2:duration=first:dropout_transition=0:normalize=0[a]` + fingerFc,
         '-map', '[v]', '-map', '[a]', ...VIDEO_OUT, ...AUDIO_OUT, '-t', total.toFixed(3), 'joined-voz.mp4'], cwd);
       fs.renameSync(path.join(cwd, 'joined-voz.mp4'), path.join(cwd, 'joined.mp4'));
       contKey = { file: 'voz.wav', start: VF.LEAD, tempo: 1 };
