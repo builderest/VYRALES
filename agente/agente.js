@@ -382,12 +382,21 @@ function codeChanged() { return WATCH.some((f, i) => { try { return fs.statSync(
 
 // --- bucle principal ---
 let busy = false;
+let pushBusy = false;
 async function tick() {
   let mine = false;
   try {
     await sb.from('agent_state').upsert({ id: 1, last_seen: new Date().toISOString(), host: os.hostname(), info: { commands: Object.keys(COMMANDS), dev_running: !!dev, platform: process.platform, files: filesInfo() } });
+    // "push" (subir los cambios a vyrales.app) no espera detrás de producciones de horas: corre en paralelo (solo git).
+    if (!pushBusy) {
+      const { data: pj } = await sb.from('agent_jobs').select('*').eq('status', 'pending').eq('command', 'push').order('created_at').limit(1);
+      if (pj && pj[0]) {
+        const { data: cl } = await sb.from('agent_jobs').update({ status: 'running' }).eq('id', pj[0].id).eq('status', 'pending').select();
+        if (cl && cl.length) { pushBusy = true; runJob(pj[0]).catch((e) => log('push:', e.message)).finally(() => { pushBusy = false; }); }
+      }
+    }
     if (busy) return;
-    if (codeChanged()) { log('el código del agente cambió: reiniciando para cargarlo...'); devStop(); process.exit(0); }
+    if (codeChanged() && !pushBusy) { log('el código del agente cambió: reiniciando para cargarlo...'); devStop(); process.exit(0); }
     migrateLocalFinales();
     organizeBySeries();
     await queueFullRenders();
@@ -402,7 +411,7 @@ async function tick() {
     await sb.from('agent_jobs').update({ status: 'expired', finished_at: new Date().toISOString() }).eq('status', 'pending').like('command', 'publish:%').lt('created_at', new Date(Date.now() - 6 * 3600000).toISOString());
     // Publicar va PRIMERO (lo pidió una persona y es rápido); después lo demás en orden de llegada.
     const { data: pubs } = await sb.from('agent_jobs').select('*').eq('status', 'pending').like('command', 'publish:%').order('created_at').limit(1);
-    const { data } = pubs && pubs.length ? { data: pubs } : await sb.from('agent_jobs').select('*').eq('status', 'pending').order('created_at').limit(1);
+    const { data } = pubs && pubs.length ? { data: pubs } : await sb.from('agent_jobs').select('*').eq('status', 'pending').neq('command', 'push').order('created_at').limit(1);
     const job = data && data[0];
     if (!job) return;
     // "Reclamar" la orden (si hubiera dos agentes, solo uno la toma).

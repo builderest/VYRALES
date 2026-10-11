@@ -2964,7 +2964,7 @@
       function scheduleGenerationRefresh(data) {
         clearTimeout(genRefreshTimer);
         if ((data.episodes || []).some(e => e.status === 'generando_media')) {
-          genRefreshTimer = setTimeout(() => { loadDashboard(); }, 20000);
+          genRefreshTimer = setTimeout(() => { gentleReload(); }, 20000);
         } else if ((data.episodes || []).some(e => narrationRunning(e))) {
           genRefreshTimer = setTimeout(() => { loadDashboard(); }, 6000);
         }
@@ -3470,7 +3470,8 @@
           renderArc(data);
           // Mientras la PC trabaja, el panel se refresca solo cada 20 s (progreso de cuadros/videos y el spinner sigue).
           clearTimeout(window.__busyRefresh);
-          if ((data.agent_jobs || []).length) window.__busyRefresh = setTimeout(() => { if (!document.hidden) loadDashboard(); }, 20000);
+          // Mientras la PC trabaja: refresco suave (sin saltar arriba, sin cortar el video que estás viendo).
+          if ((data.agent_jobs || []).length) window.__busyRefresh = setTimeout(() => { if (!document.hidden) gentleReload(); }, 20000);
           renderContinuity(data);
           renderPipeline(data);
           renderRules(data);
@@ -3683,6 +3684,25 @@
         if (ae && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName)) return true;
         return Array.from(document.querySelectorAll('video,audio')).some((v) => !v.paused && !v.ended);
       }
+      // Recarga los datos SIN mover la página: guarda la posición, fija la altura mientras se rearman las tarjetas
+      // (si no, la página se encoge un instante y el navegador te sube arriba) y no hace nada si estás viendo un video,
+      // escribiendo o con una ventana abierta (se intenta en la siguiente vuelta).
+      let gentleBusy = false;
+      async function gentleReload() {
+        if (gentleBusy) return;
+        if (uiBusy()) { clearTimeout(window.__busyRefresh); window.__busyRefresh = setTimeout(() => { if (!document.hidden) gentleReload(); }, 20000); return; }
+        gentleBusy = true;
+        const openDet = Array.from(document.querySelectorAll('details[id][open], details[data-ep-id][open]')).map((d) => d.id || ('ep:' + d.dataset.epId));
+        const y = window.scrollY;
+        const body = document.body; const prevMin = body.style.minHeight;
+        body.style.minHeight = document.documentElement.scrollHeight + 'px';
+        try { await loadDashboard(); }
+        finally {
+          openDet.forEach((k) => { const d = k.startsWith('ep:') ? document.querySelector('details[data-ep-id="' + k.slice(3) + '"]') : document.getElementById(k); if (d) d.open = true; });
+          window.scrollTo(0, y);
+          setTimeout(() => { body.style.minHeight = prevMin; window.scrollTo(0, y); gentleBusy = false; }, 1500);
+        }
+      }
       let autoBusy = false;
       async function autoRefresh() {
         if (document.hidden || autoBusy || uiBusy()) return;
@@ -3693,11 +3713,7 @@
           const sig = dataSig(await res.json());
           const aSig = agentSig(await fetchAgentInfo());
           if ((lastDataSig !== null && sig !== lastDataSig) || (lastAgentSig !== null && aSig !== lastAgentSig)) {
-            const openDet = Array.from(document.querySelectorAll('details[id][open]')).map((d) => d.id);
-            const y = window.scrollY;
-            await loadDashboard();
-            openDet.forEach((id) => { const d = document.getElementById(id); if (d) d.open = true; });
-            window.scrollTo(0, y);
+            await gentleReload();
           }
         } catch (_) { /* sin red un momento: reintenta en la próxima vuelta */ } finally { autoBusy = false; }
       }
