@@ -56,8 +56,12 @@ async function runPublish({ supabase, epId, platform, privacy, loadVideo, qualit
       const longUrl = yt.url || (yt.video_id ? 'https://youtu.be/' + yt.video_id : '');
       if (longUrl) {
         const line = '👉 Historia completa: ' + longUrl;
-        const add = (t) => { t = String(t || ''); if (!t || t.includes(longUrl)) return t; const i = t.indexOf('👇'); if (i < 0) return line + '\n' + t; const end = t.indexOf('\n', i); return end < 0 ? t + '\n' + line : t.slice(0, end) + '\n' + line + t.slice(end); };
-        pk = Object.assign({}, pk, { tiktok: add(pk.tiktok), instagram: add(pk.instagram), facebook: add(pk.facebook || pk.instagram), youtube: add(pk.youtube),
+        // Instagram y TikTok NO convierten en enlace lo que va en el texto (HECHO): ahí se manda al enlace del perfil,
+        // que apunta a vyrales.app/ver (siempre muestra los largos públicos). Facebook y YouTube sí llevan el enlace directo.
+        const SITE = (process.env.PUBLIC_SITE_HOST || 'vyrales.app') + '/ver';
+        const lineBio = '👉 Historia completa: toca el enlace de mi perfil (' + SITE + ')';
+        const add = (t, ln = line) => { t = String(t || ''); if (!t || t.includes(longUrl) || t.includes(SITE)) return t; const i = t.indexOf('👇'); if (i < 0) return ln + '\n' + t; const end = t.indexOf('\n', i); return end < 0 ? t + '\n' + ln : t.slice(0, end) + '\n' + ln + t.slice(end); };
+        pk = Object.assign({}, pk, { tiktok: add(pk.tiktok, lineBio), instagram: add(pk.instagram, lineBio), facebook: add(pk.facebook || pk.instagram), youtube: add(pk.youtube),
           pinned_comment: String(pk.pinned_comment || '').replace(/\(pega aquí el enlace del video largo\)/, longUrl) || line });
         log('enlace al video largo agregado a los textos:', longUrl);
         if (yt.privacy === 'private' || /uploaded_private/.test(String(yt.status || ''))) log('AVISO: el video largo sigue en PRIVADO en YouTube; el enlace no funcionará para el público hasta que lo hagas público.');

@@ -101,7 +101,8 @@ async function writeTexts({ series, episode, totalEpisodes }) {
   const lineShots = ordered.filter((s) => narrationOf([s]).length);
   const lines = lineShots.map((s) => narrationOf([s]).join(' '));
   const hook = String(cont.hook_text || '').trim();
-  const single = !(totalEpisodes > 1); // video suelto: sin "Parte 1/1"
+  // Video suelto o Short que lleva al largo: sin "Parte 2/5" ni "próximo episodio" (Franklin, oct-11: el Short del largo salía con "Parte 2/5").
+  const single = !(totalEpisodes > 1) || !!(cont.cta_to_long || cont.kind === 'short_cta');
   const lockedTitle = cont.title_locked && episode.title ? String(episode.title).trim() : '';
   const prompt = [
     'Eres editor de redes sociales de un canal de documentales cortos verticales en español (Latinoamérica).',

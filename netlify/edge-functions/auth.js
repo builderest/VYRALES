@@ -10,7 +10,8 @@ const PUBLIC = [
   /^\/tiktok[\w.-]*\.txt$/, /^\/favicon/,
   /^\/\.netlify\/functions\/login$/,
   /^\/\.netlify\/functions\/oauth-(tiktok|instagram|meta|youtube)-callback$/,
-  /^\/auth\/(tiktok|instagram|meta|youtube)\/callback$/
+  /^\/auth\/(tiktok|instagram|meta|youtube)\/callback$/,
+  /^\/ver\/?$/, /^\/\.netlify\/functions\/ver$/ // historias completas (enlace del perfil)
 ];
 
 const enc = new TextEncoder();

@@ -148,3 +148,8 @@ Este documento es la memoria del proyecto. Cada vez que Franklin corrige algo, l
 - El dedo 👇 del cierre colgaba ffmpeg porque finger.png estaba MAL FORMADO (ffmpeg 6/7: "chunk too big" → bucle infinito con -loop 1). Se re-guardó limpio con PIL (oct-11). Si se cambia la imagen, comprobar con ffmpeg antes de subirla.
 - Publicar un Short que lleva al largo: el enlace de YouTube del largo se agrega solo en TikTok, Instagram, Facebook y YouTube, justo bajo la línea 👇, y en el comentario fijado. Si el largo sigue en privado o no existe, se avisa en el log.
 - Calidad completa: si el archivo del episodio estaba abierto (por ejemplo viéndolo desde el panel), la versión nueva queda como "_epN-nuevo.mp4". El agente y el panel la reconocen (antes el panel decía "en cola" para siempre).
+
+## Enlaces en Instagram/TikTok (oct-11)
+- Instagram y TikTok no convierten en enlace lo que va en el texto (HECHO). Ahí el texto dice "toca el enlace de mi perfil (vyrales.app/ver)". Facebook y YouTube llevan el enlace directo.
+- vyrales.app/ver (función pública ver.js, sin candado) muestra siempre los largos PÚBLICOS de YouTube, el más nuevo primero, con su portada. `?v=<ep>` redirige directo. Franklin pone vyrales.app/ver una sola vez como enlace del perfil en Instagram y TikTok.
+- Shorts que llevan al largo: sin "Parte N/M" ni "próximo episodio".
