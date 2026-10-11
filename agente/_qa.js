@@ -105,7 +105,7 @@ Lo que salió mal (control de calidad): ${reason}
 Reglas:
 - La imagen tiene que mostrar EXACTAMENTE lo que dice la narración.
 - La cámara hace UN movimiento corto y suave que mantiene TODO lo importante dentro del cuadro hasta el final. En "camera" escribe SOLO el movimiento (ej. "slow lateral drift to the left"); nunca "no zoom", "held", "unchanged", "same framing" (LTX hace lo que lee). Si el problema fue que solo se movía la cámara, que se metió o hizo zoom de más, usa un movimiento mínimo y pon el movimiento en el SUJETO.
-- La acción (25–45 palabras, inglés) describe SOLO lo que se mueve en el sujeto principal, con verbos visibles y una dirección. Nunca uses still, steady, stay, remain, fixed, motionless, frozen, static, suspended.
+- La acción (25–45 palabras, inglés) describe SOLO lo que se mueve en el sujeto principal, con verbos visibles y una dirección. Tiene que VERSE claramente en 6 segundos: nada de "respira", "parpadea" o gestos mínimos; si el sujeto es una persona pequeña o lejana, que camine, se agache, levante algo o señale. Si una persona se salía del cuadro, que se mueva DENTRO del cuadro (hacia la cámara o de lado corto), nunca hacia fuera. Nunca uses still, steady, stay, remain, fixed, motionless, frozen, static, suspended.
 - Si el sujeto es humo, una columna de erupción, nubes o polvo: usa verbos de turbulencia visibles (billows, churns, rolls, swells and expands outward, grows taller) para que su forma CAMBIE durante la toma.
 - No nombres objetos que no estén en la imagen. No humo ni neblina de relleno (solo si la narración trata de eso).
 - El final (12–25 palabras, inglés) es el estado final de ESE mismo movimiento, con el sujeto todavía en cuadro.
@@ -210,8 +210,14 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
       const { data: fr } = await supabase.from('episodes').select('shots').eq('id', epId).single();
       await supabase.from('episodes').update({ shots: (fr.shots || []).map((x) => qaOf[x.n] ? Object.assign({}, x, { qa: Object.assign({}, qaOf[x.n], extra[x.n] || {}) }, extra[x.n] && extra[x.n].boost ? { qa_boost: true } : {}) : x) }).eq('id', epId);
     };
-    const mark = {}; todo.forEach((t) => { const pv = (items.find((it) => it.sh.n === t.n) || {}).sh; const tr = pv && pv.qa ? (Number(pv.qa.tries) || (pv.qa.redone ? 1 : 0)) : 0; mark[t.n] = { redone: true, tries: tr + 1, boost: t.boost }; });
-    await saveQa(mark);
+    // El intento se cuenta SOLO cuando la toma de verdad se rehízo (antes se contaba antes de rehacer y, si la PC
+    // cortaba el trabajo, la toma quedaba con intentos gastados sin haberse rehecho).
+    const prevTries = {}; todo.forEach((t) => { const pv = t.sh; prevTries[t.n] = pv && pv.qa ? (Number(pv.qa.tries) || (pv.qa.redone ? 1 : 0)) : 0; });
+    await saveQa({});
+    const bumpTry = async (n, boost) => {
+      const { data: fr } = await supabase.from('episodes').select('shots').eq('id', epId).single();
+      await supabase.from('episodes').update({ shots: (fr.shots || []).map((x) => x.n === n ? Object.assign({}, x, { qa: Object.assign({}, x.qa || {}, { redone: true, tries: prevTries[n] + 1 }) }, boost ? { qa_boost: true } : {}) : x) }).eq('id', epId);
+    };
     for (const t of todo) {
       if (t.rewrite) {
         try {
@@ -225,7 +231,7 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
         } catch (e) { log(`QA toma ${t.n}: no pude reescribir (${String(e.message).slice(0, 120)}) → reintento igual`); }
       }
       const r = await handler({ httpMethod: 'POST', body: JSON.stringify({ assetId: t.clip.id, provider: 'king', new_frame: t.newFrame }) });
-      if (r.statusCode >= 400) log(`QA visual toma ${t.n}: FALLÓ ${String(r.body).slice(0, 200)}`); else { log(`QA visual toma ${t.n}: rehecha ✅`); if (!redone.includes(t.n)) redone.push(t.n); }
+      if (r.statusCode >= 400) log(`QA visual toma ${t.n}: FALLÓ ${String(r.body).slice(0, 200)}`); else { await bumpTry(t.n, t.boost); log(`QA visual toma ${t.n}: rehecha ✅`); if (!redone.includes(t.n)) redone.push(t.n); }
     }
   }
   // Tomas que Claude decidió PARTIR: se parten de la última a la primera (así la renumeración no mueve las pendientes),
