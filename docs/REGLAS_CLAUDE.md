@@ -66,3 +66,8 @@ Este documento es la memoria del proyecto. Cada vez que Franklin corrige algo, l
 - action_en / reaction_en: describir SOLO lo que se mueve, con verbos visibles (sube, se expande, cae, se agrieta). Prohibido: still, steady, stay(s), remain, fixed, motionless, frozen, static, unchanged, "lo demás se queda quieto".
 - Lo que nombra la narración es lo que MÁS se mueve, a velocidad que se note.
 - En código (_king.js onlyMotion): en narrados se borran las frases de quietud de la acción y se omite un final que solo describa quietud. El modo "gentle" (movimiento muy suave) es solo para primeros planos (close-up/macro/ojo), no para "slow push-in".
+
+## Sin humo/neblina de relleno (oct-2026)
+- Salía humo blanco innecesario en tomas normales (Toba largo T30 oficina, T31 avenida, T32 chimpancés). Fuentes: el estilo de la serie decía "smoke and dust in the air", el guionista metía "golden haze / mist / dust motes drift" como relleno de movimiento, y el prompt de LTX añadía "dust and haze drift".
+- Regla: humo, neblina, niebla, bruma, haze, mist, polvo flotando SOLO si la línea habla de humo, ceniza, fuego, erupción, tormenta, niebla. Si no: "the air is clear".
+- En código (_king.js hazeScene/onlyMotion) se quitan esas frases y las palabras del estilo de la serie cuando la escena no trata de eso. Estilo de cibertales_historia(_completa) cambiado a "clear air, atmospheric depth".

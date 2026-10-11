@@ -43,10 +43,18 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // LTX (destilado, cfg = 1) HACE lo que lee: "the lake stays completely steady", "the clouds stay still"
 // congelaban TODA la toma (Toba largo T16/T33, oct-2026). En la acción y el final se quitan las frases de quietud
 // y se dejan solo los movimientos.
-const STILL_RE = /\b(stay|stays|staying|remain|remains|remaining|keep|keeps|kept|hold|holds|rest|rests|sit|sits)\b[^.;]*\b(still|steady|steadily|fixed|motionless|unchanged|unmoving|frozen|static|in place|completely|perfectly|exactly)\b|\b(still|steady|motionless|frozen|static|unmoving|locked)\b/i;
-function onlyMotion(t) {
-  const parts = String(t || '').split(/;|\.\s+|,?\s+while\s+|,\s+(?=(?:and\s+)?the\s)/i).map((x) => x.trim()).filter(Boolean);
-  const keep = parts.filter((x) => !STILL_RE.test(x)).map((x) => x.replace(/\b(steadily|very slowly)\b/gi, 'clearly').replace(/\s+/g, ' ').replace(/[.\s]+$/, ''));
+const STILL_RE = /\b(stay|stays|staying|remain|remains|remaining|keep|keeps|kept|hold|holds|rest|rests|sit|sits)\b[^.;]*\b(still|steady|steadily|fixed|motionless|unchanged|unmoving|frozen|static|in place|completely|perfectly|exactly)\b|\b(motionless|frozen|static|unmoving|locked)\b/i;
+// Adjetivos sueltos de quietud dentro de una frase con movimiento ("at an easy steady pace") se borran, no la frase.
+const STILL_WORD_RE = /\b(completely |perfectly )?(still|steady|steadily)\s*/gi;
+// Humo/neblina/polvo de relleno ("golden haze drifts", "mist drifts gently", "dust motes float") salían como humo
+// blanco innecesario (Toba largo T30–T32). Solo se dejan si la escena de verdad trata de humo, ceniza, fuego, etc.
+const HAZE_RE = /\b(haze|hazy|mist|misty|fog|foggy|smoke|smoky|steam|dust|motes?)\b/i;
+const HAZE_SCENE_RE = /\b(smoke|ash|ashes|ashfall|eruption|erupt|volcan\w*|plume|fire|flames?|burn\w*|explosion|blast|steam|geyser|fog|mist|dust ?storm|sandstorm|haze|smog|cloud of)\b/i;
+const hazeScene = (shot) => HAZE_SCENE_RE.test([shot.start_en, shot.scene_es, shot.visual_es, ((Array.isArray(shot.dialogue) ? shot.dialogue : [shot.dialogue]).find((d) => d && d.line) || {}).line].filter(Boolean).join(' '));
+function onlyMotion(t, shot) {
+  // Se corta también en cada coma; los pedazos de 1–2 palabras (restos de listas: "the skulls") se descartan.
+  const parts = String(t || '').split(/;|\.\s+|,?\s+while\s+|,\s+/i).map((x) => x.trim()).filter((x) => x.split(/\s+/).length >= 4);
+  const keep = parts.filter((x) => !STILL_RE.test(x) && (!shot || hazeScene(shot) || !HAZE_RE.test(x))).map((x) => x.replace(/\bvery slowly\b/gi, 'clearly').replace(STILL_WORD_RE, '').replace(/\s+/g, ' ').replace(/[.\s]+$/, ''));
   return keep.join(', ');
 }
 function ltxPromptFor(shot, storyBible) {
@@ -94,20 +102,20 @@ function ltxPromptFor(shot, storyBible) {
       ? ['Scene: ' + named(stripVeoSpeech(shot.prompt_override)).slice(0, 2200).replace(/[^.]*$/, '')]
       : [
         shot.start_en ? 'Scene at the start: ' + named(shot.start_en) + '.' : '',
-        shot.action_en ? (dynamic ? 'Then: ' + named(onlyMotion(shot.action_en) || String(shot.action_en).replace(/\b(completely |perfectly )?(still|steady|steadily|motionless|frozen|static|unmoving)\b/gi, '')) : 'Then, slowly and naturally: ' + named(shot.action_en)) + '.' : '',
+        shot.action_en ? (dynamic ? 'Then: ' + named(onlyMotion(shot.action_en, shot) || String(shot.action_en).replace(/\b(completely |perfectly )?(still|steady|steadily|motionless|frozen|static|unmoving)\b/gi, '')) : 'Then, slowly and naturally: ' + named(shot.action_en)) + '.' : '',
         // Final con quietud ("the column rests steady") se omite en narrados: si no, LTX frena el movimiento.
-        shot.reaction_en && (!dynamic || onlyMotion(shot.reaction_en)) ? 'By the end: ' + named(dynamic ? onlyMotion(shot.reaction_en) : shot.reaction_en) + '.' : ''
+        shot.reaction_en && (!dynamic || onlyMotion(shot.reaction_en, shot)) ? 'By the end: ' + named(dynamic ? onlyMotion(shot.reaction_en, shot) : shot.reaction_en) + '.' : ''
       ]),
     moving
       ? (dynamic ? 'Camera: ' + cam + (gentle ? '. The camera moves slowly and smoothly; the subject looks whole and sharp the whole clip.' : '. The camera moves clearly, smoothly and with energy through the scene, like a premium cinematic documentary shot; strong sense of depth and motion from the first second.') : 'Camera: ' + cam + ', very slow and subtle; the framing stays close to the first frame.')
       : 'Camera: ' + (cam ? cam + '. ' : '') + 'Locked-off tripod shot with the same fixed framing from the first frame to the last frame.',
     // Narrados sin personas: todo se mueve todo el tiempo (si no, el fondo queda como foto quieta).
-    dynamic && !hasPeople ? (gentle ? (/\b(animal|creature|dinosaur|whale|shark|octopus|squid|orca|bird|fish|mammal|eye|skin)\b/i.test([shot.start_en, shot.action_en].join(' ')) ? 'Gentle natural life in the scene: the animal skin and body move softly, tiny particles drift slowly in the water.' : 'Gentle ambient life: lights glow and flicker softly, fine dust drifts in the air; shapes look solid and real.') : (/\b(animal|creature|dinosaur|whale|shark|octopus|squid|orca|bird|fish|mammal|beast|monster)\b/i.test([shot.start_en, shot.action_en].join(' ')) ? 'Everything keeps moving for the whole clip: the animal moves its body continuously, water particles, bubbles, dust and light rays drift, waves and clouds move.' : 'The scene stays alive for the whole clip with natural ambient motion: lights flicker, dust and haze drift softly; machines, walls and objects look solid and intact.')) : '',
+    dynamic && !hasPeople ? (gentle ? (/\b(animal|creature|dinosaur|whale|shark|octopus|squid|orca|bird|fish|mammal|eye|skin)\b/i.test([shot.start_en, shot.action_en].join(' ')) ? 'Gentle natural life in the scene: the animal skin and body move softly, tiny particles drift slowly in the water.' : (hazeScene(shot) ? 'Gentle ambient life: lights glow softly, fine dust drifts in the air; shapes look solid and real.' : 'Gentle natural life in what is already in the image; the air is clear and clean, shapes look solid and real.')) : (/\b(animal|creature|dinosaur|whale|shark|octopus|squid|orca|bird|fish|mammal|beast|monster)\b/i.test([shot.start_en, shot.action_en].join(' ')) ? 'Everything keeps moving for the whole clip: the animal moves its body continuously, light shifts naturally, water and clouds move if they are in the image; the air is clear.' : (hazeScene(shot) ? 'The scene stays alive for the whole clip with natural ambient motion: lights flicker, dust and haze drift softly; objects look solid and intact.' : 'The scene stays alive for the whole clip with natural motion of what is already in the image; the air is clear and clean, objects look solid and intact.'))) : '',
     // Ropa de cada personaje (LTX inventaba pies descalzos o cambiaba la ropa al moverse: EP3 T2/T9).
     wardrobeLine(shot),
     bg ? 'Background: ' + clean(bg).replace(/[.\s]*$/, '') + (dynamic ? '.' : '; it stays exactly as in the first frame.') : (dynamic ? '' : 'The background, walls, terrain and sky stay exactly as in the first frame.'),
     // Estilo de la serie SIN lo de ropa ("period-appropriate hide garments" vestía de pieles a la científica moderna) ni el formato.
-    sb.visual_style ? clean(sb.visual_style).split(/,\s*/).filter((x) => !/garment|cloth|outfit|wear|hide|vertical|9:16|framing|aspect/i.test(x)).join(', ').slice(0, 260).replace(/,[^,]*$/, (m) => (clean(sb.visual_style).length > 260 ? '' : m)).replace(/[,.\s]*$/, '.') : 'Photorealistic cinematic footage.',
+    sb.visual_style ? clean(sb.visual_style).split(/,\s*/).filter((x) => !/garment|cloth|outfit|wear|hide|vertical|9:16|framing|aspect/i.test(x) && (hazeScene(shot) || !/smoke|dust|haze|mist|fog/i.test(x))).join(', ').slice(0, 260).replace(/,[^,]*$/, (m) => (clean(sb.visual_style).length > 260 ? '' : m)).replace(/[,.\s]*$/, '.') : 'Photorealistic cinematic footage.',
     isAnimated(sb) ? 'The whole clip keeps exactly the same stylized 3D animated look as the first frame.' : '',
     // IMPORTANTE (HECHO, oct-2026): la plantilla usa el modelo DESTILADO con cfg = 1, así que el prompt
     // NEGATIVO NO HACE NADA y nombrar algo en el positivo (aunque sea "no subtitles", "nobody is barefoot")

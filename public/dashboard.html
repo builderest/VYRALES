@@ -1402,7 +1402,8 @@
       function renderShotCard(asset, index, total) {
         const shotNo = asset.shot_number || (index + 1);
         const isCliff = shotNo === total;
-        const modelLabel = asset.model === 'veo_fast' ? 'VEO FAST' : asset.model === 'veo_lite' ? 'VEO LITE' : String(asset.model || '').toUpperCase();
+        // Tomas de king se guardan con model veo_* pero costo $0: se muestran como LTX.
+        const modelLabel = (Number(asset.cost_usd) === 0 && /^veo_/.test(asset.model || '')) ? 'LTX KING' : asset.model === 'veo_fast' ? 'VEO FAST' : asset.model === 'veo_lite' ? 'VEO LITE' : String(asset.model || '').toUpperCase();
         const cost = asset.cost_usd != null ? ('$' + Number(asset.cost_usd).toFixed(2)) : '—';
         const approveBtn = asset.approved
           ? '<button disabled class="flex-1 py-1.5 rounded bg-slate-800 text-slate-500 border border-slate-700 text-xs font-mono font-semibold cursor-default"><i class="fa-solid fa-check mr-1"></i> Aprobada</button>'
