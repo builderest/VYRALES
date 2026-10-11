@@ -86,3 +86,4 @@ Este documento es la memoria del proyecto. Cada vez que Franklin corrige algo, l
 - Cámara "con energía" que avanza hasta que el sujeto sale de cuadro o desaparece → "exactly this one smooth move ... the main subject is in the picture from the first second to the last".
 - Personas que cambian de número (4→5, 3→2) y objetos que desaparecen: mismas causas; vigilar.
 - QA: hasta 2 intentos por toma (shot.qa.tries); luego queda marcada para revisión humana.
+- (oct-11, tarde) QA con 3 intentos y estrategia distinta en cada uno: 1) movimiento reforzado; 2) Claude reescribe cámara/acción/final con lo que vio el QA ("la cámara se mete en la nube" → movimiento mínimo); 3) reescritura + imagen nueva (sin personajes). Repetir el mismo prompt daba el mismo error (T6 Toba). El prompt anterior se guarda en shot.qa_rewrite_from.

@@ -70,6 +70,30 @@ Responde SOLO este JSON: {"tomas":[{"n":1,"image_ok":true,"action_ok":true,"haze
   return out;
 }
 
+// Claude ($0) reescribe cámara/acción/final de una toma usando lo que vio el control de calidad.
+async function rewriteShot(sh, reason, log) {
+  const { runClaude, parseJson } = require('./_claude');
+  const prompt = `Eres el director de fotografía de un documental hecho con LTX (modelo de video que parte de una imagen fija y HACE todo lo que lee).
+Una toma salió mal dos veces. Reescribe SOLO la cámara, la acción y el final para que no vuelva a pasar.
+
+Narración: "${lineOf(sh)}"
+La imagen inicial muestra: ${sh.start_en || ''}
+Cámara actual: ${sh.camera || ''}
+Acción actual: ${sh.action_en || ''}
+Final actual: ${sh.reaction_en || ''}
+Lo que salió mal (control de calidad): ${reason}
+
+Reglas:
+- La cámara hace UN movimiento corto y suave que mantiene TODO lo importante de la imagen dentro del cuadro hasta el final. Si el problema fue que la cámara se metió, se fue o hizo zoom de más, usa un movimiento mínimo (slow gentle drift, slight push-in) o lateral corto.
+- La acción (25–45 palabras, inglés) describe SOLO lo que se mueve en el sujeto principal, con verbos visibles y una sola dirección. Nunca uses still, steady, stay, remain, fixed, motionless, frozen, static.
+- No nombres objetos que no estén en la imagen. No humo ni neblina de relleno (solo si la narración trata de eso).
+- El final (12–25 palabras, inglés) es el estado final de ESE mismo movimiento, con el sujeto todavía en cuadro.
+Responde SOLO este JSON: {"camera":"...","action_en":"...","reaction_en":"..."}`;
+  const j = parseJson(await runClaude(prompt, { timeoutMin: 6, log }));
+  if (!j || !j.action_en || !j.camera) return null;
+  return { camera: String(j.camera).slice(0, 160), action_en: String(j.action_en).slice(0, 500), reaction_en: String(j.reaction_en || '').slice(0, 300) };
+}
+
 async function qaShots({ supabase, epId, handler, log = console.log }) {
   // La producción larga puede llevar horas con el código de LTX ya cargado en memoria: se recarga para que las
   // tomas rehechas usen las reglas nuevas (sin quietud, sin humo de relleno, movimiento reforzado).
@@ -118,14 +142,18 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
     for (const it of items) {
       const r = res[it.sh.n]; if (!r) continue;
       const bad = r.image_ok === false || r.action_ok === false || r.haze === true || r.broken === true;
-      // Hasta 2 intentos por toma (cada intento con las reglas nuevas que se hayan agregado); luego queda para revisión humana.
+      // Hasta 3 intentos por toma, cada uno con una estrategia DISTINTA (repetir lo mismo da el mismo error, ej. T6 Toba):
+      //   1) mismo prompt con movimiento reforzado · 2) Claude reescribe cámara/acción según lo que vio el QA ·
+      //   3) reescritura + imagen nueva (solo sin personajes). Después queda para revisión humana.
       const tries = it.sh.qa ? (Number(it.sh.qa.tries) || (it.sh.qa.redone ? 1 : 0)) : 0;
-      const already = tries >= 2;
+      const already = tries >= 3;
       qaOf[it.sh.n] = { clip_id: it.clip.id, ok: !bad, image_ok: r.image_ok !== false, action_ok: r.action_ok !== false, haze: !!r.haze, broken: !!r.broken, reason: String(r.reason || '').slice(0, 300), at: new Date().toISOString(), redone: tries > 0, tries };
       if (bad && !already) {
-        const newFrame = r.image_ok === false && !(it.sh.characters || []).length; // cuadro nuevo solo por el camino gratis (Flow/FLUX)
-        todo.push({ n: it.sh.n, clip: it.clip, newFrame, boost: r.action_ok === false });
-        log(`QA visual toma ${it.sh.n}: ${r.reason || 'no pasó'} → ${newFrame ? 'cuadro nuevo + video' : 'video otra vez'}`);
+        const freeFrame = !(it.sh.characters || []).length; // cuadro nuevo solo por el camino gratis (Flow/FLUX)
+        const newFrame = freeFrame && (r.image_ok === false || tries >= 2);
+        const rewrite = tries >= 1;
+        todo.push({ n: it.sh.n, clip: it.clip, newFrame, boost: r.action_ok === false, rewrite, reason: r.reason || '', sh: it.sh });
+        log(`QA visual toma ${it.sh.n}: ${r.reason || 'no pasó'} → intento ${tries + 1}/3: ${rewrite ? 'Claude reescribe el prompt' : 'movimiento reforzado'}${newFrame ? ' + cuadro nuevo' : ''}`);
       } else if (bad) log(`QA visual toma ${it.sh.n}: sigue con problema (${r.reason || ''}) → queda marcada para que la veas`);
     }
     const saveQa = async (extra = {}) => {
@@ -135,11 +163,21 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
     const mark = {}; todo.forEach((t) => { const pv = (items.find((it) => it.sh.n === t.n) || {}).sh; const tr = pv && pv.qa ? (Number(pv.qa.tries) || (pv.qa.redone ? 1 : 0)) : 0; mark[t.n] = { redone: true, tries: tr + 1, boost: t.boost }; });
     await saveQa(mark);
     for (const t of todo) {
+      if (t.rewrite) {
+        try {
+          const fix = await rewriteShot(t.sh, t.reason, log);
+          if (fix) {
+            const { data: fr } = await supabase.from('episodes').select('shots').eq('id', epId).single();
+            await supabase.from('episodes').update({ shots: (fr.shots || []).map((x) => x.n === t.n ? Object.assign({}, x, fix, { prompt_override: null, ltx_en: null, qa_rewrite_from: { camera: x.camera, action_en: x.action_en, reaction_en: x.reaction_en } }) : x) }).eq('id', epId);
+            log(`QA toma ${t.n}: prompt nuevo → cámara "${fix.camera}" · ${fix.action_en}`);
+          }
+        } catch (e) { log(`QA toma ${t.n}: no pude reescribir (${String(e.message).slice(0, 120)}) → reintento igual`); }
+      }
       const r = await handler({ httpMethod: 'POST', body: JSON.stringify({ assetId: t.clip.id, provider: 'king', new_frame: t.newFrame }) });
       if (r.statusCode >= 400) log(`QA visual toma ${t.n}: FALLÓ ${String(r.body).slice(0, 200)}`); else { log(`QA visual toma ${t.n}: rehecha ✅`); if (!redone.includes(t.n)) redone.push(t.n); }
     }
   }
-  log(redone.length ? `QA: rehice ${redone.length} toma(s): ${redone.join(', ')}` : 'QA: todas las tomas pasaron (duración, movimiento y revisión visual)');
+  log(redone.length ? `QA: rehice ${redone.length} toma(s): ${redone.join(', ')}` : 'QA: no rehice ninguna toma en esta pasada (las marcadas con ⚠ necesitan revisión humana)');
   return redone;
 }
 
