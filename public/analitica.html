@@ -320,7 +320,7 @@
     else if (an.reason === 'api_disabled') out.push(['<b>Paso 1 de 2:</b> activa "YouTube Analytics API" en Google Cloud (botón Habilitar). <b>Paso 2:</b> dale "Reconectar YouTube" y acepta el permiso de estadísticas. Así aparecen % visto, suscriptores por video y vistas por día.', '<a class="btn-sm" target="_blank" rel="noopener" href="https://console.cloud.google.com/apis/library/youtubeanalytics.googleapis.com?project=1037421829901">1 · Activar API</a><a class="btn-sm" href="/.netlify/functions/oauth-youtube-start">2 · Reconectar YouTube</a>']);
     else if (an.reason === 'scope') out.push(['<b>Falta el permiso de estadísticas de YouTube.</b> Reconecta y acepta "ver informes de YouTube Analytics".', '<a class="btn-sm" href="/.netlify/functions/oauth-youtube-start">Reconectar YouTube</a>']);
     else if (an.reason) out.push(['<b>YouTube Analytics:</b> ' + esc(an.msg), '']);
-    if ((d.instagram.connected && d.instagram.insights === false) || (d.facebook.connected && d.facebook.insights === false)) out.push(['<b>Instagram/Facebook:</b> se ven seguidores y likes, pero las <b>vistas</b> piden los permisos <b>read_insights</b> e <b>instagram_manage_insights</b>. Ya están en la app: dale Reconectar y acepta los permisos.', '<a class="btn-sm" href="/.netlify/functions/oauth-meta-start">Reconectar Facebook + Instagram</a>']);
+    if (d.facebook.connected && d.facebook.insights === false) out.push(['<b>Facebook:</b> se ven seguidores, pero las <b>vistas</b> de los Reels piden el permiso <b>read_insights</b>. Dale Reconectar y acepta los permisos.', '<a class="btn-sm" href="/.netlify/functions/oauth-meta-start">Reconectar Facebook + Instagram</a>']);
     $('setup').innerHTML = out.map(([t, a]) => `<div class="setup-item"><span>${t}</span><span class="setup-actions">${a}</span></div>`).join('');
   }
 
@@ -336,7 +336,7 @@
     $('platforms').innerHTML = [
       yt.connected ? pcard('youtube', 'YouTube', fmt(yt.channel && yt.channel.subs), 'suscriptores', ytSub, hot ? '▲ UN VIDEO RECIENTE ESTÁ MOVIÉNDOSE' : '● CONECTADO', hot ? 'up' : 'up') : pcard('youtube', 'YouTube', '—', '', 'No conectado', 'CONECTAR EN REDES', 'off'),
       tt.connected ? (tt.stats ? pcard('tiktok', 'TikTok', fmt(tt.followers), 'seguidores', `${fmt(tt.likes)} likes · ${tt.videos} videos`, '● CONECTADO', 'up') : pcard('tiktok', 'TikTok', '—', '', 'Conectado para publicar', '⚠ ESTADÍSTICAS: FALTA PERMISO DE TIKTOK', 'warn')) : pcard('tiktok', 'TikTok', '—', '', 'No conectado', 'CONECTAR EN REDES', 'off'),
-      ig.connected ? pcard('instagram', 'Instagram', fmt(ig.followers), 'seguidores', `@${esc(ig.username || '')} · ${ig.posts || 0} publicaciones`, ig.insights ? '● CONECTADO' : '⚠ VISTAS: FALTA PERMISO', ig.insights ? 'up' : 'warn') : pcard('instagram', 'Instagram', '—', '', 'No conectado', 'CONECTAR EN REDES', 'off'),
+      ig.connected ? pcard('instagram', 'Instagram', fmt(ig.followers), 'seguidores', `@${esc(ig.username || '')} · ${ig.posts || 0} publicaciones`, ig.insights ? '● CONECTADO' : '● CONECTADO · VISTAS AÚN NO DISPONIBLES', ig.insights ? 'up' : 'off') : pcard('instagram', 'Instagram', '—', '', 'No conectado', 'CONECTAR EN REDES', 'off'),
       fb.connected ? pcard('facebook', 'Facebook', fmt(fb.followers), 'seguidores', `${esc(fb.name || '')} · ${(fb.media || []).length} reels`, fb.insights ? '● CONECTADO' : '⚠ VISTAS: FALTA PERMISO', fb.insights ? 'up' : 'warn') : pcard('facebook', 'Facebook', '—', '', 'No conectado', 'CONECTAR EN REDES', 'off')
     ].join('');
   }
