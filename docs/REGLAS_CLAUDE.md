@@ -119,3 +119,5 @@ Este documento es la memoria del proyecto. Cada vez que Franklin corrige algo, l
 - Antes de publicar, verificar que continuity.voice.one_take es true (o que la voz es la que Franklin aprobó), no solo que el video existe.
 - Render: si a una toma le falta video para cubrir su voz, se ralentiza hasta 40 % (antes 25 %); si no, la voz se adelanta y todo lo que sigue queda desfasado. Las tomas aprobadas no se rehacen por esto.
 - voz_ingles reusa la traducción y la toma inglesa si el guion no cambió ($0). Solo vuelve a colocar las frases sobre la voz española nueva. `voz_ingles:<ep>:nueva` fuerza rehacer todo.
+
+- Calidad completa (render_local): el largo horizontal va a 1920x1080, los Shorts a 1080x1920. Antes todo iba a 1080x1920 y el largo salía estirado. Antes de subir, verificar la resolución del archivo de finales/.

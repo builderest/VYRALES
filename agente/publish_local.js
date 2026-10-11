@@ -26,9 +26,12 @@ async function main() {
     // Busca en la carpeta de cada serie (y en la raíz, por si quedó algo viejo).
     const jsons = [];
     for (const d of fs.readdirSync(FINALES, { withFileTypes: true })) {
-      if (d.isDirectory() && !d.name.startsWith('.')) fs.readdirSync(path.join(FINALES, d.name)).filter((x) => /_ep\d+\.json$/.test(x)).forEach((x) => jsons.push(path.join(FINALES, d.name, x)));
+      if (d.isDirectory() && !d.name.startsWith('.')) fs.readdirSync(path.join(FINALES, d.name)).filter((x) => /_ep\d+(-nuevo)?\.json$/.test(x)).forEach((x) => jsons.push(path.join(FINALES, d.name, x)));
       else if (d.isFile() && /\.json$/.test(d.name)) jsons.push(path.join(FINALES, d.name));
     }
+    // Si el archivo estaba abierto, render_local deja la versión nueva como "-nuevo": se usa la más reciente (rendered_at).
+    const when = (jf) => { try { return String(JSON.parse(fs.readFileSync(jf, 'utf8')).rendered_at || ''); } catch (_) { return ''; } };
+    jsons.sort((a, b) => when(b).localeCompare(when(a)));
     for (const jf of jsons) {
       let meta = {};
       try { meta = JSON.parse(fs.readFileSync(jf, 'utf8')); } catch (_) { continue; }

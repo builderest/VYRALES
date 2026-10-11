@@ -70,6 +70,15 @@ async function runPublish({ supabase, epId, platform, privacy, loadVideo, qualit
       if (r.privacy === 'private') await save({ status: 'uploaded_private', url: r.url, video_id: r.videoId, forced: r.forcedPrivate });
       else await save({ status: 'published', url: r.url, video_id: r.videoId, privacy: r.privacy }, { url: r.url, via: 'api' });
       log('YouTube: subido ✅', r.url, r.privacy, '· calidad', quality);
+      // Documental largo: las fuentes van como comentario (la API no deja FIJARLO: se fija a mano en Studio con 1 clic).
+      if (pk.landscape && pk.pinned_comment) {
+        try {
+          const tk = await require('./_social').youtubeAccessToken(supabase);
+          const cr = await fetch('https://www.googleapis.com/youtube/v3/commentThreads?part=snippet', { method: 'POST', headers: { Authorization: `Bearer ${tk}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ snippet: { videoId: r.videoId, topLevelComment: { snippet: { textOriginal: String(pk.pinned_comment).slice(0, 9000) } } } }) });
+          log(cr.ok ? 'YouTube: comentario con las fuentes publicado (fíjalo en Studio: ⋮ → Fijar)' : 'YouTube: no pude publicar el comentario de fuentes (HTTP ' + cr.status + ': ' + (await cr.text()).slice(0, 160) + ')');
+        } catch (e) { log('YouTube: comentario de fuentes falló (' + String(e.message).slice(0, 120) + ')'); }
+      }
       // Playlists (Franklin, oct-11: más alcance): las de la serie + las del TEMA del episodio (un video puede ir en varias).
       try {
         const { data: ser } = await supabase.from('series').select('slug, title, story_bible').eq('id', ep.series_id).single();

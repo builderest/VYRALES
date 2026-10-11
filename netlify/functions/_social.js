@@ -396,7 +396,7 @@ async function youtubeUpload(supabase, { videoBuffer, title, description, tags =
   const up = await jsonFetch(uploadUrl, { method: 'PUT', headers: { 'Content-Type': 'video/mp4', 'Content-Length': String(videoBuffer.length) }, body: videoBuffer });
   if (!up.res.ok || !up.body.id) throw new Error('YouTube rechazó el archivo (HTTP ' + up.res.status + '): ' + JSON.stringify(up.body.error || up.body).slice(0, 300));
   const got = up.body.status || {};
-  return { videoId: up.body.id, url: `https://youtube.com/shorts/${up.body.id}`, privacy: got.privacyStatus || privacy, forcedPrivate: privacy !== 'private' && got.privacyStatus === 'private' };
+  return { videoId: up.body.id, url: `https://youtu.be/${up.body.id}`, privacy: got.privacyStatus || privacy, forcedPrivate: privacy !== 'private' && got.privacyStatus === 'private' };
 }
 
 // Agrega un video a una playlist del canal (necesita el permiso youtube.force-ssl: reconectar YouTube una vez).

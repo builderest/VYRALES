@@ -67,8 +67,14 @@ async function main() {
     // Subida a 1080x1920: las tomas de Veo vienen en 720x1280 y YouTube/TikTok comprimen MUCHO
     // más fuerte los videos de 720p (un Short en 720p se ve borroso). Escalado lanczos + nitidez
     // suave, calidad alta (crf 18). El audio se copia tal cual.
-    console.log('subiendo a 1080x1920 para las redes...');
-    await run(['-y', '-i', result.file, '-vf', 'scale=1080:1920:flags=lanczos,unsharp=5:5:0.4:5:5:0.0',
+    // Video LARGO horizontal (16:9) → 1920x1080. Antes TODO se escalaba a 1080x1920 y el largo de Toba salía
+    // estirado en vertical (oct-11). Se mira la orientación real del render.
+    let landscape = false;
+    try { await run(['-hide_banner', '-i', result.file], path.dirname(result.file)); } catch (e) {
+      const mm = String(e.stderr || '').match(/Video:.*?\b(\d{3,5})x(\d{3,5})\b/); if (mm) landscape = Number(mm[1]) > Number(mm[2]); }
+    const size = landscape ? '1920:1080' : '1080:1920';
+    console.log('subiendo a ' + size.replace(':', 'x') + ' para las redes...');
+    await run(['-y', '-i', result.file, '-vf', 'scale=' + size + ':flags=lanczos,unsharp=5:5:0.4:5:5:0.0',
       '-c:v', 'libx264', '-preset', process.env.VYRALES_X264_PRESET, '-crf', '18', '-profile:v', 'high', '-pix_fmt', 'yuv420p',
       '-c:a', 'copy', '-movflags', '+faststart', tmp], path.dirname(result.file));
     // El archivo aparece completo de una vez (nunca a medias). Si el viejo está abierto en un reproductor
@@ -83,6 +89,8 @@ async function main() {
       try { fs.rmSync(alt, { force: true }); } catch (_) {}
       fs.renameSync(tmp, alt);
       console.log(`AVISO: ${name} está abierto en otro programa; el video nuevo quedó como ${path.basename(alt)}`);
+      // El .json del archivo viejo deja de valer (si no, publicar subía el viejo; Toba oct-11).
+      try { fs.writeFileSync(dest.replace(/\.mp4$/, '.json'), JSON.stringify({ stale: true, replaced_by: path.basename(alt) })); } catch (_) {}
       dest = alt;
     }
     // Marca de qué versión del video final es (si se vuelve a unir en Netlify, la PC lo rehace).
