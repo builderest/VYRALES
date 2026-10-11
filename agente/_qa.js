@@ -83,13 +83,15 @@ Responde SOLO este JSON: {"tomas":[{"n":1,"image_ok":true,"action_ok":true,"haze
   return out;
 }
 
-// Claude ($0) reescribe cámara/acción/final de una toma usando lo que vio el control de calidad.
-async function rewriteShot(sh, reason, log) {
+// Claude ($0) reescribe la toma usando lo que vio el control de calidad. NUNCA toca la narración (la voz es fija):
+// solo cámara/acción/final, la imagen (start_en) si no cuadra con la narración, o propone PARTIR la toma cuando la
+// frase nombra 2+ cosas distintas (los pedazos son la MISMA frase cortada, palabra por palabra).
+async function rewriteShot(sh, reason, log, { allowImage = false, allowSplit = true } = {}) {
   const { runClaude, parseJson } = require('./_claude');
   const prompt = `Eres el director de fotografía de un documental hecho con LTX (modelo de video que parte de una imagen fija y HACE todo lo que lee).
-Una toma salió mal. Reescribe SOLO la cámara, la acción y el final para que no vuelva a pasar (si ya se reescribió antes, cambia de enfoque: otro movimiento de cámara, una acción más simple).
+Una toma salió mal. Arréglala para que no vuelva a pasar (si ya se reescribió antes, cambia de enfoque: otro movimiento de cámara, una acción más simple).
 
-Narración: "${lineOf(sh)}"
+Narración (FIJA: NO la cambies, no la reescribas, no la resumas): "${lineOf(sh)}"
 La imagen inicial muestra: ${sh.start_en || ''}
 Cámara actual: ${sh.camera || ''}
 Acción actual: ${sh.action_en || ''}
@@ -97,14 +99,28 @@ Final actual: ${sh.reaction_en || ''}
 Lo que salió mal (control de calidad): ${reason}
 
 Reglas:
-- La cámara hace UN movimiento corto y suave que mantiene TODO lo importante de la imagen dentro del cuadro hasta el final. Si el problema fue que la cámara se metió, se fue o hizo zoom de más, usa un movimiento mínimo (slow gentle drift, slight push-in) o lateral corto.
-- La acción (25–45 palabras, inglés) describe SOLO lo que se mueve en el sujeto principal, con verbos visibles y una sola dirección. Nunca uses still, steady, stay, remain, fixed, motionless, frozen, static.
+- La imagen tiene que mostrar EXACTAMENTE lo que dice la narración.
+- La cámara hace UN movimiento corto y suave que mantiene TODO lo importante dentro del cuadro hasta el final. Si el problema fue que solo se movía la cámara, que se metió o hizo zoom de más, usa un movimiento mínimo y pon el movimiento en el SUJETO.
+- La acción (25–45 palabras, inglés) describe SOLO lo que se mueve en el sujeto principal, con verbos visibles y una dirección. Nunca uses still, steady, stay, remain, fixed, motionless, frozen, static, suspended.
 - No nombres objetos que no estén en la imagen. No humo ni neblina de relleno (solo si la narración trata de eso).
 - El final (12–25 palabras, inglés) es el estado final de ESE mismo movimiento, con el sujeto todavía en cuadro.
-Responde SOLO este JSON: {"camera":"...","action_en":"...","reaction_en":"..."}`;
+${allowImage ? '- Puedes cambiar la imagen: "start_en" (45–80 palabras, inglés) describe el cuadro inicial en el momento JUSTO ANTES o DURANTE el movimiento (nunca "frozen mid-fall"), plano y lente, sujeto con detalles, lugar, luz.' : '- No cambies la imagen (no devuelvas start_en).'}
+${allowSplit ? '- Si la narración nombra 2 a 4 cosas visualmente distintas que no caben en una sola imagen, PARTE la toma: "split" = lista de pedazos; cada "line" es un trozo EXACTO y seguido de la narración (todas juntas forman la narración palabra por palabra, mínimo 3 palabras cada una) con su propia imagen y movimiento. Si no hace falta, no la partas.' : ''}
+Responde SOLO uno de estos JSON:
+{"camera":"...","action_en":"...","reaction_en":"..."${allowImage ? ',"start_en":"..."' : ''}}
+${allowSplit ? 'o {"split":[{"line":"...","start_en":"...","camera":"...","action_en":"...","reaction_en":"..."}]}' : ''}`;
   const j = parseJson(await runClaude(prompt, { timeoutMin: 6, log }));
+  if (allowSplit && j && Array.isArray(j.split) && j.split.length >= 2) {
+    const { validParts } = require(path.join(ROOT, 'netlify', 'functions', '_split'));
+    const parts = j.split.map((p) => ({ line: String(p.line || ''), start_en: String(p.start_en || ''), camera: String(p.camera || ''), action_en: String(p.action_en || ''), reaction_en: String(p.reaction_en || ''), background_en: sh.background_en || '', end_en: '' }));
+    const bad = validParts(lineOf(sh), parts);
+    if (!bad) return { split: parts };
+    log(`  Claude propuso partir la toma ${sh.n} pero los pedazos no forman la narración exacta (${bad}) → solo reescribo`);
+  }
   if (!j || !j.action_en || !j.camera) return null;
-  return { camera: String(j.camera).slice(0, 160), action_en: String(j.action_en).slice(0, 500), reaction_en: String(j.reaction_en || '').slice(0, 300) };
+  const out = { camera: String(j.camera).slice(0, 160), action_en: String(j.action_en).slice(0, 500), reaction_en: String(j.reaction_en || '').slice(0, 300) };
+  if (allowImage && j.start_en && String(j.start_en).split(/\s+/).length >= 25) out.start_en = String(j.start_en).slice(0, 900);
+  return out;
 }
 
 async function qaShots({ supabase, epId, handler, log = console.log }) {
@@ -114,6 +130,7 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
   handler = require(path.join(ROOT, 'netlify', 'functions', 'regen-shot-background')).handler;
   const VF = require(path.join(ROOT, 'netlify', 'functions', '_voice_full'));
   const redone = [];
+  const splits = []; // tomas que Claude decide partir (se aplican al final)
   const { data: ep } = await supabase.from('episodes').select('*, assets(*)').eq('id', epId).single();
   const { data: series } = await supabase.from('series').select('id, slug, title, genre, story_bible').eq('id', ep.series_id).single();
   let exact = {};
@@ -141,7 +158,7 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
         const fix = await rewriteShot(sh, 'El video salió casi congelado: ' + why + '. Necesita un movimiento claro y visible del sujeto principal.', log);
         if (fix) {
           const { data: fr } = await supabase.from('episodes').select('shots').eq('id', epId).single();
-          await supabase.from('episodes').update({ shots: (fr.shots || []).map((x) => x.n === sh.n ? Object.assign({}, x, fix, { prompt_override: null, ltx_en: null, qa_rewrite_from: { camera: x.camera, action_en: x.action_en, reaction_en: x.reaction_en } }) : x) }).eq('id', epId);
+          await supabase.from('episodes').update({ shots: (fr.shots || []).map((x) => x.n === sh.n ? Object.assign({}, x, fix, { prompt_override: null, ltx_en: null, keyframe_prompt_override: fix.start_en ? null : x.keyframe_prompt_override, qa_rewrite_from: { camera: x.camera, action_en: x.action_en, reaction_en: x.reaction_en, start_en: x.start_en } }) : x) }).eq('id', epId);
           log(`QA toma ${sh.n}: prompt nuevo → cámara "${fix.camera}" · ${fix.action_en}`);
         }
       } catch (e) { log(`QA toma ${sh.n}: no pude reescribir (${String(e.message).slice(0, 120)})`); }
@@ -165,7 +182,7 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
     for (const it of items) {
       const r = res[it.sh.n]; if (!r) continue;
       // Franklin la marcó a mano ("no se mueve", etc.): se rehace aunque Claude la apruebe.
-      const forced = !!(it.sh.qa && it.sh.qa.force && it.sh.qa.clip_id === it.clip.id);
+      const forced = !!(it.sh.qa && it.sh.qa.force && (it.sh.qa.clip_id === it.clip.id || it.sh.qa.force_any));
       if (forced) { r.action_ok = false; r.reason = 'Marcada a mano: ' + (it.sh.qa.force_reason || 'no está bien') + (r.reason ? ' · QA: ' + r.reason : ''); }
       const bad = forced || r.image_ok === false || r.action_ok === false || r.haze === true || r.broken === true;
       // Hasta 3 intentos por toma; en TODOS Claude reescribe cámara/acción/final con lo que vio el QA (repetir el mismo
@@ -193,10 +210,11 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
     for (const t of todo) {
       if (t.rewrite) {
         try {
-          const fix = await rewriteShot(t.sh, t.reason, log);
+          const fix = await rewriteShot(t.sh, t.reason, log, { allowImage: t.newFrame, allowSplit: true });
+          if (fix && fix.split) { splits.push({ n: t.n, parts: fix.split }); log(`QA toma ${t.n}: Claude la parte en ${fix.split.length} tomas (misma narración)`); continue; }
           if (fix) {
             const { data: fr } = await supabase.from('episodes').select('shots').eq('id', epId).single();
-            await supabase.from('episodes').update({ shots: (fr.shots || []).map((x) => x.n === t.n ? Object.assign({}, x, fix, { prompt_override: null, ltx_en: null, qa_rewrite_from: { camera: x.camera, action_en: x.action_en, reaction_en: x.reaction_en } }) : x) }).eq('id', epId);
+            await supabase.from('episodes').update({ shots: (fr.shots || []).map((x) => x.n === t.n ? Object.assign({}, x, fix, { prompt_override: null, ltx_en: null, keyframe_prompt_override: fix.start_en ? null : x.keyframe_prompt_override, qa_rewrite_from: { camera: x.camera, action_en: x.action_en, reaction_en: x.reaction_en, start_en: x.start_en } }) : x) }).eq('id', epId);
             log(`QA toma ${t.n}: prompt nuevo → cámara "${fix.camera}" · ${fix.action_en}`);
           }
         } catch (e) { log(`QA toma ${t.n}: no pude reescribir (${String(e.message).slice(0, 120)}) → reintento igual`); }
@@ -204,6 +222,16 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
       const r = await handler({ httpMethod: 'POST', body: JSON.stringify({ assetId: t.clip.id, provider: 'king', new_frame: t.newFrame }) });
       if (r.statusCode >= 400) log(`QA visual toma ${t.n}: FALLÓ ${String(r.body).slice(0, 200)}`); else { log(`QA visual toma ${t.n}: rehecha ✅`); if (!redone.includes(t.n)) redone.push(t.n); }
     }
+  }
+  // Tomas que Claude decidió PARTIR: se parten de la última a la primera (así la renumeración no mueve las pendientes),
+  // con la MISMA narración, y se piden sus cuadros (Flow, $0) + videos (king) → flow_frames en modo solo.
+  if (splits.length) {
+    const { splitShotDb } = require(path.join(ROOT, 'netlify', 'functions', '_split'));
+    for (const sp of splits.sort((a, b) => b.n - a.n)) {
+      try { await splitShotDb(supabase, epId, sp.n, sp.parts, log); } catch (e) { log(`QA toma ${sp.n}: no pude partirla (${String(e.message).slice(0, 140)})`); }
+    }
+    await supabase.from('agent_jobs').insert({ command: 'flow_frames:' + epId });
+    log(`QA: partí ${splits.length} toma(s); en cola sus imágenes nuevas (Flow) y videos (king)`);
   }
   log(redone.length ? `QA: rehice ${redone.length} toma(s): ${redone.join(', ')}` : 'QA: no rehice ninguna toma en esta pasada (las marcadas con ⚠ necesitan revisión humana)');
   return redone;
