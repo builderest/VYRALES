@@ -49,6 +49,16 @@ const sheets=fs.readdirSync(cwd).filter((x)=>/^hoja\d+\.jpg$/.test(x)).sort();
 const longList=lShots.map((s)=>`${s.n} (${lDur[s.n].toFixed(1)} s): ${lineOf(s).slice(0,160)}`).join('\n');
 const shortList=sShots.map((s)=>`${s.n} (necesita ${(need[s.n]||0).toFixed(1)} s): ${lineOf(s)}`).join('\n');
 
+// Cambio a mano de Franklin: short_reusar:<ep>:2=5 (frase 2 → toma 5 del largo; "2=5+6" para dos). Solo se rehace esa frase.
+const OVR=Object.fromEntries(String(process.argv[3]||'').split(',').filter((x)=>/^\d+=\d+(\+\d+)*$/.test(x)).map((x)=>{const [a,b]=x.split('=');return [Number(a),b.split('+').map(Number).filter((k)=>lClips[k])];}));
+const prevR=(ep.continuity||{}).reused_from_long;
+let map,side;
+if(Object.keys(OVR).length){
+  if(!prevR||!prevR.map)throw new Error('Este Short todavía no se armó con el largo; corre primero short_reusar sin cambios.');
+  map=Object.assign({},prevR.map,OVR);side=Object.assign({},prevR.side||{});
+  for(const k of Object.keys(OVR)){side[k]='center';console.log(`Cambio de Franklin: frase ${k} → toma ${OVR[k].join('+')} del largo (antes ${(prevR.map[k]||[]).join('+')})`);
+    try{await require(F+'/_memoria').addLesson(sb,{kind:'franklin_short_toma',at:new Date().toISOString(),text:`Short "${ep.title}", frase ${k} ("${lineOf(sShots.find((x)=>x.n===Number(k))||{}).slice(0,120)}"): Franklin eligió la toma ${OVR[k].join('+')} del largo en vez de ${(prevR.map[k]||[]).join('+')}. Elegir la imagen que muestra lo que se dice, aunque la narración del largo sea otra.`});}catch(_){}}
+} else {
 // 2) Elegir tomas
 const p1=`Eres editor de documentales. Vamos a armar un Short usando SOLO tomas ya hechas del video largo.
 Lee ${sheets.join(', ')}: hojas con todas las tomas del largo (número amarillo = toma).
@@ -65,8 +75,8 @@ Para cada frase del Short elige la toma del largo cuya IMAGEN muestra exactament
 - Di también dónde está el sujeto principal en la imagen ("left","center","right"): el Short es vertical y se recorta a lo alto, así que se centra en el sujeto.
 Responde SOLO JSON: {"map":[{"n":1,"shots":[12],"lado":"center","por_que":"..."}]}`;
 const j1=parseJson(await runClaude(p1,{files:sheets.map((x)=>({name:x,buffer:fs.readFileSync(path.join(cwd,x))})),timeoutMin:12,log:console.log}));
-let map=Object.fromEntries((j1.map||[]).map((m)=>[Number(m.n),(m.shots||[]).map(Number).filter((k)=>lClips[k])]));
-const side=Object.fromEntries((j1.map||[]).map((m)=>[Number(m.n),String(m.lado||'center')]));
+map=Object.fromEntries((j1.map||[]).map((m)=>[Number(m.n),(m.shots||[]).map(Number).filter((k)=>lClips[k])]));
+side=Object.fromEntries((j1.map||[]).map((m)=>[Number(m.n),String(m.lado||'center')]));
 for(const s of sShots)if(!(map[s.n]&&map[s.n].length))throw new Error('Claude no eligió toma para la frase '+s.n);
 console.log('Elección:',sShots.map((s)=>s.n+'→'+map[s.n].join('+')).join(' '));
 
@@ -90,6 +100,8 @@ Responde SOLO JSON: {"tomas":[{"n":1,"ok":true,"motivo":"","cambiar_a":[],"lado"
   for(const t of bad){map[Number(t.n)]=t.cambiar_a.map(Number).filter((k)=>lClips[k]);if(t.lado)side[Number(t.n)]=String(t.lado);}
 }
 
+} // fin de la elección automática
+
 // 4) Tomas verticales a pantalla completa
 // Pantalla COMPLETA 9:16 (Franklin: "que ocupen el teléfono completo, aunque corte los lados"): se escala a lo alto y
 // se recorta centrado en el sujeto (lado que dijo Claude).
@@ -97,6 +109,7 @@ const vertFor=(sd)=>{const x=sd==='left'?'0':sd==='right'?'iw-1080':'(iw-1080)/2
 const {uploadFile}=require(F+'/_storage');
 const now=new Date().toISOString();const rows=[];
 for(const s of sShots){
+  if(Object.keys(OVR).length&&!OVR[s.n])continue; // cambio a mano: solo esa frase
   const parts=[];
   for(const [k,ln] of map[s.n].entries()){const src='S'+s.n+'_'+k+'.mp4';fs.writeFileSync(path.join(cwd,src),Buffer.from(await (await fetch(lClips[ln].storage_path)).arrayBuffer()));parts.push(src);}
   const out='V'+s.n+'.mp4';
@@ -114,7 +127,7 @@ for(const s of sShots){
 }
 const ins=await sb.from('assets').insert(rows);if(ins.error)throw new Error('assets: '+ins.error.message);
 const {data:fr}=await sb.from('episodes').select('continuity').eq('id',epId).single();
-await sb.from('episodes').update({status:'en_revision',continuity:Object.assign({},fr.continuity||{},{reused_from_long:{long_id:longId,map,at:now}})}).eq('id',epId);
+await sb.from('episodes').update({status:'en_revision',continuity:Object.assign({},fr.continuity||{},{reused_from_long:{long_id:longId,map,side,at:now}})}).eq('id',epId);
 fs.rmSync(cwd,{recursive:true,force:true});
 
 // 5) Unir el Short (voz + letras grandes + cierre)

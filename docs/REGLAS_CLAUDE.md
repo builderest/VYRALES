@@ -144,3 +144,4 @@ Este documento es la memoria del proyecto. Cada vez que Franklin corrige algo, l
 - VYRALES_SHORT_NUEVO=1 fuerza generar tomas nuevas.
 
 - Panel: un video VERTICAL en pantalla completa (botón ⛶ o visor) se muestra dentro de un marco de teléfono del tamaño de un celular, no a lo ancho del monitor (Franklin, oct-11).
+- Cambio a mano de una frase: `short_reusar:<ep>:2=5` (frase 2 → toma 5 del largo; `2=5+6` para dos tomas). Solo rehace esa frase y vuelve a unir. Queda como lección en la memoria.
