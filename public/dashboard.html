@@ -2620,7 +2620,12 @@
           if (ns && !ns.ok) p.voices += TTS_LINE_USD * 1.5 * Math.max(1, dlgList(sh.dialogue).length); // 1.5: a veces reintenta por ritmo
         });
         // Voz continua: UNA voz para todo el video (2 tomas de voz, se queda la mejor) ≈ $0.06; si ya existe, $0.
-        if (contC && !(ep.continuity && ep.continuity.voice && ep.continuity.voice.url)) p.voices = 0.06;
+        // Largo (>420 palabras): se hace por trozos, 1 toma cada uno. ~$0.03 por cada ~80 s de voz.
+        if (contC && !(ep.continuity && ep.continuity.voice && ep.continuity.voice.url)) {
+          const words = shots.reduce((a, sh) => a + (Array.isArray(sh.dialogue) ? sh.dialogue : sh.dialogue ? [sh.dialogue] : []).map((d) => (d && d.line) || '').join(' ').split(/\s+/).filter(Boolean).length, 0);
+          const secs = words / 2.5; // ~150 palabras por minuto
+          p.voices = words > 420 ? Math.max(0.06, Math.ceil(secs / 80) * 0.03) : 0.06;
+        }
         const chars = (lastLoadedData && lastLoadedData.characters) || [];
         const used = new Set(); shots.forEach((sh) => (sh.characters || []).forEach((n) => used.add(n)));
         p.photos = chars.filter((c) => used.has(c.name) && !c.reference_image_url).length * IMAGE_PRICE_USD;
@@ -2630,6 +2635,18 @@
         return p;
       }
       function estimateEpisodeCost(ep) { return episodeCostParts(ep).total; }
+      // Qué se paga de verdad, con su monto (los cuadros con Flow son $0 y no aparecen).
+      function paidPartsLabel(ep) {
+        const p = episodeCostParts(ep);
+        const parts = [];
+        if (p.voices) parts.push('voz ~$' + p.voices.toFixed(2));
+        if (p.music) parts.push('música con Lyria ~$' + p.music.toFixed(2) + ', solo la primera vez');
+        if (p.frames) parts.push('cuadros iniciales ~$' + p.frames.toFixed(2));
+        if (p.locations) parts.push('lugares ~$' + p.locations.toFixed(2));
+        if (p.photos) parts.push('fotos de personajes ~$' + p.photos.toFixed(2));
+        if (!p.frames) parts.push('cuadros con Flow $0');
+        return parts.join(' + ');
+      }
 
       function costBreakdownLabel(ep) {
         const n = (ep.shots && ep.shots.length) || 8;
@@ -3078,7 +3095,7 @@
         if (videoProvider === 'king') {
           if (!await askConfirm('Producir EP ' + ep.episode_number + ' "' + (ep.title || '') + '" con LTX-2.5 en tu PC king.\n\n' +
             (doneClips ? 'Ya hay ' + doneClips + ' toma(s) hechas: NO se repiten. Se generan solo las ' + missingClips + ' que faltan.\n\n' : '') +
-            'Video: $0 (tu PC). Costo estimado: ~$' + cost.toFixed(2) + ' USD (cuadros iniciales y voces).\nNecesita Cronix y king prendidas. Tarda ~2 min por toma. ¿Continuar?')) return;
+            'Video: $0 (tu PC). Costo estimado: ~$' + cost.toFixed(2) + ' USD (' + paidPartsLabel(ep) + ').\nNecesita Cronix y king prendidas. Tarda ~2 min por toma. ¿Continuar?')) return;
           try { await agentOrder('gen_local:' + episodeId); } catch (err) { return alert('No se pudo mandar a la PC: ' + err.message); }
           await new Promise(r => setTimeout(r, 2500));
           return loadDashboard();
