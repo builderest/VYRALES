@@ -319,10 +319,10 @@ async function renderTail({ cwd, from, out, lines, seconds, voice, sub, finger =
   const fingerOn = finger && fs.existsSync(path.join(cwd, 'finger.png'));
   const fw = Math.round(Math.min(W, H) * 0.26);
   const vchain = fingerOn
-    ? `[0:v]${vf}[bg];[1:v]scale=${fw}:${fw},format=rgba[fg];[bg][fg]overlay=x=(W-w)/2:y=${Math.round(H * 0.62)}+${Math.round(H * 0.018)}*sin(2*PI*2*t):shortest=1[v]`
+    ? `[0:v]${vf}[bg];[1:v]setpts=PTS-STARTPTS,scale=${fw}:${fw},format=rgba[fg];[bg][fg]overlay=x=(W-w)/2:y=${Math.round(H * 0.62)}+${Math.round(H * 0.018)}*sin(2*PI*2*t):shortest=1[v]`
     : `[0:v]${vf}[v]`;
   // Todas las entradas con duración fija: en la PC (ffmpeg de Windows) el cierre con dedo se quedaba colgado para siempre (oct-11, Shorts del largo Toba).
-  if (fingerOn) args.push('-loop', '1', '-t', dur.toFixed(3), '-i', 'finger.png');
+  if (fingerOn) args.push('-framerate', String(FPS), '-loop', '1', '-t', dur.toFixed(3), '-i', 'finger.png');
   const ai = fingerOn ? 2 : 1;
   if (voice) {
     args.push('-i', voice.file);
@@ -331,7 +331,7 @@ async function renderTail({ cwd, from, out, lines, seconds, voice, sub, finger =
     args.push('-f', 'lavfi', '-t', dur.toFixed(3), '-i', 'anullsrc=channel_layout=stereo:sample_rate=48000');
     fc = `${vchain};[${ai}:a]anull[a]`;
   }
-  await run([...args, '-filter_complex', fc, '-map', '[v]', '-map', '[a]', '-t', dur.toFixed(3), '-frames:v', String(frames), ...VIDEO_OUT, ...AUDIO_OUT, out], cwd, 5);
+  await run([...args, '-filter_complex', fc, '-map', '[v]', '-map', '[a]', '-t', dur.toFixed(3), '-frames:v', String(frames), ...VIDEO_OUT, ...AUDIO_OUT, out], cwd, 2);
   return { dur, narr: voice ? { start: 0.4, seconds: voice.seconds, file: voice.file, tempo: 1 } : null };
 }
 // Voz del cierre con el narrador de la serie (Gemini TTS, ~$0.001). Se guarda en caché por texto+voz
