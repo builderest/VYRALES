@@ -148,7 +148,7 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
   }
   for (const sh of ep.shots || []) {
     const clip = (ep.assets || []).filter((a) => a.kind === 'video_clip' && a.shot_number === sh.n).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))[0];
-    if (!clip) continue;
+    if (!clip || clip.approved) continue; // aprobada por Franklin: no se toca
     const d = await durationOf(clip.storage_path);
     let why = '';
     if (exact[sh.n] && d && d < exact[sh.n] * 0.8) why = `dura ${d.toFixed(1)} s y su voz ${exact[sh.n].toFixed(1)} s`;
@@ -178,6 +178,8 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
     for (const sh of ep2.shots || []) {
       const clip = (ep2.assets || []).filter((a) => a.kind === 'video_clip' && a.shot_number === sh.n).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))[0];
       // Se salta solo si ESTE clip ya pasó. Si falló y no se alcanzó a rehacer (proceso cortado), se vuelve a revisar.
+      // Si Franklin APROBÓ esta toma, manda su decisión: no se revisa ni se rehace (salvo que la marque con ✗).
+      if (clip && clip.approved && !(sh.qa && sh.qa.force)) continue;
       if (clip && !(sh.qa && sh.qa.clip_id === clip.id && sh.qa.ok && !sh.qa.force)) items.push({ sh, clip, url: clip.storage_path, dur: await durationOf(clip.storage_path) });
     }
     log(`QA visual: revisando ${items.length} toma(s) con Claude ($0)...`);

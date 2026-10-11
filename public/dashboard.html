@@ -1427,7 +1427,8 @@
                   const ln = (sh0.voice_part || (sh0.dialogue || []).map(d => d.line).join(' ') || '').trim();
                   const qa = sh0.qa;
                   // La revisión guardada es de OTRO clip (este ya es el rehecho): todavía no se revisó el nuevo.
-                  const qaHtml = !qa ? '' : (qa.clip_id && qa.clip_id !== asset.id)
+                  // Aprobada por Franklin: su decisión manda sobre el control de calidad.
+                  const qaHtml = asset.approved ? '<p class="text-[10px] text-cyber-emerald">✓ Aprobada por ti</p>' : !qa ? '' : (qa.clip_id && qa.clip_id !== asset.id)
                     ? '<p class="text-[10px] text-cyber-cyan" title="El control de calidad rehízo esta toma; la nueva versión se revisa en la siguiente pasada">⟳ QA: rehecha (antes: ' + esc(qa.reason || 'tenía un problema') + ')</p>'
                     : qa.ok && qa.fixed_from
                     ? '<p class="text-[10px] text-cyber-emerald" title="El control de calidad la rehízo y la volvió a revisar: ya está bien">✓ QA: corregida' + (qa.tries ? ' (intento ' + qa.tries + ')' : '') + ' — antes: ' + esc(qa.fixed_from) + '</p>'
