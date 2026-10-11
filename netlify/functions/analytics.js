@@ -65,6 +65,17 @@ exports.handler = async (event) => {
       if (bad) return json(401, { error: bad });
       const body = JSON.parse(event.body || '{}');
       if (body.action === 'ideas') return json(200, await ideas(sb, body));
+      if (body.action === 'claude_script') { // guion con Claude en la PC (plan de Claude, $0): pedido → Storage + orden al agente
+        const job = String(body.job || '').replace(/[^a-z0-9-]/gi, '').slice(0, 60);
+        if (job.length < 6) return json(400, { error: 'Falta job.' });
+        const { uploadFile } = require('./_storage');
+        await uploadFile(sb, { path: `guiones/${job}.req.json`, buffer: Buffer.from(JSON.stringify({ idea: body.idea || {}, at: new Date().toISOString() })), contentType: 'application/json' });
+        const { data: st } = await sb.from('agent_state').select('last_seen').eq('id', 1).maybeSingle();
+        const online = !!(st && st.last_seen && Date.now() - new Date(st.last_seen).getTime() < 90000);
+        const { error } = await sb.from('agent_jobs').insert({ command: 'claude_guion:' + job });
+        if (error) return json(500, { error: error.message });
+        return json(200, { queued: true, online });
+      }
       return json(400, { error: 'Acción no válida.' });
     }
     const qs = event.queryStringParameters || {};

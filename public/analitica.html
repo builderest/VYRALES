@@ -487,23 +487,31 @@
   // ---------- guion completo desde una idea ----------
   let lastScript = null;
   function scriptModal(title, html){ $('modalTitle').textContent = title; $('modalBody').innerHTML = html; $('modal').style.display = 'flex'; document.body.style.overflow = 'hidden'; }
-  async function createScript(idea){
+  async function createScript(idea, engine){
     const job = 'g' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-    scriptModal('Escribiendo el guion…', `<div class="empty"><b style="color:var(--text)">${esc(idea.titulo)}</b><br><br>La IA escribe la narración completa y después revisa cada imagen contra la narración y detalla todos los prompts para Flow y LTX.<br>Tarda 2–3 minutos. Puedes dejar esta ventana abierta.<br><br><span id="scriptClock">0 s</span></div>`);
+    scriptModal('Escribiendo el guion…', `<div class="empty"><b style="color:var(--text)">${esc(idea.titulo)}</b><br><br>${engine === 'claude' ? 'Claude escribe el guion en tu PC (tu plan, $0)' : 'Gemini escribe el guion'}: la narración completa y después revisa cada imagen contra la narración y detalla todos los prompts para Flow y LTX.<br>Tarda 2–5 minutos. Puedes dejar esta ventana abierta.<br><br><span id="scriptClock">0 s</span></div>`);
     const t0 = Date.now(); const clock = setInterval(() => { const c = $('scriptClock'); if (c) c.textContent = Math.round((Date.now() - t0) / 1000) + ' s'; }, 1000);
     try {
       const k = key();
-      const r = await fetch('/.netlify/functions/idea-script-background', { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, k ? { 'x-vyrales-key': k } : {}), body: JSON.stringify({ job, idea }) });
-      if (!r.ok && r.status !== 202) throw new Error('HTTP ' + r.status);
+      const H = Object.assign({ 'Content-Type': 'application/json' }, k ? { 'x-vyrales-key': k } : {});
+      if (engine === 'claude') {
+        const r = await fetch('/.netlify/functions/analytics', { method: 'POST', headers: H, body: JSON.stringify({ action: 'claude_script', job, idea }) });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+        if (!j.online) { const c = $('scriptClock'); if (c) c.insertAdjacentHTML('afterend', '<br><span style="color:var(--orange)">⚠ La PC (Cronix) no responde ahora mismo: el guion se escribe cuando el agente vuelva. Si tienes prisa, cierra y usa el botón de Gemini.</span>'); }
+      } else {
+        const r = await fetch('/.netlify/functions/idea-script-background', { method: 'POST', headers: H, body: JSON.stringify({ job, idea }) });
+        if (!r.ok && r.status !== 202) throw new Error('HTTP ' + r.status);
+      }
       let out = null;
-      while (Date.now() - t0 < 8 * 60000) {
+      while (Date.now() - t0 < 15 * 60000) {
         await new Promise((ok) => setTimeout(ok, 6000));
         if ($('modal').style.display === 'none') { clearInterval(clock); return; }
         const j = await (await fetch('/.netlify/functions/analytics?script=' + job, { cache: 'no-store' })).json();
         if (!j.pending) { out = j; break; }
       }
       clearInterval(clock);
-      if (!out) throw new Error('No terminó en 8 minutos. Intenta otra vez.');
+      if (!out) throw new Error('No terminó en 15 minutos. Revisa la Terminal del panel o usa el botón de Gemini.');
       if (!out.ok) throw new Error(out.error || 'falló');
       showScript(out);
     } catch (err) { clearInterval(clock); scriptModal('No se pudo crear el guion', '<div class="err">' + esc(err.message) + '</div>'); }
@@ -514,7 +522,7 @@
     const words = ep.shots.map((s) => (s.dialogue || []).map((d) => d.line).join(' ')).join(' ').split(/\s+/).filter(Boolean).length;
     const txt = JSON.stringify(out.series, null, 2);
     scriptModal('Guion listo: ' + ep.title, `
-      <div class="muted" style="margin-bottom:8px">${ep.shots.length} tomas · ${words} palabras (~${Math.round(words / 2.3)} s de voz) · ${esc(out.series.title)} · costo $${(out.costUsd || 0).toFixed(3)}</div>
+      <div class="muted" style="margin-bottom:8px">${ep.shots.length} tomas · ${words} palabras (~${Math.round(words / 2.3)} s de voz) · ${esc(out.series.title)} · ${esc(out.model || '')} · costo $${(out.costUsd || 0).toFixed(3)}</div>
       ${v.ok ? '<div class="alert"><i style="background:var(--green);box-shadow:0 0 6px var(--green)"></i><span>Pasó la misma validación del botón PROMPT.</span></div>' : '<div class="err">La validación encontró problemas: ' + esc((v.errors || []).join(' · ')) + '</div>'}
       <div class="setup-actions" style="margin:10px 0">
         <button class="btn-sm" id="scCreate" style="border-color:rgba(61,220,151,.5);color:var(--green)" ${v.ok ? '' : 'disabled'}>Crear el video en el panel</button>
@@ -551,8 +559,9 @@
         <div class="hook">“${esc(i.gancho)}”</div>
         <div class="why">${esc(i.por_que)}</div>
         <div class="idea-bottom"><div class="tags">${i.nuevo ? '<span class="tag-pill new">PRUEBA</span>' : ''}${(i.tags || []).slice(0, 3).map((t) => `<span class="tag-pill">${esc(t)}</span>`).join('')}</div>
-          <span class="setup-actions"><button class="btn-sm" data-copy="${n}" title="Texto para pegarle a Claude">Copiar idea</button><button class="btn-sm" data-script="${n}" style="border-color:rgba(255,107,214,.5);color:var(--pink)" title="Escribe el guion completo (JSON) con prompts súper detallados">Crear guion JSON (~$0.16)</button></span></div></div>`).join('');
+          <span class="setup-actions"><button class="btn-sm" data-copy="${n}" title="Texto para pegarle a Claude">Copiar idea</button><button class="btn-sm" data-claude="${n}" style="border-color:rgba(61,220,151,.5);color:var(--green)" title="Claude escribe el guion completo en tu PC con tu plan de Claude ($0)">Crear guion con Claude ($0)</button><button class="btn-sm" data-script="${n}" style="border-color:rgba(255,107,214,.35);color:var(--text-dim)" title="Respaldo si la PC está apagada: Gemini por API">Gemini (~$0.16)</button></span></div></div>`).join('');
     box.querySelectorAll('[data-script]').forEach((b) => b.onclick = () => createScript(res.ideas[+b.dataset.script]));
+    box.querySelectorAll('[data-claude]').forEach((b) => b.onclick = () => createScript(res.ideas[+b.dataset.claude], 'claude'));
     box.querySelectorAll('[data-copy]').forEach((b) => b.onclick = async () => {
       const txt = claudePrompt(res.ideas[+b.dataset.copy]);
       try { await navigator.clipboard.writeText(txt); toast('Copiado: pégaselo a Claude'); } catch (_) { window.prompt('Copia este texto:', txt); }
