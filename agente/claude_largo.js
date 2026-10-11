@@ -48,6 +48,15 @@ async function detail(shots, { aspect, context, title, log }) {
       try { raw = await runClaude(F('_guionista').buildLongPrompt(tipo, { topic: req.topic }), { timeoutMin: 25, log: console.log }); fs.mkdirSync(path.join(ROOT, '_to_delete'), { recursive: true }); fs.writeFileSync(path.join(ROOT, '_to_delete', `claude_raw_${k}.txt`), raw); story = parseJson(raw); }
       catch (e) { console.log(`  intento ${k}: ${String(e.message).slice(0, 200)}`); if (k === 2) throw e; }
     }
+    // Pulido de la narración (largo y cada Short): sin "Y" muletilla, sin saltos, sin palabras raras. Claude, $0.
+    try {
+      const { polishLines } = F('_pulir');
+      const all = (story.chapters || []).flatMap((c) => c.shots || []);
+      const nl = await polishLines(all.map((x) => x.line), claudeLlm(() => {}), { kind: 'largo', title: story.title });
+      all.forEach((x, i) => { x.line = nl[i]; });
+      for (const sh of story.shorts || []) { const n2 = await polishLines((sh.shots || []).map((x) => x.line), claudeLlm(() => {}), { kind: 'short_cta', title: sh.title }); sh.shots.forEach((x, i) => { x.line = n2[i]; }); }
+      console.log('Narración pulida (largo + Shorts).');
+    } catch (e) { console.log('  (pulido: ' + String(e.message).slice(0, 160) + ')'); }
     const longShots = (story.chapters || []).flatMap((c, ci) => (c.shots || []).map((s) => Object.assign({}, s, { chapter: ci + 1, chapter_title: c.title })));
     const words = longShots.map((s) => s.line).join(' ').split(/\s+/).filter(Boolean).length;
     console.log(`Historia escrita en ${Math.round((Date.now() - t0) / 1000)} s: "${story.title}" · ${(story.chapters || []).length} capítulos · ${longShots.length} tomas · ${words} palabras (~${(words / 2.3 / 60).toFixed(1)} min) · ${(story.shorts || []).length} Shorts`);

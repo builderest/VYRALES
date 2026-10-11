@@ -101,6 +101,8 @@ ${p.reglas ? '8b. REGLAS DE ESTE TIPO: ' + p.reglas + '\n' : ''}${p.fuentes ? '9
 - Ritmo vivo: mezcla frases de 3 palabras con frases largas; una pausa ("…") antes de lo que pega. Detalles sensoriales concretos (el frío, el olor, el silencio, el peso) en vez de adjetivos genéricos.
 - Habla de personas reales y sus decisiones, con nombres, lugares, horas y números exactos cuando existen: la emoción sale de los hechos, no de los adjetivos.
 - PROHIBIDO lo que delata a una IA: "En un mundo donde", "Imagina…", "sumérgete", "adentrémonos", "cabe destacar", "sin duda", "fascinante", "crucial", "épico", "tapiz", "un viaje", "en definitiva", "a lo largo de la historia", tríos de adjetivos, preguntas retóricas seguidas, moralejas al final, frases que repiten la idea anterior con otras palabras.
+- Nada de "Y" suelta como muletilla para empezar frases ("Y la ceniza…", "Y aquí…"): empieza directo o con una transición natural.
+- La historia fluye de corrido, sin saltos bruscos: si cambias de lugar, de tiempo o de tema, la frase lo anuncia ("Mientras tanto, al otro lado del océano…", "Años después…"). Nada de palabras raras o rebuscadas.
 - Prueba final: léelo en voz alta. Si alguna frase no la diría un buen narrador de documental en una conversación, reescríbela.
 
 === REGLAS TÉCNICAS (obligatorias; el sistema valida el JSON) ===
@@ -208,7 +210,7 @@ ${voz}
   3. 6 a 8 CAPÍTULOS de 60–120 s. Cada capítulo tiene título corto, avanza la historia (causa → efecto) y TERMINA con una pregunta abierta o un giro que obliga a seguir viendo.
   4. EL CLÍMAX al 70–80 % del video.
   5. RESOLUCIÓN Y LEGADO: qué pasó después y por qué te importa hoy.
-  6. CIERRE: vuelve a la imagen de la apertura, una pregunta al espectador para que comente y una invitación natural a suscribirse (una sola frase, sin rogar).
+  6. CIERRE: vuelve a la imagen de la apertura, una pregunta al espectador para que comente y, como ÚLTIMA frase, EXACTAMENTE: "Si quieres más historias como esta, contadas completas, suscríbete al canal."
 - RETENCIÓN: un re-enganche cada 30–60 s (un dato que sorprende, un giro, una pregunta). Nunca resumas lo que ya se dijo. Nada de relleno ni de listas de datos.
 - CERO DATOS FALSOS: cada dato con su fuente en "sources". Si hay un rango, usa palabras prudentes ("cerca de", "unos"). Si no se puede verificar, no entra.
 

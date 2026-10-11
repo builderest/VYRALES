@@ -66,6 +66,7 @@ async function job(id) {
       try { data = parseJson(await runClaude(prompt, { log: console.log })); }
       catch (e) { console.log(`  intento ${k}: ${String(e.message).slice(0, 200)}`); if (k === 2 || /instalado|sesión/.test(e.message)) throw e; }
     }
+    try { const { polishLines } = require(path.join(ROOT, 'netlify', 'functions', '_pulir')); const sh = data.episodes[0].shots; const nl = await polishLines(sh.map((x) => (x.dialogue || []).map((d) => d.line).join(' ')), claudeLlm(() => {}), { title: data.episodes[0].title }); sh.forEach((x, i) => { x.dialogue = [{ speaker: 'Narrador', line: nl[i] }]; }); console.log('Narración pulida (sin muletillas ni saltos).'); } catch (e) { console.log('  (pulido: ' + String(e.message).slice(0, 120) + ')'); }
     console.log('Guion escrito en', Math.round((Date.now() - t) / 1000), 's. Revisor IMAGEN = NARRACIÓN (prompts detallados) con Claude...');
     const { validation } = await finishScript(data, { idea, tipo, llm: claudeLlm(console.log) });
     const ep = data.episodes[0];
@@ -112,6 +113,24 @@ async function revisar(epId, list) {
   await sb.from('episodes').update({ shots: fr.shots.map((s) => fixed.find((x) => x.n === s.n) || s) }).eq('id', epId);
   console.log('LISTO: prompts guardados en las tomas', want.join(','));
 }
+// Pulir la narración de un episodio (sin "Y" muletilla, sin saltos, sin palabras raras). Gratis.
+async function pulir(epId) {
+  const { getSupabaseClient } = require(path.join(ROOT, 'netlify', 'functions', '_supabase'));
+  const { polishLines } = require(path.join(ROOT, 'netlify', 'functions', '_pulir'));
+  const sb = getSupabaseClient();
+  const { data: ep } = await sb.from('episodes').select('title, shots, continuity').eq('id', epId).single();
+  const sh = (ep.shots || []).slice().sort((a, b) => a.n - b.n);
+  const lineOf = (x) => String(x.voice_part || (x.dialogue || []).map((d) => d.line).join(' ')).trim();
+  const lines = sh.map(lineOf);
+  const kind = ep.continuity && ep.continuity.kind === 'short_cta' ? 'short_cta' : ep.continuity && ep.continuity.kind === 'largo' ? 'largo' : 'normal';
+  console.log('Puliendo la narración de "' + ep.title + '" (' + lines.length + ' líneas, ' + kind + ') con Claude...');
+  const nl = await polishLines(lines, claudeLlm(console.log), { kind, title: ep.title });
+  let changed = 0;
+  const byN = {}; sh.forEach((x, i) => { if (nl[i] !== lines[i]) { changed++; console.log(`  #${x.n}: ${lines[i]}\n     → ${nl[i]}`); } byN[x.n] = nl[i]; });
+  const { data: fr } = await sb.from('episodes').select('shots').eq('id', epId).single();
+  await sb.from('episodes').update({ shots: fr.shots.map((x) => (byN[x.n] && byN[x.n] !== lineOf(x) ? Object.assign({}, x, x.voice_part ? { voice_part: byN[x.n] } : {}, { dialogue: [{ speaker: ((x.dialogue || [])[0] || {}).speaker || 'Narrador', line: byN[x.n] }] }) : x)) }).eq('id', epId);
+  console.log('LISTO: ' + changed + ' línea(s) pulidas.' + (ep.continuity && ep.continuity.voice ? ' (Este episodio ya tenía voz: se ajusta sola al producir, solo las frases cambiadas.)' : ''));
+}
 // "Generar nuevas ideas" de /analitica.html (gratis).
 async function ideas(job) {
   const { getSupabaseClient } = require(path.join(ROOT, 'netlify', 'functions', '_supabase'));
@@ -131,7 +150,8 @@ async function ideas(job) {
 }
 
 const mode = process.argv[2];
-if (mode === 'revisar') { revisar(process.argv[3], process.argv[4]).catch((e) => { console.error('ERROR:', e.message || e); process.exit(1); }); }
+if (mode === 'pulir') { pulir(process.argv[3]).catch((e) => { console.error('ERROR:', e.message || e); process.exit(1); }); }
+else if (mode === 'revisar') { revisar(process.argv[3], process.argv[4]).catch((e) => { console.error('ERROR:', e.message || e); process.exit(1); }); }
 else if (mode === 'detalle') { detalle(process.argv[3], process.argv[4]).catch((e) => { console.error('ERROR:', e.message || e); process.exit(1); }); }
 else if (mode === 'ideas') { ideas(String(process.argv[3] || '').replace(/[^a-z0-9-]/gi, '')); }
 else
