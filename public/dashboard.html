@@ -725,7 +725,10 @@
         const cfg = narrationCfg(series);
         return narratorLines(series, sh).map(d => (cfg && cfg.cast ? d.speaker + ': ' : '') + d.line).join(cfg && cfg.cast ? ' | ' : ' ').trim();
       }
+      // VOZ CONTINUA: una sola voz para todo el video → no hay voz por toma (esos botones no aplican).
+      const isContinuous = (series) => { const n = series && series.story_bible && series.story_bible.narration; return !!(n && n.engine === 'gemini_tts' && n.mode === 'continuous'); };
       function narrationState(series, sh) {
+        if (isContinuous(series)) return null;
         const cfg = narrationCfg(series); if (!cfg) return null;
         const text = narratorText(series, sh); if (!text) return null;
         const vc = (series.story_bible && series.story_bible.voice_cast) || {};
@@ -2344,6 +2347,13 @@
         };
       };
 
+      window.genContinuousVoice = async function(btn) {
+        const id = btn.dataset.ep;
+        if (!await askConfirm('Generar la VOZ CONTINUA de este video (una sola voz para todo, ~' + btn.dataset.secs + ' s, con el narrador del canal).\n\nCosto aproximado: $' + btn.dataset.cost + ' (Gemini TTS: es lo único que se paga). Se hace en tu PC y se alinea palabra por palabra.\n\n¿Continuar?')) return;
+        try { await agentOrder('voz_continua:' + id); } catch (err) { return alert('No se pudo mandar a la PC: ' + err.message); }
+        btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>Voz continua en tu PC...';
+        loadDashboard();
+      };
       async function generateKeyframe(episodeId, n) {
         const ep = await freshEpisodeOrBlock(episodeId);
         if (!ep) return;
@@ -2740,8 +2750,8 @@
             : '<pre class="text-[11px] text-slate-300 whitespace-pre-wrap">' + esc(e.script || 'Sin guion todavía.') + '</pre>';
           const missingFrames = usesKeyframes(data.series) ? shots.filter(sh => sh.frame_stale || (!frameFor(e, sh.n) && !clipFor(e, sh.n))).length : 0;
           // ¿La PC está trabajando en este episodio? (cuadros con Flow, producir, rehacer…) → spinner fijo hasta que termine.
-          const busyJob = ((data.agent_jobs || []).find(j => String(j.command).includes(e.id) && /^(flow_frames|flow_cuadros|gen_local|regen_local|toma_local|claude_revisar|claude_detalle):/.test(j.command)));
-          const busyLabel = busyJob ? (busyJob.status === 'pending' ? 'En la fila de la PC (espera su turno)…' : /^flow_/.test(busyJob.command) ? 'Google Flow en tu PC: haciendo cuadros… (faltan ' + missingFrames + ')' : /^claude_/.test(busyJob.command) ? 'Claude en tu PC: escribiendo prompts…' : 'Tu PC está produciendo los videos de este episodio…') : '';
+          const busyJob = ((data.agent_jobs || []).find(j => String(j.command).includes(e.id) && /^(flow_frames|flow_cuadros|gen_local|regen_local|toma_local|claude_revisar|claude_detalle|claude_pulir|voz_continua):/.test(j.command)));
+          const busyLabel = busyJob ? (busyJob.status === 'pending' ? 'En la fila de la PC (espera su turno)…' : /^flow_/.test(busyJob.command) ? 'Google Flow en tu PC: haciendo cuadros… (faltan ' + missingFrames + ')' : /^voz_continua/.test(busyJob.command) ? 'Generando la voz continua en tu PC…' : /^claude_pulir/.test(busyJob.command) ? 'Claude en tu PC: puliendo la narración…' : /^claude_/.test(busyJob.command) ? 'Claude en tu PC: escribiendo prompts…' : 'Tu PC está produciendo los videos de este episodio…') : '';
           const busyBtn = busyJob ? '<span class="mr-2 mb-1 inline-block px-3 py-1.5 rounded-lg bg-cyber-gold/10 border border-cyber-gold/50 text-cyber-gold text-xs font-mono"><i class="fa-solid fa-spinner fa-spin mr-1"></i>' + busyLabel + '</span>' : '';
           const framesBtn = busyJob ? busyBtn : (e.status === 'guion_generado' && missingFrames)
             ? '<button onclick="generateAllFrames(this)" data-ep="' + e.id + '" class="mr-2 mb-1 px-3 py-1.5 rounded-lg bg-cyber-violet/15 border border-cyber-violet/50 text-cyber-violet text-xs font-mono hover:bg-cyber-violet/25"><i class="fa-solid fa-images mr-1"></i>Generar los ' + missingFrames + ' cuadros que faltan' + (missingLocationsFor(e).length ? ' + ' + missingLocationsFor(e).length + ' lugares' : '') + ' (' + ((((lastLoadedData && lastLoadedData.series && lastLoadedData.series.story_bible) || {}).image_engine === 'flow' && ((((lastLoadedData && lastLoadedData.series && lastLoadedData.series.story_bible) || {}).flow_characters === true) || !(e.shots || []).some(sh => (sh.characters || []).length))) ? 'Google Flow, $0' : '~$' + ((missingFrames + missingLocationsFor(e).length) * IMAGE_PRICE_USD).toFixed(2)) + ') para revisarlos</button>'
@@ -2749,7 +2759,20 @@
           const narrMissing = narrationCfg(data.series) ? shots.filter(sh => { const ns = narrationState(data.series, sh); return ns && !ns.ok; }).length : 0;
           const narrRun = narrationRunning(e);
           const lastNarr = (e.validator_report || {}).last_narration_run;
-          const narrBtn = narrRun
+          // Voz continua del episodio: un solo botón (una sola voz para todo el video, en tu PC con alineación exacta).
+          const contHtml = (function() {
+            if (!isContinuous(data.series) || !shots.length) return '';
+            const txt = shots.slice().sort((a, b) => a.n - b.n).flatMap(x => (x.dialogue || []).map(d => d && d.line).filter(Boolean)).join(' ').replace(/\s*…\s*/g, ' ').replace(/\s+/g, ' ').trim();
+            const v = cont.voice;
+            const words = txt.split(' ').filter(Boolean).length; const secs = words / 2.3; const takes = words > 420 ? 1 : 2;
+            const cost = Math.max(0.01, takes * secs / 80 * 0.03);
+            if (v && v.url) {
+              const same = String(v.text || '').replace(/\s+/g, ' ').trim() === txt;
+              return '<span class="mr-2 mb-1 inline-flex items-center gap-2 px-2 py-1 rounded-lg border border-cyber-emerald/40 text-[10px] font-mono text-cyber-emerald"><i class="fa-solid fa-microphone"></i>Voz continua · ' + Math.round(v.seconds || 0) + ' s<audio controls preload="none" src="' + esc(v.url) + '" class="h-7 max-w-[220px]"></audio>' + (same ? '' : '<span class="text-cyber-gold">⚠ el texto cambió: al producir se ajustan solo las frases cambiadas (misma voz)</span>') + '</span>';
+            }
+            return '<button onclick="genContinuousVoice(this)" data-ep="' + e.id + '" data-cost="' + cost.toFixed(2) + '" data-secs="' + Math.round(secs) + '" class="mr-2 mb-1 px-3 py-1.5 rounded-lg bg-cyber-emerald/15 border border-cyber-emerald/50 text-cyber-emerald text-xs font-mono hover:bg-cyber-emerald/25" title="Una sola voz para todo el video, con el narrador del canal. Se hace en tu PC y se alinea palabra por palabra."><i class="fa-solid fa-microphone mr-1"></i>Generar voz continua (una sola voz, ~' + Math.round(secs / 60 * 10) / 10 + ' min, ~$' + cost.toFixed(2) + ')</button>';
+          })();
+          const narrBtn = contHtml ? contHtml : narrRun
             ? '<span class="mr-2 mb-1 px-3 py-1.5 rounded-lg border border-cyber-emerald/50 text-cyber-emerald text-xs font-mono"><i class="fa-solid fa-spinner fa-spin mr-1"></i>Generando narración ' + (narrRun.done || 0) + '/' + (narrRun.total || '?') + '</span>'
             : (narrMissing ? '<button onclick="genNarration(this)" data-ep="' + e.id + '" class="mr-2 mb-1 px-3 py-1.5 rounded-lg bg-cyber-emerald/15 border border-cyber-emerald/50 text-cyber-emerald text-xs font-mono hover:bg-cyber-emerald/25"><i class="fa-solid fa-microphone mr-1"></i>Generar narración: ' + narrMissing + ' toma' + (narrMissing === 1 ? '' : 's') + ' (~$' + (narrMissing * TTS_LINE_USD).toFixed(2) + ')</button>' : '') +
               (lastNarr && lastNarr.status !== 'running' && ((lastNarr.failed || []).length || lastNarr.error) ? '<span class="text-[10px] font-mono text-cyber-pink">Narración con errores: ' + esc(lastNarr.error || (lastNarr.failed || []).map(f => 'T' + f.shot + ' ' + f.error).join(' · ')) + '</span>' : '');
