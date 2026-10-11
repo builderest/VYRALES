@@ -19,13 +19,13 @@ async function main() {
   const withFrame = nums(b);
   const { getSupabaseClient } = require(path.join(ROOT, 'netlify', 'functions', '_supabase'));
   const supabase = getSupabaseClient();
-  const { data: ep } = await supabase.from('episodes').select('id, episode_number, series_id, assets(id, kind, shot_number, created_at)').eq('id', epId).single();
+  const { data: ep } = await supabase.from('episodes').select('id, episode_number, series_id, assets(id, kind, shot_number, created_at, updated_at)').eq('id', epId).single();
   const { data: series } = await supabase.from('series').select('id, slug, title, genre, story_bible').eq('id', ep.series_id).single();
   const { handler } = require(path.join(ROOT, 'netlify', 'functions', 'regen-shot-background'));
   const todo = [...withFrame.map((n) => [n, true]), ...videoOnly.filter((n) => !withFrame.includes(n)).map((n) => [n, false])].sort((x, y) => x[0] - y[0]);
   const fallas = [];
   for (const [n, frame] of todo) {
-    const asset = (ep.assets || []).filter((x) => x.kind === 'video_clip' && x.shot_number === n).sort((x, y) => String(y.created_at).localeCompare(String(x.created_at)))[0];
+    const asset = (ep.assets || []).filter((x) => x.kind === 'video_clip' && x.shot_number === n).sort((x, y) => String(y.updated_at || y.created_at).localeCompare(String(x.updated_at || x.created_at)))[0];
     if (!asset) { console.log(`toma ${n}: no tiene video, la salto`); continue; }
     console.log(`\nTOMA ${n}: rehaciendo ${frame ? 'cuadro inicial + video' : 'video'} en king...`);
     const r = await handler({ httpMethod: 'POST', body: JSON.stringify({ assetId: asset.id, provider: 'king', new_frame: frame }) });

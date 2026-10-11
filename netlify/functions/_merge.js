@@ -45,7 +45,7 @@ async function mergeEpisodeVideo(supabase, { episode, series, log = console.log 
   // (karaoke que sigue a la voz, transiciones, música, cierre) en vez de la unión simple.
   const sbm = (series && series.story_bible) || {};
   if (sbm.narration && sbm.narration.engine === 'ltx') return mergeWithNarration(supabase, { episode, series, log, skipNarration: true });
-  const clips = (episode.assets || [])
+  const clips = require('./_assets').latestPerShot(episode.assets || [], ['video_clip'])
     .filter((a) => a.kind === 'video_clip' && a.storage_path)
     .sort((a, b) => (a.shot_number || 0) - (b.shot_number || 0));
   if (clips.length === 0) {

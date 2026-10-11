@@ -17,12 +17,12 @@ exports.handler = async (event) => {
     const body = event.httpMethod === 'POST' ? JSON.parse(event.body || '{}') : {};
     const epId = body.episode_id || q.episode_id;
     const n = Number(body.shot || q.shot);
-    const { data: ep, error } = await sb.from('episodes').select('id, episode_number, series_id, shots, assets(id, kind, shot_number, storage_path, created_at)').eq('id', epId || '').single();
+    const { data: ep, error } = await sb.from('episodes').select('id, episode_number, series_id, shots, assets(id, kind, shot_number, storage_path, created_at, updated_at)').eq('id', epId || '').single();
     if (error || !ep) return json(404, { error: 'Episodio no encontrado.' });
     const shot = (ep.shots || []).find((s) => s.n === n);
     if (!shot) return json(404, { error: 'No existe la toma ' + n + '.' });
     const { lineOf } = require('./_visual_check');
-    const last = (kind) => (ep.assets || []).filter((a) => a.kind === kind && a.shot_number === n).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))[0];
+    const last = (kind) => require('./_assets').newest((ep.assets || []).filter((a) => a.kind === kind && a.shot_number === n));
 
     if (event.httpMethod === 'GET') {
       return json(200, { n, line: lineOf(shot), fields: Object.fromEntries(FIELDS.map((f) => [f, shot[f] || ''])), frame_stale: !!shot.frame_stale, clip_stale: !!shot.clip_stale,

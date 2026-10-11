@@ -38,6 +38,8 @@ exports.handler = async (event) => {
       .limit(50);
 
     if (episodesError) throw episodesError;
+    const { latestPerShot } = require('./_assets');
+    (episodes || []).forEach((e) => { e.assets = latestPerShot(e.assets); });
 
     const { data: characters } = await supabase
       .from('characters')

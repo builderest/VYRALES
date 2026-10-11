@@ -481,7 +481,7 @@ async function renderEpisode({ episode, series, log = console.log, fetchFile = d
   // Series con story_bible.subtitle_style = 'poster' (frases motivacionales): texto tipo póster en vez del karaoke.
   if (series && series.story_bible && series.story_bible.subtitle_style === 'poster') { sub.style = 'poster'; sub.karaoke = false; }
   const clipsByShot = {};
-  (episode.assets || []).filter((a) => a.kind === 'video_clip' && a.storage_path).forEach((a) => { clipsByShot[a.shot_number] = a; });
+  require('./_assets').latestPerShot((episode.assets || []).filter((a) => a.kind === 'video_clip' && a.storage_path), ['video_clip']).forEach((a) => { clipsByShot[a.shot_number] = a; });
   const shotsByN = {};
   (episode.shots || []).forEach((s) => { shotsByN[s.n] = s; });
   const chosen = plan.clips.filter((c) => c.include !== false && clipsByShot[c.shot]);

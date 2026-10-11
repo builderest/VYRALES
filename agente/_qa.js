@@ -148,7 +148,7 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
     await supabase.from('episodes').update({ shots: (fr.shots || []).map((x, i) => Object.assign({}, x, { seconds: Math.min(15, Math.max(secs[i] || 2, Math.ceil((exact[x.n] || 0) + 0.3))) })) }).eq('id', epId);
   }
   for (const sh of ep.shots || []) {
-    const clip = (ep.assets || []).filter((a) => a.kind === 'video_clip' && a.shot_number === sh.n).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))[0];
+    const clip = (ep.assets || []).filter((a) => a.kind === 'video_clip' && a.shot_number === sh.n).sort((a, b) => String(b.updated_at || b.created_at).localeCompare(String(a.updated_at || a.created_at)))[0];
     if (!clip || clip.approved) continue; // aprobada por Franklin: no se toca
     const d = await durationOf(clip.storage_path);
     let why = '';
@@ -177,7 +177,7 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
     const { data: ep2 } = await supabase.from('episodes').select('shots, assets(*)').eq('id', epId).single();
     const items = [];
     for (const sh of ep2.shots || []) {
-      const clip = (ep2.assets || []).filter((a) => a.kind === 'video_clip' && a.shot_number === sh.n).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))[0];
+      const clip = (ep2.assets || []).filter((a) => a.kind === 'video_clip' && a.shot_number === sh.n).sort((a, b) => String(b.updated_at || b.created_at).localeCompare(String(a.updated_at || a.created_at)))[0];
       // Se salta solo si ESTE clip ya pasó. Si falló y no se alcanzó a rehacer (proceso cortado), se vuelve a revisar.
       // Si Franklin APROBÓ esta toma, manda su decisión: no se revisa ni se rehace (salvo que la marque con ✗).
       if (clip && clip.approved && !(sh.qa && sh.qa.force)) continue;
@@ -246,7 +246,7 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
       const items3 = [];
       for (const n of redone) {
         const sh = (ep3.shots || []).find((x) => x.n === n);
-        const clip = (ep3.assets || []).filter((a) => a.kind === 'video_clip' && a.shot_number === n).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))[0];
+        const clip = (ep3.assets || []).filter((a) => a.kind === 'video_clip' && a.shot_number === n).sort((a, b) => String(b.updated_at || b.created_at).localeCompare(String(a.updated_at || a.created_at)))[0];
         if (sh && clip) items3.push({ sh, clip, url: clip.storage_path, dur: await durationOf(clip.storage_path) });
       }
       log(`QA: verificando ${items3.length} toma(s) recién rehechas...`);
