@@ -60,8 +60,11 @@ async function runJob(job) {
   const def = def0 && (def0.arg ? def0.arg.test(arg || '') : arg === undefined) ? def0 : null;
   let out = '';
   let flushT = 0;
+  let flushTimer = null;
   const flush = async (force) => {
-    if (!force && Date.now() - flushT < 1000) return;
+    // Si llegan líneas muy seguidas, la última se guarda igual 1 s después (antes se quedaba sin guardar y el
+    // panel mostraba el trabajo "parado" en una línea vieja; oct-11, EP2).
+    if (!force && Date.now() - flushT < 1000) { if (!flushTimer) flushTimer = setTimeout(() => { flushTimer = null; flush(true).catch(() => {}); }, 1100); return; }
     flushT = Date.now();
     await sb.from('agent_jobs').update({ output: out.slice(-MAX_OUT) }).eq('id', job.id);
   };
@@ -81,6 +84,9 @@ async function runJob(job) {
       code = await new Promise((resolve) => {
         const p = spawn(process.execPath, [path.join(__dirname, script)].concat({ flow_login: ['login'], flow_prueba: ['prueba'], flow_ver: ['ver'], flow_frames: ['solo'], flow_prueba_ref: ['prueba_ref'], flow_prueba_lote: ['prueba_lote'], claude_diag: ['diag'], claude_login: ['login'], claude_detalle: ['detalle'], claude_ideas: ['ideas'], claude_revisar: ['revisar'], claude_pulir: ['pulir'] }[def.special] || []).concat(arg ? arg.split(':') : []), { cwd: ROOT, shell: false });
         const timer = setTimeout(() => { add('\n[se canceló: tardó más de ' + maxMin + ' minutos]\n'); p.kill(); }, maxMin * 60000);
+        // Cancelar desde el panel / Claude: agent_jobs.status = 'cancelar' → se corta el proceso.
+        const cancelPoll = setInterval(async () => { try { const { data: st } = await sb.from('agent_jobs').select('status').eq('id', job.id).single(); if (st && st.status === 'cancelar') { add('\n[cancelado a pedido]\n'); clearInterval(cancelPoll); p.kill(); } } catch (_) {} }, 15000);
+        p.on('close', () => clearInterval(cancelPoll));
         p.stdout.on('data', (d) => add(String(d)));
         p.stderr.on('data', (d) => add(String(d)));
         p.on('error', (e) => { add('ERROR: ' + e.message + '\n'); resolve(1); });
