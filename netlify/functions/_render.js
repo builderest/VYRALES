@@ -690,10 +690,13 @@ async function renderEpisode({ episode, series, log = console.log, fetchFile = d
     let finalName = 'final.mp4';
     const sizeMb = fs.statSync(path.join(cwd, finalName)).size / 1048576;
     if (sizeMb > maxMb) { // maxMb = Infinity en la PC: se guarda sin recomprimir
-      const audioK = 160;
-      const videoK = Math.max(600, Math.floor((MAX_UPLOAD_MB * 0.94 * 8 * 1024) / total - audioK));
+      // Videos largos (8–15 min): con piso de 600 kb/s no cabían en 50 MB ("The object exceeded the maximum allowed size",
+      // Toba largo oct-2026). Esta copia es solo la vista previa del panel; la de calidad completa se guarda en la PC.
+      const audioK = total > 300 ? 96 : 160;
+      const videoK = Math.max(total > 300 ? 200 : 600, Math.floor((MAX_UPLOAD_MB * 0.94 * 8 * 1024) / total - audioK));
+      const small = videoK < 900 ? ['-vf', W > H ? 'scale=-2:480' : 'scale=480:-2'] : []; // a poco bitrate se ve mejor en 480p
       log(`el video final pesa ${sizeMb.toFixed(0)} MB (límite ${MAX_UPLOAD_MB}); recomprimiendo a ${videoK} kb/s...`);
-      await run(['-y', '-i', 'final.mp4', '-c:v', 'libx264', '-preset', 'veryfast', '-b:v', videoK + 'k', '-maxrate', Math.round(videoK * 1.3) + 'k', '-bufsize', (videoK * 2) + 'k', '-pix_fmt', 'yuv420p', '-c:a', 'copy', '-movflags', '+faststart', 'final-small.mp4'], cwd);
+      await run(['-y', '-i', 'final.mp4', ...small, '-c:v', 'libx264', '-preset', 'veryfast', '-b:v', videoK + 'k', '-maxrate', Math.round(videoK * 1.3) + 'k', '-bufsize', (videoK * 2) + 'k', '-pix_fmt', 'yuv420p', ...(audioK < 160 ? ['-c:a', 'aac', '-b:a', audioK + 'k'] : ['-c:a', 'copy']), '-movflags', '+faststart', 'final-small.mp4'], cwd);
       tagAiMetadata(path.join(cwd, 'final-small.mp4'), log);
       finalName = 'final-small.mp4';
       log(`recomprimido: ${(fs.statSync(path.join(cwd, finalName)).size / 1048576).toFixed(1)} MB`);
