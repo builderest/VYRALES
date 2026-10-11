@@ -1425,7 +1425,10 @@
                 (function() { const ep0 = ((lastLoadedData && lastLoadedData.episodes) || []).find(e => (e.assets || []).some(x => x.id === asset.id)); const sh0 = ep0 && (ep0.shots || []).find(x => x.n === shotNo); if (!sh0) return '';
                   const ln = (sh0.voice_part || (sh0.dialogue || []).map(d => d.line).join(' ') || '').trim();
                   const qa = sh0.qa;
-                  const qaHtml = !qa ? '' : qa.ok
+                  // La revisión guardada es de OTRO clip (este ya es el rehecho): todavía no se revisó el nuevo.
+                  const qaHtml = !qa ? '' : (qa.clip_id && qa.clip_id !== asset.id)
+                    ? '<p class="text-[10px] text-cyber-cyan" title="El control de calidad rehízo esta toma; la nueva versión se revisa en la siguiente pasada">⟳ QA: rehecha (antes: ' + esc(qa.reason || 'tenía un problema') + ')</p>'
+                    : qa.ok
                     ? '<p class="text-[10px] text-cyber-emerald" title="Revisada por el control de calidad (Claude mira inicio, mitad y final contra la narración)">✓ QA: revisada</p>'
                     : '<p class="text-[10px] ' + (qa.redone ? 'text-cyber-pink' : 'text-cyber-gold') + '" title="Control de calidad automático">' + (qa.redone ? '⚠ QA: se rehízo y sigue con problema: ' : '⟳ QA: se rehace sola: ') + esc(qa.reason || [qa.image_ok ? '' : 'la imagen no cuadra', qa.action_ok ? '' : 'no se ve la acción', qa.haze ? 'humo de relleno' : '', qa.broken ? 'algo deforme' : ''].filter(Boolean).join(', ')) + '</p>';
                   return (ln ? '<p class="text-[11px] text-slate-300 leading-snug" title="Lo que dice el narrador en esta toma: la imagen debe mostrar esto">🎙 ' + esc(ln) + '</p>' : '') + qaHtml +
