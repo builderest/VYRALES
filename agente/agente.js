@@ -393,9 +393,10 @@ async function tick() {
     await queueFullRenders();
     await backupClips();
     // Órdenes viejas (más de 2 min sin atender) no se ejecutan: se marcan vencidas.
-    await sb.from('agent_jobs').update({ status: 'expired', finished_at: new Date().toISOString() }).eq('status', 'pending').not('command', 'like', 'publish:%').not('command', 'like', 'prueba_%').not('command', 'like', 'gen_local:%').not('command', 'like', 'regen_local:%').lt('created_at', new Date(Date.now() - 120000).toISOString());
+    await sb.from('agent_jobs').update({ status: 'expired', finished_at: new Date().toISOString() }).eq('status', 'pending').not('command', 'like', 'publish:%').not('command', 'like', 'prueba_%').not('command', 'like', 'gen_local:%').not('command', 'like', 'regen_local:%').not('command', 'like', 'claude_%').not('command', 'like', 'flow_%').not('command', 'like', 'voz_continua:%').neq('command', 'push').lt('created_at', new Date(Date.now() - 120000).toISOString());
     // Pruebas y producciones en la PC esperan hasta 3 h en la fila (king puede estar ocupada con otro episodio).
-    for (const pat of ['prueba_%', 'gen_local:%', 'regen_local:%']) await sb.from('agent_jobs').update({ status: 'expired', finished_at: new Date().toISOString() }).eq('status', 'pending').like('command', pat).lt('created_at', new Date(Date.now() - 180 * 60000).toISOString());
+    // Claude, Flow, voz continua y push también esperan su turno (antes se vencían a los 2 min si la PC estaba ocupada).
+    for (const pat of ['prueba_%', 'gen_local:%', 'regen_local:%', 'claude_%', 'flow_%', 'voz_continua:%', 'push']) await sb.from('agent_jobs').update({ status: 'expired', finished_at: new Date().toISOString() }).eq('status', 'pending').like('command', pat).lt('created_at', new Date(Date.now() - 180 * 60000).toISOString());
     // Publicar espera hasta 6 h: si la PC estaba generando un episodio (25+ min), a los 15 min se
     // vencía sin publicar (oct-7: EP3 a YouTube y TikTok se perdieron así).
     await sb.from('agent_jobs').update({ status: 'expired', finished_at: new Date().toISOString() }).eq('status', 'pending').like('command', 'publish:%').lt('created_at', new Date(Date.now() - 6 * 3600000).toISOString());
