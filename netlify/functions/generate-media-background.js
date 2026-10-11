@@ -265,7 +265,7 @@ exports.handler = async (event) => {
     const shotModel = modelOverride || rules.shot_model || 'veo_lite';
     const cliffhangerModel = modelOverride || rules.cliffhanger_model || 'veo_fast';
     if (modelOverride) console.log(LOG, 'modelo forzado para esta corrida:', modelOverride);
-    console.log(LOG, 'proveedor de video:', provider === 'fal' ? 'fal.ai (sin cuota diaria)' : 'Google (API de Gemini)');
+    console.log(LOG, 'proveedor de video:', provider === 'fal' ? 'fal.ai (sin cuota diaria)' : provider === 'king' ? 'LTX-2.5 en la PC king (gratis)' : 'Google (API de Gemini)');
     console.log(LOG, 'audio del video:', videoGeneratesAudio(series.story_bible) ? 'con audio de Veo' : 'SIN audio (narrador TTS + música en el render)');
     console.log(LOG, 'modelos:', shotModel, '(tomas) /', cliffhangerModel, '(cliffhanger)');
 
@@ -307,7 +307,7 @@ exports.handler = async (event) => {
       const modelKey = isCliffhanger ? cliffhangerModel : shotModel;
       const prompt = prompts[scene.number];
 
-      console.log(LOG, `toma ${scene.number}/${total} (${modelKey}): arrancando generación con Veo...`);
+      console.log(LOG, `toma ${scene.number}/${total} (${provider === 'king' ? 'LTX king' : modelKey}): arrancando generación con ${provider === 'king' ? 'LTX' : 'Veo'}...`);
       try {
         const referenceImages = refUrls[scene.number] ? await loadReferenceImages(refUrls[scene.number]) : [];
         let startImage = null;
@@ -355,7 +355,7 @@ exports.handler = async (event) => {
         }
         const { videoBuffer, costUsd, model } = veo;
         await logSpend(supabase, { seriesId: series.id, episodeId: episode.id, shotNumber: scene.number, kind: 'video', model: provider === 'fal' ? 'fal_' + modelKey : provider === 'king' ? 'ltx_king' : modelKey, costUsd, note: provider === 'fal' ? 'fal.ai' : provider === 'king' ? 'PC king (gratis)' : undefined });
-        console.log(LOG, `toma ${scene.number}/${total}: Veo terminó, guardando${veo.falUrl ? ' (queda en fal.ai, sin copiar a Supabase)' : ' en Supabase Storage'}...`);
+        console.log(LOG, `toma ${scene.number}/${total}: ${provider === 'king' ? 'LTX' : 'Veo'} terminó, guardando${veo.falUrl ? ' (queda en fal.ai, sin copiar a Supabase)' : ' en Supabase Storage'}...`);
 
         const storagePath = `${series.slug}/ep${episode.episode_number}/shot-${String(scene.number).padStart(2, '0')}-v${Date.now()}.mp4`;
         const publicUrl = await storeClip(supabase, { veo, path: storagePath });
