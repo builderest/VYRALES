@@ -5,7 +5,7 @@
 //   youtube   → sube el Short (título + descripción + etiqueta de IA por API; privado si el proyecto no está auditado)
 // Resultado en episodes.validator_report.social_runs[platform] { status, at, error?, url? }.
 const { getSupabaseClient } = require('./_supabase');
-const { tiktokSendDraft, tiktokDirectPost, instagramPublishReel, facebookPublishReel, youtubeUpload } = require('./_social');
+const { tiktokSendDraft, tiktokDirectPost, instagramPublishReel, facebookPublishReel, youtubeUpload, youtubeAddToPlaylist, youtubePlaylists } = require('./_social');
 const { youtubeTitle } = require('./_publish');
 
 const LOG = '[social]';
@@ -40,7 +40,7 @@ async function runPublish({ supabase, epId, platform, privacy, loadVideo, qualit
   };
   try {
     if (!['tiktok', 'instagram', 'facebook', 'youtube'].includes(platform)) throw new Error('Plataforma no válida.');
-    const { data: ep, error } = await supabase.from('episodes').select('id, episode_number, validator_report, continuity, assets(kind, storage_path)').eq('id', epId || '').single();
+    const { data: ep, error } = await supabase.from('episodes').select('id, title, episode_number, series_id, validator_report, continuity, assets(kind, storage_path)').eq('id', epId || '').single();
     if (error || !ep) throw error || new Error('Episodio no encontrado.');
     const final = (ep.assets || []).find((a) => a.kind === 'final_render' && a.storage_path);
     if (!final) throw new Error('El episodio no tiene video final.');
@@ -70,6 +70,24 @@ async function runPublish({ supabase, epId, platform, privacy, loadVideo, qualit
       if (r.privacy === 'private') await save({ status: 'uploaded_private', url: r.url, video_id: r.videoId, forced: r.forcedPrivate });
       else await save({ status: 'published', url: r.url, video_id: r.videoId, privacy: r.privacy }, { url: r.url, via: 'api' });
       log('YouTube: subido ✅', r.url, r.privacy, '· calidad', quality);
+      // Playlists (Franklin, oct-11: más alcance): las de la serie + las del TEMA del episodio (un video puede ir en varias).
+      try {
+        const { data: ser } = await supabase.from('series').select('slug, title, story_bible').eq('id', ep.series_id).single();
+        const lists = await youtubePlaylists(supabase);
+        const want = new Set(((ser && ser.story_bible && ser.story_bible.youtube_playlists) || []));
+        const topic = [ep.title, pk.youtube_title, pk.youtube_title_en, ser && ser.title].join(' ').toLowerCase();
+        const RULES = [
+          [/origen|human|neandert|denisov|sapiens|homo |ancestr|prehist|toba|cazadores|evoluci/, /orígenes|origins/i],
+          [/historia|history|imperio|guerra|batalla|siglo|antigu|rey|reina/, /historia|history/i],
+          [/curios|sabías|facts|ciencia|espacio|cuerpo|planeta|animal|océano|tierra/, /curiosidades|facts/i]
+        ];
+        for (const [re, listRe] of RULES) if (re.test(topic)) lists.filter((l) => listRe.test(l.title)).forEach((l) => want.add(l.id));
+        for (const pid of want) {
+          try { await youtubeAddToPlaylist(supabase, { videoId: r.videoId, playlistId: pid }); log('YouTube: agregado a la playlist', (lists.find((l) => l.id === pid) || {}).title || pid); }
+          catch (e) { log('YouTube: no pude agregarlo a la playlist (' + String(e.message).slice(0, 160) + ')'); }
+        }
+        if (!want.size) log('YouTube: ninguna playlist coincide con este video');
+      } catch (e) { log('YouTube: playlists no disponibles (' + String(e.message).slice(0, 120) + ')'); }
     } else if (platform === 'facebook') {
       const r = await facebookPublishReel(supabase, { videoUrl: final.storage_path, caption: pk.facebook || pk.instagram, log });
       await save({ status: 'published', url: r.permalink, video_id: r.videoId, pending: !!r.pending }, { url: r.permalink, via: 'api' });

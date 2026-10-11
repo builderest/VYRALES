@@ -341,7 +341,7 @@ async function facebookPublishReel(supabase, { videoUrl, caption, log = console.
 // por API queda PRIVADO (regla de Google para proyectos sin verificar). Se cambia a Público en
 // YouTube Studio con un toque. Docs: developers.google.com/youtube/v3/docs/videos/insert
 // Llaves: YOUTUBE_CLIENT_ID, YOUTUBE_CLIENT_SECRET.
-const YT_SCOPES = 'https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/yt-analytics.readonly'; // analytics: página /analitica.html
+const YT_SCOPES = 'https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/yt-analytics.readonly https://www.googleapis.com/auth/youtube.force-ssl'; // force-ssl: agregar a playlists y editar títulos/descripciones (oct-11) // analytics: página /analitica.html
 function youtubeAuthUrl() {
   const q = new URLSearchParams({ client_id: need('YOUTUBE_CLIENT_ID'), redirect_uri: REDIRECT('youtube'), response_type: 'code', scope: YT_SCOPES, access_type: 'offline', prompt: 'consent', include_granted_scopes: 'true', state: makeState('youtube') });
   return `https://accounts.google.com/o/oauth2/v2/auth?${q}`;
@@ -399,4 +399,21 @@ async function youtubeUpload(supabase, { videoBuffer, title, description, tags =
   return { videoId: up.body.id, url: `https://youtube.com/shorts/${up.body.id}`, privacy: got.privacyStatus || privacy, forcedPrivate: privacy !== 'private' && got.privacyStatus === 'private' };
 }
 
-module.exports = { tiktokAuthUrl, tiktokConnect, tiktokSendDraft, tiktokCreatorInfo, tiktokDirectPost, ttDirect, metaAuthUrl, metaConnect, instagramPublishReel, facebookPublishReel, youtubeAuthUrl, youtubeConnect, youtubeUpload, checkState, stateProblem, getAccount, REDIRECT };
+// Agrega un video a una playlist del canal (necesita el permiso youtube.force-ssl: reconectar YouTube una vez).
+async function youtubeAddToPlaylist(supabase, { videoId, playlistId }) {
+  const token = await youtubeAccessToken(supabase);
+  const r = await fetch('https://www.googleapis.com/youtube/v3/playlistItems?part=snippet', {
+    method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ snippet: { playlistId, resourceId: { kind: 'youtube#video', videoId } } })
+  });
+  if (!r.ok) { const t = await r.text(); throw new Error((r.status === 403 && /insufficient|scope|permission/i.test(t) ? 'Falta el permiso para playlists: reconecta YouTube en el panel. ' : '') + 'HTTP ' + r.status + ': ' + t.slice(0, 200)); }
+  return true;
+}
+// Playlists del canal (id + título), para asignarlas por serie o por tema.
+async function youtubePlaylists(supabase) {
+  const token = await youtubeAccessToken(supabase);
+  const r = await fetch('https://www.googleapis.com/youtube/v3/playlists?part=snippet&mine=true&maxResults=50', { headers: { Authorization: `Bearer ${token}` } });
+  const j = await r.json(); if (!r.ok) throw new Error('playlists HTTP ' + r.status);
+  return (j.items || []).map((p) => ({ id: p.id, title: p.snippet.title }));
+}
+module.exports = { youtubeAccessToken, youtubeAddToPlaylist, youtubePlaylists, tiktokAuthUrl, tiktokConnect, tiktokSendDraft, tiktokCreatorInfo, tiktokDirectPost, ttDirect, metaAuthUrl, metaConnect, instagramPublishReel, facebookPublishReel, youtubeAuthUrl, youtubeConnect, youtubeUpload, checkState, stateProblem, getAccount, REDIRECT };
