@@ -1667,15 +1667,15 @@
       function narrationBoxHtml(episode) {
         const v = ((episode && episode.continuity) || {}).voice;
         if (v && v.url) {
-          return '<div class="mb-2 flex flex-wrap items-center gap-2 bg-cyber-darker border border-cyber-emerald/40 rounded-lg p-2 text-xs font-mono text-cyber-emerald">' +
+          return '<span class="inline-flex flex-wrap items-center gap-2 align-middle mr-1 my-1 bg-cyber-darker border border-cyber-emerald/40 rounded-lg px-2 py-1 text-xs font-mono text-cyber-emerald">' +
             '<i class="fa-solid fa-headphones"></i><span class="font-bold">Escuchar narración</span>' +
             '<span class="text-slate-400">(' + Math.floor((v.seconds || 0) / 60) + ' min ' + Math.round((v.seconds || 0) % 60) + ' s)</span>' +
-            '<audio controls preload="none" src="' + esc(v.url) + '" class="h-8 w-full sm:w-auto sm:min-w-[320px]"></audio></div>';
+            '<audio controls preload="none" src="' + esc(v.url) + '" class="h-8 w-[260px] max-w-full"></audio></span> ';
         }
         const jobs = (lastLoadedData && lastLoadedData.agent_jobs) || [];
         const working = episode && (episode.status === 'generando_media' || jobs.some(j => String(j.command).includes(episode.id) && /^(gen_local|voz_continua):/.test(j.command)));
         if (working && isContinuous(lastLoadedData && lastLoadedData.series)) {
-          return '<div class="mb-2 bg-cyber-darker border border-cyber-emerald/30 rounded-lg p-2 text-xs font-mono text-cyber-emerald"><i class="fa-solid fa-spinner fa-spin mr-1"></i>Generando narración... (aparece aquí para escucharla apenas esté lista)</div>';
+          return '<span class="inline-flex items-center align-middle mr-1 my-1 bg-cyber-darker border border-cyber-emerald/30 rounded-lg px-3 py-2 text-xs font-mono text-cyber-emerald"><i class="fa-solid fa-spinner fa-spin mr-1"></i>Generando narración...</span> ';
         }
         return '';
       }
@@ -1708,11 +1708,11 @@
             '</div>';
         } else if (clips.length > 0) {
           panel.classList.remove('hidden');
-          panel.innerHTML = narrationBoxHtml(episode) +
+          panel.innerHTML =
             '<button id="mergeBtn" onclick="mergeEpisode(\'' + episode.id + '\')" class="px-3 py-2 rounded-lg bg-cyber-cyan/10 border border-cyber-cyan/30 text-cyber-cyan text-xs font-mono hover:bg-cyber-cyan/20">' +
               '<i class="fa-solid fa-film mr-1"></i> Unir las ' + clips.length + ' tomas en un solo video final' +
             '</button>' +
-            ' <button onclick="vyEditor.open(\'' + episode.id + '\')" class="px-3 py-2 rounded-lg bg-cyber-gold/10 border border-cyber-gold/40 text-cyber-gold text-xs font-mono hover:bg-cyber-gold/20"><i class="fa-solid fa-scissors mr-1"></i>Abrir editor</button>';
+            ' <button onclick="vyEditor.open(\'' + episode.id + '\')" class="px-3 py-2 rounded-lg bg-cyber-gold/10 border border-cyber-gold/40 text-cyber-gold text-xs font-mono hover:bg-cyber-gold/20"><i class="fa-solid fa-scissors mr-1"></i>Abrir editor</button> ' + narrationBoxHtml(episode);
         } else {
           const nb = narrationBoxHtml(episode);
           panel.classList.toggle('hidden', !nb);
