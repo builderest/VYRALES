@@ -1407,7 +1407,8 @@
         const cost = asset.cost_usd != null ? ('$' + Number(asset.cost_usd).toFixed(2)) : '—';
         const approveBtn = asset.approved
           ? '<button disabled class="flex-1 py-1.5 rounded bg-slate-800 text-slate-500 border border-slate-700 text-xs font-mono font-semibold cursor-default"><i class="fa-solid fa-check mr-1"></i> Aprobada</button>'
-          : '<button onclick="approveShot(\'' + asset.id + '\')" class="flex-1 py-1.5 rounded bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/40 text-xs font-mono font-semibold transition-all"><i class="fa-solid fa-check mr-1"></i> Aprobar</button>';
+          : '<button onclick="approveShot(\'' + asset.id + '\')" class="flex-1 py-1.5 rounded bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/40 text-xs font-mono font-semibold transition-all"><i class="fa-solid fa-check mr-1"></i> Aprobar</button>' +
+            '<button onclick="qaForce(\'' + asset.id + '\')" title="No está bien: Claude reescribe el prompt (y la imagen si hace falta) y se rehace en king ($0)" class="ml-1 px-2 py-1.5 rounded bg-cyber-pink/10 hover:bg-cyber-pink/20 text-cyber-pink border border-cyber-pink/40 text-xs font-mono"><i class="fa-solid fa-xmark"></i></button>';
         return (
           '<div class="demo-shot-card bg-cyber-darker rounded-xl border ' + (isCliff ? 'border-2 border-cyber-pink/60 shadow-neon-pink' : 'border-cyber-border') + ' overflow-hidden group hover:border-cyber-cyan transition-all flex flex-col justify-between relative" data-asset-id="' + asset.id + '" data-updated-at="' + esc(asset.updated_at || '') + '">' +
             '<div>' +
@@ -3105,6 +3106,21 @@
           return null;
         }
       }
+
+      // ✗ en la tarjeta: Franklin marca una toma que no está bien → el control de calidad la rehace con prompt nuevo.
+      window.qaForce = async function(assetId) {
+        const ep = ((lastLoadedData && lastLoadedData.episodes) || []).find(e => (e.assets || []).some(x => x.id === assetId));
+        const a = ep && (ep.assets || []).find(x => x.id === assetId);
+        if (!ep || !a) return alert('No encontré la toma.');
+        const reason = prompt('¿Qué está mal en la toma ' + a.shot_number + '? (ej.: no se mueve, humo de relleno, la imagen no cuadra)', 'no se mueve');
+        if (reason == null) return;
+        const k = (() => { try { return localStorage.getItem('vyrales_key'); } catch (_) { return null; } })();
+        try {
+          const r = await fetch('/.netlify/functions/shot-edit', { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, k ? { 'x-vyrales-key': k } : {}), body: JSON.stringify({ episode_id: ep.id, shot: a.shot_number, action: 'qa_force', reason }) });
+          const d = await r.json(); if (!r.ok) throw new Error(d.error || r.status);
+          alert('Listo: la toma ' + a.shot_number + ' se rehace en tu PC con un prompt nuevo de Claude ($0). Sale aquí cuando termine.');
+        } catch (e) { alert('No se pudo marcar: ' + e.message); }
+      };
 
       window.produceEpisode = async function(episodeId) {
         const ep = await freshEpisodeOrBlock(episodeId);

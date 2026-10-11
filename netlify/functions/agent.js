@@ -22,7 +22,7 @@ exports.handler = async (event) => {
       if (!def || (def.arg ? !def.arg.test(arg || '') : arg !== undefined)) return json(400, { error: 'Comando no permitido.' });
       // Producir / rehacer en la PC esperan su turno en la fila (el agente las hace una por una);
       // los comandos de la Terminal no se encolan si hay algo corriendo.
-      const queueable = ['gen_local', 'regen_local', 'voz_continua', 'flow_frames', 'flow_lugar', 'claude_pulir', 'claude_revisar', 'claude_detalle', 'claude_guion', 'claude_largo', 'claude_ideas'].includes(name);
+      const queueable = ['gen_local', 'regen_local', 'qa_tomas', 'voz_continua', 'flow_frames', 'flow_lugar', 'claude_pulir', 'claude_revisar', 'claude_detalle', 'claude_guion', 'claude_largo', 'claude_ideas'].includes(name);
       if (!queueable) {
         const { data: busy } = await sb.from('agent_jobs').select('id').in('status', ['pending', 'running']).limit(1);
         if (busy && busy.length) return json(409, { error: 'Ya hay una orden en curso; espera a que termine.' });

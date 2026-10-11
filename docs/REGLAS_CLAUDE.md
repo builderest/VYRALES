@@ -87,3 +87,6 @@ Este documento es la memoria del proyecto. Cada vez que Franklin corrige algo, l
 - Personas que cambian de número (4→5, 3→2) y objetos que desaparecen: mismas causas; vigilar.
 - QA: hasta 2 intentos por toma (shot.qa.tries); luego queda marcada para revisión humana.
 - (oct-11, tarde) QA con 3 intentos: en TODOS Claude reescribe cámara/acción/final con lo que vio el QA (Franklin: sin cambiar el prompt no se arregla); imagen nueva si no cuadra o desde el 2º intento (sin personajes); también para clips congelados. Repetir el mismo prompt daba el mismo error (T6 Toba). El prompt anterior se guarda en shot.qa_rewrite_from.
+- (oct-11) start_en tampoco puede decir "frozen mid-fall"/"suspended in mid-air": LTX deja la toma congelada (T16 Toba). _king.js lo cambia por "in the middle of falling" en narrados.
+- QA visual más estricto: 5 cuadros por toma + movimiento medido en píxeles; action_ok exige comparar 2 objetos entre el cuadro 1 y el 5 (si solo cambia el encuadre de cámara → false). Campo evidence.
+- Botón ✗ en cada tarjeta del panel: Franklin marca "no está bien" + motivo → shot.qa.force → qa_tomas la rehace con prompt reescrito por Claude aunque la revisión automática la haya aprobado.

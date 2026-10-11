@@ -49,7 +49,7 @@ const STILL_WORD_RE = /\b(completely |perfectly )?(still|steady|steadily)\s*/gi;
 // Humo/neblina/polvo de relleno ("golden haze drifts", "mist drifts gently", "dust motes float") salían como humo
 // blanco innecesario (Toba largo T30–T32). Solo se dejan si la escena de verdad trata de humo, ceniza, fuego, etc.
 const HAZE_RE = /\b(haze|hazy|mist|misty|fog|foggy|smoke|smoky|steam|dust|motes?)\b/i;
-const HAZE_SCENE_RE = /\b(smoke|ash|ashes|ashfall|eruption|erupt|volcan\w*|plume|fire|flames?|burn\w*|explosion|blast|steam|geyser|fog|mist|dust ?storm|sandstorm|haze|smog|cloud of)\b/i;
+const HAZE_SCENE_RE = /\b(smoke|ash|ashes|ashfall|eruption|erupt|volcan\w*|plume|fire|flames?|burn\w*|explosion|blast|steam|geyser|fog|mist|dust ?storm|sandstorm|haze|smog|cloud of|collaps\w*|landslide|rockfall|avalanche|debris|crumbl\w*|demoli\w*|cave-?in)\b/i;
 const hazeScene = (shot) => HAZE_SCENE_RE.test([shot.start_en, shot.scene_es, shot.visual_es, ((Array.isArray(shot.dialogue) ? shot.dialogue : [shot.dialogue]).find((d) => d && d.line) || {}).line].filter(Boolean).join(' '));
 function onlyMotion(t, shot) {
   // 1) Por cláusulas (; / punto / "while"): la cláusula de quietud se va ENTERA con su lista ("the skulls, maps and monitor stay still").
@@ -107,7 +107,8 @@ function ltxPromptFor(shot, storyBible) {
     ...(shot.prompt_override && shot.prompt_override.trim()
       ? ['Scene: ' + named(stripVeoSpeech(shot.prompt_override)).slice(0, 2200).replace(/[^.]*$/, '')]
       : [
-        shot.start_en ? 'Scene at the start: ' + named(shot.start_en) + '.' : '',
+        // "frozen mid-fall" / "suspended in mid-air" en la descripción del cuadro → LTX lo deja congelado (Toba T16).
+        shot.start_en ? 'Scene at the start: ' + named(dynamic ? String(shot.start_en).replace(/\bfrozen\s+(mid-?(fall|air|motion|collapse))/gi, 'in the middle of falling').replace(/\b(frozen|motionless|suspended|still)\s+(in\s+)?(mid-?air|place|time)\b/gi, 'falling').replace(/\b(frozen|motionless|static)\b/gi, '') : shot.start_en) + '.' : '',
         shot.action_en ? (dynamic ? 'Then: ' + named(onlyMotion(shot.action_en, shot) || String(shot.action_en).replace(/\b(completely |perfectly )?(still|steady|steadily|motionless|frozen|static|unmoving)\b/gi, '')) : 'Then, slowly and naturally: ' + named(shot.action_en)) + '.' : '',
         // Final con quietud ("the column rests steady") se omite en narrados: si no, LTX frena el movimiento.
         // El control de calidad vio que la acción no se notaba → se pide que ocurra completa y se vea.

@@ -36,6 +36,18 @@ exports.handler = async (event) => {
       await sb.from('episodes').update({ shots: (fr.shots || []).map((s) => (s.n === n ? Object.assign({}, s, patch) : s)) }).eq('id', ep.id);
     };
 
+    // "No está bien" desde el panel: se marca la toma y el control de calidad la rehace con prompt reescrito por Claude
+    // (y cuadro nuevo si hace falta), aunque su revisión automática la haya aprobado. $0 (king + Claude + Flow).
+    if (body.action === 'qa_force') {
+      const clip = last('video_clip');
+      if (!clip) return json(400, { error: 'La toma todavía no tiene video.' });
+      const reason = clean(body.reason || 'no está bien').slice(0, 300);
+      await saveShot({ qa: Object.assign({}, shot.qa || {}, { force: true, force_reason: reason, clip_id: clip.id, ok: false, tries: Math.min(Number((shot.qa || {}).tries) || 0, 2) }) });
+      const { data: open } = await sb.from('agent_jobs').select('id').in('status', ['pending', 'running']).like('command', 'qa_tomas:' + ep.id + '%').limit(1);
+      if (!(open && open.length)) { const { error: qe } = await sb.from('agent_jobs').insert({ command: 'qa_tomas:' + ep.id }); if (qe) return json(500, { error: qe.message }); }
+      return json(200, { queued: true });
+    }
+
     if (body.action === 'detail' && !body.paid) { // GRATIS: Claude en la PC con tu plan; el resultado llega a shot.detail_proposal
       const { data: stt } = await sb.from('agent_state').select('last_seen').eq('id', 1).maybeSingle();
       if (!(stt && stt.last_seen && Date.now() - new Date(stt.last_seen).getTime() < 90000)) return json(200, { offline: true });

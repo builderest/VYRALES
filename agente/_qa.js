@@ -32,6 +32,17 @@ function grab(url, t) {
   const ffmpeg = require(path.join(ROOT, 'node_modules', 'ffmpeg-static'));
   return new Promise((res) => execFile(ffmpeg, ['-v', 'error', '-ss', String(Math.max(0, t)), '-i', url, '-frames:v', '1', '-vf', 'scale=640:-2', '-f', 'image2', '-c:v', 'mjpeg', '-q:v', '4', '-'], { encoding: 'buffer', timeout: 60000, maxBuffer: 1 << 24 }, (e, so) => res(e || !so || !so.length ? null : so)));
 }
+// Movimiento medido: diferencia media entre cuadros (gris 64x36, 4 fps). Calibrado en Toba: ~1 congelado, 3–6 poco
+// (a veces solo la cámara), 8–15 movimiento claro.
+function motionStep(url) {
+  const ffmpeg = require(path.join(ROOT, 'node_modules', 'ffmpeg-static'));
+  return new Promise((res) => execFile(ffmpeg, ['-v', 'error', '-i', url, '-vf', 'fps=4,scale=64:36,format=gray', '-f', 'rawvideo', '-'], { encoding: 'buffer', timeout: 90000, maxBuffer: 1 << 26 }, (e, raw) => {
+    if (e || !raw) return res(null);
+    const N = 64 * 36, n = Math.floor(raw.length / N); if (n < 2) return res(null);
+    let tot = 0; for (let k = 1; k < n; k++) { let d = 0; for (let i = 0; i < N; i++) d += Math.abs(raw[k * N + i] - raw[(k - 1) * N + i]); tot += d / N; }
+    res(Math.round(tot / (n - 1) * 10) / 10);
+  }));
+}
 const lineOf = (sh) => String(sh.voice_part || (Array.isArray(sh.dialogue) ? sh.dialogue : sh.dialogue ? [sh.dialogue] : []).map((d) => d && d.line).filter(Boolean).join(' ')).trim();
 
 // Revisa tomas de a 4 con Claude (lee las imágenes). Devuelve { n: { image_ok, action_ok, haze, broken, reason } }.
@@ -39,15 +50,16 @@ async function visionReview(items, log) {
   const { runClaude, parseJson, claudePath } = require('./_claude');
   if (!claudePath()) { log('QA visual: Claude no está instalado en esta PC → me la salto'); return {}; }
   const out = {};
-  for (let i = 0; i < items.length; i += 4) {
-    const group = items.slice(i, i + 4);
+  for (let i = 0; i < items.length; i += 3) {
+    const group = items.slice(i, i + 3);
     const files = []; const desc = [];
     for (const it of group) {
       const d = it.dur || 6;
-      const fr = await Promise.all([0.15, d / 2, Math.max(0.2, d - 0.3)].map((t) => grab(it.url, t)));
+      const fr = await Promise.all([0.15, d * 0.25, d * 0.5, d * 0.75, Math.max(0.2, d - 0.3)].map((t) => grab(it.url, t)));
       if (fr.some((b) => !b)) continue;
       fr.forEach((b, k) => files.push({ name: `t${it.sh.n}_${k + 1}.jpg`, buffer: b }));
-      desc.push(`TOMA ${it.sh.n}: imágenes t${it.sh.n}_1.jpg (inicio), t${it.sh.n}_2.jpg (mitad), t${it.sh.n}_3.jpg (final).\n  Narración: "${lineOf(it.sh)}"\n  Debe mostrar: ${it.sh.start_en || it.sh.visual_es || ''}\n  Acción pedida: ${it.sh.action_en || ''}`);
+      const mv = await motionStep(it.url);
+      desc.push(`TOMA ${it.sh.n}: imágenes t${it.sh.n}_1.jpg … t${it.sh.n}_5.jpg (de inicio a final, en orden).\n  Narración: "${lineOf(it.sh)}"\n  Debe mostrar: ${it.sh.start_en || it.sh.visual_es || ''}\n  Acción pedida: ${it.sh.action_en || ''}\n  Movimiento medido en píxeles: ${mv == null ? 'desconocido' : mv} (≈1 congelado, 3–6 poco o solo cámara, 8+ claro)`);
     }
     if (!desc.length) continue;
     const prompt = `Eres el control de calidad de un documental. Usa la herramienta Read para mirar TODAS las imágenes que se nombran abajo (están en la carpeta actual). Para cada toma compara inicio, mitad y final con la narración.
@@ -56,11 +68,12 @@ ${desc.join('\n\n')}
 
 Para cada toma decide (sé justo: marca false solo si el problema se ve claro):
 - image_ok: la imagen muestra el sujeto principal que dice la narración (no otra cosa distinta).
-- action_ok: entre inicio y final SE VE la acción pedida en el sujeto principal (no basta con que solo se mueva la cámara). Si la acción es sutil por naturaleza (una luz que brilla, alguien leyendo), true si se nota algo.
+- action_ok: SE VE la acción pedida en el sujeto principal. Sé ESTRICTO: compara la posición de 2 objetos concretos del sujeto (ej. "roca grande arriba a la izquierda") entre la imagen 1 y la 5 RESPECTO a lo que los rodea. Si solo cambia el encuadre (zoom, giro o inclinación de cámara) y los objetos siguen igual entre sí, es false. Si la imagen muestra algo que debería estar en movimiento (derrumbe, caída, explosión, corriente) y entre 1 y 5 no avanza, es false. Si el movimiento medido es menor que 6, desconfía y mira con más cuidado. Solo para acciones sutiles por naturaleza (una luz que brilla, alguien leyendo) basta con que se note algo.
+- evidence: en una frase, qué objeto comparaste y dónde estaba en la imagen 1 y en la 5.
 - haze: aparece humo, neblina o bruma blanca que NO tiene que ver con la narración (true = problema).
 - broken: algo deforme, caras o manos rotas, letras/texto inventado, cosas que aparecen o desaparecen (true = problema).
 - reason: una frase corta en español con lo que viste (vacío si todo bien).
-Responde SOLO este JSON: {"tomas":[{"n":1,"image_ok":true,"action_ok":true,"haze":false,"broken":false,"reason":""}]}`;
+Responde SOLO este JSON: {"tomas":[{"n":1,"image_ok":true,"action_ok":true,"haze":false,"broken":false,"evidence":"","reason":""}]}`;
     try {
       const j = parseJson(await runClaude(prompt, { files, timeoutMin: 8, log }));
       for (const t of (j.tomas || [])) if (t && t.n != null) out[Number(t.n)] = t;
@@ -143,7 +156,7 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
     for (const sh of ep2.shots || []) {
       const clip = (ep2.assets || []).filter((a) => a.kind === 'video_clip' && a.shot_number === sh.n).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))[0];
       // Se salta solo si ESTE clip ya pasó. Si falló y no se alcanzó a rehacer (proceso cortado), se vuelve a revisar.
-      if (clip && !(sh.qa && sh.qa.clip_id === clip.id && sh.qa.ok)) items.push({ sh, clip, url: clip.storage_path, dur: await durationOf(clip.storage_path) });
+      if (clip && !(sh.qa && sh.qa.clip_id === clip.id && sh.qa.ok && !sh.qa.force)) items.push({ sh, clip, url: clip.storage_path, dur: await durationOf(clip.storage_path) });
     }
     log(`QA visual: revisando ${items.length} toma(s) con Claude ($0)...`);
     const res = await visionReview(items, log);
@@ -151,7 +164,10 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
     const qaOf = {};
     for (const it of items) {
       const r = res[it.sh.n]; if (!r) continue;
-      const bad = r.image_ok === false || r.action_ok === false || r.haze === true || r.broken === true;
+      // Franklin la marcó a mano ("no se mueve", etc.): se rehace aunque Claude la apruebe.
+      const forced = !!(it.sh.qa && it.sh.qa.force && it.sh.qa.clip_id === it.clip.id);
+      if (forced) { r.action_ok = false; r.reason = 'Marcada a mano: ' + (it.sh.qa.force_reason || 'no está bien') + (r.reason ? ' · QA: ' + r.reason : ''); }
+      const bad = forced || r.image_ok === false || r.action_ok === false || r.haze === true || r.broken === true;
       // Hasta 3 intentos por toma; en TODOS Claude reescribe cámara/acción/final con lo que vio el QA (repetir el mismo
       // prompt daba el mismo error, ej. T6 Toba). Imagen nueva si no cuadra o desde el 2º intento (solo sin personajes).
       // Después de 3 queda para revisión humana.
