@@ -40,6 +40,15 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // El prompt de Veo es para Veo. LTX entiende mejor una descripción larga y en orden
 // (cuadro → acción → final) con la cámara y el fondo dichos de forma explícita: si no, se
 // acerca solo e inventa cosas en el fondo (probado en la PC king, oct-2026).
+// LTX (destilado, cfg = 1) HACE lo que lee: "the lake stays completely steady", "the clouds stay still"
+// congelaban TODA la toma (Toba largo T16/T33, oct-2026). En la acción y el final se quitan las frases de quietud
+// y se dejan solo los movimientos.
+const STILL_RE = /\b(stay|stays|staying|remain|remains|remaining|keep|keeps|kept|hold|holds|rest|rests|sit|sits)\b[^.;]*\b(still|steady|steadily|fixed|motionless|unchanged|unmoving|frozen|static|in place|completely|perfectly|exactly)\b|\b(still|steady|motionless|frozen|static|unmoving|locked)\b/i;
+function onlyMotion(t) {
+  const parts = String(t || '').split(/;|\.\s+|,?\s+while\s+|,\s+(?=(?:and\s+)?the\s)/i).map((x) => x.trim()).filter(Boolean);
+  const keep = parts.filter((x) => !STILL_RE.test(x)).map((x) => x.replace(/\b(steadily|very slowly)\b/gi, 'clearly').replace(/\s+/g, ' ').replace(/[.\s]+$/, ''));
+  return keep.join(', ');
+}
 function ltxPromptFor(shot, storyBible) {
   const sb = storyBible || {};
   const names = {};
@@ -52,10 +61,11 @@ function ltxPromptFor(shot, storyBible) {
   const dynamic = sb.format === 'narrado_unico';
   // Narrados: NUNCA cámara fija ("static" dejaba la toma como una foto quieta: EP2 depredadores T7/T11/T16).
   const cam0 = clean(shot.camera);
-  const cam = dynamic && !MOVE_RE.test(cam0) ? [cam0.replace(/\bstatic\b/ig, '').replace(/^[,\s]+|[,\s]+$/g, '').replace(/,\s*,/g, ','), 'slow steady push-in'].filter(Boolean).join(', ') : cam0;
+  const cam = dynamic && !MOVE_RE.test(cam0) ? [cam0.replace(/\bstatic\b/ig, '').replace(/^[,\s]+|[,\s]+$/g, '').replace(/,\s*,/g, ','), 'slow push-in'].filter(Boolean).join(', ') : cam0;
   const moving = MOVE_RE.test(cam);
   // Primeros planos (ojo, dientes, ventosas): movimiento suave. Con "energía" LTX los hacía explotar (EP2 T10/T11).
-  const gentle = dynamic && /close[- ]?up|macro|eye|very slow|slow/i.test(cam + ' ' + (shot.start_en || ''));
+  // Solo planos cerrados: "slow push-in" en planos abiertos dejaba casi todo quieto (Toba largo, oct-2026).
+  const gentle = dynamic && /close[- ]?up|macro|\beye\b/i.test(cam + ' ' + (shot.start_en || ''));
   void names;
   // LTX no sabe quién es "Valentina": cada nombre se cambia por lo que lleva puesto
   // ("the person in a mustard-yellow cardigan over a white t-shirt"), así sabe a quién mover y quién habla.
@@ -84,17 +94,18 @@ function ltxPromptFor(shot, storyBible) {
       ? ['Scene: ' + named(stripVeoSpeech(shot.prompt_override)).slice(0, 2200).replace(/[^.]*$/, '')]
       : [
         shot.start_en ? 'Scene at the start: ' + named(shot.start_en) + '.' : '',
-        shot.action_en ? (dynamic ? 'Then: ' : 'Then, slowly and naturally: ') + named(shot.action_en) + '.' : '',
-        shot.reaction_en ? 'By the end: ' + named(shot.reaction_en) + '.' : ''
+        shot.action_en ? (dynamic ? 'Then: ' + named(onlyMotion(shot.action_en) || String(shot.action_en).replace(/\b(completely |perfectly )?(still|steady|steadily|motionless|frozen|static|unmoving)\b/gi, '')) : 'Then, slowly and naturally: ' + named(shot.action_en)) + '.' : '',
+        // Final con quietud ("the column rests steady") se omite en narrados: si no, LTX frena el movimiento.
+        shot.reaction_en && (!dynamic || onlyMotion(shot.reaction_en)) ? 'By the end: ' + named(dynamic ? onlyMotion(shot.reaction_en) : shot.reaction_en) + '.' : ''
       ]),
     moving
-      ? (dynamic ? 'Camera: ' + cam + (gentle ? '. The camera moves slowly and smoothly; the subject stays whole, sharp and in the same place for the whole clip.' : '. The camera moves clearly, smoothly and with energy through the scene, like a premium cinematic documentary shot; strong sense of depth and motion from the first second.') : 'Camera: ' + cam + ', very slow and subtle; the framing stays close to the first frame.')
+      ? (dynamic ? 'Camera: ' + cam + (gentle ? '. The camera moves slowly and smoothly; the subject looks whole and sharp the whole clip.' : '. The camera moves clearly, smoothly and with energy through the scene, like a premium cinematic documentary shot; strong sense of depth and motion from the first second.') : 'Camera: ' + cam + ', very slow and subtle; the framing stays close to the first frame.')
       : 'Camera: ' + (cam ? cam + '. ' : '') + 'Locked-off tripod shot with the same fixed framing from the first frame to the last frame.',
     // Narrados sin personas: todo se mueve todo el tiempo (si no, el fondo queda como foto quieta).
-    dynamic && !hasPeople ? (gentle ? (/\b(animal|creature|dinosaur|whale|shark|octopus|squid|orca|bird|fish|mammal|eye|skin)\b/i.test([shot.start_en, shot.action_en].join(' ')) ? 'Gentle natural life in the scene: the animal skin and body move softly, tiny particles drift slowly in the water.' : 'Gentle ambient life: lights glow and flicker softly, fine dust drifts in the air; everything stays solid and in place.') : (/\b(animal|creature|dinosaur|whale|shark|octopus|squid|orca|bird|fish|mammal|beast|monster)\b/i.test([shot.start_en, shot.action_en].join(' ')) ? 'Everything keeps moving for the whole clip: the animal moves its body continuously, water particles, bubbles, dust and light rays drift, waves and clouds move.' : 'The scene stays alive for the whole clip with natural ambient motion: lights flicker, dust and haze drift softly; machines, walls and objects stay solid and intact.')) : '',
+    dynamic && !hasPeople ? (gentle ? (/\b(animal|creature|dinosaur|whale|shark|octopus|squid|orca|bird|fish|mammal|eye|skin)\b/i.test([shot.start_en, shot.action_en].join(' ')) ? 'Gentle natural life in the scene: the animal skin and body move softly, tiny particles drift slowly in the water.' : 'Gentle ambient life: lights glow and flicker softly, fine dust drifts in the air; shapes look solid and real.') : (/\b(animal|creature|dinosaur|whale|shark|octopus|squid|orca|bird|fish|mammal|beast|monster)\b/i.test([shot.start_en, shot.action_en].join(' ')) ? 'Everything keeps moving for the whole clip: the animal moves its body continuously, water particles, bubbles, dust and light rays drift, waves and clouds move.' : 'The scene stays alive for the whole clip with natural ambient motion: lights flicker, dust and haze drift softly; machines, walls and objects look solid and intact.')) : '',
     // Ropa de cada personaje (LTX inventaba pies descalzos o cambiaba la ropa al moverse: EP3 T2/T9).
     wardrobeLine(shot),
-    bg ? 'Background: ' + clean(bg).replace(/[.\s]*$/, '') + (dynamic ? '; the same place throughout the shot.' : '; it stays exactly as in the first frame.') : (dynamic ? '' : 'The background, walls, terrain and sky stay exactly as in the first frame.'),
+    bg ? 'Background: ' + clean(bg).replace(/[.\s]*$/, '') + (dynamic ? '.' : '; it stays exactly as in the first frame.') : (dynamic ? '' : 'The background, walls, terrain and sky stay exactly as in the first frame.'),
     // Estilo de la serie SIN lo de ropa ("period-appropriate hide garments" vestía de pieles a la científica moderna) ni el formato.
     sb.visual_style ? clean(sb.visual_style).split(/,\s*/).filter((x) => !/garment|cloth|outfit|wear|hide|vertical|9:16|framing|aspect/i.test(x)).join(', ').slice(0, 260).replace(/,[^,]*$/, (m) => (clean(sb.visual_style).length > 260 ? '' : m)).replace(/[,.\s]*$/, '.') : 'Photorealistic cinematic footage.',
     isAnimated(sb) ? 'The whole clip keeps exactly the same stylized 3D animated look as the first frame.' : '',

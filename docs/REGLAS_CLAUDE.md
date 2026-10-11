@@ -60,3 +60,9 @@ Este documento es la memoria del proyecto. Cada vez que Franklin corrige algo, l
 - TOMAS PARTIDAS en el panel: "TOMA 4 · PARTE 1/3", y las partes 2..N van debajo con sangría (↳), cada una con su imagen.
 - GRATIS PRIMERO también en: botón "Generar cuadro" por toma (abre Editar toma → Flow) y Lugares fijos (Flow en la PC, flow_lugar). Las únicas cosas pagadas que quedan: voz (TTS) y música.
 - NARRACIÓN PULIDA (oct-11): nada de "Y" suelta como muletilla al empezar frases; la historia fluye sin saltos bruscos (las transiciones se anuncian); nada de palabras raras. Cierre de los largos SIEMPRE: "Si quieres más historias como esta, contadas completas, suscríbete al canal." (sin "Y"). Está en el guionista maestro (VOZ HUMANA + estructura) y además Claude hace un PASO DE PULIDO automático (_pulir.js) en todo guion nuevo (Short, largo y sus Shorts) y a mano con el comando claude_pulir.
+
+## Movimiento en LTX: NUNCA nombrar quietud (oct-2026)
+- LTX corre destilado con cfg = 1: hace TODO lo que lee. "the clouds stay still", "the lake stays completely steady", "the column rests steady" congelaban TODA la toma (Toba largo: la columna no subía, el corte de la caldera no se movía).
+- action_en / reaction_en: describir SOLO lo que se mueve, con verbos visibles (sube, se expande, cae, se agrieta). Prohibido: still, steady, stay(s), remain, fixed, motionless, frozen, static, unchanged, "lo demás se queda quieto".
+- Lo que nombra la narración es lo que MÁS se mueve, a velocidad que se note.
+- En código (_king.js onlyMotion): en narrados se borran las frases de quietud de la acción y se omite un final que solo describa quietud. El modo "gentle" (movimiento muy suave) es solo para primeros planos (close-up/macro/ojo), no para "slow push-in".
