@@ -147,3 +147,4 @@ Este documento es la memoria del proyecto. Cada vez que Franklin corrige algo, l
 - Cambio a mano de una frase: `short_reusar:<ep>:2=5` (frase 2 → toma 5 del largo; `2=5+6` para dos tomas). Solo rehace esa frase y vuelve a unir. Queda como lección en la memoria.
 - El dedo 👇 del cierre colgaba ffmpeg porque finger.png estaba MAL FORMADO (ffmpeg 6/7: "chunk too big" → bucle infinito con -loop 1). Se re-guardó limpio con PIL (oct-11). Si se cambia la imagen, comprobar con ffmpeg antes de subirla.
 - Publicar un Short que lleva al largo: el enlace de YouTube del largo se agrega solo en TikTok, Instagram, Facebook y YouTube, justo bajo la línea 👇, y en el comentario fijado. Si el largo sigue en privado o no existe, se avisa en el log.
+- Calidad completa: si el archivo del episodio estaba abierto (por ejemplo viéndolo desde el panel), la versión nueva queda como "_epN-nuevo.mp4". El agente y el panel la reconocen (antes el panel decía "en cola" para siempre).

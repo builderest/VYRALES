@@ -287,7 +287,7 @@ function filesInfo() {
     // Una carpeta por serie: E:\VYRALES_videos\<serie>\<serie>_ep<N>.mp4 (+ .json con la versión).
     const files = [];
     for (const d of fs.readdirSync(FINALES, { withFileTypes: true })) {
-      if (d.isDirectory() && !d.name.startsWith('.')) fs.readdirSync(path.join(FINALES, d.name)).filter((f) => /_ep\d+\.mp4$/.test(f)).forEach((f) => files.push(d.name + '/' + f));
+      if (d.isDirectory() && !d.name.startsWith('.')) fs.readdirSync(path.join(FINALES, d.name)).filter((f) => /_ep\d+(-nuevo)?\.mp4$/.test(f)).forEach((f) => files.push(d.name + '/' + f));
       else if (d.isFile() && /\.mp4$/.test(d.name)) files.push(d.name);
     }
     finales = files.map((f) => {
@@ -312,8 +312,9 @@ async function queueFullRenders() {
   const { data: fins } = await sb.from('assets').select('episode_id, storage_path, updated_at').eq('kind', 'final_render').gt('updated_at', since).order('updated_at', { ascending: false }).limit(20);
   const have = {};
   // Si la receta de calidad cambió (QUALITY_V en render_local.js), también se rehace.
-  filesInfo().finales.forEach((f) => { if (f.episode_id && f.quality_v >= QUALITY_V) have[f.episode_id] = f.source; });
-  const todo = (fins || []).find((a) => have[a.episode_id] !== a.storage_path && (failedRenders[a.storage_path] || 0) < 2);
+  // Puede haber 2 archivos por episodio (el normal y el "-nuevo" si el viejo estaba abierto): vale cualquiera con la versión actual.
+  filesInfo().finales.forEach((f) => { if (f.episode_id && f.quality_v >= QUALITY_V) (have[f.episode_id] = have[f.episode_id] || []).push(f.source); });
+  const todo = (fins || []).find((a) => !(have[a.episode_id] || []).includes(a.storage_path) && (failedRenders[a.storage_path] || 0) < 2);
   if (!todo) return;
   const { data: open } = await sb.from('agent_jobs').select('id').in('status', ['pending', 'running']).limit(1);
   if (open && open.length) return;
