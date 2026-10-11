@@ -115,7 +115,8 @@ exports.handler = async (event) => {
     // Recién AHORA (video nuevo subido y guardado en la base) se borra el archivo viejo de
     // Storage, para no acumular clips sin uso. Si algo falló antes, el viejo sigue intacto.
     const oldPath = storagePathFromPublicUrl(asset.storage_path);
-    if (oldPath && oldPath !== storagePath) {
+    // Un clip que Franklin APROBÓ nunca se borra (oct-11: el QA rehízo aprobadas y sus archivos se perdieron).
+    if (oldPath && oldPath !== storagePath && !asset.approved) {
       const { error: removeError } = await supabase.storage.from(BUCKET).remove([oldPath]);
       if (removeError) console.warn(LOG, 'no se pudo borrar el archivo viejo (no es grave):', oldPath, removeError.message);
       else console.log(LOG, 'archivo viejo borrado de Storage:', oldPath);
