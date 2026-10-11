@@ -10,7 +10,7 @@ for (const line of fs.readFileSync(path.join(ROOT, '.env'), 'utf8').split(/\r?\n
   if (m && !process.env[m[1]]) process.env[m[1]] = m[2].replace(/^(['"])(.*)\1$/, '$2');
 }
 process.env.VYRALES_LOCAL_RUN = '1';
-const nums = (s) => String(s || '').split(',').map(Number).filter((n) => n >= 1 && n <= 60);
+const nums = (s) => String(s || '').split(',').map(Number).filter((n) => n >= 1 && n <= 300);
 
 async function main() {
   const [epId, a, b] = process.argv.slice(2);

@@ -104,6 +104,8 @@ function ltxPromptFor(shot, storyBible) {
         shot.start_en ? 'Scene at the start: ' + named(shot.start_en) + '.' : '',
         shot.action_en ? (dynamic ? 'Then: ' + named(onlyMotion(shot.action_en, shot) || String(shot.action_en).replace(/\b(completely |perfectly )?(still|steady|steadily|motionless|frozen|static|unmoving)\b/gi, '')) : 'Then, slowly and naturally: ' + named(shot.action_en)) + '.' : '',
         // Final con quietud ("the column rests steady") se omite en narrados: si no, LTX frena el movimiento.
+        // El control de calidad vio que la acción no se notaba → se pide que ocurra completa y se vea.
+        shot.qa_boost && shot.action_en ? 'The main action is the whole point of this clip: it happens fully, clearly and visibly from the first second to the last.' : '',
         shot.reaction_en && (!dynamic || onlyMotion(shot.reaction_en, shot)) ? 'By the end: ' + named(dynamic ? onlyMotion(shot.reaction_en, shot) : shot.reaction_en) + '.' : ''
       ]),
     moving

@@ -71,3 +71,11 @@ Este documento es la memoria del proyecto. Cada vez que Franklin corrige algo, l
 - Salía humo blanco innecesario en tomas normales (Toba largo T30 oficina, T31 avenida, T32 chimpancés). Fuentes: el estilo de la serie decía "smoke and dust in the air", el guionista metía "golden haze / mist / dust motes drift" como relleno de movimiento, y el prompt de LTX añadía "dust and haze drift".
 - Regla: humo, neblina, niebla, bruma, haze, mist, polvo flotando SOLO si la línea habla de humo, ceniza, fuego, erupción, tormenta, niebla. Si no: "the air is clear".
 - En código (_king.js hazeScene/onlyMotion) se quitan esas frases y las palabras del estilo de la serie cuando la escena no trata de eso. Estilo de cibertales_historia(_completa) cambiado a "clear air, atmospheric depth".
+
+## Control de calidad automático de tomas (oct-2026)
+- Al final de cada producción (gen_local) y con el comando qa_tomas:<episodio>, agente/_qa.js revisa cada toma ANTES de que Franklin la vea:
+  1. Duración contra su parte de la voz continua (corta → se rehace más larga).
+  2. Congelada (ffmpeg freezedetect > 40 % del clip) → se rehace.
+  3. Revisión visual con Claude (plan Max, $0, lee 3 cuadros: inicio/mitad/final): imagen que no cuadra con la narración → cuadro nuevo (solo tomas sin personajes, camino gratis Flow/FLUX) + video; acción que no se ve, humo de relleno o algo deforme → video otra vez con qa_boost (movimiento reforzado en el prompt de LTX).
+- UNA sola vuelta por toma (shot.qa.redone): si sigue mal, queda marcada en el panel ("⚠ QA: se rehízo y sigue con problema") para revisión humana. Nunca bucles ni cobros.
+- Calibración (Toba largo, oct-2026): T7 congelada de verdad (cambio casi nulo); el resto tenía movimiento de cámara aunque el sujeto no se moviera → por eso hace falta la revisión visual, no solo la de píxeles.

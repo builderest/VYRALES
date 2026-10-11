@@ -1,0 +1,25 @@
+// CONTROL DE CALIDAD a mano de un episodio ya producido (lo lanza el agente: node agente/qa_tomas.js <episode_id>).
+// Mismo QA que corre solo al final de gen_local: duración, congelado y revisión visual con Claude ($0);
+// rehace en king lo que falle (una vez por toma) y vuelve a unir el video final si cambió algo.
+const fs = require('fs');
+const path = require('path');
+const ROOT = path.resolve(__dirname, '..');
+for (const line of fs.readFileSync(path.join(ROOT, '.env'), 'utf8').split(/\r?\n/)) {
+  const m = /^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/.exec(line);
+  if (m && !process.env[m[1]]) process.env[m[1]] = m[2].replace(/^(['"])(.*)\1$/, '$2');
+}
+process.env.VYRALES_LOCAL_RUN = '1';
+(async () => {
+  const epId = process.argv[2];
+  if (!/^[0-9a-f-]{36}$/i.test(epId || '')) throw new Error('Uso: node agente/qa_tomas.js <episode_id>');
+  const { getSupabaseClient } = require(path.join(ROOT, 'netlify', 'functions', '_supabase'));
+  const supabase = getSupabaseClient();
+  const redone = await require('./_qa').qaShots({ supabase, epId, handler: null, log: (...x) => console.log(...x) });
+  if (redone.length) {
+    const { mergeEpisodeVideo } = require(path.join(ROOT, 'netlify', 'functions', '_merge'));
+    const { data: ep } = await supabase.from('episodes').select('*, assets(*)').eq('id', epId).single();
+    const { data: sr } = await supabase.from('series').select('id, slug, title, genre, story_bible').eq('id', ep.series_id).single();
+    const m = await mergeEpisodeVideo(supabase, { episode: ep, series: sr, log: (...x) => console.log(...x) });
+    console.log('QA: video final unido de nuevo:', m.asset && m.asset.storage_path);
+  }
+})().catch((e) => { console.error('ERROR:', e.message || e); process.exit(1); });
