@@ -79,3 +79,10 @@ Este documento es la memoria del proyecto. Cada vez que Franklin corrige algo, l
   3. Revisión visual con Claude (plan Max, $0, lee 3 cuadros: inicio/mitad/final): imagen que no cuadra con la narración → cuadro nuevo (solo tomas sin personajes, camino gratis Flow/FLUX) + video; acción que no se ve, humo de relleno o algo deforme → video otra vez con qa_boost (movimiento reforzado en el prompt de LTX).
 - UNA sola vuelta por toma (shot.qa.redone): si sigue mal, queda marcada en el panel ("⚠ QA: se rehízo y sigue con problema") para revisión humana. Nunca bucles ni cobros.
 - Calibración (Toba largo, oct-2026): T7 congelada de verdad (cambio casi nulo); el resto tenía movimiento de cámara aunque el sujeto no se moviera → por eso hace falta la revisión visual, no solo la de píxeles.
+
+## Lo que encontró el QA visual en el largo Toba (oct-2026, ~32 de 90 tomas)
+- Papeles/libros que aparecen en manos de cazadores y arqueólogos: venía de la frase del prompt de LTX "Objects ... (envelopes, letters) ... Papers and letters are plain" → ahora solo en novelas con personajes, nunca en narrados.
+- Gente que se gira a cámara: la frase "small natural expressions with the eyes" → en narrados se usa "keep the same number, direction and clothing".
+- Cámara "con energía" que avanza hasta que el sujeto sale de cuadro o desaparece → "exactly this one smooth move ... the main subject is in the picture from the first second to the last".
+- Personas que cambian de número (4→5, 3→2) y objetos que desaparecen: mismas causas; vigilar.
+- QA: hasta 2 intentos por toma (shot.qa.tries); luego queda marcada para revisión humana.

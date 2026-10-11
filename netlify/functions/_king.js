@@ -52,9 +52,15 @@ const HAZE_RE = /\b(haze|hazy|mist|misty|fog|foggy|smoke|smoky|steam|dust|motes?
 const HAZE_SCENE_RE = /\b(smoke|ash|ashes|ashfall|eruption|erupt|volcan\w*|plume|fire|flames?|burn\w*|explosion|blast|steam|geyser|fog|mist|dust ?storm|sandstorm|haze|smog|cloud of)\b/i;
 const hazeScene = (shot) => HAZE_SCENE_RE.test([shot.start_en, shot.scene_es, shot.visual_es, ((Array.isArray(shot.dialogue) ? shot.dialogue : [shot.dialogue]).find((d) => d && d.line) || {}).line].filter(Boolean).join(' '));
 function onlyMotion(t, shot) {
-  // Se corta también en cada coma; los pedazos de 1–2 palabras (restos de listas: "the skulls") se descartan.
-  const parts = String(t || '').split(/;|\.\s+|,?\s+while\s+|,\s+/i).map((x) => x.trim()).filter((x) => x.split(/\s+/).length >= 4);
-  const keep = parts.filter((x) => !STILL_RE.test(x) && (!shot || hazeScene(shot) || !HAZE_RE.test(x))).map((x) => x.replace(/\bvery slowly\b/gi, 'clearly').replace(STILL_WORD_RE, '').replace(/\s+/g, ' ').replace(/[.\s]+$/, ''));
+  // 1) Por cláusulas (; / punto / "while"): la cláusula de quietud se va ENTERA con su lista ("the skulls, maps and monitor stay still").
+  // 2) Dentro de cada cláusula, por comas: se quitan pedazos de humo de relleno o de quietud; "waves wash in" (3 palabras) se queda.
+  const clauses = String(t || '').split(/;|\.\s+|,?\s+while\s+/i).map((x) => x.trim()).filter((x) => x && !STILL_RE.test(x));
+  const keep = [];
+  for (const c of clauses) for (const x of c.split(/,\s+/)) {
+    const y = x.trim();
+    if (y.split(/\s+/).length < 2 || STILL_RE.test(y) || (shot && !hazeScene(shot) && HAZE_RE.test(y))) continue;
+    keep.push(y.replace(/\bvery slowly\b/gi, 'clearly').replace(STILL_WORD_RE, '').replace(/\s+/g, ' ').replace(/[.\s]+$/, ''));
+  }
   return keep.join(', ');
 }
 function ltxPromptFor(shot, storyBible) {
@@ -109,7 +115,7 @@ function ltxPromptFor(shot, storyBible) {
         shot.reaction_en && (!dynamic || onlyMotion(shot.reaction_en, shot)) ? 'By the end: ' + named(dynamic ? onlyMotion(shot.reaction_en, shot) : shot.reaction_en) + '.' : ''
       ]),
     moving
-      ? (dynamic ? 'Camera: ' + cam + (gentle ? '. The camera moves slowly and smoothly; the subject looks whole and sharp the whole clip.' : '. The camera moves clearly, smoothly and with energy through the scene, like a premium cinematic documentary shot; strong sense of depth and motion from the first second.') : 'Camera: ' + cam + ', very slow and subtle; the framing stays close to the first frame.')
+      ? (dynamic ? 'Camera: ' + cam + (gentle ? '. The camera moves slowly and smoothly; the subject looks whole and sharp the whole clip.' : '. The camera makes exactly this one smooth move, like a premium cinematic documentary shot, and the main subject of the first frame is in the picture from the first second to the last.') : 'Camera: ' + cam + ', very slow and subtle; the framing stays close to the first frame.')
       : 'Camera: ' + (cam ? cam + '. ' : '') + 'Locked-off tripod shot with the same fixed framing from the first frame to the last frame.',
     // Narrados sin personas: todo se mueve todo el tiempo (si no, el fondo queda como foto quieta).
     dynamic && !hasPeople ? (gentle ? (/\b(animal|creature|dinosaur|whale|shark|octopus|squid|orca|bird|fish|mammal|eye|skin)\b/i.test([shot.start_en, shot.action_en].join(' ')) ? 'Gentle natural life in the scene: the animal skin and body move softly, tiny particles drift slowly in the water.' : (hazeScene(shot) ? 'Gentle ambient life: lights glow softly, fine dust drifts in the air; shapes look solid and real.' : 'Gentle natural life in what is already in the image; the air is clear and clean, shapes look solid and real.')) : (/\b(animal|creature|dinosaur|whale|shark|octopus|squid|orca|bird|fish|mammal|beast|monster)\b/i.test([shot.start_en, shot.action_en].join(' ')) ? 'Everything keeps moving for the whole clip: the animal moves its body continuously, light shifts naturally, water and clouds move if they are in the image; the air is clear.' : (hazeScene(shot) ? 'The scene stays alive for the whole clip with natural ambient motion: lights flicker, dust and haze drift softly; objects look solid and intact.' : 'The scene stays alive for the whole clip with natural motion of what is already in the image; the air is clear and clean, objects look solid and intact.'))) : '',
@@ -123,8 +129,12 @@ function ltxPromptFor(shot, storyBible) {
     // NEGATIVO NO HACE NADA y nombrar algo en el positivo (aunque sea "no subtitles", "nobody is barefoot")
     // lo PROVOCA: EP1 Dulce salió con subtítulos inventados (hasta en chino) y con pies descalzos.
     // Todo se pide en AFIRMATIVO: lo que sí debe verse.
-    hasPeople ? 'Objects that the characters hold at the start (trays, envelopes, letters, phones, cups) stay in the same hands for the whole clip. Papers and letters are plain and blank.' : '',
-    hasPeople ? 'Acting is subtle and restrained' + (isAnimated(sb) ? ', like a premium animated feature' : '') + ': small natural expressions with the eyes and brows, lips relaxed.' : '',
+    // Solo con personajes reales de novela: en narrados, nombrar "envelopes, letters, papers" hacía APARECER papeles en las
+    // manos de cazadores y arqueólogos (QA visual Toba T29/T41/T44/T52/T56/T64, oct-2026).
+    hasPeople && (shot.characters || []).length && !dynamic ? 'Objects that the characters hold at the start (trays, envelopes, letters, phones, cups) stay in the same hands for the whole clip. Papers and letters are plain and blank.' : '',
+    // Narrados: gente de espaldas/perfil. Hablar de "expresiones con los ojos" las hacía girarse a cámara (QA Toba T29/T56/T68).
+    hasPeople && dynamic ? 'The people keep the same number, direction and clothing as in the first frame while their bodies move naturally.' : '',
+    hasPeople && !dynamic ? 'Acting is subtle and restrained' + (isAnimated(sb) ? ', like a premium animated feature' : '') + ': small natural expressions with the eyes and brows, lips relaxed.' : '',
     // Voces fijas para todos: el que habla mueve la boca en 0–6 s (ahí el render pone su voz); si no, bocas cerradas.
     speaksOnScreen(shot, sb)
       ? 'Natural subtle body motion, consistent faces. ' + (speaker ? speaker.charAt(0).toUpperCase() + speaker.slice(1) : 'The character who speaks') + ' keeps the head and eyes turned toward whoever or whatever the action says they are talking to, from the first frame to the last frame' + (sayLine ? '. ' + sayLine + ' ' : ', and moves the lips softly and naturally as if talking quietly during the first 6 seconds, then closes the mouth. ') + 'Everyone else keeps the mouth closed. Photos, paintings and screens on the walls are still pictures. ' + soundLine + ' Clean cinematic image.'

@@ -117,8 +117,10 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
     for (const it of items) {
       const r = res[it.sh.n]; if (!r) continue;
       const bad = r.image_ok === false || r.action_ok === false || r.haze === true || r.broken === true;
-      const already = !!(it.sh.qa && it.sh.qa.redone);
-      qaOf[it.sh.n] = { clip_id: it.clip.id, ok: !bad, image_ok: r.image_ok !== false, action_ok: r.action_ok !== false, haze: !!r.haze, broken: !!r.broken, reason: String(r.reason || '').slice(0, 300), at: new Date().toISOString(), redone: already };
+      // Hasta 2 intentos por toma (cada intento con las reglas nuevas que se hayan agregado); luego queda para revisión humana.
+      const tries = it.sh.qa ? (Number(it.sh.qa.tries) || (it.sh.qa.redone ? 1 : 0)) : 0;
+      const already = tries >= 2;
+      qaOf[it.sh.n] = { clip_id: it.clip.id, ok: !bad, image_ok: r.image_ok !== false, action_ok: r.action_ok !== false, haze: !!r.haze, broken: !!r.broken, reason: String(r.reason || '').slice(0, 300), at: new Date().toISOString(), redone: tries > 0, tries };
       if (bad && !already) {
         const newFrame = r.image_ok === false && !(it.sh.characters || []).length; // cuadro nuevo solo por el camino gratis (Flow/FLUX)
         todo.push({ n: it.sh.n, clip: it.clip, newFrame, boost: r.action_ok === false });
@@ -129,7 +131,7 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
       const { data: fr } = await supabase.from('episodes').select('shots').eq('id', epId).single();
       await supabase.from('episodes').update({ shots: (fr.shots || []).map((x) => qaOf[x.n] ? Object.assign({}, x, { qa: Object.assign({}, qaOf[x.n], extra[x.n] || {}) }, extra[x.n] && extra[x.n].boost ? { qa_boost: true } : {}) : x) }).eq('id', epId);
     };
-    const mark = {}; todo.forEach((t) => { mark[t.n] = { redone: true, boost: t.boost }; });
+    const mark = {}; todo.forEach((t) => { const pv = (items.find((it) => it.sh.n === t.n) || {}).sh; const tr = pv && pv.qa ? (Number(pv.qa.tries) || (pv.qa.redone ? 1 : 0)) : 0; mark[t.n] = { redone: true, tries: tr + 1, boost: t.boost }; });
     await saveQa(mark);
     for (const t of todo) {
       const r = await handler({ httpMethod: 'POST', body: JSON.stringify({ assetId: t.clip.id, provider: 'king', new_frame: t.newFrame }) });
