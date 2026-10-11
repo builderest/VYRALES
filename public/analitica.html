@@ -274,17 +274,17 @@
         <div class="section-title"><i class="bar"></i>MÉTRICAS CLAVE</div>
         ${an.ok ? chartDaily(an.daily, 'views', 'Vistas por día (28 días)', 'line') + chartDaily(an.daily, 'subs', 'Suscriptores netos por día', 'bars') : ''}
         ${chartPerVideo(withViews)}
-        <div class="panel">
-          <div class="card-title"><span class="t">TOP 5 MÁS VIRALES${TAB === 'todos' ? '' : ' · ' + TAB.toUpperCase()}</span><span class="muted">${list.length} en total</span></div>
-          ${videoList(list, 5)}
-          ${list.length > 5 ? '<button class="generar-btn" id="moreBtn" style="margin-top:10px;padding:10px">VER TODOS LOS VIDEOS (' + list.length + ')</button>' : ''}
-        </div>
         ${an.ok && an.traffic && an.traffic.length ? trafficCard(an.traffic) : ''}
       </div>`;
 
     const col2 = `
       <div class="col">
         <div class="section-title"><i class="bar"></i>ANÁLISIS DEL ALGORITMO</div>
+        <div class="panel">
+          <div class="card-title"><span class="t">TOP 5 MÁS VIRALES${TAB === 'todos' ? '' : ' · ' + TAB.toUpperCase()}</span><span class="muted">${list.length} en total</span></div>
+          ${videoList(list, 5)}
+          ${list.length > 5 ? '<button class="generar-btn" id="moreBtn" style="margin-top:10px;padding:10px">VER TODOS LOS VIDEOS (' + list.length + ')</button>' : ''}
+        </div>
         ${scatterCard(withViews, an.ok)}
         <div class="panel"><div class="card-title"><span class="t">ALERTAS</span></div><div class="alerts">${alerts(d, withViews, medPH)}</div></div>
         <div class="two">
@@ -409,7 +409,7 @@
       <div class="scatter-wrap"><svg>${[25, 50, 75].map((f) => `<line x1="0" x2="100%" y1="${f}%" y2="${f}%" stroke="rgba(124,156,255,.08)"/><line y1="0" y2="100%" x1="${f}%" x2="${f}%" stroke="rgba(124,156,255,.08)"/>`).join('')}${dots}</svg>
         <div class="badge-ring"><b>${pts.length ? (hasAn ? Math.round(avg) + '%' : avg.toFixed(1) + '%') : '—'}</b><span>${hasAn ? 'VISTO<br>PROMEDIO' : 'LIKES POR<br>VISTA'}</span></div></div>
       <div class="axis-labels"><span>menos ${hasAn ? 'retención' : 'interés'}</span><span>↑ más vistas · más ${hasAn ? 'retención' : 'interés'} →</span></div>
-      ${hasAn ? (list.length > pts.length ? '<p class="muted" style="margin-top:6px">' + (list.length - pts.length) + ' video(s) muy recientes aún sin % visto (YouTube tarda 1–2 días).</p>' : '') : '<p class="muted" style="margin-top:6px">Cuando actives YouTube Analytics, este gráfico usa el % visto real (lo que más pesa en Shorts).</p>'}</div>`;
+      ${hasAn ? (list.filter((v) => v.platform === 'youtube' && v.avgPct == null).length ? '<p class="muted" style="margin-top:6px">' + list.filter((v) => v.platform === 'youtube' && v.avgPct == null).length + ' video(s) de YouTube muy recientes aún sin % visto (YouTube tarda 1–2 días). Instagram y Facebook no dan % visto.</p>' : '') : '<p class="muted" style="margin-top:6px">Cuando actives YouTube Analytics, este gráfico usa el % visto real (lo que más pesa en Shorts).</p>'}</div>`;
   }
 
   function bucketCard(title, list, keyFn, order){
