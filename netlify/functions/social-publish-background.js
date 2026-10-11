@@ -70,6 +70,14 @@ async function runPublish({ supabase, epId, platform, privacy, loadVideo, qualit
       if (r.privacy === 'private') await save({ status: 'uploaded_private', url: r.url, video_id: r.videoId, forced: r.forcedPrivate });
       else await save({ status: 'published', url: r.url, video_id: r.videoId, privacy: r.privacy }, { url: r.url, via: 'api' });
       log('YouTube: subido ✅', r.url, r.privacy, '· calidad', quality);
+      // Documental largo: sin letras en pantalla → subtítulos CC español e inglés (YouTube los muestra según el idioma).
+      if ((ep.continuity || {}).kind === 'largo') {
+        try {
+          const C = require('./_captions');
+          const { data: epFull } = await supabase.from('episodes').select('*').eq('id', ep.id).single();
+          await C.uploadSubtitles(supabase, { videoId: r.videoId, subs: await C.ensureSubtitles(supabase, epFull, log), log });
+        } catch (e) { log('YouTube: subtítulos no subidos (' + String(e.message).slice(0, 160) + ') → se pueden subir con "subtitulos:<ep>"'); }
+      }
       // Documental largo: las fuentes van como comentario (la API no deja FIJARLO: se fija a mano en Studio con 1 clic).
       if (pk.landscape && pk.pinned_comment) {
         try {

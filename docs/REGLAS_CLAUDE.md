@@ -121,3 +121,8 @@ Este documento es la memoria del proyecto. Cada vez que Franklin corrige algo, l
 - voz_ingles reusa la traducción y la toma inglesa si el guion no cambió ($0). Solo vuelve a colocar las frases sobre la voz española nueva. `voz_ingles:<ep>:nueva` fuerza rehacer todo.
 
 - Calidad completa (render_local): el largo horizontal va a 1920x1080, los Shorts a 1080x1920. Antes todo iba a 1080x1920 y el largo salía estirado. Antes de subir, verificar la resolución del archivo de finales/.
+
+## Letras en pantalla solo en Shorts (oct-11)
+- Franklin: "solo los Shorts con letras grandes". El documental LARGO (continuity.kind = 'largo') se renderiza SIN texto en pantalla.
+- En YouTube el largo lleva pistas de subtítulos CC en español e inglés (_captions.js). YouTube las muestra según el idioma del espectador. Se suben solas al publicar, o con `subtitulos:<ep>[:<videoId>]`. Tiempos: voz ES por palabra / voz EN colocada (english.words) + LEAD.
+- YouTube no deja reemplazar el archivo de un video: si se rehace, se sube uno nuevo y Franklin borra el viejo en Studio (yo no borro).

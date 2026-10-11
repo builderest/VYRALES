@@ -633,6 +633,9 @@ async function renderEpisode({ episode, series, log = console.log, fetchFile = d
         const text = sbx.subtitle_style === 'poster' ? posterText(x.text, big, gold) : subtitleText(x.text, Math.max(0.3, Number(x.end) - Number(x.start)), Object.assign({}, sub, { karaoke: true }), null);
         return en > st + 0.3 ? { start: st, end: en, style: sbx.subtitle_style === 'poster' ? 'PosterSm' : 'Sub', text } : null;
       }).filter(Boolean).concat(numEvs);
+      // Documental LARGO (Franklin, oct-11: "solo los Shorts con letras grandes"): sin texto en pantalla; en YouTube
+      // van subtítulos ES/EN aparte (pistas CC que cambian según el idioma del teléfono).
+      if ((episode.continuity || {}).kind === 'largo') evs.length = 0;
       fs.writeFileSync(path.join(cwd, 'voz.ass'), [...assHeader(sub), ...evs.map(dialogueLine), ''].join('\n'));
       const ms = Math.round(VF.LEAD * 1000);
       await run(['-y', '-i', 'joined.mp4', '-i', 'voz.wav', '-filter_complex',
@@ -640,7 +643,7 @@ async function renderEpisode({ episode, series, log = console.log, fetchFile = d
         '-map', '[v]', '-map', '[a]', ...VIDEO_OUT, ...AUDIO_OUT, '-t', total.toFixed(3), 'joined-voz.mp4'], cwd);
       fs.renameSync(path.join(cwd, 'joined-voz.mp4'), path.join(cwd, 'joined.mp4'));
       contKey = { file: 'voz.wav', start: VF.LEAD, tempo: 1 };
-      log('voz continua:', contVoice.seconds, 's ·', evs.length, 'textos en pantalla.');
+      log('voz continua:', contVoice.seconds, 's ·', evs.length ? evs.length + ' textos en pantalla.' : 'sin texto en pantalla (largo: subtítulos aparte).');
     }
 
     const music = plan.audio.music_url;
