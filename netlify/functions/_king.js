@@ -76,7 +76,7 @@ function ltxPromptFor(shot, storyBible) {
   const soundLine = ltxVoiceMode(sb) ? 'Sound: ' + (ambient ? clean(ambient) + ', ' : '') + 'soft and quiet' + (sayLine ? ', with the spoken words clear on top.' : '.') : '';
   // Tomas sin personas (espacio, paisajes, animales: curiosidades): nada de frases de gente/ropa/actuación,
   // que con cfg = 1 pueden hacer aparecer personas donde no hay.
-  const hasPeople = (shot.characters || []).length > 0 || /\b(person|people|man|men|woman|women|child|children|boy|girl|silhouette|guard|crowd)\b/i.test([shot.start_en, shot.action_en, shot.prompt_override].join(' '));
+  const hasPeople = (shot.characters || []).length > 0 || /\b(person|people|man|men|woman|women|child|children|boy|girl|silhouette|silhouettes|guard|crowd|human|humans|hunter|hunters|survivor|survivors|clan|tribe|band|family|forager|foragers|artisan|figures|soldier|soldiers|officer|members|homo sapiens)\b/i.test([shot.start_en, shot.action_en, shot.prompt_override].join(' '));
   return [
     hasPeople ? 'The video starts exactly on the provided image and keeps its composition, people, clothing, lighting and background.' : 'The video starts exactly on the provided image and keeps its composition, lighting and background.',
     // Si el usuario editó el prompt de la toma en el panel, esa descripción manda.

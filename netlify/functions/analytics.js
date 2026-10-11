@@ -67,7 +67,15 @@ exports.handler = async (event) => {
       if (body.action === 'ideas') return json(200, await ideas(sb, body));
       return json(400, { error: 'Acción no válida.' });
     }
-    const fresh = (event.queryStringParameters || {}).fresh === '1';
+    const qs = event.queryStringParameters || {};
+    if (qs.script) { // resultado del botón "Crear guion" (lo deja idea-script-background en Storage)
+      const job = String(qs.script).replace(/[^a-z0-9-]/gi, '');
+      const { data } = sb.storage.from('media').getPublicUrl(`guiones/${job}.json`);
+      const r = await fetch(data.publicUrl + '?t=' + Date.now());
+      if (!r.ok) return json(200, { pending: true });
+      return json(200, await r.json());
+    }
+    const fresh = qs.fresh === '1';
     return json(200, await getData(sb, fresh));
   } catch (err) {
     return json(500, { error: err.message });
