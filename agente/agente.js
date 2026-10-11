@@ -424,6 +424,8 @@ async function tick() {
     migrateLocalFinales();
     organizeBySeries();
     await queueFullRenders();
+    // Cada 10 min: videos que Franklin hizo PÚBLICOS en YouTube Studio → se marcan publicados (vyrales.app/ver, enlaces de los Shorts).
+    if (Date.now() - (global.__ytSyncAt || 0) > 600000) { global.__ytSyncAt = Date.now(); require('./_yt_sync').syncYoutubePublic(sb, log).catch((e) => log('sync YouTube: ' + String(e.message).slice(0, 120))); }
     await backupClips();
     // Órdenes viejas (más de 2 min sin atender) no se ejecutan: se marcan vencidas.
     // Todo lo que espera en la fila aguanta 3 h (antes los comandos fuera de la lista se vencían a los 2 min si la PC estaba ocupada: portada_yt, render_full, publish_pkg se perdían; oct-11).

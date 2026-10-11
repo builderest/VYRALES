@@ -154,3 +154,4 @@ Este documento es la memoria del proyecto. Cada vez que Franklin corrige algo, l
 - vyrales.app/ver (función pública ver.js, sin candado) muestra siempre los largos PÚBLICOS de YouTube, el más nuevo primero, con su portada. `?v=<ep>` redirige directo. Franklin pone vyrales.app/ver una sola vez como enlace del perfil en Instagram y TikTok.
 - Shorts que llevan al largo: sin "Parte N/M" ni "próximo episodio".
 - Facebook e Instagram también se suben en CALIDAD COMPLETA desde la PC (rupload: FB video_reels con el archivo en binario; IG upload_type=resumable). Si Meta rechaza el archivo, se reintenta con el enlace de Supabase.
+- _yt_sync.js (agente, cada 10 min): si Franklin hace PÚBLICO un video en Studio, se marca publicado (sale en vyrales.app/ver y los Shorts enlazan a él) y se publica el comentario de fuentes/enlace que YouTube rechazaba mientras era privado.
