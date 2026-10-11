@@ -658,7 +658,7 @@ async function renderEpisode({ episode, series, log = console.log, fetchFile = d
           const st = (VF.LEAD + Number(contVoice.words[k].start)).toFixed(2);
           const fw = Math.round(Math.min(W, H) * 0.24);
           fingerIn = ['-i', 'finger.png'];
-          fingerFc = `;[2:v]scale=${fw}:${fw},format=rgba,loop=loop=-1:size=1:start=0,fps=${FPS},trim=duration=${total.toFixed(3)},setpts=PTS-STARTPTS[fg];[v0][fg]overlay=x=(W-w)/2:y=${Math.round(H * 0.70)}+${Math.round(H * 0.018)}*sin(2*PI*2*t):enable='gte(t,${st})':eof_action=pass[v]`;
+          fingerFc = `;[2:v]scale=${fw}:${fw},format=rgba,loop=loop=-1:size=1:start=0,fps=${FPS},trim=duration=${total.toFixed(3)},setpts=PTS-STARTPTS[fg];[v0][fg]overlay=x=(W-w)/2:y=${Math.round(H * 0.80)}+${Math.round(H * 0.018)}*sin(2*PI*2*t):enable='gte(t,${st})':eof_action=pass[v]`;
           log('dedo 👇 desde el segundo', st, '(frase del enlace).');
         }
       }
