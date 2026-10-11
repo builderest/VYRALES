@@ -231,7 +231,23 @@ async function ensureFullVoice(supabase, { episode, series, log = console.log, f
   const takes = [];
   const nWords = text.split(/\s+/).filter(Boolean).length;
   let best;
-  if (nWords > 420) {
+  // VIDEO LARGO: primero UNA sola toma de voz para todo (Franklin, oct-11: sin cortes no cambia el tono ni se
+  // repiten frases; prueba Toba: 12:31 en una llamada, completa, sin acelerarse, $0.34). Si sale incompleta
+  // (mucho más corta de lo esperado) o repite una frase, se cae al método por pedazos.
+  if (nWords > 420 && process.env.VYRALES_VOZ_PEDAZOS !== '1') {
+    try {
+      log(`voz continua LARGA: ${nWords} palabras en UNA sola toma (misma voz, sin cortes)...`);
+      const r1 = await synthesize({ text, voice: cfg.voice, style, model: cfg.model, log });
+      await logSpend(supabase, { seriesId: series.id, episodeId: episode.id, shotNumber: 0, kind: 'narration', model: 'tts_' + r1.model, costUsd: r1.costUsd, note: 'voz continua larga (una toma)' });
+      const expected = nWords / 2.4; // ~144 palabras por minuto (ritmo medido del narrador)
+      const got = wavSeconds(r1.wav);
+      const rep = got >= expected * 0.75 ? await repeatedPhrase(r1.wav, text, log) : null;
+      if (got < expected * 0.75) log(`  la toma única salió corta (${Math.round(got)} s de ~${Math.round(expected)} s esperados) → uso pedazos`);
+      else if (rep) log(`  la toma única repitió "${rep}" → uso pedazos`);
+      else { best = r1; log(`  toma única lista: ${Math.round(got)} s`); }
+    } catch (e) { log('  la toma única falló (' + String(e.message).slice(0, 120) + ') → uso pedazos'); }
+  }
+  if (nWords > 420 && !best) {
     // VIDEO LARGO (8–15 min): una sola llamada de TTS no aguanta tanto audio → por CAPÍTULOS (o ~250 palabras),
     // MISMA voz y MISMO estilo en todos, 1 toma por pedazo (cuesta lo mismo por minuto que un Short), y se unen.
     const { parseWav, buildWav } = require('./_voice_patch');
@@ -267,7 +283,7 @@ async function ensureFullVoice(supabase, { episode, series, log = console.log, f
     }
     const total = pcs.reduce((a, p) => a + p.length, 0); const all = new Int16Array(total); let o = 0; pcs.forEach((p) => { all.set(p, o); o += p.length; });
     best = { wav: buildWav(sr, all) };
-  } else {
+  } else if (!best) {
   for (let k = 0; k < 2; k++) {
     const r = await synthesize({ text, voice: cfg.voice, style, model: cfg.model, log });
     await logSpend(supabase, { seriesId: series.id, episodeId: episode.id, shotNumber: 0, kind: 'narration', model: 'tts_' + r.model, costUsd: r.costUsd, note: 'voz continua' });

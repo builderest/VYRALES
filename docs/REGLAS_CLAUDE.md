@@ -109,3 +109,4 @@ Este documento es la memoria del proyecto. Cada vez que Franklin corrige algo, l
 - TODAS las llamadas creativas a Claude (agente/_claude.js runClaude) anteponen esa memoria; con Gemini, _visual_check la antepone. Panel: botón "🧠 Memoria" para verla, borrar o agregar reglas.
 - Sembrada con 12 reglas del largo de Toba.
 - (oct-11) Voz larga: el TTS repitió una frase al final de un pedazo (Toba 7:33–7:39). Ahora cada pedazo se escucha con Whisper y si hay una frase de 5+ palabras repetida que el guion no repite, se regenera ese pedazo (máx. 2 veces). En Toba se cortó la repetición a mano (voz 663 s).
+- (oct-11) DECIDIDO por Franklin: la voz de los videos largos se genera en UNA sola toma por defecto (sin cortes: no cambia el tono ni repite frases). Si sale incompleta (<75 % de lo esperado) o repite una frase, cae a pedazos. VYRALES_VOZ_PEDAZOS=1 fuerza pedazos.
