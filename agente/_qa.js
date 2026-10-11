@@ -108,7 +108,8 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
     const items = [];
     for (const sh of ep2.shots || []) {
       const clip = (ep2.assets || []).filter((a) => a.kind === 'video_clip' && a.shot_number === sh.n).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))[0];
-      if (clip && !(sh.qa && sh.qa.clip_id === clip.id)) items.push({ sh, clip, url: clip.storage_path, dur: await durationOf(clip.storage_path) });
+      // Se salta solo si ESTE clip ya pasó. Si falló y no se alcanzó a rehacer (proceso cortado), se vuelve a revisar.
+      if (clip && !(sh.qa && sh.qa.clip_id === clip.id && sh.qa.ok)) items.push({ sh, clip, url: clip.storage_path, dur: await durationOf(clip.storage_path) });
     }
     log(`QA visual: revisando ${items.length} toma(s) con Claude ($0)...`);
     const res = await visionReview(items, log);

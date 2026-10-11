@@ -15,7 +15,11 @@ process.env.VYRALES_LOCAL_RUN = '1';
   const { getSupabaseClient } = require(path.join(ROOT, 'netlify', 'functions', '_supabase'));
   const supabase = getSupabaseClient();
   const redone = await require('./_qa').qaShots({ supabase, epId, handler: null, log: (...x) => console.log(...x) });
-  if (redone.length) {
+  // Se une si cambió algo O si todavía no hay video final más nuevo que la última toma (producción cortada antes de unir).
+  const { data: chk } = await supabase.from('episodes').select('assets(kind, created_at)').eq('id', epId).single();
+  const lastClip = (chk.assets || []).filter((a) => a.kind === 'video_clip').map((a) => a.created_at).sort().pop() || '';
+  const lastFinal = (chk.assets || []).filter((a) => a.kind === 'final_render').map((a) => a.created_at).sort().pop() || '';
+  if (redone.length || lastFinal < lastClip) {
     const { mergeEpisodeVideo } = require(path.join(ROOT, 'netlify', 'functions', '_merge'));
     const { data: ep } = await supabase.from('episodes').select('*, assets(*)').eq('id', epId).single();
     const { data: sr } = await supabase.from('series').select('id, slug, title, genre, story_bible').eq('id', ep.series_id).single();
