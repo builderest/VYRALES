@@ -140,5 +140,5 @@ Este documento es la memoria del proyecto. Cada vez que Franklin corrige algo, l
 ## Shorts que salen de un largo (oct-11)
 - Franklin: el Short conserva SU narración, pero usa las tomas YA HECHAS del largo. No se gasta tiempo generando video nuevo. Los Shorts sueltos (sin largo) sí se generan con LTX + QA normal.
 - `short_reusar:<short_ep>` (gen_local lo hace solo si continuity.parent_episode_id tiene tomas). Claude ve las hojas de contacto del largo y elige, por frase, la toma (o 2 seguidas) que MUESTRA lo que se dice. Su QA: revisa cada frase con su cuadro y, si no cuadra, elige otra toma del largo (2 vueltas). Nunca regenera.
-- Vertical: el video del largo grande al centro y el mismo desenfocado arriba/abajo. Assets con el model de la toma original y prompt "del largo: toma N" (asset_model es un enum). _qa.js se salta estos Shorts (continuity.reused_from_long).
+- Vertical a PANTALLA COMPLETA 9:16 (Franklin: aunque corte los lados se ve bien): se escala a lo alto y se recorta centrado en el sujeto (Claude dice left/center/right por frase). Assets con el model de la toma original y prompt "del largo: toma N" (asset_model es un enum). _qa.js se salta estos Shorts (continuity.reused_from_long).
 - VYRALES_SHORT_NUEVO=1 fuerza generar tomas nuevas.

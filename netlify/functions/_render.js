@@ -27,10 +27,10 @@ const MAX_UPLOAD_MB = 45; // límite de Supabase Storage del proyecto: 50 MB por
 // negro y sube (sin encimar, con fade en cada toma).
 const XFADE = { crossfade: 'fade', dissolve: 'dissolve', slide: 'slideleft', slide_up: 'slideup', wipe: 'wipeleft', zoom: 'zoomin', circle: 'circleopen', blur: 'hblur', flash: 'fadewhite' }; // el diálogo se dice entre 0 y 6 s de cada toma (así lo pide el prompt)
 
-function run(args, cwd) {
+function run(args, cwd, maxMin) {
   return new Promise((resolve, reject) => {
     // timeout: un ffmpeg nunca debe quedarse colgado para siempre (oct-11: EP2 trabado al unir). 40 min alcanza para el largo completo.
-    execFile(ffmpegPath, args, { cwd, maxBuffer: 1024 * 1024 * 100, timeout: (Number(process.env.VYRALES_FFMPEG_MIN) || 40) * 60000, killSignal: 'SIGKILL' }, (err, stdout, stderr) => {
+    execFile(ffmpegPath, args, { cwd, maxBuffer: 1024 * 1024 * 100, timeout: (maxMin || Number(process.env.VYRALES_FFMPEG_MIN) || 40) * 60000, killSignal: 'SIGKILL' }, (err, stdout, stderr) => {
       if (err) { err.stderr = stderr; return reject(err); }
       resolve({ stdout, stderr });
     });
@@ -321,16 +321,17 @@ async function renderTail({ cwd, from, out, lines, seconds, voice, sub, finger =
   const vchain = fingerOn
     ? `[0:v]${vf}[bg];[1:v]scale=${fw}:${fw},format=rgba[fg];[bg][fg]overlay=x=(W-w)/2:y=${Math.round(H * 0.62)}+${Math.round(H * 0.018)}*sin(2*PI*2*t):shortest=1[v]`
     : `[0:v]${vf}[v]`;
-  if (fingerOn) args.push('-loop', '1', '-i', 'finger.png');
+  // Todas las entradas con duración fija: en la PC (ffmpeg de Windows) el cierre con dedo se quedaba colgado para siempre (oct-11, Shorts del largo Toba).
+  if (fingerOn) args.push('-loop', '1', '-t', dur.toFixed(3), '-i', 'finger.png');
   const ai = fingerOn ? 2 : 1;
   if (voice) {
     args.push('-i', voice.file);
     fc = `${vchain};[${ai}:a]aresample=48000,aformat=channel_layouts=stereo,adelay=400|400,apad[a]`;
   } else {
-    args.push('-f', 'lavfi', '-i', 'anullsrc=channel_layout=stereo:sample_rate=48000');
+    args.push('-f', 'lavfi', '-t', dur.toFixed(3), '-i', 'anullsrc=channel_layout=stereo:sample_rate=48000');
     fc = `${vchain};[${ai}:a]anull[a]`;
   }
-  await run([...args, '-filter_complex', fc, '-map', '[v]', '-map', '[a]', '-t', dur.toFixed(3), ...VIDEO_OUT, ...AUDIO_OUT, out], cwd);
+  await run([...args, '-filter_complex', fc, '-map', '[v]', '-map', '[a]', '-t', dur.toFixed(3), '-frames:v', String(frames), ...VIDEO_OUT, ...AUDIO_OUT, out], cwd, 5);
   return { dur, narr: voice ? { start: 0.4, seconds: voice.seconds, file: voice.file, tempo: 1 } : null };
 }
 // Voz del cierre con el narrador de la serie (Gemini TTS, ~$0.001). Se guarda en caché por texto+voz
@@ -563,7 +564,10 @@ async function renderEpisode({ episode, series, log = console.log, fetchFile = d
       // Voz del cierre: el narrador TTS de la serie (también en modo voz de LTX, que no tiene narrador).
       const cfg = narrationConfig(sbx) || (sbx.narration && sbx.narration.engine === 'ltx' ? Object.assign({}, sbx.narration, { engine: 'gemini_tts' }) : null);
       const voice = cfg && plan.end_card.voice ? await endVoice({ cwd, text: plan.end_card.voice, cfg, log }) : null;
-      const t = await renderTail({ cwd, from: lastPart.file, out: 'p99-end.mp4', lines: [plan.end_card.text, plan.end_card.subtext], seconds: plan.end_card.seconds, voice, sub, finger: ctaShort });
+      const tailArgs = { cwd, from: lastPart.file, out: 'p99-end.mp4', lines: [plan.end_card.text, plan.end_card.subtext], seconds: plan.end_card.seconds, voice, sub, finger: ctaShort };
+      let t;
+      try { t = await renderTail(tailArgs); }
+      catch (e) { log('cierre con dedo falló (' + String(e.message).slice(0, 100) + ') → sin dedo'); t = await renderTail(Object.assign({}, tailArgs, { finger: false })); }
       lastPart.xfade = Math.min(TAIL_XF, lastPart.dur / 2);
       lastPart.xname = 'fade';
       parts.push({ file: 'p99-end.mp4', dur: t.dur, narr: t.narr, xfade: 0 });

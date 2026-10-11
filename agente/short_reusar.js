@@ -4,7 +4,7 @@
 //  2) Claude ve TODAS las tomas del largo (hojas de contacto + su narración) y elige, para cada frase del Short, la
 //     toma (o 2 seguidas si la frase es larga) que muestra exactamente lo que se dice.
 //  3) QA: Claude revisa cada frase con su cuadro elegido; si no cuadra, elige otra toma del largo (hasta 2 vueltas).
-//  4) Cada toma se pasa a vertical (video grande al centro + el mismo desenfocado arriba/abajo) y se une el Short
+//  4) Cada toma se pasa a vertical a pantalla completa (recortada centrada en el sujeto) y se une el Short
 //     con su voz y letras grandes.
 const path=require('path');const fs=require('fs');const os=require('os');const {execFile}=require('child_process');const ROOT=path.join(__dirname,'..');
 for (const l of fs.readFileSync(path.join(ROOT,'.env'),'utf8').split(/\r?\n/)){const m=/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/.exec(l);if(m&&!process.env[m[1]])process.env[m[1]]=m[2].replace(/^(['"])(.*)\1$/,'$2');}
@@ -62,8 +62,11 @@ Para cada frase del Short elige la toma del largo cuya IMAGEN muestra exactament
 - Si la frase necesita más segundos que la toma (más de 1.4 veces su duración), elige 2 tomas seguidas o parecidas en "shots" (se ponen una detrás de otra).
 - No repitas una toma en frases distintas salvo que no haya otra que sirva.
 - La última frase (llamada a ver la historia completa) lleva la toma más épica del largo.
-Responde SOLO JSON: {"map":[{"n":1,"shots":[12],"por_que":"..."}]}`;
-let map=Object.fromEntries((parseJson(await runClaude(p1,{files:sheets.map((x)=>({name:x,buffer:fs.readFileSync(path.join(cwd,x))})),timeoutMin:12,log:console.log})).map||[]).map((m)=>[Number(m.n),(m.shots||[]).map(Number).filter((k)=>lClips[k])]));
+- Di también dónde está el sujeto principal en la imagen ("left","center","right"): el Short es vertical y se recorta a lo alto, así que se centra en el sujeto.
+Responde SOLO JSON: {"map":[{"n":1,"shots":[12],"lado":"center","por_que":"..."}]}`;
+const j1=parseJson(await runClaude(p1,{files:sheets.map((x)=>({name:x,buffer:fs.readFileSync(path.join(cwd,x))})),timeoutMin:12,log:console.log}));
+let map=Object.fromEntries((j1.map||[]).map((m)=>[Number(m.n),(m.shots||[]).map(Number).filter((k)=>lClips[k])]));
+const side=Object.fromEntries((j1.map||[]).map((m)=>[Number(m.n),String(m.lado||'center')]));
 for(const s of sShots)if(!(map[s.n]&&map[s.n].length))throw new Error('Claude no eligió toma para la frase '+s.n);
 console.log('Elección:',sShots.map((s)=>s.n+'→'+map[s.n].join('+')).join(' '));
 
@@ -78,16 +81,19 @@ for(let round=1;round<=2;round++){
 ${longList}
 
 ${desc.join('\n')}
-Responde SOLO JSON: {"tomas":[{"n":1,"ok":true,"motivo":"","cambiar_a":[]}]}`;
+Si propones otra toma, di dónde está su sujeto ("left","center","right").
+Responde SOLO JSON: {"tomas":[{"n":1,"ok":true,"motivo":"","cambiar_a":[],"lado":"center"}]}`;
   const j=parseJson(await runClaude(p2,{files:files.concat(sheets.map((x)=>({name:x,buffer:fs.readFileSync(path.join(cwd,x))}))),timeoutMin:10,log:console.log}));
   const bad=(j.tomas||[]).filter((t)=>!t.ok&&Array.isArray(t.cambiar_a)&&t.cambiar_a.map(Number).some((k)=>lClips[k]));
   for(const t of j.tomas||[])if(!t.ok)console.log(`QA frase ${t.n}: ${t.motivo}${t.cambiar_a&&t.cambiar_a.length?' → toma '+t.cambiar_a.join('+'):''}`);
   if(!bad.length){console.log('QA: todas las frases muestran lo que se narra ✅');break;}
-  for(const t of bad)map[Number(t.n)]=t.cambiar_a.map(Number).filter((k)=>lClips[k]);
+  for(const t of bad){map[Number(t.n)]=t.cambiar_a.map(Number).filter((k)=>lClips[k]);if(t.lado)side[Number(t.n)]=String(t.lado);}
 }
 
-// 4) Tomas verticales (video grande al centro, el mismo desenfocado de fondo)
-const VERT='[0:v]split[a][b];[a]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=24:3,eq=brightness=-0.18:saturation=0.9[bg];[b]scale=-2:820,crop=1080:820[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2,setsar=1,fps=24[v]';
+// 4) Tomas verticales a pantalla completa
+// Pantalla COMPLETA 9:16 (Franklin: "que ocupen el teléfono completo, aunque corte los lados"): se escala a lo alto y
+// se recorta centrado en el sujeto (lado que dijo Claude).
+const vertFor=(sd)=>{const x=sd==='left'?'0':sd==='right'?'iw-1080':'(iw-1080)/2';return `[0:v]scale=-2:1920:flags=lanczos,crop=1080:1920:${x}:0,unsharp=5:5:0.5,setsar=1,fps=24[v]`;};
 const {uploadFile}=require(F+'/_storage');
 const now=new Date().toISOString();const rows=[];
 for(const s of sShots){
@@ -95,7 +101,7 @@ for(const s of sShots){
   for(const [k,ln] of map[s.n].entries()){const src='S'+s.n+'_'+k+'.mp4';fs.writeFileSync(path.join(cwd,src),Buffer.from(await (await fetch(lClips[ln].storage_path)).arrayBuffer()));parts.push(src);}
   const out='V'+s.n+'.mp4';
   const inArgs=parts.flatMap((p)=>['-i',p]);
-  const pre=parts.length>1?parts.map((_,i)=>`[${i}:v]setsar=1,fps=24,scale=1280:720[c${i}]`).join(';')+';'+parts.map((_,i)=>`[c${i}]`).join('')+`concat=n=${parts.length}:v=1:a=0[cat];`+VERT.replace('[0:v]','[cat]'):VERT;
+  const pre=parts.length>1?parts.map((_,i)=>`[${i}:v]setsar=1,fps=24,scale=1280:720[c${i}]`).join(';')+';'+parts.map((_,i)=>`[c${i}]`).join('')+`concat=n=${parts.length}:v=1:a=0[cat];`+vertFor(side[s.n]).replace('[0:v]','[cat]'):vertFor(side[s.n]);
   await ff(inArgs.concat(['-f','lavfi','-i','anullsrc=channel_layout=stereo:sample_rate=48000','-filter_complex',pre,'-map','[v]','-map',parts.length+':a','-shortest','-c:v','libx264','-preset','veryfast','-crf','18','-pix_fmt','yuv420p','-c:a','aac',out]),cwd);
   await ff(['-i',out,'-frames:v','1','-q:v','2','F'+s.n+'.jpg'],cwd);
   const key=`${series.slug}/ep${ep.episode_number}/shot-${String(s.n).padStart(2,'0')}-largo-v${Date.now()}`;
