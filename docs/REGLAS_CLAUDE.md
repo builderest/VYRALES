@@ -43,3 +43,8 @@ Este documento es la memoria del proyecto. Cada vez que Franklin corrige algo, l
 6. Paquete de publicación: título y portada empiezan con el tema gancho; título fijado (`continuity.title_locked`) se respeta; sin "Parte 1/1" en videos sueltos.
 7. Subidas a Supabase con reintentos (5xx sueltos).
 - Importar un guion narrado nuevo en un canal que ya existe = VIDEO NUEVO (siguiente número de episodio). Nunca reemplaza la serie ni los videos anteriores, y conserva la voz/estilo elegidos (oct-10: el guion de Teutoburgo no aparecía porque pisaba al de Petrov).
+
+## Imágenes = narración y Flow en lote (oct-10)
+- Antes de generar cuadros, `_visual_check.js` (Gemini, ~$0.02–0.04/episodio) compara cada línea del narrador con su start_en y reescribe las que no muestran lo que se dice (personas cuando la línea habla de gente, clima/época correctos, metáfora visual para cifras, ninguna imagen repetida, fauna/geografía del lugar). Una vez por episodio (`continuity.visual_checked`); las tomas corregidas quedan `frame_stale` y se rehacen solas.
+- Flow genera en LOTES: un solo mensaje con varias escenas numeradas (6 por lote, `FLOW_LOTE`). Mandar pedidos seguidos NO sirve (se pierden mientras genera). Flow devuelve las imágenes en desorden → se emparejan mirándolas (Gemini visión). Lo que no empareje se hace una por una.
+- Botón de cuadro por toma en series Flow → `flow_frames:<ep>:<n>` en la PC ($0). Si la toma ya tenía video, se rehace en king y se vuelve a unir el final.

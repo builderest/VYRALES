@@ -17,7 +17,7 @@ const PW_VERSION = '1.48.2';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const RULE_BASE = ' Vertical 9:16 portrait image. Photorealistic, cinematic documentary, dramatic lighting, sharp detail. No text.';
 // Sin personas SOLO si la escena no las menciona (el oficial del búnker, siluetas, manos…).
-const PEOPLE_RE = /\b(person|people|man|men|woman|women|officer|soldier|silhouette|child|boy|girl|hand|hands|crowd|figure|worker|operator|pilot|scientist)\b/i;
+const PEOPLE_RE = /\b(person|people|persons|man|men|woman|women|officer|soldier|soldiers|silhouette|silhouettes|child|children|boy|girl|hand|hands|crowd|figure|figures|worker|operator|pilot|scientist|human|humans|hunter|hunters|survivor|survivors|clan|tribe|band|members|family|families|warrior|warriors|villagers|pedestrians|sapiens|hominid|hominids)\b/i;
 const ruleFor = (prompt) => RULE_BASE + (PEOPLE_RE.test(prompt) ? '' : ' No people, no hands.');
 const RULE = RULE_BASE + ' No people, no hands.';
 
@@ -210,7 +210,67 @@ async function flowImage({ prompt, refs = [] }) {
     await ctx.close().catch(() => {});
   }
 }
-// Varias imágenes en UNA sola sesión de Flow (un proyecto, sin reabrir Chrome): se mandan una tras otra.
+// LOTE (Franklin, oct-10; probado: 3 imágenes en 49 s en vez de ~40 s CADA una): Flow es un agente de chat,
+// así que UN mensaje con varias escenas numeradas → genera todas juntas. Pedidos seguidos NO sirven (mientras
+// genera, los mensajes nuevos se pierden). Flow NO respeta el orden de las escenas al devolverlas, así que cada
+// imagen se empareja con su escena mirándola (Gemini visión, miniaturas, ~$0.002 por lote). Lo que no se pueda
+// emparejar se rehace solo, una por una.
+const LOTE = Math.max(1, Math.min(12, Number(process.env.FLOW_LOTE) || 6));
+async function newImages(page, before) {
+  const seen = new Set();
+  return (await imgSrcs(page)).filter((s) => { const k = mediaKey(s); if (before.has(k) || seen.has(k)) return false; seen.add(k); return true; });
+}
+async function download(ctx, page, src, full) {
+  const url = full && /googleusercontent\.com|flow\.google\.com\/asb\/|\/asb\//.test(src) ? src.replace(/=[a-z0-9-]+$/i, '') + '=s0' : src;
+  try { const r = await ctx.request.get(url); if (r.ok()) { const b = Buffer.from(await r.body()); if (b.length > 3000) return b; } } catch (_) {}
+  const b64 = await page.evaluate(async (u) => { const r = await fetch(u); const b = new Uint8Array(await r.arrayBuffer()); let s = ''; for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000)); return btoa(s); }, url).catch(() => null);
+  return b64 ? Buffer.from(b64, 'base64') : null;
+}
+async function generateBatch(page, ctx, prompts, name, log) {
+  const before = new Set((await imgSrcs(page)).map(mediaKey));
+  const msg = `Create ${prompts.length} separate images, one for EACH scene below. Each scene is its own vertical 9:16 photorealistic image; do not combine scenes into one picture and do not skip any scene. Generate all ${prompts.length} now without asking.\n` +
+    prompts.map((p, i) => `Scene ${i + 1}: ${String(p).trim().replace(/\.?$/, '.')}${PEOPLE_RE.test(p) ? '' : ' (no people)'}`).join('\n') + '\nStyle for every image:' + RULE_BASE;
+  await page.click('.ProseMirror');
+  await page.keyboard.insertText(msg);
+  await sleep(800);
+  await shot(page, name + '_1_prompt');
+  await page.keyboard.press('Enter');
+  const t0 = Date.now(), maxMs = (3 + prompts.length * 0.75) * 60000;
+  let last = -1, quiet = 0, cur = [];
+  while (Date.now() - t0 < maxMs) {
+    await sleep(4000);
+    const c = page.getByRole('button', { name: /^(Generar|Confirmar|Sí|Continuar|Generate|Confirm|Yes|Continue)$/i }).first();
+    if (await c.isVisible().catch(() => false)) { await c.click().catch(() => {}); log('  (confirmé la generación)'); }
+    cur = await newImages(page, before);
+    if (cur.length !== last) { log(`  Flow lote: ${cur.length}/${prompts.length} imágenes (${Math.round((Date.now() - t0) / 1000)} s)`); last = cur.length; quiet = 0; }
+    else if (cur.length >= prompts.length) { if (++quiet >= 2) break; }
+    else if (cur.length > 0 && ++quiet >= 12) break; // ~48 s sin novedades: Flow ya terminó lo que iba a hacer
+  }
+  await shot(page, name + '_2_listo');
+  const out = [];
+  for (const src of cur) { const thumb = await download(ctx, page, src, false); out.push({ src, thumb }); }
+  return out;
+}
+// Empareja miniaturas ↔ escenas mirando las imágenes (Gemini). Devuelve [índice de escena | -1] por imagen.
+async function matchScenes(prompts, imgs, log) {
+  const key = process.env.GOOGLE_AI_API_KEY;
+  if (!key || !imgs.length) return imgs.map(() => -1);
+  let model = 'gemini-3.8-flash'; try { model = require(path.join(ROOT, 'netlify', 'functions', '_publish')).TEXT_MODEL || model; } catch (_) {}
+  const parts = [{ text: 'Match each image to the scene it depicts. Scenes:\n' + prompts.map((p, i) => `${i + 1}. ${p}`).join('\n') + `\n\nThen ${imgs.length} images follow, in order. Each scene matches at most one image. If an image matches no scene, use 0. Return ONLY JSON: {"images":[{"image":1,"scene":3}]}` }];
+  imgs.forEach((im, i) => { parts.push({ text: `Image ${i + 1}:` }); parts.push({ inline_data: { mime_type: im.thumb && im.thumb[0] === 0x89 ? 'image/png' : 'image/jpeg', data: (im.thumb || Buffer.alloc(0)).toString('base64') } }); });
+  try {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, { method: 'POST', headers: { 'x-goog-api-key': key, 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts }], generationConfig: { responseMimeType: 'application/json', temperature: 0 } }) });
+    const j = await res.json();
+    if (!res.ok) throw new Error('HTTP ' + res.status + ' ' + JSON.stringify(j.error || {}).slice(0, 160));
+    const out = JSON.parse(j.candidates[0].content.parts.map((p) => p.text || '').join(''));
+    const used = new Set(), map = imgs.map(() => -1);
+    (out.images || []).forEach((x) => { const i = Number(x.image) - 1, sc = Number(x.scene) - 1; if (i >= 0 && i < imgs.length && sc >= 0 && sc < prompts.length && !used.has(sc) && map[i] === -1) { map[i] = sc; used.add(sc); } });
+    return map;
+  } catch (e) { log('  (no pude emparejar las imágenes: ' + String(e.message).slice(0, 160) + ')'); return imgs.map(() => -1); }
+}
+
+// Varias imágenes en UNA sola sesión de Flow (un proyecto, sin reabrir Chrome): en lotes de LOTE escenas por
+// mensaje; lo que falte se rehace una por una.
 // prompts: [string] → [{ buffer, mimeType } | { error }] en el mismo orden.
 async function flowImages(prompts, log = console.log, onEach = null) {
   let { ctx, page } = await openFlow(process.env.FLOW_VISIBLE === '1');
@@ -225,14 +285,37 @@ async function flowImages(prompts, log = console.log, onEach = null) {
     }
     if (!ok) throw new Error('Flow: no hay sesión de Google.');
     await newProject(page);
+    const res = new Array(prompts.length).fill(null);
+    const finish = async (i, buf) => {
+      const jpg = buf[0] === 0xff && buf[1] === 0xd8;
+      res[i] = { buffer: buf, mimeType: jpg ? 'image/jpeg' : 'image/png' };
+      if (onEach) { try { await onEach(i, res[i]); } catch (e) { log('  (no se pudo guardar al momento: ' + String(e.message).slice(0, 120) + ')'); } }
+    };
+    if (LOTE > 1 && prompts.length > 1) {
+      for (let s0 = 0; s0 < prompts.length; s0 += LOTE) {
+        const idx = []; for (let k = s0; k < Math.min(prompts.length, s0 + LOTE); k++) idx.push(k);
+        try {
+          const t = Date.now();
+          const imgs = await generateBatch(page, ctx, idx.map((k) => prompts[k]), 'lote' + (s0 / LOTE + 1), log);
+          const map = await matchScenes(idx.map((k) => prompts[k]), imgs, log);
+          let n = 0;
+          for (let m = 0; m < imgs.length; m++) {
+            if (map[m] < 0) continue;
+            const buf = await download(ctx, page, imgs[m].src, true);
+            if (buf && buf.length > 60000) { await finish(idx[map[m]], buf); n++; log(`Flow escena ${idx[map[m]] + 1}/${prompts.length}: lista (${buf.length} bytes, en lote)`); }
+          }
+          log(`Flow lote ${s0 / LOTE + 1}: ${n}/${idx.length} en ${Math.round((Date.now() - t) / 1000)} s`);
+        } catch (e) { log('Flow lote: FALLÓ ' + String(e.message).slice(0, 200) + ' → las de este lote van una por una'); }
+        await sleep(2000 + Math.random() * 2000);
+      }
+    }
     for (let i = 0; i < prompts.length; i++) {
+      if (res[i]) { out[i] = res[i]; continue; }
       try {
         const img = await generate(page, ctx, String(prompts[i]).trim().replace(/\.?$/, '.') + ruleFor(prompts[i]), 'lote' + (i + 1));
-        const jpg = img.buffer[0] === 0xff && img.buffer[1] === 0xd8;
-        out.push({ buffer: img.buffer, mimeType: jpg ? 'image/jpeg' : 'image/png' });
-        if (onEach) { try { await onEach(i, out[out.length - 1]); } catch (e) { log('  (no se pudo guardar al momento: ' + String(e.message).slice(0, 120) + ')'); } }
-        log(`Flow ${i + 1}/${prompts.length}: lista (${img.buffer.length} bytes)`);
-      } catch (e) { out.push({ error: e.message }); log(`Flow ${i + 1}/${prompts.length}: FALLÓ ${String(e.message).slice(0, 200)}`); }
+        await finish(i, img.buffer); out[i] = res[i];
+        log(`Flow ${i + 1}/${prompts.length}: lista una por una (${img.buffer.length} bytes)`);
+      } catch (e) { out[i] = { error: e.message }; log(`Flow ${i + 1}/${prompts.length}: FALLÓ ${String(e.message).slice(0, 200)}`); }
       await sleep(2000 + Math.random() * 2000);
     }
     return out;
@@ -258,6 +341,42 @@ if (require.main === module) (async () => {
     }
     if (!ok) throw new Error('No se inició sesión de Google en 10 min.');
     if (mode === 'login') { console.log('LISTO: sesión guardada en', PROFILE); return; }
+    if (mode === 'prueba_lote') {
+      // EXPERIMENTO: ¿se pueden pedir varias imágenes sin esperar cada una? A = pedidos seguidos; B = un solo pedido con 3 escenas.
+      const info = () => page.evaluate(() => [...document.querySelectorAll('img')].filter((i) => i.naturalWidth >= 120 && i.naturalHeight > i.naturalWidth && !/avatar|profile|googleusercontent\.com\/a\//i.test(i.src)).map((i) => {
+        let el = i, txt = ''; for (let k = 0; k < 8 && el; k++) { el = el.parentElement; if (el && el.innerText && el.innerText.trim().length > 15) { txt = el.innerText.trim().slice(0, 160); break; } }
+        return { src: (i.currentSrc || i.src), alt: i.alt || '', aria: i.getAttribute('aria-label') || '', near: txt, w: i.naturalWidth, h: i.naturalHeight };
+      }));
+      const save = async (tag, list) => { let k = 0; for (const it of list) { k++; try { const full = /googleusercontent|\/asb\//.test(it.src) ? it.src.replace(/=[a-z0-9-]+$/i, '') + '=s0' : it.src; const r = await ctx.request.get(full); fs.writeFileSync(path.join(OUT, `${tag}_${k}.jpg`), Buffer.from(await r.body())); } catch (e) { console.log('no bajó', e.message); } } };
+      const waitNew = async (before, want, maxMs) => { const t0 = Date.now(); let last = -1, quiet = 0; let cur = []; while (Date.now() - t0 < maxMs) { await sleep(4000);
+          const c = page.getByRole('button', { name: /^(Generar|Confirmar|Sí|Continuar|Generate|Confirm)$/i }).first(); if (await c.isVisible().catch(() => false)) { await c.click().catch(() => {}); console.log('  (confirmé)'); }
+          cur = (await info()).filter((x) => !before.has(mediaKey(x.src))); const seen = new Set(); cur = cur.filter((x) => { const k = mediaKey(x.src); if (seen.has(k)) return false; seen.add(k); return true; });
+          if (cur.length !== last) { console.log(`  ${Math.round((Date.now() - t0) / 1000)} s: ${cur.length} nuevas`); last = cur.length; quiet = 0; } else if (cur.length >= want) { quiet++; if (quiet >= 3) break; } }
+        return cur; };
+      // A (ya probado: los pedidos seguidos se PIERDEN mientras Flow genera; se deja como registro)
+      await newProject(page);
+      if (process.env.FLOW_LOTE_A === '1') {
+      let before = new Set((await info()).map((x) => mediaKey(x.src)));
+      const A = ['A single shiny red apple on a wooden table.', 'A bright blue vintage car on an empty road.', 'A green parrot perched on a branch.'];
+      let t = Date.now();
+      for (const pr of A) { await page.click('.ProseMirror'); await page.keyboard.insertText(pr + RULE); await sleep(500); await page.keyboard.press('Enter'); console.log('  enviado:', pr); await sleep(2500); }
+      await shot(page, 'loteA_enviado');
+      let got = await waitNew(before, 3, 5 * 60000);
+      console.log(`A: ${got.length} imágenes en ${Math.round((Date.now() - t) / 1000)} s`); got.forEach((g, i) => console.log('  A', i + 1, g.w + 'x' + g.h, '| alt:', g.alt.slice(0, 80), '| near:', g.near.replace(/\s+/g, ' ').slice(0, 120)));
+      await shot(page, 'loteA_fin'); await save('loteA', got);
+      }
+      // B: un solo pedido con 3 escenas numeradas
+      let before = new Set((await info()).map((x) => mediaKey(x.src))), got, t;
+      before = new Set((await info()).map((x) => mediaKey(x.src)));
+      const B = 'Create 3 separate images, one for each scene (do not combine them into one picture):\nScene 1: a yellow desk lamp glowing in a dark room.\nScene 2: a purple umbrella standing open on a beach.\nScene 3: an orange cat sleeping on a sofa.' + RULE;
+      t = Date.now();
+      await page.click('.ProseMirror'); await page.keyboard.insertText(B); await sleep(500); await page.keyboard.press('Enter');
+      got = await waitNew(before, 3, 5 * 60000);
+      console.log(`B: ${got.length} imágenes en ${Math.round((Date.now() - t) / 1000)} s`); got.forEach((g, i) => console.log('  B', i + 1, g.w + 'x' + g.h, '| alt:', g.alt.slice(0, 80), '| near:', g.near.replace(/\s+/g, ' ').slice(0, 120)));
+      await shot(page, 'loteB_fin'); await save('loteB', got);
+      console.log('LISTO prueba_lote → _to_delete\\flow\\loteA_* y loteB_*');
+      return;
+    }
     if (mode === 'prueba_ref') {
       await newProject(page);
       const url = process.argv[3] || 'https://pfwdbdkngmdmoolzflhe.supabase.co/storage/v1/object/public/media/characters/job_la_prueba/1721708b-31d5-42d0-b7a2-1fbef60075d9-1791249285259.jpg';

@@ -169,7 +169,9 @@ exports.handler = async (event) => {
       .select('shot_number')
       .eq('episode_id', episode.id)
       .eq('kind', 'video_clip');
-    const doneShots = new Set((existingAssets || []).map((a) => a.shot_number));
+    // clip_stale: el cuadro inicial se rehízo (revisor imagen=narración / Flow) → su video viejo ya no sirve.
+    const staleClips = new Set((episode.shots || []).filter((s) => s.clip_stale).map((s) => s.n));
+    const doneShots = new Set((existingAssets || []).map((a) => a.shot_number).filter((n) => !staleClips.has(n)));
 
     if (onlyShot && !allScenes.find((s) => s.number === onlyShot)) {
       throw new Error(`El episodio no tiene la toma ${onlyShot}.`);
@@ -375,6 +377,7 @@ exports.handler = async (event) => {
         if (assetError) throw assetError;
 
         console.log(LOG, `toma ${scene.number}/${total}: OK ✅ (asset ${asset.id})`);
+        if (staleClips.has(scene.number)) { try { const { data: fr } = await supabase.from('episodes').select('shots').eq('id', episode.id).single(); await supabase.from('episodes').update({ shots: (fr.shots || []).map((x) => (x.n === scene.number ? Object.assign({}, x, { clip_stale: false }) : x)) }).eq('id', episode.id); } catch (_) {} }
         if (continuous) prevEnd = endImage || await require('./_keyframe').lastFrameOf(videoBuffer).catch(() => null);
         results.push({ status: 'fulfilled', value: { shot: scene.number, model, costUsd, assetId: asset.id } });
         // Voces fijas: la voz de ESTA toma se genera junto con su video (~$0.004), así cada
