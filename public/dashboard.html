@@ -1593,6 +1593,7 @@
                 '<div class="grid grid-cols-1 lg:grid-cols-2 gap-3">' + block('DESCRIPCIÓN TIKTOK', pk.tiktok) + block('DESCRIPCIÓN INSTAGRAM / FACEBOOK', pk.instagram) + '</div>' +
                 '<div class="grid grid-cols-1 lg:grid-cols-2 gap-3">' + block('COMENTARIO PARA FIJAR (en todas)', pk.pinned_comment) + block('TEXTO DE PORTADA', pk.cover_text) + '</div>' +
                 '<div class="grid grid-cols-1 lg:grid-cols-2 gap-3">' + block('TÍTULO YOUTUBE', pk.youtube_title) + block('DESCRIPCIÓN YOUTUBE', pk.youtube) + '</div>' +
+                (pk.youtube_title_en ? '<div class="grid grid-cols-1 lg:grid-cols-2 gap-3">' + block('TITLE YOUTUBE (EN)', pk.youtube_title_en) + block('DESCRIPTION YOUTUBE (EN)', pk.youtube_en) + '</div>' : '') +
               '</div>' +
             '</div>' +
             '<p class="text-[11px] font-mono text-cyber-gold">Recuerda: activa la etiqueta de IA en la app (TikTok: Más opciones → “Contenido generado por IA”; Instagram: Configuración avanzada; Facebook: «AI label» junto a «Público»; YouTube: «Contenido alterado → Sí»).</p>';

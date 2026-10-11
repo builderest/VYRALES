@@ -57,6 +57,8 @@ async function writeTexts({ series, episode, totalEpisodes }) {
     '  "instagram_caption": "3 a 5 líneas: gancho, contexto breve, invitación a seguir la serie (sin hashtags)",',
     '  "youtube_title": "título para YouTube Shorts, máx. 70 caracteres, claro e intrigante, sin hashtags ni emojis",',
     '  "hashtags": ["5 a 8 hashtags relevantes en español e inglés, sin #"],',
+    '  "youtube_title_en": "el mismo título de YouTube en inglés natural (no literal), máx. 90 caracteres",',
+    '  "youtube_description_en": "la misma descripción en inglés natural de documental (2–4 frases), sin hashtags",',
     '  "pinned_comment": "una pregunta para que la gente comente",',
     '  "next_hook": "una frase para anunciar el próximo episodio"',
     '}'
@@ -87,6 +89,9 @@ async function writeTexts({ series, episode, totalEpisodes }) {
     instagram: [String(out.instagram_caption || '').trim(), ctaLong ? '\n' + CTA : '', '', single ? '' : part + (out.next_hook ? ' · ' + String(out.next_hook).trim() : ''), '', AI_DISCLOSURE, '', tags.join(' ')].filter((x, i, a) => x !== '' || a[i - 1] !== '').join('\n'),
     youtube_title: youtubeTitle(lockedTitle || out.youtube_title || out.cover_text || episode.title, part),
     youtube: [String(out.instagram_caption || '').trim(), '', single ? '' : part + (out.next_hook ? ' · ' + String(out.next_hook).trim() : ''), '', AI_DISCLOSURE, '', ['#Shorts'].concat(tags.slice(0, 6)).join(' ')].filter((x, i, a) => x !== '' || a[i - 1] !== '').join('\n'),
+    // Inglés (Franklin, oct-11: títulos y descripciones en los DOS idiomas en YouTube; YouTube muestra el de su idioma).
+    youtube_title_en: youtubeTitle(String(out.youtube_title_en || '').trim() || lockedTitle || out.youtube_title || episode.title, single ? '' : `Part ${episode.episode_number}/${totalEpisodes}`),
+    youtube_en: [String(out.youtube_description_en || '').trim(), ctaLong ? '\n👇 Want the full story? The link is right below.' : '', '', 'Made with AI.', '', ['#Shorts'].concat(tags.slice(0, 6)).join(' ')].filter((x, i, a) => x !== '' || (a[i - 1] !== '' && i > 0)).join('\n').trim(),
     hashtags: tags,
     pinned_comment: ctaLong ? '👇 La historia completa está aquí: (pega aquí el enlace del video largo)' : String(out.pinned_comment || '').trim(),
     ai_disclosure: AI_DISCLOSURE

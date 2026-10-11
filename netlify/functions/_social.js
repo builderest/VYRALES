@@ -377,13 +377,15 @@ async function youtubeAccessToken(supabase) {
   return t.access_token;
 }
 // privacy: 'public' | 'unlisted' | 'private'. YouTube puede forzar 'private' (proyecto sin auditar).
-async function youtubeUpload(supabase, { videoBuffer, title, description, tags = [], privacy = 'public', log = console.log }) {
+// en: { title, description } → localización en inglés (YouTube la muestra a quien tiene el teléfono en inglés).
+async function youtubeUpload(supabase, { videoBuffer, title, description, tags = [], privacy = 'public', en = null, log = console.log }) {
   const token = await youtubeAccessToken(supabase);
   const meta = {
     snippet: { title: String(title || 'VYRALES').slice(0, 100), description: String(description || '').slice(0, 4900), tags: tags.map((t) => String(t).replace(/^#/, '')).slice(0, 15), categoryId: '27', defaultLanguage: 'es', defaultAudioLanguage: 'es' },
     status: { privacyStatus: privacy, selfDeclaredMadeForKids: false, containsSyntheticMedia: true, embeddable: true }
   };
-  const init = await fetch('https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status', {
+  if (en && en.title) meta.localizations = { en: { title: String(en.title).slice(0, 100), description: String(en.description || '').slice(0, 4900) } };
+  const init = await fetch('https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status' + (meta.localizations ? ',localizations' : ''), {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json; charset=UTF-8', 'X-Upload-Content-Type': 'video/mp4', 'X-Upload-Content-Length': String(videoBuffer.length) },
     body: JSON.stringify(meta)

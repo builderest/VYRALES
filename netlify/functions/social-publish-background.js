@@ -40,7 +40,7 @@ async function runPublish({ supabase, epId, platform, privacy, loadVideo, qualit
   };
   try {
     if (!['tiktok', 'instagram', 'facebook', 'youtube'].includes(platform)) throw new Error('Plataforma no válida.');
-    const { data: ep, error } = await supabase.from('episodes').select('id, episode_number, validator_report, assets(kind, storage_path)').eq('id', epId || '').single();
+    const { data: ep, error } = await supabase.from('episodes').select('id, episode_number, validator_report, continuity, assets(kind, storage_path)').eq('id', epId || '').single();
     if (error || !ep) throw error || new Error('Episodio no encontrado.');
     const final = (ep.assets || []).find((a) => a.kind === 'final_render' && a.storage_path);
     if (!final) throw new Error('El episodio no tiene video final.');
@@ -62,7 +62,11 @@ async function runPublish({ supabase, epId, platform, privacy, loadVideo, qualit
     } else if (platform === 'youtube') {
       const title = pk.youtube_title || youtubeTitle(pk.cover_text, pk.part || ('Parte ' + ep.episode_number));
       const description = pk.youtube || [pk.instagram, '#Shorts'].join('\n');
-      const r = await youtubeUpload(supabase, { videoBuffer: await loadVideo(final), title, description, tags: pk.hashtags || [], privacy: privacy || 'private', log }); // PRIVADO por defecto (Franklin, oct-7: revisa antes de hacerlo público)
+      // Título y descripción también en INGLÉS (localización): del paquete, o de la pista en inglés del episodio.
+      const enC = (ep.continuity && ep.continuity.english) || {};
+      const en = pk.youtube_title_en ? { title: pk.youtube_title_en, description: pk.youtube_en || '' } : (enC.title ? { title: enC.title, description: [enC.description || '', '', 'Made with AI.'].join('\n') } : null);
+      if (!en) log('YouTube: este paquete no trae textos en inglés (se generan en los paquetes nuevos); sube solo en español');
+      const r = await youtubeUpload(supabase, { videoBuffer: await loadVideo(final), title, description, tags: pk.hashtags || [], privacy: privacy || 'private', en, log }); // PRIVADO por defecto (Franklin, oct-7: revisa antes de hacerlo público)
       if (r.privacy === 'private') await save({ status: 'uploaded_private', url: r.url, video_id: r.videoId, forced: r.forcedPrivate });
       else await save({ status: 'published', url: r.url, video_id: r.videoId, privacy: r.privacy }, { url: r.url, via: 'api' });
       log('YouTube: subido ✅', r.url, r.privacy, '· calidad', quality);
