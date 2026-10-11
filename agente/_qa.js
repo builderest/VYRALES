@@ -100,7 +100,7 @@ Lo que salió mal (control de calidad): ${reason}
 
 Reglas:
 - La imagen tiene que mostrar EXACTAMENTE lo que dice la narración.
-- La cámara hace UN movimiento corto y suave que mantiene TODO lo importante dentro del cuadro hasta el final. Si el problema fue que solo se movía la cámara, que se metió o hizo zoom de más, usa un movimiento mínimo y pon el movimiento en el SUJETO.
+- La cámara hace UN movimiento corto y suave que mantiene TODO lo importante dentro del cuadro hasta el final. En "camera" escribe SOLO el movimiento (ej. "slow lateral drift to the left"); nunca "no zoom", "held", "unchanged", "same framing" (LTX hace lo que lee). Si el problema fue que solo se movía la cámara, que se metió o hizo zoom de más, usa un movimiento mínimo y pon el movimiento en el SUJETO.
 - La acción (25–45 palabras, inglés) describe SOLO lo que se mueve en el sujeto principal, con verbos visibles y una dirección. Nunca uses still, steady, stay, remain, fixed, motionless, frozen, static, suspended.
 - No nombres objetos que no estén en la imagen. No humo ni neblina de relleno (solo si la narración trata de eso).
 - El final (12–25 palabras, inglés) es el estado final de ESE mismo movimiento, con el sujeto todavía en cuadro.

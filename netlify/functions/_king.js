@@ -69,12 +69,13 @@ function ltxPromptFor(shot, storyBible) {
   // "NeandertalUno" → "the first neandertal" (nombres internos que LTX no entiende).
   const clean = (t) => String(t || '').replace(/\b([A-Z][a-z]+)(Uno|Dos|Tres|Cuatro)\b/g, (_, a, b) => ({ Uno: 'the first ', Dos: 'the second ', Tres: 'the third ', Cuatro: 'the fourth ' }[b] + a.toLowerCase())).replace(/\s+/g, ' ').trim();
   if (shot.ltx_en) return clean(shot.ltx_en); // si el guion trae un prompt propio para LTX, manda ese
-  const MOVE_RE = /push|pull|dolly|pan|tilt|track|zoom|orbit|crane|handheld|fpv|drone|fly|follow|glide|rise|rush|slide|sink|descend|move/i;
+  const MOVE_RE = /push|pull|dolly|pan|tilt|track|zoom|orbit|crane|handheld|fpv|drone|fly|follow|glide|rise|rush|slide|sink|descend|move|drift|lateral|arc|truck|boom|sweep/i;
   // Videos narrados de curiosidades (sin personajes): cámara con energía, se mueve de verdad.
   // En novelas con personas se mantiene lenta (con gente, el movimiento fuerte deforma caras e inventa fondos).
   const dynamic = sb.format === 'narrado_unico';
   // Narrados: NUNCA cámara fija ("static" dejaba la toma como una foto quieta: EP2 depredadores T7/T11/T16).
-  const cam0 = clean(shot.camera);
+  // Cámaras que Claude escribe con "framing kept unchanged", "held", "no zoom": con cfg = 1 eso frena o PROVOCA el zoom.
+  const cam0 = clean(shot.camera).replace(/,?\s*(?:with\s+)?(?:the\s+)?(?:same\s+)?(?:extreme\s+)?(?:wide\s+)?(?:framing|angle|height)\s+(?:kept|held)(?:\s+unchanged)?/gi, '').replace(/,?\s*\b(?:no zoom|without zoom(?:ing)?|kept unchanged|unchanged|held)\b/gi, '').replace(/,?\s*(?:the\s+)?same\s+(?:\w+\s+){0,2}(?:framing|angle|distance)\b/gi, '').replace(/,\s*(?:high|low|wide)\s*(?=,|$)/gi, '').replace(/\s+,/g, ',').replace(/[,\s]+$/, '');
   const cam = dynamic && !MOVE_RE.test(cam0) ? [cam0.replace(/\bstatic\b/ig, '').replace(/^[,\s]+|[,\s]+$/g, '').replace(/,\s*,/g, ','), 'slow push-in'].filter(Boolean).join(', ') : cam0;
   const moving = MOVE_RE.test(cam);
   // Primeros planos (ojo, dientes, ventosas): movimiento suave. Con "energía" LTX los hacía explotar (EP2 T10/T11).
