@@ -139,6 +139,10 @@
   .empty{font-size:12px;color:var(--text-dim);text-align:center;padding:20px 8px;line-height:1.5}
   .err{color:var(--red);font-size:12px;padding:8px 0}
   .loading{padding:60px 0;text-align:center;color:var(--text-dim);font-size:13px}
+  .rank{width:18px;flex:none;font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:700;color:var(--text-dim-2);text-align:center}
+  .modal{position:fixed;inset:0;z-index:30;background:rgba(3,6,14,.75);backdrop-filter:blur(3px);display:none;align-items:center;justify-content:center;padding:16px}
+  .modal-box{width:100%;max-width:760px;max-height:86vh;display:flex;flex-direction:column}
+  .modal-body{overflow-y:auto;padding-right:4px}
   .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--panel-2);border:1px solid rgba(61,220,151,.4);color:var(--green);padding:9px 16px;border-radius:10px;font-size:12.5px;font-weight:700;display:none;z-index:20}
   @media (max-width:1279px){ .dash-grid{grid-template-columns:1fr 1fr} .col.reco{grid-column:1 / -1} }
   @media (max-width:899px){
@@ -186,6 +190,7 @@
     <div id="content"><div class="loading">Leyendo tus redes…</div></div>
   </main>
 </div>
+<div class="modal" id="modal"><div class="modal-box panel"><div class="card-title" style="margin-bottom:10px"><span class="t" id="modalTitle" style="font-size:14px;color:var(--text)"></span><button class="btn-sm" id="modalClose">✕ Cerrar</button></div><div class="modal-body" id="modalBody"></div></div></div>
 <div class="tip" id="tip"></div>
 <div class="toast" id="toast"></div>
 
@@ -270,10 +275,6 @@
         ${an.ok ? chartDaily(an.daily, 'views', 'Vistas por día (28 días)', 'line') + chartDaily(an.daily, 'subs', 'Suscriptores netos por día', 'bars') : ''}
         ${chartPerVideo(withViews)}
         ${an.ok && an.traffic && an.traffic.length ? trafficCard(an.traffic) : ''}
-        <div class="panel">
-          <div class="card-title"><span class="t">Tus videos (de más a menos vistas)</span><span class="muted">${withViews.length} con datos</span></div>
-          ${videoList(list)}
-        </div>
       </div>`;
 
     const col2 = `
@@ -298,10 +299,16 @@
           <button class="generar-btn" id="genBtn">${SPARK} GENERAR NUEVAS IDEAS CON IA (~$0.01)</button>
           <div id="ideas" style="display:flex;flex-direction:column;gap:10px;margin-top:10px"></div>
         </div>
+        <div class="panel">
+          <div class="card-title"><span class="t">TOP 5 MÁS VIRALES${TAB === 'todos' ? '' : ' · ' + TAB.toUpperCase()}</span><span class="muted">${list.length} en total</span></div>
+          ${videoList(list, 5)}
+          ${list.length > 5 ? '<button class="generar-btn" id="moreBtn" style="margin-top:10px;padding:10px">VER TODOS LOS VIDEOS (' + list.length + ')</button>' : ''}
+        </div>
       </div>`;
 
     $('content').innerHTML = '<div class="dash-grid">' + col1 + col2 + col3 + '</div>';
     $('genBtn').onclick = genIdeas;
+    if ($('moreBtn')) $('moreBtn').onclick = () => openModal(list);
     renderIdeas(store.get('vy_an_ideas'));
     bindTips($('content'));
   }
@@ -378,11 +385,11 @@
       `<div class="bk" style="grid-template-columns:120px 1fr 44px"><span>${esc(TRAFFIC[t.source] || t.source)}</span><span class="track"><span class="fill" style="display:block;width:${(t.views / total * 100).toFixed(1)}%"></span></span><span class="n">${Math.round(t.views / total * 100)}%</span></div>`).join('')}</div></div>`;
   }
 
-  function videoList(list){
+  function videoList(list, limit){
     if (!list.length) return '<div class="empty">Sin videos en esta pestaña.</div>';
     const s = list.slice().sort((a, b) => (b.views ?? -1) - (a.views ?? -1) || new Date(b.published) - new Date(a.published));
-    return s.slice(0, 12).map((v) => `<a class="vid" href="${esc(v.url || '#')}" target="_blank" rel="noopener">
-        ${v.thumb ? `<img src="${esc(v.thumb)}" alt="" loading="lazy">` : '<span class="ph"></span>'}
+    return s.slice(0, limit || s.length).map((v, i) => `<a class="vid" href="${esc(v.url || '#')}" target="_blank" rel="noopener">
+        <span class="rank">${i + 1}</span>${v.thumb ? `<img src="${esc(v.thumb)}" alt="" loading="lazy">` : '<span class="ph"></span>'}
         <span class="info"><span class="ttl">${esc(v.title ? clean(v.title) + (/Parte \d+\/\d+/i.exec(v.title) && !/Parte 1\/1/i.test(v.title) ? ' · ' + /Parte \d+\/\d+/i.exec(v.title)[0] : '') : '(sin título)')}</span>
           <span class="meta"><span class="plat">${v.platform.toUpperCase()}</span><span class="pill">${esc(v.topic || 'Otros')}</span>${v.hot ? '<span class="pill hot">🔥 despegando</span>' : ''}${v.avgPct != null ? `<span>${Math.round(v.avgPct)}% visto</span>` : ''}${v.duration ? `<span>${v.duration}s</span>` : ''}${v.likes != null ? `<span>${fmt(v.likes)} ♥</span>` : ''}</span></span>
         <span class="num">${fmt(v.views)}<small>${v.views != null ? fmt(Math.round(v.perHour)) + '/h' : 'sin permiso'}</small></span></a>`).join('');
@@ -464,6 +471,18 @@
         <p>${t.n} video(s) · mediana ${fmt(Math.round(t.med))} vistas${t.avgPct != null ? ' · ' + Math.round(t.avgPct) + '% visto' : ''}. ${t.viral ? '🔥 Aquí está tu video más visto: ' : 'El que más funcionó: '}<b style="color:var(--text)">"${esc(clean(t.best.title).slice(0, 70))}"</b> (${fmt(t.best.views)})${t.n < 3 ? ' — aún pocos videos, confirma con 2–3 más.' : '.'}</p>
       </div>`).join('');
   }
+
+  // ---------- modal: todos los videos de la pestaña ----------
+  function openModal(list){
+    const m = $('modal');
+    $('modalTitle').textContent = 'Todos los videos' + (TAB === 'todos' ? '' : ' · ' + TAB.charAt(0).toUpperCase() + TAB.slice(1)) + ' (' + list.length + ')';
+    $('modalBody').innerHTML = videoList(list);
+    m.style.display = 'flex'; document.body.style.overflow = 'hidden';
+  }
+  function closeModal(){ $('modal').style.display = 'none'; document.body.style.overflow = ''; }
+  $('modal').addEventListener('click', (e) => { if (e.target.id === 'modal') closeModal(); });
+  $('modalClose').onclick = closeModal;
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
 
   // ---------- ideas IA ----------
   function claudePrompt(i){
