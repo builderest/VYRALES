@@ -212,12 +212,39 @@ async function ensureFullVoice(supabase, { episode, series, log = console.log, f
   log('voz continua: narrando TODO el texto en una sola toma de voz...');
   const style = (cfg.style || '') + ' Es UNA sola frase continua: dila de corrido, con naturalidad, sin cortes ni pausas raras; solo una pausa mínima en cada punto o coma.';
   const takes = [];
+  const nWords = text.split(/\s+/).filter(Boolean).length;
+  let best;
+  if (nWords > 420) {
+    // VIDEO LARGO (8–15 min): una sola llamada de TTS no aguanta tanto audio → por CAPÍTULOS (o ~250 palabras),
+    // MISMA voz y MISMO estilo en todos, 1 toma por pedazo (cuesta lo mismo por minuto que un Short), y se unen.
+    const { parseWav, buildWav } = require('./_voice_patch');
+    const sh = (episode.shots || []).slice().sort((a, b) => a.n - b.n);
+    const lineOf = (x) => String(x.voice_part || (Array.isArray(x.dialogue) ? x.dialogue : (x.dialogue ? [x.dialogue] : [])).map((d) => d && d.line).filter(Boolean).join(' ')).trim();
+    const chunks = []; let cur = [], cw = 0, chap = null;
+    for (const x of sh) { const l = lineOf(x); if (!l) continue; const w = l.split(/\s+/).length;
+      if (cur.length && ((x.chapter != null && x.chapter !== chap && cw > 120) || cw + w > 300)) { chunks.push(cur.join(' ')); cur = []; cw = 0; }
+      cur.push(l); cw += w; chap = x.chapter; }
+    if (cur.length) chunks.push(cur.join(' '));
+    log(`voz continua LARGA: ${nWords} palabras en ${chunks.length} pedazos con la misma voz...`);
+    let sr = 0; const pcs = [];
+    for (const [i, t] of chunks.entries()) {
+      let r = null;
+      for (let k = 1; k <= 3 && !r; k++) { try { r = await synthesize({ text: t, voice: cfg.voice, style, model: cfg.model, log }); } catch (e) { log(`  pedazo ${i + 1}: intento ${k} falló (${String(e.message).slice(0, 100)})`); if (k === 3) throw e; } }
+      await logSpend(supabase, { seriesId: series.id, episodeId: episode.id, shotNumber: 0, kind: 'narration', model: 'tts_' + r.model, costUsd: r.costUsd, note: 'voz continua larga ' + (i + 1) + '/' + chunks.length });
+      const w = parseWav(shortPauses(tightenSpeech(r.wav, () => {})));
+      sr = sr || w.sr; pcs.push(w.pcm, new Int16Array(Math.round(sr * 0.35)));
+      log(`  pedazo ${i + 1}/${chunks.length} listo`);
+    }
+    const total = pcs.reduce((a, p) => a + p.length, 0); const all = new Int16Array(total); let o = 0; pcs.forEach((p) => { all.set(p, o); o += p.length; });
+    best = { wav: buildWav(sr, all) };
+  } else {
   for (let k = 0; k < 2; k++) {
     const r = await synthesize({ text, voice: cfg.voice, style, model: cfg.model, log });
     await logSpend(supabase, { seriesId: series.id, episodeId: episode.id, shotNumber: 0, kind: 'narration', model: 'tts_' + r.model, costUsd: r.costUsd, note: 'voz continua' });
     takes.push(r);
   }
-  const best = energyScore(takes[1].wav) > energyScore(takes[0].wav) ? takes[1] : takes[0];
+  best = energyScore(takes[1].wav) > energyScore(takes[0].wav) ? takes[1] : takes[0];
+  }
   let wav = shortPauses(tightenSpeech(best.wav, log));
   let usedTempo = 1;
   {

@@ -15,7 +15,10 @@ const PROFILE = path.join(process.env.LOCALAPPDATA || ROOT, 'VYRALES_flow_perfil
 const OUT = path.join(ROOT, '_to_delete', 'flow');
 const PW_VERSION = '1.48.2';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const RULE_BASE = ' Vertical 9:16 portrait image. Photorealistic, cinematic documentary, dramatic lighting, sharp detail. No text.';
+// Formato: vertical 9:16 (Shorts) u horizontal 16:9 (videos largos). flowImages({aspect}) lo cambia.
+let ASPECT = process.env.FLOW_ASPECT === '16:9' ? '16:9' : '9:16';
+const ruleBaseFor = () => (ASPECT === '16:9' ? ' Horizontal 16:9 landscape widescreen image.' : ' Vertical 9:16 portrait image.') + ' Photorealistic, cinematic documentary, dramatic lighting, sharp detail. No text.';
+let RULE_BASE = ruleBaseFor();
 // Sin personas SOLO si la escena no las menciona (el oficial del búnker, siluetas, manos…).
 const PEOPLE_RE = /\b(person|people|persons|man|men|woman|women|officer|soldier|soldiers|silhouette|silhouettes|child|children|boy|girl|hand|hands|crowd|figure|figures|worker|operator|pilot|scientist|human|humans|hunter|hunters|survivor|survivors|clan|tribe|band|members|family|families|warrior|warriors|villagers|pedestrians|sapiens|hominid|hominids)\b/i;
 const ruleFor = (prompt) => RULE_BASE + (PEOPLE_RE.test(prompt) ? '' : ' No people, no hands.');
@@ -96,7 +99,7 @@ async function newProject(page) {
 const mediaKey = (src) => { const m = /\/image\/([0-9a-f-]{36})/i.exec(src) || /\/asb\/([^=?]+)/.exec(src); return m ? m[1] : String(src).split('?')[0]; };
 async function imgSrcs(page) {
   // Miniaturas de la cuadrícula del proyecto (no las del chat del agente, que repiten las mismas).
-  return page.evaluate(() => [...new Set([...document.querySelectorAll('img')].filter((i) => i.naturalWidth >= 120 && i.naturalHeight > i.naturalWidth && !/avatar|profile|googleusercontent\.com\/a\//i.test(i.src)).map((i) => i.currentSrc || i.src))]);
+  return page.evaluate((wide) => [...new Set([...document.querySelectorAll('img')].filter((i) => i.naturalWidth >= 120 && (wide ? i.naturalWidth > i.naturalHeight * 1.2 : i.naturalHeight > i.naturalWidth) && !/avatar|profile|googleusercontent\.com\/a\//i.test(i.src)).map((i) => i.currentSrc || i.src))], ASPECT === '16:9');
 }
 
 // Sube imágenes de referencia (fotos de cara de los personajes) como "ingredientes" del pedido:
@@ -228,7 +231,7 @@ async function download(ctx, page, src, full) {
 }
 async function generateBatch(page, ctx, prompts, name, log) {
   const before = new Set((await imgSrcs(page)).map(mediaKey));
-  const msg = `Create ${prompts.length} separate images, one for EACH scene below. Each scene is its own vertical 9:16 photorealistic image; do not combine scenes into one picture and do not skip any scene. Generate all ${prompts.length} now without asking.\n` +
+  const msg = `Create ${prompts.length} separate images, one for EACH scene below. Each scene is its own ${ASPECT === '16:9' ? 'horizontal 16:9 widescreen' : 'vertical 9:16'} photorealistic image; do not combine scenes into one picture and do not skip any scene. Generate all ${prompts.length} now without asking.\n` +
     prompts.map((p, i) => `Scene ${i + 1}: ${String(p).trim().replace(/\.?$/, '.')}${PEOPLE_RE.test(p) ? '' : ' (no people)'}`).join('\n') + '\nStyle for every image:' + RULE_BASE;
   await page.click('.ProseMirror');
   await page.keyboard.insertText(msg);
@@ -272,7 +275,9 @@ async function matchScenes(prompts, imgs, log) {
 // Varias imágenes en UNA sola sesión de Flow (un proyecto, sin reabrir Chrome): en lotes de LOTE escenas por
 // mensaje; lo que falte se rehace una por una.
 // prompts: [string] → [{ buffer, mimeType } | { error }] en el mismo orden.
-async function flowImages(prompts, log = console.log, onEach = null) {
+async function flowImages(prompts, log = console.log, onEach = null, opts = {}) {
+  ASPECT = opts.aspect === '16:9' ? '16:9' : '9:16'; RULE_BASE = ruleBaseFor();
+  if (ASPECT === '16:9') log('Flow: imágenes HORIZONTALES 16:9');
   let { ctx, page } = await openFlow(process.env.FLOW_VISIBLE === '1');
   const out = [];
   try {

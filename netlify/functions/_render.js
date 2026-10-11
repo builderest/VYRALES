@@ -14,8 +14,10 @@ const { execFile } = require('child_process');
 const ffmpegPath = require('ffmpeg-static');
 const { narrationConfig, castMode } = require('./_series');
 
-const W = 720;
-const H = 1280;
+// Tamaño del video: vertical 720x1280 (Shorts) o horizontal 1280x720 (videos largos, story_bible.aspect = '16:9').
+// renderEpisode lo fija al empezar cada render.
+let W = 720;
+let H = 1280;
 const FPS = 24;
 const FONT_FILE = 'Montserrat-ExtraBold.ttf';
 const FONT_NAME = 'Montserrat Thin ExtraBold'; // nombre de familia real dentro del archivo (fontsource)
@@ -131,7 +133,7 @@ function assHeader(sub) {
     `Style: EndSmall,${FONT_NAME},44,&H0000E1FF,&H000000FF,&H00000000,&H96000000,0,0,0,0,100,100,0,0,1,4,2,5,50,50,0,1`,
     // Póster (frases motivacionales): letras romanas grandes, plata y oro, arriba (el personaje queda abajo).
     // Una palabra a la vez, grande y a colores (estilo de los Shorts virales) + número gigante del top.
-    `Style: Word,${FONT_NAME},96,&H0000E1FF,&H000000FF,&H00000000,&HA0000000,-1,0,0,0,100,100,1,0,1,8,3,2,40,40,330,1`,
+    `Style: Word,${FONT_NAME},96,&H0000E1FF,&H000000FF,&H00000000,&HA0000000,-1,0,0,0,100,100,1,0,1,8,3,2,40,40,${H > W ? 330 : 80},1`,
     `Style: Num,${FONT_NAME},430,&H00F0F0F0,&H000000FF,&H00FF8A1E,&H96000000,-1,0,0,0,100,100,0,0,1,14,6,5,20,20,0,1`,
     `Style: PosterSm,Cinzel,58,&H00E6E6E6,&H000000FF,&H00101010,&HA0000000,-1,0,0,0,100,100,2,0,1,3,4,8,50,50,190,1`,
     `Style: PosterBig,Cinzel,116,&H00D8D8D8,&H000000FF,&H00101010,&HA0000000,-1,0,0,0,100,100,1,0,1,4,5,8,40,40,190,1`,
@@ -185,7 +187,7 @@ function subtitleText(text, seconds, sub, color) {
 // En la PC (agente/render_local.js) se usa VYRALES_X264_PRESET=medium y VYRALES_CRF=18: calidad completa sin apuro.
 const VIDEO_OUT = ['-c:v', 'libx264', '-preset', process.env.VYRALES_X264_PRESET || 'veryfast', '-crf', process.env.VYRALES_CRF || '20', '-pix_fmt', 'yuv420p', '-r', String(FPS)];
 const AUDIO_OUT = ['-c:a', 'aac', '-b:a', '160k', '-ar', '48000', '-ac', '2'];
-const NORMALIZE_V = `scale=${W}:${H}:force_original_aspect_ratio=decrease,pad=${W}:${H}:(ow-iw)/2:(oh-ih)/2,setsar=1`;
+const normalizeV = () => `scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},setsar=1`;
 
 // Narración con voz fija (TTS): empieza a NARR_START s de la toma y debe terminar antes del
 // final (o antes del fundido cruzado). Si no cabe, se acelera hasta NARR_MAX_TEMPO.
@@ -237,7 +239,7 @@ async function renderClip({ cwd, input, out, c, subtitle, speakerColor, sub, fad
 
   const vf = [];
   if (speed !== 1) vf.push(`setpts=PTS/${speed}`);
-  vf.push(NORMALIZE_V);
+  vf.push(normalizeV());
   if (c.zoom) {
     // Zoom suave (Ken Burns): de 1.00 a 1.08 durante la toma, centrado.
     const frames = Math.max(1, Math.round(dur * FPS));
@@ -455,6 +457,11 @@ async function download(url, dest) {
 
 // ---------- Episodio ----------
 async function renderEpisode({ episode, series, log = console.log, fetchFile = download, maxMb = MAX_UPLOAD_MB }) {
+  // Formato: el del episodio (los Shorts de un video largo son verticales dentro de una serie horizontal) o el de la serie.
+  const asp = (episode.continuity && episode.continuity.aspect) || (series && series.story_bible && series.story_bible.aspect) || '9:16';
+  const wide = asp === '16:9';
+  W = wide ? 1280 : 720; H = wide ? 720 : 1280;
+  if (wide) log('video HORIZONTAL 16:9 (1280x720)');
   const plan = resolvePlan(episode);
   // Cierre propio de la serie (ej. curiosidades: "Síguenos para más curiosidades"), si el editor no lo cambió.
   const sbEnd = series && series.story_bible && series.story_bible.end_card;

@@ -2634,7 +2634,7 @@
           return;
         }
         const openEps = new Set([...list.querySelectorAll('details[data-ep-id][open]')].map(d => d.getAttribute('data-ep-id')));
-        list.innerHTML = eps.map(e => {
+        const renderOne = (e) => {
           const st = STATUS_LABELS[e.status] || [e.status, 'text-slate-400 border-slate-600'];
           const canGenerateShots = e.status === 'guion_generado';
           const m = seriesModels(data.series);
@@ -2748,6 +2748,21 @@
               '</div>' +
             '</details>'
           );
+        };
+        // VIDEO LARGO + sus SHORTS (Franklin, oct-11): los Shorts van DENTRO de la entrada de su video largo (submenú),
+        // así se sabe a cuál pertenecen y la lista no se llena.
+        const kids = {};
+        eps.forEach(e => { const p = (e.continuity || {}).parent_episode_id; if (p) (kids[p] = kids[p] || []).push(e); });
+        const top = eps.filter(e => !((e.continuity || {}).parent_episode_id && eps.some(x => x.id === e.continuity.parent_episode_id)));
+        list.innerHTML = top.map(e => {
+          const ks = kids[e.id] || [];
+          if (!ks.length) return renderOne(e);
+          const ready = ks.filter(k => (k.assets || []).some(a => a.kind === 'final_render')).length;
+          return '<div class="rounded-xl border border-cyber-pink/30 p-1.5 space-y-1.5">' + renderOne(e) +
+            '<details class="ml-4 rounded-lg border border-cyber-pink/30 bg-cyber-pink/5" data-ep-id="shorts-' + e.id + '"' + (openEps.has('shorts-' + e.id) ? ' open' : '') + '>' +
+              '<summary class="cursor-pointer px-3 py-2 text-xs font-mono text-cyber-pink list-none"><i class="fa-solid fa-mobile-screen mr-1"></i>SHORTS DE ESTE VIDEO (' + ks.length + ') · vertical · llevan al video completo · ' + ready + '/' + ks.length + ' listos</summary>' +
+              '<div class="p-1.5 space-y-1.5">' + ks.map(renderOne).join('') + '</div>' +
+            '</details></div>';
         }).join('');
       }
 

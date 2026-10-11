@@ -50,16 +50,18 @@ exports.handler = async (event) => {
     const longSlug = p.slug + '_completa';
     const longEp = { title: L.title, continuity: { summary: L.description || '', hook_text: L.hook_text || '', sources: L.sources || [], chapters: L.chapters || [], youtube_description: L.description || '', visual_checked: new Date().toISOString(), from_job: job, kind: 'largo' }, shots: L.shots };
     await doImport(seriesJson({ slug: longSlug, title: p.title + ' · Historias completas', synopsis: 'Historias completas (8–15 min) para YouTube: ' + p.nombre + '.', tipo, narration, ep: longEp, aspect: '16:9',
-      sbExtra: { end_card: { enabled: true, mode: 'tail', text: 'SUSCRÍBETE', subtext: 'Una historia completa cada semana', voice: '', seconds: 3 } } }));
+      sbExtra: { max_seconds: 1100, end_card: { enabled: true, mode: 'tail', text: 'SUSCRÍBETE', subtext: 'Una historia completa cada semana', voice: '', seconds: 3 } } }));
     const { data: ls } = await sb.from('series').select('id').eq('slug', longSlug).single();
     const { data: le } = await sb.from('episodes').select('id, episode_number').eq('series_id', ls.id).order('episode_number', { ascending: false }).limit(1).single();
     let shorts = 0;
     for (const s of g.shorts || []) {
-      const ep = { title: s.title, continuity: { summary: 'Short que lleva al video completo: ' + L.title, hook_text: s.hook_text || '', pinned_comment: s.pinned_comment || '', cta_to_long: { series: longSlug, episode_id: le.id, title: L.title }, visual_checked: new Date().toISOString(), from_job: job, kind: 'short_cta' }, shots: s.shots };
-      await doImport(seriesJson({ slug: p.slug, title: p.title, synopsis: 'Videos únicos narrados: ' + p.nombre + '.', tipo, narration, ep, aspect: '9:16' }));
+      const ep = { title: s.title, continuity: { summary: 'Short que lleva al video completo: ' + L.title, hook_text: s.hook_text || '', pinned_comment: s.pinned_comment || '', cta_to_long: { series: longSlug, episode_id: le.id, title: L.title }, parent_episode_id: le.id, aspect: '9:16', visual_checked: new Date().toISOString(), from_job: job, kind: 'short_cta' }, shots: s.shots };
+      // Los Shorts viven DENTRO de la serie del largo (submenú bajo su video largo), en vertical por episodio (continuity.aspect).
+      await doImport(seriesJson({ slug: longSlug, title: p.title + ' · Historias completas', synopsis: 'Historias completas (8–15 min) para YouTube: ' + p.nombre + '.', tipo, narration, ep, aspect: '16:9',
+        sbExtra: { max_seconds: 1100, end_card: { enabled: true, mode: 'tail', text: 'SUSCRÍBETE', subtext: 'Una historia completa cada semana', voice: '', seconds: 3 } } }));
       shorts++;
     }
-    return json(200, { ok: true, long_slug: longSlug, long_episode: le.episode_number, shorts, short_slug: p.slug });
+    return json(200, { ok: true, long_slug: longSlug, long_episode: le.episode_number, shorts, short_slug: longSlug });
   } catch (err) {
     return json(500, { error: err.message });
   }

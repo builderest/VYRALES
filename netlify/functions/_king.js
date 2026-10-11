@@ -186,6 +186,16 @@ function addEndFrame(wf, imageName, strength) {
   wf['398:374'].inputs.samples = ['vy:cropB', 2];
 }
 
+// Tamaño de una imagen JPEG/PNG (para saber si la toma es horizontal 16:9 o vertical 9:16 sin pasar más datos).
+function imageSize(b64) {
+  try {
+    const b = Buffer.from(b64, 'base64');
+    if (b[0] === 0x89 && b[1] === 0x50) return { w: b.readUInt32BE(16), h: b.readUInt32BE(20) };
+    let i = 2;
+    while (i < b.length) { if (b[i] !== 0xff) { i++; continue; } const m = b[i + 1]; const len = b.readUInt16BE(i + 2); if (m >= 0xc0 && m <= 0xcf && m !== 0xc4 && m !== 0xc8 && m !== 0xcc) return { h: b.readUInt16BE(i + 5), w: b.readUInt16BE(i + 7) }; i += 2 + len; }
+  } catch (_) {}
+  return null;
+}
 async function kingGenerateVideo({ prompt, negative = null, startImage, endImage = null, durationSeconds = 8, keepAudio = false, log = console.log }) {
   if (!startImage || !startImage.imageBytes) throw new Error('Con la PC king cada toma necesita su cuadro inicial (memoria visual).');
   if (!fs.existsSync(TEMPLATE)) throw new Error('Falta agente/ltx2_api.json (plantilla de LTX exportada desde ComfyUI).');
@@ -200,8 +210,12 @@ async function kingGenerateVideo({ prompt, negative = null, startImage, endImage
   wf[N.image].inputs.image = up.subfolder ? up.subfolder + '/' + up.name : up.name;
   wf[N.prompt].inputs.value = prompt;
   wf[N.negative].inputs.text = negative || NEGATIVE;
-  wf[N.width].inputs.value = 704;   // 9:16 (la 1ª pasada va a la mitad; el escalador ×2 la sube)
-  wf[N.height].inputs.value = 1280;
+  // 9:16 (Shorts) o 16:9 (videos largos), según la imagen inicial (la 1ª pasada va a la mitad; el escalador ×2 la sube)
+  const isz = imageSize(startImage.imageBytes);
+  const wide = !!(isz && isz.w > isz.h * 1.15);
+  wf[N.width].inputs.value = wide ? 1280 : 704;
+  wf[N.height].inputs.value = wide ? 704 : 1280;
+  if (wide) log('  LTX en horizontal 16:9');
   // LTX en king aguanta hasta 16 s por toma (probado por Franklin; tarda más).
   wf[N.duration].inputs.value = Math.max(2, Math.min(15, Math.round(Number(durationSeconds) || 8)));
   wf[N.seedA].inputs.noise_seed = crypto.randomInt(1, 2 ** 31);
