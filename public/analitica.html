@@ -274,6 +274,7 @@
         <div class="section-title"><i class="bar"></i>MÉTRICAS CLAVE</div>
         ${an.ok ? chartDaily(an.daily, 'views', 'Vistas por día (28 días)', 'line') + chartDaily(an.daily, 'subs', 'Suscriptores netos por día', 'bars') : ''}
         ${chartPerVideo(withViews)}
+        ${summaryCard(d, withViews)}
         ${an.ok && an.traffic && an.traffic.length ? trafficCard(an.traffic) : ''}
       </div>`;
 
@@ -291,7 +292,6 @@
           ${bucketCard('Duración que más rinde', withViews.filter((v) => v.duration), (v) => v.duration < 60 ? '< 60 s' : v.duration < 90 ? '60–90 s' : v.duration < 120 ? '90–120 s' : v.duration < 180 ? '2–3 min' : '> 3 min', ['< 60 s','60–90 s','90–120 s','2–3 min','> 3 min'])}
           ${bucketCard('Hora de publicación', withViews, (v) => { const h = new Date(v.published).getHours(); return h < 6 ? '0–6 h' : h < 12 ? '6–12 h' : h < 18 ? '12–18 h' : '18–24 h'; }, ['0–6 h','6–12 h','12–18 h','18–24 h'])}
         </div>
-        ${summaryCard(d, withViews)}
       </div>`;
 
     const col3 = `
