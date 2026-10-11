@@ -2314,6 +2314,7 @@
               ta('action_en', '🎬 MOVIMIENTO 0–6 s', '25–45 palabras: UN movimiento simple que se vea; qué se mueve y hacia dónde (no escribas lo que se queda quieto: LTX congela todo)', 3) +
               ta('reaction_en', '⏹ CÓMO TERMINA 6–8 s', '12–25 palabras', 2) +
               '<div class="grid md:grid-cols-2 gap-3">' + ta('background_en', 'FONDO', '3–4 cosas del lugar, solo nombradas (sin static/fixed/frozen)', 2) + ta('camera', 'CÁMARA', 'slow push-in, crane up…', 2) + '</div>' +
+              '<label class="mt-3 flex items-center gap-2 text-[11px] font-mono text-slate-300"><input type="checkbox" id="se_camera_only"' + (d.camera_only ? ' checked' : '') + '> 🎥 Solo cámara: el objeto es rígido (maqueta, mapa, escultura) y NO debe cambiar de forma; solo se mueve la cámara</label>' +
               ta('end_en', 'CUADRO FINAL', 'solo planos abiertos ("The same view: …"); vacío = sin cuadro final', 2) +
               '<p id="se_msg" class="text-[11px] font-mono mt-2 text-slate-400"></p>' +
             '</div></div>' +
@@ -2324,7 +2325,7 @@
             '<button id="se_img" class="px-3 py-2 rounded-lg bg-gradient-to-r from-cyber-cyan to-cyber-violet text-black font-bold text-xs font-mono" title="Imagen nueva con este prompt y, si ya había video, también el video"><i class="fa-solid fa-rotate mr-1"></i>Guardar + nueva imagen y video</button>' +
           '</div></div>';
         const msg = (t, c) => { const el = document.getElementById('se_msg'); if (el) { el.className = 'text-[11px] font-mono mt-2 ' + (c || 'text-slate-400'); el.innerHTML = t; } };
-        const fields = () => Object.fromEntries(['start_en', 'action_en', 'reaction_en', 'background_en', 'camera', 'end_en'].map(k => [k, document.getElementById('se_' + k).value]));
+        const fields = () => Object.assign(Object.fromEntries(['start_en', 'action_en', 'reaction_en', 'background_en', 'camera', 'end_en'].map(k => [k, document.getElementById('se_' + k).value])), { camera_only: !!(document.getElementById('se_camera_only') || {}).checked });
         const check = () => { const w1 = words('start_en'), w2 = words('action_en'); msg('Imagen: ' + w1 + ' palabras' + (w1 < 35 ? ' <span class="text-cyber-gold">(corta: LTX y Flow inventan más)</span>' : '') + ' · Movimiento: ' + w2 + ' palabras' + (w2 < 18 ? ' <span class="text-cyber-gold">(corto)</span>' : '')); };
         ['start_en', 'action_en'].forEach(k => document.getElementById('se_' + k).addEventListener('input', check)); check();
         const save = async () => { const k = (() => { try { return localStorage.getItem('vyrales_key'); } catch (_) { return null; } })();

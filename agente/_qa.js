@@ -61,7 +61,8 @@ async function visionReview(items, log) {
       fr.forEach((b, k) => files.push({ name: `t${it.sh.n}_${k + 1}.jpg`, buffer: b }));
       const mv = await motionStep(it.url);
       const mvc = await motionStep(it.url, true);
-      desc.push(`TOMA ${it.sh.n}: imágenes t${it.sh.n}_1.jpg … t${it.sh.n}_5.jpg (de inicio a final, en orden).\n  Narración: "${lineOf(it.sh)}"\n  Debe mostrar: ${it.sh.start_en || it.sh.visual_es || ''}\n  Acción pedida: ${it.sh.action_en || ''}\n  Movimiento medido en píxeles: todo el cuadro ${mv == null ? '?' : mv}, solo el centro ${mvc == null ? '?' : mvc} (≈1 congelado, 3–6 poco o solo cámara, 8+ claro)`);
+      const camOnly = it.sh.camera_only ? '\n  TOMA DE SOLO CÁMARA (pedido de Franklin): el objeto/maqueta NO debe moverse ni cambiar de forma; action_ok = true si la cámara hace su paneo; si el objeto cambia de forma, de estructura o se convierte en otra cosa → broken = true.' : '';
+      desc.push(`TOMA ${it.sh.n}${camOnly}: imágenes t${it.sh.n}_1.jpg … t${it.sh.n}_5.jpg (de inicio a final, en orden).\n  Narración: "${lineOf(it.sh)}"\n  Debe mostrar: ${it.sh.start_en || it.sh.visual_es || ''}\n  Acción pedida: ${it.sh.action_en || ''}\n  Movimiento medido en píxeles: todo el cuadro ${mv == null ? '?' : mv}, solo el centro ${mvc == null ? '?' : mvc} (≈1 congelado, 3–6 poco o solo cámara, 8+ claro)`);
     }
     if (!desc.length) continue;
     const prompt = `Eres el control de calidad de un documental. Usa la herramienta Read para mirar TODAS las imágenes que se nombran abajo (están en la carpeta actual). Para cada toma compara inicio, mitad y final con la narración.
@@ -94,7 +95,7 @@ Responde SOLO este JSON: {"tomas":[{"n":1,"image_ok":true,"action_ok":true,"haze
 async function rewriteShot(sh, reason, log, { allowImage = false, allowSplit = true } = {}) {
   const { runClaude, parseJson } = require('./_claude');
   const prompt = `Eres el director de fotografía de un documental hecho con LTX (modelo de video que parte de una imagen fija y HACE todo lo que lee).
-Una toma salió mal. Arréglala para que no vuelva a pasar (si ya se reescribió antes, cambia de enfoque: otro movimiento de cámara, una acción más simple).
+Una toma salió mal. Arréglala para que no vuelva a pasar${sh.camera_only ? ' (es una toma de SOLO CÁMARA: el objeto no se mueve ni cambia de forma; solo cambia el movimiento de cámara, y la acción describe ese paneo y la luz que lo recorre)' : ''} (si ya se reescribió antes, cambia de enfoque: otro movimiento de cámara, una acción más simple).
 
 Narración (FIJA: NO la cambies, no la reescribas, no la resumas): "${lineOf(sh)}"
 La imagen inicial muestra: ${sh.start_en || ''}

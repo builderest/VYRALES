@@ -25,7 +25,7 @@ exports.handler = async (event) => {
     const last = (kind) => require('./_assets').newest((ep.assets || []).filter((a) => a.kind === kind && a.shot_number === n));
 
     if (event.httpMethod === 'GET') {
-      return json(200, { n, line: lineOf(shot), fields: Object.fromEntries(FIELDS.map((f) => [f, shot[f] || ''])), frame_stale: !!shot.frame_stale, clip_stale: !!shot.clip_stale,
+      return json(200, { n, line: lineOf(shot), camera_only: !!shot.camera_only, fields: Object.fromEntries(FIELDS.map((f) => [f, shot[f] || ''])), frame_stale: !!shot.frame_stale, clip_stale: !!shot.clip_stale,
         overrides: { image: !!shot.keyframe_prompt_override, video: !!shot.prompt_override }, detail_proposal: shot.detail_proposal || null, frame: (last('image') || {}).storage_path || null, clip: (last('video_clip') || {}).storage_path || null, clip_id: (last('video_clip') || {}).id || null });
     }
     const bad = checkDashboardKey(event);
@@ -89,12 +89,15 @@ exports.handler = async (event) => {
     const f = body.fields || {};
     const patch = {};
     FIELDS.forEach((k) => { if (f[k] != null) patch[k] = clean(f[k]); });
+    // "Solo cámara": objeto rígido (maqueta, mapa); LTX no lo deforma y el QA no le pide movimiento propio.
+    const camChanged = f.camera_only != null && !!f.camera_only !== !!shot.camera_only;
+    if (f.camera_only != null) patch.camera_only = !!f.camera_only;
     const imgChanged = patch.start_en != null && patch.start_en !== (shot.start_en || '');
     const vidChanged = ['action_en', 'reaction_en', 'background_en', 'end_en', 'camera'].some((k) => patch[k] != null && patch[k] !== (shot[k] || ''));
     // Lo que escribes aquí MANDA: se quitan los prompts "editados" viejos que lo pisarían.
     Object.assign(patch, { keyframe_prompt_override: null, prompt_override: null, edited_at: new Date().toISOString() });
     if (imgChanged) Object.assign(patch, { frame_stale: true, end_frame_url: null, end_frame_skip: false, own_image: false });
-    if (imgChanged || vidChanged) patch.clip_stale = !!last('video_clip');
+    if (imgChanged || vidChanged || camChanged) patch.clip_stale = !!last('video_clip');
     await saveShot(patch);
     return json(200, { ok: true, imgChanged, vidChanged });
   } catch (err) {
