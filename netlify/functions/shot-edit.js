@@ -43,6 +43,9 @@ exports.handler = async (event) => {
       if (!clip) return json(400, { error: 'La toma todavía no tiene video.' });
       const reason = clean(body.reason || 'no está bien').slice(0, 300);
       await saveShot({ qa: Object.assign({}, shot.qa || {}, { force: true, force_reason: reason, clip_id: clip.id, ok: false, tries: Math.min(Number((shot.qa || {}).tries) || 0, 2) }) });
+      // Memoria: la corrección de Franklin es una lección para Claude (la consolida claude_aprender).
+      try { await require('./_memoria').addLesson(sb, { source: 'franklin', serie: series && series.slug, ep: ep.id, toma: n, narracion: lineOf(shot), motivo: reason, imagen: shot.start_en || '', accion: shot.action_en || '', camara: shot.camera || '' }); } catch (_) {}
+      try { const { data: oa } = await sb.from('agent_jobs').select('id').eq('status', 'pending').eq('command', 'claude_aprender').limit(1); if (!(oa && oa.length)) await sb.from('agent_jobs').insert({ command: 'claude_aprender' }); } catch (_) {}
       const { data: open } = await sb.from('agent_jobs').select('id').in('status', ['pending', 'running']).like('command', 'qa_tomas:' + ep.id + '%').limit(1);
       if (!(open && open.length)) { const { error: qe } = await sb.from('agent_jobs').insert({ command: 'qa_tomas:' + ep.id }); if (qe) return json(500, { error: qe.message }); }
       return json(200, { queued: true });
@@ -99,6 +102,14 @@ exports.handler = async (event) => {
     if (imgChanged) Object.assign(patch, { frame_stale: true, end_frame_url: null, end_frame_skip: false, own_image: false });
     if (imgChanged || vidChanged || camChanged) patch.clip_stale = !!last('video_clip');
     await saveShot(patch);
+    // Memoria: lo que Franklin cambió a mano (antes → después) enseña a Claude cómo lo quiere.
+    if (imgChanged || vidChanged || camChanged) {
+      try {
+        const antes = {}, despues = {};
+        FIELDS.concat(['camera_only']).forEach((k) => { if (patch[k] != null && String(patch[k]) !== String(shot[k] == null ? '' : shot[k])) { antes[k] = shot[k] == null ? '' : shot[k]; despues[k] = patch[k]; } });
+        await require('./_memoria').addLesson(sb, { source: 'franklin_edicion', serie: series && series.slug, ep: ep.id, toma: n, narracion: lineOf(shot), antes, despues });
+      } catch (_) {}
+    }
     return json(200, { ok: true, imgChanged, vidChanged });
   } catch (err) {
     return json(500, { error: err.message });

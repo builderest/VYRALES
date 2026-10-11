@@ -209,7 +209,10 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
         const rewrite = true;
         todo.push({ n: it.sh.n, clip: it.clip, newFrame, boost: r.action_ok === false, rewrite, reason: r.reason || '', sh: it.sh });
         log(`QA visual toma ${it.sh.n}: ${r.reason || 'no pasó'} → intento ${tries + 1}/3: Claude reescribe el prompt${newFrame ? ' + imagen nueva' : ''}`);
-      } else if (bad) log(`QA visual toma ${it.sh.n}: sigue con problema (${r.reason || ''}) → queda marcada para que la veas`);
+      } else if (bad) {
+        log(`QA visual toma ${it.sh.n}: sigue con problema (${r.reason || ''}) → queda marcada para que la veas`);
+        try { await require(path.join(ROOT, 'netlify', 'functions', '_memoria')).addLesson(supabase, { source: 'qa_falla', ep: epId, toma: it.sh.n, narracion: lineOf(it.sh), problema: r.reason || '', imagen: it.sh.start_en, accion: it.sh.action_en, camara: it.sh.camera }); } catch (_) {}
+      }
     }
     const saveQa = async (extra = {}) => {
       const { data: fr } = await supabase.from('episodes').select('shots').eq('id', epId).single();
@@ -260,6 +263,10 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
         const prev = it.sh.qa || {};
         upd[it.sh.n] = Object.assign({}, prev, { clip_id: it.clip.id, ok, image_ok: r.image_ok !== false, action_ok: r.action_ok !== false, haze: !!r.haze, broken: !!r.broken, reason: ok ? '' : String(r.reason || '').slice(0, 300), fixed_from: ok ? (prev.reason || prev.force_reason || 'tenía un problema') : prev.fixed_from, force: false, force_any: false, at: new Date().toISOString() });
         log(`QA toma ${it.sh.n}: ${ok ? 'quedó bien ✓' : 'todavía no (' + (r.reason || '') + ')'}`);
+        // Memoria: un arreglo que FUNCIONÓ (problema → cómo se resolvió) es una lección para Claude.
+        if (ok && (prev.reason || prev.force_reason)) {
+          try { await require(path.join(ROOT, 'netlify', 'functions', '_memoria')).addLesson(supabase, { source: 'qa_arreglo', ep: epId, toma: it.sh.n, narracion: lineOf(it.sh), problema: prev.reason || prev.force_reason, solucion: { camara: it.sh.camera, accion: it.sh.action_en, imagen: it.sh.start_en, solo_camara: !!it.sh.camera_only } }); } catch (_) {}
+        }
       }
       await supabase.from('episodes').update({ shots: (fr.shots || []).map((x) => upd[x.n] ? Object.assign({}, x, { qa: upd[x.n] }) : x) }).eq('id', epId);
     } catch (e) { log('QA: no pude verificar las rehechas (' + String(e.message).slice(0, 120) + ')'); }
@@ -274,6 +281,10 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
     await supabase.from('agent_jobs').insert({ command: 'flow_frames:' + epId });
     log(`QA: partí ${splits.length} toma(s); en cola sus imágenes nuevas (Flow) y videos (king)`);
   }
+  try {
+    const lessons = await require(path.join(ROOT, 'netlify', 'functions', '_memoria')).readJson(supabase, 'lecciones.json', []);
+    if (lessons.some((l) => !l.consolidated)) { const { data: oa } = await supabase.from('agent_jobs').select('id').eq('status', 'pending').eq('command', 'claude_aprender').limit(1); if (!(oa && oa.length)) await supabase.from('agent_jobs').insert({ command: 'claude_aprender' }); }
+  } catch (_) {}
   log(redone.length ? `QA: rehice ${redone.length} toma(s): ${redone.join(', ')}` : 'QA: no rehice ninguna toma en esta pasada (las marcadas con ⚠ necesitan revisión humana)');
   return redone;
 }

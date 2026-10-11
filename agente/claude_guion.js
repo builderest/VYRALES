@@ -29,7 +29,7 @@ async function diag() {
   console.log('Probando una respuesta corta con tu plan...');
   try {
     const t = Date.now();
-    const r = await runClaude('Responde SOLO este JSON: {"ok": true, "saludo": "listo"}', { timeoutMin: 3 });
+    const r = await runClaude('Responde SOLO este JSON: {"ok": true, "saludo": "listo"}', { timeoutMin: 3, memory: false });
     console.log('✔ Claude respondió en', Math.round((Date.now() - t) / 1000), 's:', JSON.stringify(parseJson(r)));
     console.log('LISTO: el guionista con Claude funciona en esta PC ($0 por guion, usa tu plan).');
   } catch (e) {

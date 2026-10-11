@@ -102,3 +102,9 @@ Este documento es la memoria del proyecto. Cada vez que Franklin corrige algo, l
 - (oct-11) Una toma puede quedar con 2 videos/cuadros (regen manual + QA). Regla única en panel, editor, render, unir, QA y regen: vale el MÁS RECIENTE (updated_at || created_at) — netlify/functions/_assets.js latestPerShot.
 - (oct-11) Modo 'Solo cámara' (shot.camera_only, casilla en el editor): objeto rígido (maqueta de museo, mapa); LTX recibe que el objeto mantiene forma y capas y solo se mueve la cámara; el QA no le pide movimiento propio y marca broken si el objeto cambia de forma. T15 Toba: la acción pedía que el techo se hundiera y el lago creciera → la maqueta se transformaba.
 - (oct-11) regen-shot nunca borra el archivo de un clip APROBADO. (Ese día el QA rehízo 7 aprobadas antes del arreglo y sus archivos originales se borraron; se apuntaron a la versión más reciente y quedaron sin aprobar para revisión.)
+
+## Memoria de Claude (oct-11) — Claude aprende solo
+- media/memoria/lecciones.json: cada ✗ de Franklin (motivo), cada edición manual (antes→después), cada arreglo del QA que funcionó y cada falla.
+- media/memoria/reglas.json: reglas profesionales que Claude consolida con `claude_aprender` (se encola solo tras un ✗ y al final de cada pasada de QA). Máx. 40, generales, lo de Franklin manda.
+- TODAS las llamadas creativas a Claude (agente/_claude.js runClaude) anteponen esa memoria; con Gemini, _visual_check la antepone. Panel: botón "🧠 Memoria" para verla, borrar o agregar reglas.
+- Sembrada con 12 reglas del largo de Toba.

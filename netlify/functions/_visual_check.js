@@ -59,7 +59,9 @@ async function checkVisuals({ series, shots, rewriteStart = 'failing', framed = 
     'Tomas (JSON):', JSON.stringify(rows), '',
     'Devuelve SOLO este JSON con TODAS las tomas en orden: {"shots":[{"n":1,"ok":true,"problema":"","start_en":"…","action_en":"…","reaction_en":"…","background_en":"…","end_en":""},{"n":2,"ok":false,"problema":"nombra dos cosas distintas","split":[{"line":"…","start_en":"…","action_en":"…","reaction_en":"…","background_en":"…","end_en":"","camera":"…"},{"line":"…","start_en":"…","action_en":"…","reaction_en":"…","background_en":"…","end_en":"","camera":"…"}]}]} (ok=false y problema = 1 frase en español cuando la imagen original no mostraba lo que dice el narrador).'
   ].join('\n');
-  const { out, costUsd } = llm ? await llm(prompt) : await gemini(prompt, 0.4);
+  // Claude (llm) ya trae la memoria desde runClaude; con Gemini se antepone aquí.
+  const mem = llm ? '' : await (async () => { try { return await require('./_memoria').memoryBlock(require('./_supabase').getSupabaseClient()); } catch (_) { return ''; } })();
+  const { out, costUsd } = llm ? await llm(prompt) : await gemini(mem + prompt, 0.4);
   const byN = Object.fromEntries(rows.map((r) => [r.n, r]));
   const changes = (out.shots || []).filter((x) => x && byN[Number(x.n)]).map((x) => {
     const o = byN[Number(x.n)];

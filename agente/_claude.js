@@ -18,7 +18,19 @@ function claudePath() {
 // Manda `prompt` por stdin a `claude -p` y devuelve el texto de la respuesta. Corre en una carpeta temporal vacía
 // (no puede tocar el proyecto) y sin herramientas.
 // files: [{ name, buffer }] → se escriben en la carpeta temporal para que Claude los LEA (imágenes para revisar tomas).
-function runClaude(prompt, { timeoutMin = 12, log = () => {}, files = [] } = {}) {
+// Memoria profesional de Claude (media/memoria/reglas.json): se antepone a cada prompt (salvo memory:false).
+async function withMemory(prompt) {
+  try {
+    const path2 = require('path');
+    const { getSupabaseClient } = require(path2.join(__dirname, '..', 'netlify', 'functions', '_supabase'));
+    const { memoryBlock } = require(path2.join(__dirname, '..', 'netlify', 'functions', '_memoria'));
+    return (await memoryBlock(getSupabaseClient())) + prompt;
+  } catch (_) { return prompt; }
+}
+async function runClaude(prompt, opts = {}) {
+  return runClaudeRaw(opts.memory === false ? prompt : await withMemory(prompt), opts);
+}
+function runClaudeRaw(prompt, { timeoutMin = 12, log = () => {}, files = [] } = {}) {
   const exe = claudePath();
   if (!exe) return Promise.reject(new Error('Claude Code no está instalado en esta PC (usa el botón "Claude: instalar / revisar").'));
   const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'vy-claude-'));

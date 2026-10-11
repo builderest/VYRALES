@@ -29,16 +29,16 @@ module.exports = {
   // "regen_local:<episode_id>:<tomas>[:<tomas con cuadro nuevo>]" — rehacer tomas en king y volver a unir.
   regen_local: {
     label: 'Rehacer tomas en la PC (LTX)', help: 'Rehace tomas con LTX en king y vuelve a unir el episodio',
-    special: 'regen_local', arg: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}:\d{1,2}(,\d{1,2})*(:\d{1,2}(,\d{1,2})*)?$/i, hidden: true
+    special: 'regen_local', arg: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}:\d{1,3}(,\d{1,3})*(:\d{1,3}(,\d{1,3})*)?$/i, hidden: true
   },
   // "prueba_ltx_voz:<episode_id>:<tomas>" — LTX genera video CON su propia voz (prueba, no toca el episodio).
-  prueba_ltx_voz: { label: 'Prueba LTX con voces propias', help: 'LTX genera las tomas con la voz incluida (gratis en king) para comparar con las voces fijas', special: 'prueba_ltx_voz', arg: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}:\d{1,2}(,\d{1,2})*$/i, hidden: true },
+  prueba_ltx_voz: { label: 'Prueba LTX con voces propias', help: 'LTX genera las tomas con la voz incluida (gratis en king) para comparar con las voces fijas', special: 'prueba_ltx_voz', arg: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}:\d{1,3}(,\d{1,3})*$/i, hidden: true },
   // Graba el video demo para la revisión de TikTok (abre Edge/Chrome visible; tú inicias sesión en TikTok).
   grabar_demo_tiktok: { label: 'Grabar demo para TikTok', help: 'Abre el navegador en esta PC y graba el flujo Conectar TikTok → Post to TikTok (tú solo inicias sesión en TikTok y das Authorize)', special: 'grabar_demo_tiktok' },
   prueba_ltx_final: { label: 'Prueba LTX con cuadro final', help: 'LTX con cuadro inicial + final (gratis en king) para comparar contra solo inicial', special: 'prueba_ltx_final', hidden: true },
   flow_login: { label: 'Flow: iniciar sesión (una vez)', help: 'Abre Flow en el Chrome de VYRALES para que inicies sesión con tu cuenta de Google', special: 'flow_login' },
   // "flow_cuadros:<episode_id>[:<tomas>]" — cuadros con Google Flow en una sesión + videos en king.
-  flow_cuadros: { label: 'Flow: cuadros del episodio', help: 'Genera los cuadros iniciales en Google Flow (una sesión) y rehace los videos en king', special: 'flow_cuadros', arg: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(:\d{1,2}(,\d{1,2})*)?$/i, hidden: true },
+  flow_cuadros: { label: 'Flow: cuadros del episodio', help: 'Genera los cuadros iniciales en Google Flow (una sesión) y rehace los videos en king', special: 'flow_cuadros', arg: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(:\d{1,3}(,\d{1,3})*)?$/i, hidden: true },
   // "toma_local:<episode_id>:<n>" — una sola toma (cuadro + video) en king; lo pide el panel.
   toma_local: { label: 'Una toma en king', help: 'Genera una sola toma (cuadro + video) en la PC king', special: 'toma_local', arg: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}:\d{1,2}$/i, hidden: true },
   diag_python: { label: 'Diagnóstico Python', help: 'Revisa si hay Python en la PC', special: 'diag_python' },
@@ -48,6 +48,7 @@ module.exports = {
   claude_guion: { label: 'Claude: escribir guion', help: 'Escribe el guion de una idea con Claude en la PC ($0)', special: 'claude_guion', arg: /^[a-z0-9-]{6,60}$/i, hidden: true },
   claude_detalle: { label: 'Claude: detallar toma', help: 'Prompts detallados de una toma con Claude ($0)', special: 'claude_detalle', arg: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}:\d{1,3}$/i, hidden: true },
   flow_lugar: { label: 'Flow: imagen de un lugar', help: 'Imagen fija de un lugar con Google Flow ($0)', special: 'flow_lugar', arg: /^[a-z0-9_]{3,60}:[A-Za-z0-9_-]{1,60}$/, hidden: true },
+  claude_aprender: { label: 'Claude aprende', help: 'Convierte las lecciones nuevas (correcciones y arreglos) en reglas de su memoria profesional ($0)', special: 'claude_aprender', hidden: true },
   qa_tomas: { label: 'Control de calidad de tomas', help: 'Revisa cada toma (congelada, imagen que no cuadra, acción que no se ve, humo) y rehace las malas en king ($0)', special: 'qa_tomas', arg: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, hidden: true },
   prueba_voz_completa: { label: 'Prueba: voz en una sola toma', help: 'Narra todo el episodio en UNA llamada de TTS (sin pedazos) para comparar', special: 'prueba_voz_completa', arg: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, hidden: true },
   voz_continua: { label: 'Voz continua del episodio', help: 'Una sola voz para todo el video, alineada palabra por palabra', special: 'voz_continua', arg: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, hidden: true },
@@ -58,7 +59,7 @@ module.exports = {
   flow_prueba_lote: { label: 'Flow: prueba de lote', help: 'Experimento: varias imágenes sin esperar cada una', special: 'flow_prueba_lote' },
   flow_prueba_ref: { label: 'Flow: prueba con foto de referencia', help: 'Genera 1 imagen en Flow usando una foto de cara como referencia', special: 'flow_prueba_ref' },
   publish_pkg: { label: 'Rehacer paquete de publicación', help: 'Textos + portada del episodio (≈$0.001)', special: 'publish_pkg', arg: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, hidden: true },
-  flow_frames: { label: 'Flow: cuadros que faltan (sin video)', help: 'Lo pide el panel: genera con Google Flow los cuadros iniciales que faltan', special: 'flow_frames', arg: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(:\d{1,2}(,\d{1,2})*)?$/i, hidden: true },
+  flow_frames: { label: 'Flow: cuadros que faltan (sin video)', help: 'Lo pide el panel: genera con Google Flow los cuadros iniciales que faltan', special: 'flow_frames', arg: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(:\d{1,3}(,\d{1,3})*)?$/i, hidden: true },
   flow_ver: { label: 'Flow: mostrar ventana', help: 'Hace la prueba de Flow con la ventana de Chrome visible', special: 'flow_ver' },
   flow_prueba: { label: 'Flow: imagen de prueba', help: 'Genera 1 imagen en Flow con tu cuenta y la guarda', special: 'flow_prueba' },
   prueba_flux_nat: { label: 'Prueba Flux naturaleza (inicio+final)', help: 'Cuadros inicial y final con Flux.2 Klein en king para tomas sin caras (gratis)', special: 'prueba_flux_nat' },
