@@ -96,7 +96,7 @@ async function runPublish({ supabase, epId, platform, privacy, loadVideo, qualit
         } catch (e) { log('YouTube: subtítulos no subidos (' + String(e.message).slice(0, 160) + ') → se pueden subir con "subtitulos:<ep>"'); }
       }
       // Documental largo: las fuentes van como comentario (la API no deja FIJARLO: se fija a mano en Studio con 1 clic).
-      if (pk.landscape && pk.pinned_comment) {
+      if ((pk.landscape || parentId) && pk.pinned_comment) { // largo: fuentes · Short del largo: enlace a la historia completa
         try {
           const tk = await require('./_social').youtubeAccessToken(supabase);
           const cr = await fetch('https://www.googleapis.com/youtube/v3/commentThreads?part=snippet', { method: 'POST', headers: { Authorization: `Bearer ${tk}`, 'Content-Type': 'application/json' },
