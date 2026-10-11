@@ -47,6 +47,7 @@ module.exports = {
   // "claude_guion:<job>" — lo pide /analitica.html (botón Crear guion con Claude).
   claude_guion: { label: 'Claude: escribir guion', help: 'Escribe el guion de una idea con Claude en la PC ($0)', special: 'claude_guion', arg: /^[a-z0-9-]{6,60}$/i, hidden: true },
   claude_detalle: { label: 'Claude: detallar toma', help: 'Prompts detallados de una toma con Claude ($0)', special: 'claude_detalle', arg: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}:\d{1,3}$/i, hidden: true },
+  claude_revisar: { label: 'Claude: prompts de tomas', help: 'Prompts completos de tomas nuevas/partidas con Claude ($0)', special: 'claude_revisar', arg: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}:\d{1,3}(,\d{1,3})*$/i, hidden: true },
   claude_ideas: { label: 'Claude: ideas de videos', help: 'Ideas de próximos videos con tus estadísticas, con Claude ($0)', special: 'claude_ideas', arg: /^[a-z0-9-]{6,60}$/i, hidden: true },
   claude_largo: { label: 'Claude: guion largo + Shorts', help: 'Escribe un video largo (8–15 min) y sus Shorts con Claude en la PC ($0)', special: 'claude_largo', arg: /^[a-z0-9-]{6,60}$/i, hidden: true },
   flow_prueba_lote: { label: 'Flow: prueba de lote', help: 'Experimento: varias imágenes sin esperar cada una', special: 'flow_prueba_lote' },

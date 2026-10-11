@@ -48,12 +48,23 @@ exports.handler = async (event) => {
     if (body.action === 'detail') {
       const { checkVisuals } = require('./_visual_check');
       const aspect = series.story_bible && series.story_bible.aspect === '16:9' ? '16:9' : '9:16';
-      const vc = await checkVisuals({ series, shots: [Object.assign({}, shot, body.fields || {})], rewriteStart: 'all', aspect, log: () => {} });
+      const vc = await checkVisuals({ series, shots: [Object.assign({}, shot, body.fields || {})], rewriteStart: 'all', allowSplit: false, aspect, log: () => {} });
       const c = vc.changes[0] || {};
       try { await require('./_spend').logSpend(sb, { seriesId: series.id, episodeId: ep.id, shotNumber: n, kind: 'text', costUsd: vc.costUsd, note: 'detallar toma' }); } catch (_) {}
       return json(200, { fields: { start_en: c.start_en, action_en: c.action_en, reaction_en: c.reaction_en, background_en: c.background_en, end_en: c.end_en, camera: shot.camera || '' }, problema: c.ok === false ? c.problema : '', costUsd: vc.costUsd });
     }
 
+    if (body.action === 'split') { // "Dividir en tomas": pedazos de la línea; Claude detalla los prompts de cada pedazo
+      const { splitShotDb } = require('./_split');
+      const lines = (body.lines || []).map((x) => String(x || '').trim()).filter(Boolean);
+      const parts = lines.map((line, k) => (k === 0 ? Object.assign({ line }, Object.fromEntries(FIELDS.map((f) => [f, shot[f] || '']))) : { line, start_en: '', action_en: '', reaction_en: '', background_en: '', end_en: '', camera: shot.camera || '' }));
+      const r = await splitShotDb(sb, ep.id, n, parts, () => {});
+      const list = parts.map((_, k) => r.first + k).join(',');
+      const { data: stt } = await sb.from('agent_state').select('last_seen').eq('id', 1).maybeSingle();
+      const online = !!(stt && stt.last_seen && Date.now() - new Date(stt.last_seen).getTime() < 90000);
+      if (online) await sb.from('agent_jobs').insert({ command: 'claude_revisar:' + ep.id + ':' + list });
+      return json(200, { ok: true, shots: list, detailing: online });
+    }
     if (body.image_base64) {
       const buf = Buffer.from(String(body.image_base64), 'base64');
       if (buf.length < 5000 || buf.length > 8e6) return json(400, { error: 'Imagen inválida (tamaño).' });

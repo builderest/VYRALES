@@ -56,13 +56,12 @@ for (const line of fs.readFileSync(path.join(ROOT, '.env'), 'utf8').split(/\r?\n
   console.log('Cuadros de Flow guardados:', done.join(',') || 'ninguno');
   if (!done.length && !conPersonajes.length) process.exit(1);
   if (solo) {
-    // Tomas que YA tenían video: su video viejo no corresponde al cuadro nuevo → se rehace solo en king ($0) y se vuelve a unir.
-    const redo = done.filter((n) => (ep.assets || []).some((a) => a.kind === 'video_clip' && a.shot_number === n));
-    if (!redo.length) { console.log('LISTO: cuadros hechos con Flow ($0). Revísalos en el panel.'); return; }
-    console.log('Cuadros listos. Estas tomas ya tenían video, se rehacen en king con el cuadro nuevo:', redo.join(','));
-    execFileSync(process.execPath, [path.join(__dirname, 'regen_local.js'), epId, redo.join(',')], { cwd: ROOT, stdio: 'inherit' });
-    const { data: f2 } = await supabase.from('episodes').select('shots').eq('id', epId).single();
-    await supabase.from('episodes').update({ shots: f2.shots.map((x) => (redo.includes(x.n) ? Object.assign({}, x, { clip_stale: false }) : x)) }).eq('id', epId);
+    // Si el episodio ya estaba producido: los videos viejos de las tomas con cuadro nuevo (clip_stale) y los de
+    // las tomas nuevas (partidas) se hacen en king ($0) con el mismo generador de Producir, y se une el final.
+    const produced = (ep.assets || []).some((a) => a.kind === 'video_clip');
+    if (!produced) { console.log('LISTO: cuadros hechos con Flow ($0). Revísalos en el panel.'); return; }
+    console.log('Cuadros listos. El episodio ya tenía videos → hago en king los que faltan o quedaron viejos y uno el video final...');
+    execFileSync(process.execPath, [path.join(__dirname, 'gen_local.js'), epId], { cwd: ROOT, stdio: 'inherit' });
     console.log('LISTO: cuadros nuevos + videos rehechos + video final unido.');
     return;
   }

@@ -15,7 +15,7 @@ const F = (f) => require(path.join(ROOT, 'netlify', 'functions', f));
 
 // Convierte tomas {line, visual_es, camera} en tomas del sistema con prompts detallados (Claude, por grupos).
 async function detail(shots, { aspect, context, title, log }) {
-  const rows = shots.map((s, i) => ({ n: i + 1, camera: s.camera || '', start_en: s.visual_es || '', dialogue: [{ speaker: 'Narrador', line: s.line }] }));
+  const rows = shots.map((s, i) => ({ n: i + 1, chapter: s.chapter, chapter_title: s.chapter_title, camera: s.camera || '', start_en: s.visual_es || '', dialogue: [{ speaker: 'Narrador', line: s.line }] }));
   const { checkVisuals, applyChanges } = F('_visual_check');
   const out = [];
   for (let i = 0; i < rows.length; i += 16) {
@@ -28,7 +28,7 @@ async function detail(shots, { aspect, context, title, log }) {
     out.push(...(done || part));
     log(`    prompts detallados: ${Math.min(i + 16, rows.length)}/${rows.length}`);
   }
-  return out.map((s) => Object.assign({}, s, { characters: [], location: s.location || 'escena' }));
+  return out.map((s, i) => Object.assign({}, s, { n: i + 1, characters: [], location: s.location || 'escena' }));
 }
 
 (async () => {
@@ -55,7 +55,6 @@ async function detail(shots, { aspect, context, title, log }) {
     const context = story.title + '. ' + (story.chapters || []).map((c) => c.title).join(' → ');
     console.log('Prompts detallados del video largo (16:9)...');
     const detailed = await detail(longShots, { aspect: '16:9', context, title: story.title, log: console.log });
-    detailed.forEach((s, i) => Object.assign(s, { chapter: longShots[i].chapter, chapter_title: longShots[i].chapter_title }));
     const shorts = [];
     for (const [i, sh] of (story.shorts || []).entries()) {
       console.log(`Prompts detallados del Short ${i + 1} (9:16): ${sh.title}`);

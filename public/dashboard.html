@@ -2257,7 +2257,10 @@
         const words = (id) => { const el = document.getElementById('se_' + id); return el ? el.value.trim().split(/\s+/).filter(Boolean).length : 0; };
         m.innerHTML = '<div class="bg-cyber-card border border-cyber-border rounded-xl w-full max-w-5xl max-h-[92vh] overflow-y-auto p-5">' +
           '<div class="flex items-center justify-between mb-3"><h3 class="font-display font-bold text-white tracking-wider">EDITAR TOMA ' + String(n).padStart(2, '0') + '</h3><button onclick="document.getElementById(\'shotEdModal\').remove()" class="text-slate-400 hover:text-white text-sm font-mono">✕ Cerrar</button></div>' +
-          '<div class="p-3 rounded-lg border border-cyber-cyan/30 bg-cyber-cyan/5 text-[13px] text-slate-100">🎙 <b>Narración:</b> ' + esc(d.line || '(sin narración)') + '<div class="text-[10px] text-slate-500 mt-1">La imagen tiene que mostrar EXACTAMENTE esto, y el movimiento tiene que ser la acción de esta frase.</div></div>' +
+          '<div class="p-3 rounded-lg border border-cyber-cyan/30 bg-cyber-cyan/5 text-[13px] text-slate-100">🎙 <b>Narración:</b> ' + esc(d.line || '(sin narración)') + '<div class="text-[10px] text-slate-500 mt-1">La imagen tiene que mostrar EXACTAMENTE esto, y el movimiento tiene que ser la acción de esta frase. ¿Nombra 2 o más cosas distintas? <button id="se_splitBtn" class="text-cyber-gold hover:underline">✂ Dividir en varias tomas</button></div>' +
+            '<div id="se_split" class="hidden mt-2"><p class="text-[11px] text-slate-300">Pon una barra <b class="text-cyber-gold">|</b> donde quieras cortar (2 a 5 pedazos, mínimo 3 palabras cada uno). La voz no cambia: cada pedazo sale justo cuando el narrador lo dice, con su propia imagen.</p>' +
+            '<textarea id="se_splitText" rows="2" class="w-full mt-1 bg-cyber-darker border border-cyber-gold/40 rounded-lg p-2 text-[13px] text-slate-100">' + esc(d.line || '') + '</textarea>' +
+            '<button id="se_splitGo" class="mt-1 px-3 py-1.5 rounded-lg border border-cyber-gold/50 text-cyber-gold bg-cyber-gold/10 hover:bg-cyber-gold/20 text-xs font-mono">✂ Dividir (Claude escribe los prompts de cada pedazo, $0)</button></div></div>' +
           '<div class="grid md:grid-cols-[230px_1fr] gap-4 mt-3">' +
             '<div><div class="aspect-[9/16] bg-slate-950 rounded-lg overflow-hidden border border-cyber-border relative">' + (d.frame ? '<img src="' + esc(vyMedia(d.frame)) + '" class="w-full h-full object-cover">' : '<div class="absolute inset-0 flex items-center justify-center text-[11px] text-slate-600">sin imagen</div>') +
               (d.frame_stale ? '<div class="absolute bottom-0 inset-x-0 bg-black/80 text-cyber-gold text-[10px] p-1 text-center">⚠ imagen vieja (el prompt cambió)</div>' : '') + '</div>' +
@@ -2300,6 +2303,18 @@
             Object.entries(j.fields || {}).forEach(([k2, v]) => { const el = document.getElementById('se_' + k2); if (el && v != null && String(v).trim()) el.value = v; });
             check(); msg((j.problema ? '⚠ ' + esc(j.problema) + '<br>' : '') + 'Propuesta lista (aún NO guardada). Revísala y dale Guardar o Regenerar.', 'text-cyber-gold');
           } catch (err) { msg('No se pudo: ' + esc(err.message), 'text-cyber-pink'); } b.disabled = false; };
+        document.getElementById('se_splitBtn').onclick = () => document.getElementById('se_split').classList.toggle('hidden');
+        document.getElementById('se_splitGo').onclick = async (ev) => {
+          const lines = document.getElementById('se_splitText').value.split('|').map(x => x.trim()).filter(Boolean);
+          if (lines.length < 2) return msg('Pon al menos una barra | donde quieres cortar.', 'text-cyber-gold');
+          ev.currentTarget.disabled = true; msg('<i class="fa-solid fa-spinner fa-spin mr-1"></i>Dividiendo...');
+          try { const k = (() => { try { return localStorage.getItem('vyrales_key'); } catch (_) { return null; } })();
+            const r = await fetch('/.netlify/functions/shot-edit', { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, k ? { 'x-vyrales-key': k } : {}), body: JSON.stringify({ episode_id: episodeId, shot: n, action: 'split', lines }) });
+            const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status);
+            m.remove(); await loadDashboard();
+            alert('✂ Listo: la toma ' + n + ' ahora son las tomas ' + j.shots + '.\n\n' + (j.detailing ? 'Claude está escribiendo la imagen y el movimiento de cada pedazo en tu PC ($0, ~1–2 min). Después dale "Generar cuadros" (Flow) y se hacen sus videos.' : 'La PC no responde: cuando vuelva, abre cada toma nueva y dale "Detallar con IA".'));
+          } catch (err) { ev.currentTarget.disabled = false; msg('No se pudo dividir: ' + esc(err.message), 'text-cyber-pink'); }
+        };
         document.getElementById('se_save').onclick = async () => { try { const j = await save(); msg('✔ Guardado.' + (j.imgChanged ? ' La imagen quedó marcada para rehacer.' : '') + (j.vidChanged && !j.imgChanged ? ' El video quedó marcado para rehacer.' : ''), 'text-cyber-emerald'); loadDashboard(); } catch (err) { msg('No se pudo guardar: ' + esc(err.message), 'text-cyber-pink'); } };
         document.getElementById('se_img').onclick = async () => { try { await save(); m.remove(); await loadDashboard(); generateKeyframe(episodeId, n); } catch (err) { msg('No se pudo: ' + esc(err.message), 'text-cyber-pink'); } };
         const vb = document.getElementById('se_vid'); if (vb) vb.onclick = async () => { try { await save(); m.remove(); await loadDashboard(); runRegenShot(d.clip_id, 'king'); } catch (err) { msg('No se pudo: ' + esc(err.message), 'text-cyber-pink'); } };

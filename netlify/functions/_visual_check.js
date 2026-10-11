@@ -7,6 +7,7 @@
 // ~$0.05–0.10 por episodio. Una vez por episodio (continuity.visual_checked); tus ediciones posteriores se respetan.
 const { TEXT_MODEL } = require('./_publish');
 const PRICE = { input: 0.75, output: 3.75 };
+const { validParts } = require('./_split');
 
 const lineOf = (sh) => String(sh.voice_part || (Array.isArray(sh.dialogue) ? sh.dialogue : (sh.dialogue ? [sh.dialogue] : [])).map((d) => d && d.line).filter(Boolean).join(' ')).trim();
 
@@ -37,7 +38,7 @@ async function gemini(prompt, temperature) {
 
 // rewriteStart: 'all' (guion nuevo, aún sin cuadros) | 'failing' (ya hay cuadros: solo se rehace la imagen de las que fallan).
 // llm(prompt) → { out (JSON ya parseado), costUsd }. Por defecto Gemini por API; en la PC se usa Claude con tu plan ($0).
-async function checkVisuals({ series, shots, rewriteStart = 'failing', framed = null, llm = null, aspect = '9:16', context = '', log = console.log }) {
+async function checkVisuals({ series, shots, rewriteStart = 'failing', framed = null, llm = null, aspect = '9:16', context = '', allowSplit = true, log = console.log }) {
   // fija = esa toma ya tiene una imagen buena generada con su start_en (no se toca salvo que falle).
   const isFixed = (sh) => rewriteStart !== 'all' && (!framed || framed.has(sh.n)) && !sh.frame_stale;
   const rows = (shots || []).map((sh) => ({ n: sh.n, imagen_ya_generada: isFixed(sh), narracion: lineOf(sh), camera: sh.camera || '', start_en: sh.start_en || '', action_en: sh.action_en || '', reaction_en: sh.reaction_en || '', background_en: sh.background_en || '', end_en: sh.end_en || '' })).filter((r) => r.narracion || r.start_en);
@@ -49,13 +50,14 @@ async function checkVisuals({ series, shots, rewriteStart = 'failing', framed = 
       ? 'TAREA 2 — Escribe para TODAS las tomas un start_en nuevo, súper detallado, que cumpla las reglas (si la idea original ya estaba bien, conserva el mismo sujeto pero con todo el detalle).'
       : 'TAREA 2 — Escribe un start_en nuevo, súper detallado, para las tomas que FALLAN y para TODAS las que tienen imagen_ya_generada=false (conserva el mismo sujeto si ya estaba bien). Las que tienen imagen_ya_generada=true y están bien: devuelve su start_en tal cual.',
     'TAREA 3 — Para TODAS las tomas escribe action_en, reaction_en, background_en y end_en súper detallados y coherentes con su start_en final, para que el video haga un movimiento simple y creíble sin inventar nada.',
+    allowSplit ? 'TAREA 4 — PARTIR: si la línea del narrador nombra 2, 3 o 4 cosas que se VEN distintas (sujetos, lugares o momentos distintos: "el volcán explota… y la ceniza cae sobre los bosques de la India"), parte la toma en varias tomas cortas, una por cada cosa, para que cada imagen muestre exactamente lo que se dice en ese instante. Pon en "split" la lista de pedazos (2 a 4), cada uno con "line" = su pedazo EXACTO de la línea (en orden; juntos forman la línea completa palabra por palabra; mínimo 3 palabras cada uno) y sus propios start_en, action_en, reaction_en, background_en, end_en y camera. NO partas si es la misma vista con un cambio (eso se resuelve con end_en) ni si la línea es corta (menos de 8 palabras). Si no hay que partir, no pongas "split".' : '',
     RULES,
     aspect === '16:9' ? '- FORMATO HORIZONTAL 16:9 (video largo de YouTube): composición panorámica, el sujeto puede ir a un tercio y el paisaje respira a los lados.' : '- FORMATO VERTICAL 9:16 (Shorts): el sujeto principal ocupa el centro y el cuadro alto.',
     context ? 'Contexto de la historia: ' + context : '',
     '',
     `Serie: ${(series && (series.title || series.slug)) || ''}`,
     'Tomas (JSON):', JSON.stringify(rows), '',
-    'Devuelve SOLO este JSON con TODAS las tomas en orden: {"shots":[{"n":1,"ok":true,"problema":"","start_en":"…","action_en":"…","reaction_en":"…","background_en":"…","end_en":""}]} (ok=false y problema = 1 frase en español cuando la imagen original no mostraba lo que dice el narrador).'
+    'Devuelve SOLO este JSON con TODAS las tomas en orden: {"shots":[{"n":1,"ok":true,"problema":"","start_en":"…","action_en":"…","reaction_en":"…","background_en":"…","end_en":""},{"n":2,"ok":false,"problema":"nombra dos cosas distintas","split":[{"line":"…","start_en":"…","action_en":"…","reaction_en":"…","background_en":"…","end_en":"","camera":"…"},{"line":"…","start_en":"…","action_en":"…","reaction_en":"…","background_en":"…","end_en":"","camera":"…"}]}]} (ok=false y problema = 1 frase en español cuando la imagen original no mostraba lo que dice el narrador).'
   ].join('\n');
   const { out, costUsd } = llm ? await llm(prompt) : await gemini(prompt, 0.4);
   const byN = Object.fromEntries(rows.map((r) => [r.n, r]));
@@ -66,22 +68,26 @@ async function checkVisuals({ series, shots, rewriteStart = 'failing', framed = 
     const newStart = (!ok || !o.imagen_ya_generada) && start.length > 40 ? start : o.start_en;
     return { n: Number(x.n), ok, problema: String(x.problema || ''), start_en: newStart, startChanged: newStart !== o.start_en,
       action_en: String(x.action_en || '').trim() || o.action_en, reaction_en: String(x.reaction_en || '').trim() || o.reaction_en,
-      background_en: String(x.background_en || '').trim() || o.background_en, end_en: String(x.end_en == null ? o.end_en : x.end_en).trim() };
+      background_en: String(x.background_en || '').trim() || o.background_en, end_en: String(x.end_en == null ? o.end_en : x.end_en).trim(),
+      split: allowSplit && Array.isArray(x.split) && !validParts(o.narracion, x.split) ? x.split.map((p) => ({ line: String(p.line || '').trim(), start_en: String(p.start_en || '').trim(), action_en: String(p.action_en || '').trim(), reaction_en: String(p.reaction_en || '').trim(), background_en: String(p.background_en || '').trim(), end_en: String(p.end_en || '').trim(), camera: String(p.camera || o.camera || '').trim() })) : null };
   });
-  changes.filter((c) => !c.ok).forEach((c) => log(`  toma ${c.n}: ${c.problema}\n     → ${c.start_en}`));
+  changes.filter((c) => !c.ok).forEach((c) => log(c.split ? `  toma ${c.n}: se parte en ${c.split.length} (${c.problema})` : `  toma ${c.n}: ${c.problema}\n     → ${c.start_en}`));
   return { changes, costUsd };
 }
 
 // Aplica los cambios a una lista de tomas (sin guardar). frames=true → las tomas con imagen nueva quedan frame_stale.
-function applyChanges(shots, changes, { frames = false } = {}) {
+function applyChanges(shots, changes, { frames = false, splits = true } = {}) {
   const byN = Object.fromEntries(changes.map((c) => [c.n, c]));
-  return (shots || []).map((sh) => {
+  let out = (shots || []).map((sh) => {
     const c = byN[sh.n];
     if (!c) return sh;
     const upd = { start_en: c.start_en, action_en: c.action_en, reaction_en: c.reaction_en, background_en: c.background_en, end_en: c.end_en };
     if (c.startChanged) Object.assign(upd, { end_frame_url: null, end_frame_skip: false, visual_fix: { at: new Date().toISOString(), problema: c.problema, antes: sh.start_en } }, frames ? { frame_stale: true } : {});
     return Object.assign({}, sh, upd);
   });
+  // Guion nuevo (sin cuadros): las tomas a partir se parten aquí mismo y todo se renumera 1..N.
+  if (splits) { const { splitInArray } = require('./_split'); changes.filter((c) => c.split).sort((a, b) => b.n - a.n).forEach((c) => { out = splitInArray(out, c.n, c.split); }); }
+  return out;
 }
 
 // Revisa y GUARDA un episodio (shots + continuity.visual_checked). Devuelve los cambios.
@@ -95,8 +101,13 @@ async function reviewEpisode(supabase, { episodeId, force = false, llm = null, e
   const hasFrames = framed.size > 0;
   log('Revisor de imágenes: comparando cada imagen con su narración y detallando los prompts...');
   const { changes, costUsd } = await checkVisuals({ series, shots: ep.shots, rewriteStart: hasFrames ? 'failing' : 'all', framed, llm, log });
-  const shots = applyChanges(ep.shots, changes, { frames: hasFrames });
+  const shots = applyChanges(ep.shots, changes, { frames: hasFrames, splits: false });
   await supabase.from('episodes').update({ shots, continuity: Object.assign({}, cont, { visual_checked: new Date().toISOString() }) }).eq('id', episodeId);
+  // Partir tomas (de la última a la primera, así los números de las demás no se mueven antes de tiempo).
+  const { splitShotDb } = require('./_split');
+  for (const c of changes.filter((x) => x.split).sort((a, b) => b.n - a.n)) {
+    try { await splitShotDb(supabase, episodeId, c.n, c.split, log); } catch (e) { log(`  (no pude partir la toma ${c.n}: ${String(e.message).slice(0, 120)})`); }
+  }
   try { const { logSpend } = require('./_spend'); await logSpend(supabase, { seriesId: ep.series_id, episodeId, kind: 'text', model: engine === 'claude' ? 'claude_plan' : TEXT_MODEL, costUsd, note: 'revisor imagen=narración' }); } catch (_) {}
   const fixed = changes.filter((c) => c.startChanged).length;
   log(`Revisor de imágenes: ${fixed} imagen(es) corregida(s), ${changes.length} toma(s) con prompts detallados · $${costUsd.toFixed(4)}`);

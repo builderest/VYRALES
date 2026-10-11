@@ -89,12 +89,28 @@ async function detalle(epId, n) {
   const shot = (ep.shots || []).find((s) => s.n === Number(n));
   const req = shot.detail_request || {};
   console.log('Detallando la toma', n, 'con Claude...');
-  const vc = await checkVisuals({ series, shots: [Object.assign({}, shot, req.fields || {})], rewriteStart: 'all', llm: claudeLlm(console.log), aspect: series.story_bible && series.story_bible.aspect === '16:9' ? '16:9' : '9:16', log: () => {} });
+  const vc = await checkVisuals({ series, shots: [Object.assign({}, shot, req.fields || {})], rewriteStart: 'all', allowSplit: false, llm: claudeLlm(console.log), aspect: series.story_bible && series.story_bible.aspect === '16:9' ? '16:9' : '9:16', log: () => {} });
   const c = vc.changes[0] || {};
   const prop = { at: new Date().toISOString(), req_at: req.at || null, problema: c.ok === false ? c.problema : '', fields: { start_en: c.start_en, action_en: c.action_en, reaction_en: c.reaction_en, background_en: c.background_en, end_en: c.end_en } };
   const { data: fr } = await sb.from('episodes').select('shots').eq('id', epId).single();
   await sb.from('episodes').update({ shots: fr.shots.map((s) => (s.n === Number(n) ? Object.assign({}, s, { detail_proposal: prop }) : s)) }).eq('id', epId);
   console.log('LISTO: propuesta guardada (el panel la muestra para que la revises).');
+}
+// Tomas recién partidas: Claude escribe sus prompts completos y se GUARDAN (gratis).
+async function revisar(epId, list) {
+  const { getSupabaseClient } = require(path.join(ROOT, 'netlify', 'functions', '_supabase'));
+  const { checkVisuals, applyChanges } = require(path.join(ROOT, 'netlify', 'functions', '_visual_check'));
+  const sb = getSupabaseClient();
+  const want = String(list || '').split(',').map(Number).filter(Boolean);
+  const { data: ep } = await sb.from('episodes').select('shots, series_id').eq('id', epId).single();
+  const { data: series } = await sb.from('series').select('title, slug, story_bible').eq('id', ep.series_id).single();
+  const shots = (ep.shots || []).filter((s) => want.includes(s.n));
+  console.log('Claude escribe los prompts de las tomas', want.join(','), '...');
+  const vc = await checkVisuals({ series, shots, rewriteStart: 'all', allowSplit: false, llm: claudeLlm(console.log), aspect: series.story_bible && series.story_bible.aspect === '16:9' ? '16:9' : '9:16', log: console.log });
+  const { data: fr } = await sb.from('episodes').select('shots').eq('id', epId).single();
+  const fixed = applyChanges(fr.shots.filter((s) => want.includes(s.n)), vc.changes, { splits: false });
+  await sb.from('episodes').update({ shots: fr.shots.map((s) => fixed.find((x) => x.n === s.n) || s) }).eq('id', epId);
+  console.log('LISTO: prompts guardados en las tomas', want.join(','));
 }
 // "Generar nuevas ideas" de /analitica.html (gratis).
 async function ideas(job) {
@@ -115,7 +131,8 @@ async function ideas(job) {
 }
 
 const mode = process.argv[2];
-if (mode === 'detalle') { detalle(process.argv[3], process.argv[4]).catch((e) => { console.error('ERROR:', e.message || e); process.exit(1); }); }
+if (mode === 'revisar') { revisar(process.argv[3], process.argv[4]).catch((e) => { console.error('ERROR:', e.message || e); process.exit(1); }); }
+else if (mode === 'detalle') { detalle(process.argv[3], process.argv[4]).catch((e) => { console.error('ERROR:', e.message || e); process.exit(1); }); }
 else if (mode === 'ideas') { ideas(String(process.argv[3] || '').replace(/[^a-z0-9-]/gi, '')); }
 else
 (mode === 'diag' ? diag() : mode === 'login' ? Promise.resolve(login()) : job(String(mode || '').replace(/[^a-z0-9-]/gi, '')))
