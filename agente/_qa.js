@@ -104,7 +104,7 @@ Final actual: ${sh.reaction_en || ''}
 Lo que salió mal (control de calidad): ${reason}
 
 Reglas:
-- La imagen tiene que mostrar EXACTAMENTE lo que dice la narración.
+- La imagen tiene que mostrar EXACTAMENTE lo que dice la narración y ser de la ÉPOCA de la historia: si la historia es de la prehistoria (o de otra época), nada moderno (estadios, ciudades, ropa actual, carros, pantallas) salvo que la narración lo nombre de forma explícita. Cifras de población ("diez mil adultos") se muestran con gente de esa época (grupos pequeños dispersos por el paisaje), nunca con una metáfora moderna.
 - La cámara hace UN movimiento corto y suave que mantiene TODO lo importante dentro del cuadro hasta el final. En "camera" escribe SOLO el movimiento (ej. "slow lateral drift to the left"); nunca "no zoom", "held", "unchanged", "same framing" (LTX hace lo que lee). Si el problema fue que solo se movía la cámara, que se metió o hizo zoom de más, usa un movimiento mínimo y pon el movimiento en el SUJETO.
 - La acción (25–45 palabras, inglés) describe SOLO lo que se mueve en el sujeto principal, con verbos visibles y una dirección. Tiene que VERSE claramente en 6 segundos: nada de "respira", "parpadea" o gestos mínimos; si el sujeto es una persona pequeña o lejana, que camine, se agache, levante algo o señale. Si una persona se salía del cuadro, que se mueva DENTRO del cuadro (hacia la cámara o de lado corto), nunca hacia fuera. Nunca uses still, steady, stay, remain, fixed, motionless, frozen, static, suspended.
 - Si el sujeto es humo, una columna de erupción, nubes o polvo: usa verbos de turbulencia visibles (billows, churns, rolls, swells and expands outward, grows taller) para que su forma CAMBIE durante la toma.
