@@ -32,6 +32,12 @@
   to = "/.netlify/functions/ver"
   status = 200
 
+# Página PÚBLICA para compartir un video con alguien (vyrales.app/ve/<id del episodio>).
+[[redirects]]
+  from = "/ve/:id"
+  to = "/.netlify/functions/compartir?id=:id"
+  status = 200
+
 [[redirects]]
   from = "/auth/tiktok/callback"
   to = "/.netlify/functions/oauth-tiktok-callback"

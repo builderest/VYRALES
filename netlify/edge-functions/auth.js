@@ -14,7 +14,8 @@ const PUBLIC = [
   /^\/\.netlify\/functions\/login$/,
   /^\/\.netlify\/functions\/oauth-(tiktok|instagram|meta|youtube)-callback$/,
   /^\/auth\/(tiktok|instagram|meta|youtube)\/callback$/,
-  /^\/ver\/?$/, /^\/\.netlify\/functions\/ver$/ // historias completas (enlace del perfil)
+  /^\/ver\/?$/, /^\/\.netlify\/functions\/ver$/, // historias completas (enlace del perfil)
+  /^\/ve\/[0-9a-fA-F-]{36}$/, /^\/\.netlify\/functions\/compartir$/ // compartir UN video (enlace con el id)
 ];
 
 const enc = new TextEncoder();
