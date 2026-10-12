@@ -23,6 +23,12 @@ for (const line of fs.readFileSync(path.join(ROOT, '.env'), 'utf8').split(/\r?\n
 }
 const { createClient } = require(path.join(ROOT, 'node_modules', '@supabase', 'supabase-js'));
 const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY);
+// Claves de la página Cuenta → API del panel (cifradas en Supabase): mandan sobre el .env.
+// Se cargan al arrancar y se refrescan cada minuto; los comandos que lanza el agente las heredan.
+// Para descifrarlas, SUPABASE_SERVICE_ROLE_KEY (o VYRALES_SECRET) debe ser la MISMA que en Netlify.
+const PANEL_KEYS = require(path.join(ROOT, 'netlify', 'functions', '_keys.js'));
+PANEL_KEYS.applyKeys(sb, true).then((r) => { if (r && r.error && !PANEL_KEYS.isMissingTable(r.error)) console.log('Claves del panel: ' + (r.error.message || r.error)); }).catch(() => {});
+setInterval(() => { PANEL_KEYS.applyKeys(sb, true).catch(() => {}); }, 60000);
 
 const MAX_OUT = 20000; // caracteres guardados por orden
 const log = (...a) => console.log(new Date().toLocaleTimeString(), ...a);

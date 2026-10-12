@@ -18,3 +18,6 @@ exports.handler = async (event) => {
     return page(true, 'conectado ✓ ' + String(name || '').replace(/[<>]/g, ''));
   } catch (err) { return page(false, String(err.message).replace(/[<>]/g, '')); }
 };
+
+// Claves de la página Cuenta → API (cifradas en Supabase; mandan sobre el .env). Ver _keys.js.
+exports.handler = require('./_keys').withKeys(exports.handler);

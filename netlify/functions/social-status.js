@@ -14,3 +14,6 @@ exports.handler = async () => {
     return json(200, { keys, accounts, tiktok_mode: sandbox ? 'sandbox' : (/^(1|true|si|sí)$/i.test(process.env.TIKTOK_DIRECT || '') ? 'direct' : 'draft') });
   } catch (err) { return json(500, { error: err.message }); }
 };
+
+// Claves de la página Cuenta → API (cifradas en Supabase; mandan sobre el .env). Ver _keys.js.
+exports.handler = require('./_keys').withKeys(exports.handler);

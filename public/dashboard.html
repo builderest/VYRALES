@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VYRALES // AI Automation Control Center</title>
+    <title>VYRALES · Estudio de video IA</title>
 
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -11,7 +11,11 @@
     <!-- Google Fonts: Space Grotesk & Inter -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700&family=Cinzel:wght@700&family=Orbitron:wght@700&display=swap" rel="stylesheet">
+    <!-- Rediseño: tema por novela + efectos (fase 1) -->
+    <link rel="stylesheet" href="tema.css?v=10">
+    <script src="tema.js?v=3" defer></script>
+    <script src="panel.js?v=9" defer></script>
     
     <!-- Font Awesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -30,23 +34,23 @@
                             bg: '#05070f',
                             card: '#0a0f1d',
                             border: '#1b253e',
-                            cyan: '#00f0ff',
-                            violet: '#7000ff',
-                            pink: '#ff007f',
-                            emerald: '#00ff88',
-                            gold: '#ffb700',
+                            cyan: 'rgb(var(--vy-a) / <alpha-value>)',
+                            violet: 'rgb(var(--vy-b) / <alpha-value>)',
+                            pink: 'rgb(var(--vy-pink) / <alpha-value>)',
+                            emerald: 'rgb(var(--vy-emerald) / <alpha-value>)',
+                            gold: 'rgb(var(--vy-gold) / <alpha-value>)',
                             darker: '#020307'
                         }
                     },
                     fontFamily: {
-                        sans: ['Inter', 'sans-serif'],
+                        sans: ['Space Grotesk', 'sans-serif'],
                         mono: ['JetBrains Mono', 'monospace'],
                         display: ['Space Grotesk', 'sans-serif']
                     },
                     boxShadow: {
-                        'neon-cyan': '0 0 15px rgba(0, 240, 255, 0.35)',
-                        'neon-violet': '0 0 15px rgba(112, 0, 255, 0.35)',
-                        'neon-pink': '0 0 15px rgba(255, 0, 127, 0.35)',
+                        'neon-cyan': '0 0 15px rgb(var(--vy-a) / 0.4)',
+                        'neon-violet': '0 0 15px rgb(var(--vy-b) / 0.4)',
+                        'neon-pink': '0 0 15px rgb(var(--vy-pink) / 0.4)',
                         'neon-emerald': '0 0 15px rgba(0, 255, 136, 0.35)',
                         'glass': '0 8px 32px 0 rgba(0, 0, 0, 0.5)'
                     }
@@ -123,202 +127,274 @@
 
 <body class="bg-cyber-bg text-slate-200 font-sans min-h-screen cyber-grid-bg antialiased selection:bg-cyber-cyan selection:text-black">
 
-    <!-- TOP HEADER / COMMAND BAR -->
-    <header class="sticky top-0 z-50 glass-panel border-b border-cyber-border/80 px-4 lg:px-8 py-3">
-        <div class="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
-            
-            <!-- Logo & Brand Title -->
-            <div class="flex items-center space-x-3">
-                <div class="relative flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-cyber-cyan via-cyber-violet to-cyber-pink p-[1px] shadow-neon-cyan">
-                    <div class="w-full h-full bg-cyber-darker rounded-[11px] flex items-center justify-center">
-                        <i class="fa-solid fa-clapperboard text-cyber-cyan text-lg animate-pulse"></i>
-                    </div>
-                </div>
-                <div>
-                    <div class="flex items-center gap-2">
-                        <h1 class="font-display font-bold text-xl tracking-wider text-white">VYRALES</h1>
-                        <span class="text-xs font-mono bg-cyber-violet/30 text-cyber-cyan border border-cyber-cyan/30 px-2 py-0.5 rounded-full font-semibold">v3.1 ORCHESTRATOR</span>
-                        <button type="button" onclick="openSocialModal()" class="text-[10px] font-mono px-2 py-0.5 rounded-full border border-cyber-pink/50 text-cyber-pink hover:bg-cyber-pink/10 ml-1" title="Conectar TikTok / Facebook / Instagram / YouTube"><i class="fa-solid fa-share-nodes mr-1"></i>Redes</button>
-                        <button onclick="openMemoria()" class="text-[10px] font-mono px-2 py-0.5 rounded-full border border-cyber-violet/50 text-cyber-violet hover:bg-cyber-violet/10 ml-1" title="Lo que Claude aprendió de tus correcciones">🧠 Memoria</button><a href="/analitica.html" class="text-[10px] font-mono px-2 py-0.5 rounded-full border border-cyber-cyan/50 text-cyber-cyan hover:bg-cyber-cyan/10 ml-1" title="Analítica: qué temas funcionan y qué crear"><i class="fa-solid fa-chart-column mr-1"></i>Analítica</a>
-                        <button type="button" onclick="openTerminal()" class="text-[10px] font-mono px-2 py-0.5 rounded-full border border-cyber-emerald/50 text-cyber-emerald hover:bg-cyber-emerald/10 ml-1" title="Comandos en tu PC"><i class="fa-solid fa-terminal mr-1"></i>Terminal</button>
-                        <a href="/.netlify/functions/login?logout=1" class="text-[10px] font-mono text-slate-500 hover:text-cyber-pink ml-1" title="Cerrar sesión"><i class="fa-solid fa-right-from-bracket mr-1"></i>Salir</a>
-                    </div>
-                    <p class="text-xs text-slate-400 font-mono">Arquitectura de Automatización de Microdramas con IA</p>
-                </div>
-            </div>
+    <!-- ================================================================
+         REDISEÑO (Estudio futurista): menú lateral + barra superior + INICIO.
+         Todos los IDs y funciones de antes siguen aquí (seriesPicker, métricas,
+         openSocialModal, openMemoria, openTerminal, openNovelModal, triggerPipelineRun…).
+         El INICIO nuevo lo pinta panel.js con los mismos datos de loadDashboard().
+         Respaldo del diseño anterior: backups/dashboard_antes_rediseno_2026-10-11.html
+         ================================================================ -->
+    <div class="vy-shell">
 
-            <!-- Active Series Selector (menú propio: el <select> nativo no se puede estilizar) -->
-            <div id="seriesPicker" class="relative">
-                <button id="seriesPickerBtn" type="button" onclick="toggleSeriesMenu(event)" aria-haspopup="listbox" aria-expanded="false"
-                        class="flex items-center gap-2.5 bg-cyber-darker/80 border border-cyber-border hover:border-cyber-cyan/60 px-3 py-2 rounded-lg transition-all">
-                    <i class="fa-solid fa-tv text-cyber-pink text-xs"></i>
-                    <span class="text-[10px] text-slate-400 font-mono hidden sm:inline whitespace-nowrap tracking-wider">SERIE ACTIVA</span>
-                    <span id="seriesPickerLabel" class="text-sm font-semibold text-cyber-cyan whitespace-nowrap max-w-[220px] truncate">Cargando...</span>
-                    <i id="seriesPickerChevron" class="fa-solid fa-chevron-down text-[10px] text-slate-400 transition-transform"></i>
-                </button>
-                <div id="seriesMenu" role="listbox"
-                     class="hidden absolute left-0 mt-2 w-80 bg-cyber-card border border-cyber-border rounded-xl shadow-neon-cyan p-1.5 z-50"></div>
-            </div>
+    <!-- MENÚ LATERAL -->
+    <nav id="vySide" class="vy-side" aria-label="Menú principal">
+        <a href="#inicio" data-vy-go="inicio" class="vy-brand" aria-label="VYRALES, ir al inicio">
+            <span class="vy-logo"><span>V</span></span>
+            <span class="flex flex-col gap-0.5">
+                <span class="vy-brand-name">VYRALES</span>
+                <span class="vy-lab text-cyber-cyan" style="font-size:10px">Estudio de video IA</span>
+            </span>
+        </a>
+        <a class="vy-nav act" href="#inicio" data-vy-go="inicio"><i class="fa-solid fa-house"></i>Inicio</a>
+        <button type="button" class="vy-nav" onclick="openNovelModal()"><i class="fa-solid fa-plus"></i>Nueva novela</button>
+        <a class="vy-nav" href="#produccion" data-vy-go="produccion"><i class="fa-solid fa-film"></i>Producción</a>
+        <a class="vy-nav" href="#revisar" data-vy-go="revisar"><i class="fa-regular fa-eye"></i>Revisar y publicar<span id="vyNavReview" class="vy-badge hidden">0</span></a>
+        <a class="vy-nav" href="#guiones" data-vy-go="guiones"><i class="fa-solid fa-scroll"></i>Guiones</a>
+        <a class="vy-nav" href="/analitica.html"><i class="fa-solid fa-chart-line"></i>Analítica</a>
 
-            <!-- Crear novela nueva pegando el JSON que escribe Claude -->
-            <button onclick="openNovelModal()" class="px-4 py-2 rounded-lg border border-cyber-violet/50 bg-cyber-violet/15 hover:bg-cyber-violet/25 text-white font-display font-semibold text-xs tracking-wider transition-all">
-                <i class="fa-solid fa-wand-magic-sparkles text-cyber-violet mr-1.5"></i>PROMPT
+        <div class="vy-lab vy-side-sec">Novela</div>
+        <a class="vy-nav" href="#personajes" data-vy-go="personajes"><i class="fa-solid fa-users"></i>Personajes</a>
+        <a class="vy-nav" href="#lugares" data-vy-go="lugares"><i class="fa-solid fa-location-dot"></i>Lugares</a>
+        <a class="vy-nav" href="#reglas" data-vy-go="reglas"><i class="fa-solid fa-book-bookmark"></i>Reglas de la novela</a>
+        <button type="button" class="vy-nav" onclick="openMemoria()" title="Lo que Claude aprendió de tus correcciones"><i class="fa-solid fa-brain"></i>Reglas aprendidas</button>
+
+        <div class="vy-lab vy-side-sec">Cuenta</div>
+        <a class="vy-nav" href="#api" data-vy-go="api"><i class="fa-solid fa-plug"></i>API</a>
+        <button type="button" class="vy-nav" onclick="openSocialModal()" title="Conectar TikTok / Facebook / Instagram / YouTube"><i class="fa-solid fa-share-nodes"></i>Redes conectadas</button>
+        <a class="vy-nav" href="#gastos" data-vy-go="gastos"><i class="fa-solid fa-wallet"></i>Gastos</a>
+        <button type="button" class="vy-nav" onclick="openTerminal()" title="Comandos en tu PC"><i class="fa-solid fa-terminal"></i>Terminal</button>
+        <a class="vy-nav" href="/.netlify/functions/login?logout=1" title="Cerrar sesión"><i class="fa-solid fa-right-from-bracket"></i>Salir</a>
+
+        <div class="glass-panel rounded-xl vy-status">
+            <span class="font-mono text-xs inline-flex items-center gap-2.5"><span id="vyAgentDot" class="vy-live" aria-hidden="true"></span><span id="vyAgentLabel" class="text-slate-300">REVISANDO TU PC…</span></span>
+            <span id="vyAgentSub" class="text-xs text-slate-400">Un momento</span>
+        </div>
+    </nav>
+
+    <div class="vy-body">
+
+    <!-- BARRA SUPERIOR -->
+    <header class="vy-top">
+        <h2 id="vyPageTitle" class="vy-page">Inicio</h2>
+        <span class="vy-sep" aria-hidden="true"></span>
+        <!-- Selector de novela (mismo menú y mismas funciones de antes) -->
+        <div id="seriesPicker" class="relative">
+            <button id="seriesPickerBtn" type="button" onclick="toggleSeriesMenu(event)" aria-haspopup="listbox" aria-expanded="false"
+                    class="vy-ghost flex items-center gap-2.5 bg-cyber-darker/80 border border-cyber-border px-3 rounded-lg">
+                <span class="w-2.5 h-2.5 rounded-full bg-cyber-cyan shadow-neon-cyan"></span>
+                <span class="text-[10px] text-slate-400 font-mono hidden sm:inline whitespace-nowrap tracking-wider">NOVELA</span>
+                <span id="seriesPickerLabel" class="vy-novela text-sm font-semibold text-white whitespace-nowrap max-w-[240px] truncate">Cargando...</span>
+                <i id="seriesPickerChevron" class="fa-solid fa-chevron-down text-[10px] text-slate-400 transition-transform"></i>
             </button>
-
-            <!-- Quick Trigger Run Button -->
-            <button onclick="triggerPipelineRun()" class="relative group overflow-hidden px-4 py-2 rounded-lg bg-gradient-to-r from-cyber-cyan via-cyber-violet to-cyber-pink p-[1px] shadow-neon-pink hover:scale-105 transition-all">
-                <div class="bg-cyber-darker group-hover:bg-opacity-80 transition-all px-3 py-1.5 rounded-[7px] flex items-center space-x-2">
-                    <i class="fa-solid fa-bolt text-cyber-gold animate-bounce"></i>
-                    <span class="font-display font-semibold text-xs text-white tracking-wider">EJECUTAR PIPELINE</span>
-                </div>
+            <div id="seriesMenu" role="listbox"
+                 class="hidden absolute left-0 mt-2 w-80 bg-cyber-card border border-cyber-border rounded-xl shadow-neon-cyan p-1.5 z-50"></div>
+        </div>
+        <div class="flex flex-wrap items-center gap-3 ml-auto">
+            <!-- Crear novela nueva pegando el JSON que escribe Claude (antes: PROMPT) -->
+            <button type="button" onclick="openNovelModal()" class="vy-ghost px-4 rounded-lg border border-cyber-border bg-cyber-darker/80 text-white text-sm font-semibold">
+                <i class="fa-solid fa-wand-magic-sparkles text-cyber-violet mr-1.5"></i>Nueva novela
+            </button>
+            <!-- Producir el siguiente episodio (antes: EJECUTAR PIPELINE) -->
+            <button type="button" onclick="triggerPipelineRun()" class="vy-cta bg-gradient-to-r from-cyber-cyan to-cyber-violet text-white text-sm font-bold px-5 rounded-lg shadow-neon-cyan">
+                <i class="fa-solid fa-bolt mr-1.5"></i>Producir siguiente
             </button>
         </div>
     </header>
 
-    <main class="max-w-7xl mx-auto px-4 lg:px-8 py-6 space-y-6">
+    <main class="vy-content">
 
-        <!-- SYSTEM METRICS & BUDGET STATUS PANEL -->
-        <section class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            
-            <!-- Budget Widget -->
-            <div class="glass-panel rounded-xl p-4 border-l-4 border-l-cyber-cyan relative overflow-hidden">
-                <div class="flex justify-between items-start mb-2">
-                    <div>
-                        <p class="text-xs font-mono text-slate-400 uppercase tracking-wider">Gasto real del mes</p>
-                        <h3 id="budgetSpentLabel" class="text-2xl font-display font-bold text-white mt-1">$0.00 <span class="text-xs text-slate-400 font-normal">/ $150.00</span></h3>
-                    </div>
-                    <div class="w-8 h-8 rounded-lg bg-cyber-cyan/10 border border-cyber-cyan/30 flex items-center justify-center text-cyber-cyan">
-                        <i class="fa-solid fa-wallet"></i>
+        <!-- INICIO: novela activa -->
+        <section id="vyInicio" class="vy-hero" data-vy-view="inicio">
+            <span class="vy-lab text-cyber-cyan">// Novela activa · <span id="vyNovelTag">cargando…</span></span>
+            <h1 id="vyNovelTitle" class="vy-novela vy-grad">&nbsp;</h1>
+        </section>
+
+        <!-- Lo que sigue (lo pinta panel.js) -->
+        <div data-vy-view="inicio"><div id="vyNext" class="hidden" role="status"></div></div>
+
+        <!-- MÉTRICAS (mismos IDs de antes: renderStats y renderVeoMode las siguen llenando) -->
+        <section class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4" aria-label="Resumen" data-vy-view="inicio">
+            <div class="glass-panel rounded-xl p-5 flex flex-col gap-3 vy-go-card" data-vy-go="gastos" role="link" tabindex="0" aria-label="Ver gastos">
+                <div class="flex items-center gap-4">
+                    <svg width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Porcentaje del presupuesto usado" class="flex-none vy-ring">
+                        <circle cx="32" cy="32" r="26" fill="none" stroke="#1b253e" stroke-width="6"/>
+                        <circle id="vyBudgetRing" cx="32" cy="32" r="26" fill="none" stroke-width="6" stroke-linecap="round" stroke-dasharray="0 163.4" transform="rotate(-90 32 32)" style="stroke: rgb(var(--vy-a))"/>
+                        <text id="vyBudgetPct" x="32" y="36" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="12" fill="#e9eefb">0%</text>
+                    </svg>
+                    <div class="flex flex-col gap-1 min-w-0">
+                        <p class="vy-lab">Gasto del mes</p>
+                        <h3 id="budgetSpentLabel" class="vy-num text-xl text-cyber-cyan whitespace-nowrap">$0.00 <span class="text-xs text-slate-400 font-normal">/ $150.00</span></h3>
                     </div>
                 </div>
-                <div class="w-full bg-slate-800 rounded-full h-2 overflow-hidden mb-2">
-                    <div id="budgetBar" class="bg-gradient-to-r from-cyber-cyan to-cyber-violet h-full rounded-full" style="width: 0%"></div>
-                </div>
-                <div class="flex justify-between text-[11px] font-mono text-slate-400">
+                <div class="vy-bar"><div id="budgetBar" class="vy-fill" style="width: 0%"></div></div>
+                <div class="flex justify-between gap-2 text-[11px] font-mono text-slate-400">
                     <span id="budgetAvgLabel">—</span>
-                    <span id="budgetPctLabel" class="text-cyber-cyan font-bold">0% Usado</span>
+                    <span id="budgetPctLabel" class="text-cyber-cyan">0% usado</span>
                 </div>
             </div>
-
-            <!-- Episode Production Yield -->
-            <div class="glass-panel rounded-xl p-4 border-l-4 border-l-cyber-violet">
-                <div class="flex justify-between items-start mb-2">
-                    <div>
-                        <p class="text-xs font-mono text-slate-400 uppercase tracking-wider">Episodios (total real)</p>
-                        <h3 id="episodeCountLabel" class="text-2xl font-display font-bold text-white mt-1">0</h3>
-                    </div>
-                    <div class="w-8 h-8 rounded-lg bg-cyber-violet/10 border border-cyber-violet/30 flex items-center justify-center text-cyber-violet">
-                        <i class="fa-solid fa-film"></i>
-                    </div>
-                </div>
-                <div class="grid grid-cols-3 gap-1 mt-3 text-center text-[10px] font-mono">
-                    <div class="bg-slate-900/60 p-1 rounded border border-slate-800">
-                        <span class="block text-slate-400">Listos</span>
-                        <span id="episodesListos" class="text-cyber-emerald font-bold text-xs">0</span>
-                    </div>
-                    <div class="bg-slate-900/60 p-1 rounded border border-slate-800">
-                        <span class="block text-slate-400">Revisión</span>
-                        <span id="episodesRevision" class="text-cyber-gold font-bold text-xs">0</span>
-                    </div>
-                    <div class="bg-slate-900/60 p-1 rounded border border-slate-800">
-                        <span class="block text-slate-400">Cola</span>
-                        <span id="episodesCola" class="text-cyber-cyan font-bold text-xs">0</span>
-                    </div>
+            <div class="glass-panel rounded-xl p-5 flex flex-col gap-2 vy-go-card" data-vy-go="guiones" role="link" tabindex="0" aria-label="Ver guiones">
+                <p class="vy-lab">Episodios</p>
+                <h3 id="episodeCountLabel" class="vy-num text-3xl text-cyber-violet">0</h3>
+                <div class="grid grid-cols-3 gap-2 text-center text-[11px] font-mono mt-1">
+                    <div class="vy-mini"><span class="text-slate-400">Publicados</span><span id="episodesListos" class="text-cyber-emerald font-bold">0</span></div>
+                    <div class="vy-mini"><span class="text-slate-400">Revisión</span><span id="episodesRevision" class="text-cyber-gold font-bold">0</span></div>
+                    <div class="vy-mini"><span class="text-slate-400">En fila</span><span id="episodesCola" class="text-cyber-cyan font-bold">0</span></div>
                 </div>
             </div>
-
-            <!-- Claude Validator & Cliffhanger Score -->
-            <div class="glass-panel rounded-xl p-4 border-l-4 border-l-cyber-pink">
-                <div class="flex justify-between items-start mb-2">
-                    <div>
-                        <p class="text-xs font-mono text-slate-400 uppercase tracking-wider">Tomas aprobadas</p>
-                        <h3 id="approvalRateLabel" class="text-2xl font-display font-bold text-white mt-1">—</h3>
-                    </div>
-                    <div class="w-8 h-8 rounded-lg bg-cyber-pink/10 border border-cyber-pink/30 flex items-center justify-center text-cyber-pink">
-                        <i class="fa-solid fa-shield-halved"></i>
-                    </div>
-                </div>
-                <p class="text-xs text-slate-300 mt-2 font-mono">
-                    <i class="fa-solid fa-check text-cyber-emerald mr-1"></i> Aprobadas / generadas (serie activa)
-                </p>
-                <div class="mt-2 text-[11px] text-slate-400 font-mono">
-                    Por revisar: <span id="rejectedCountLabel" class="text-cyber-pink font-bold">0</span>
-                </div>
+            <div class="glass-panel rounded-xl p-5 flex flex-col gap-2 vy-go-card" data-vy-go="revisar" role="link" tabindex="0" aria-label="Revisar tomas">
+                <p class="vy-lab">Tomas aprobadas</p>
+                <h3 id="approvalRateLabel" class="vy-num text-3xl text-white">—</h3>
+                <p class="text-xs text-slate-400">Aprobadas / hechas en esta novela</p>
+                <p class="text-xs font-mono text-slate-400">Por revisar: <span id="rejectedCountLabel" class="text-cyber-gold font-bold">0</span></p>
             </div>
-
-            <!-- Veo API Multi-Model Config -->
-            <div class="glass-panel rounded-xl p-4 border-l-4 border-l-cyber-emerald">
-                <div class="flex justify-between items-start mb-2">
-                    <div>
-                        <p class="text-xs font-mono text-slate-400 uppercase tracking-wider">Modo Veo API</p>
-                        <h3 id="veoModeTitle" class="text-lg font-display font-bold text-cyber-emerald mt-1">—</h3>
-                    </div>
-                    <div class="w-8 h-8 rounded-lg bg-cyber-emerald/10 border border-cyber-emerald/30 flex items-center justify-center text-cyber-emerald">
-                        <i class="fa-solid fa-wand-magic-sparkles"></i>
-                    </div>
-                </div>
-                <p id="veoModeDesc" class="text-xs text-slate-400 mt-1">Cargando…</p>
+            <div class="glass-panel rounded-xl p-5 flex flex-col gap-2 vy-go-card" data-vy-go="produccion" role="link" tabindex="0" aria-label="Ver producción">
+                <p class="vy-lab">Motor de video</p>
+                <h3 id="veoModeTitle" class="vy-num text-xl text-cyber-emerald">—</h3>
+                <p id="veoModeDesc" class="text-xs text-slate-400">Cargando…</p>
             </div>
         </section>
 
-        <!-- ELENCO: PERSONAJES PRINCIPALES (datos reales de Supabase, tabla characters) -->
-        <section id="castSection" class="glass-panel rounded-2xl p-6">
-            <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-cyber-border pb-4 mb-5">
-                <div>
-                    <h3 class="font-display font-bold text-lg text-white flex items-center gap-2">
-                        <i class="fa-solid fa-masks-theater text-cyber-pink"></i>
-                        <span>ELENCO // PERSONAJES PRINCIPALES</span>
-                    </h3>
-                    <p id="castSubtitle" class="text-xs text-slate-400 font-mono">Cargando personajes desde Supabase...</p>
+        <!-- Episodios + columna derecha -->
+        <div class="flex flex-wrap gap-6 items-start" data-vy-view="inicio">
+            <section class="glass-panel rounded-2xl vy-eps" aria-labelledby="vyEpsTitle">
+                <div class="flex flex-wrap items-center justify-between gap-3 px-5 pt-5 pb-3">
+                    <div class="flex flex-col gap-1">
+                        <h2 id="vyEpsTitle" class="vy-novela text-xl font-bold text-white">Episodios</h2>
+                        <span class="font-mono text-[11px] text-slate-400 tracking-wider">GUION · IMÁGENES · VIDEO · VIDEO FINAL · PUBLICADO</span>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span id="vyEpCount" class="text-xs text-slate-500"></span>
+                        <a href="#guiones" data-vy-go="guiones" class="text-sm font-semibold text-cyber-cyan hover:underline">Ver todos →</a>
+                    </div>
                 </div>
-                <div class="flex flex-wrap items-center gap-2">
-                    <button id="castToggleAll" onclick="toggleAllCast()" class="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 text-xs font-mono hover:bg-slate-700"><i class="fa-solid fa-up-right-and-down-left-from-center mr-1"></i>Abrir todas</button>
-                    <button id="genMissingPhotosBtn" onclick="generateMissingCharacterPhotos()" class="hidden px-3 py-1.5 rounded-lg text-xs font-mono border border-cyber-violet/50 bg-cyber-violet/15 text-cyber-violet hover:bg-cyber-violet/25" title="Genera con Gemini las fotos de cara que faltan, todas en el mismo estilo"></button>
-                    <button id="deleteSeriesBtn" onclick="deleteSeries()" class="hidden px-3 py-1.5 rounded-lg text-xs font-mono border border-cyber-pink/40 bg-cyber-pink/10 text-cyber-pink hover:bg-cyber-pink/20" title="Borra la serie completa: episodios, personajes, tomas y archivos"><i class="fa-solid fa-trash mr-1"></i>Eliminar serie</button>
+                <div class="overflow-x-auto">
+                    <table class="w-full border-collapse min-w-[620px]">
+                        <thead><tr>
+                            <th class="vy-th">Episodio</th><th class="vy-th">Progreso</th><th class="vy-th">Estado</th><th class="vy-th text-right">Tomas</th><th class="vy-th"><span class="sr-only">Acción</span></th>
+                        </tr></thead>
+                        <tbody id="vyEpRows"><tr><td class="vy-td" colspan="5"><span class="vy-sk" style="width:60%"></span></td></tr><tr><td class="vy-td" colspan="5"><span class="vy-sk" style="width:60%"></span></td></tr><tr><td class="vy-td" colspan="5"><span class="vy-sk" style="width:60%"></span></td></tr><tr><td class="vy-td" colspan="5"><span class="vy-sk" style="width:60%"></span></td></tr></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <div class="vy-right">
+                <section id="vyWork" class="glass-panel rounded-2xl p-5 flex flex-col gap-3" aria-live="polite">
+                    <span class="vy-lab">Trabajando ahora</span>
+                    <span class="vy-sk" style="width:70%"></span><span class="vy-sk"></span>
+                </section>
+                <section class="glass-panel rounded-2xl p-5 flex flex-col gap-1.5">
+                    <div class="flex items-center justify-between mb-1.5">
+                        <h2 class="vy-novela text-lg font-bold text-white">Redes conectadas</h2>
+                        <button type="button" onclick="openSocialModal()" class="vy-link text-xs">Administrar</button>
+                    </div>
+                    <div id="vyNets" class="flex flex-col gap-3"><span class="vy-sk"></span><span class="vy-sk"></span><span class="vy-sk"></span></div>
+                </section>
+                <section class="glass-panel rounded-2xl p-5 flex flex-col gap-3">
+                    <div class="flex items-center justify-between">
+                        <h2 class="vy-novela text-lg font-bold text-white">Fila de tu PC</h2>
+                        <button type="button" onclick="openTerminal()" class="vy-link text-xs">Ver terminal</button>
+                    </div>
+                    <div id="vyQueue" class="flex flex-col gap-3"><span class="vy-sk"></span><span class="vy-sk" style="width:70%"></span></div>
+                </section>
+            </div>
+        </div>
+
+
+        <!-- ELENCO: PERSONAJES PRINCIPALES (datos reales de Supabase, tabla characters) -->
+        <section id="castSection" class="glass-panel rounded-2xl p-6" data-vy-view="personajes">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-cyber-border pb-4 mb-5">
+                <div class="flex flex-col gap-1 min-w-0">
+                    <span class="vy-lab text-cyber-cyan">// Personajes</span>
+                    <h3 class="vy-novela text-2xl font-bold text-white">El elenco de la novela</h3>
+                    <p id="castSubtitle" class="text-sm text-slate-400 max-w-3xl">Cargando personajes…</p>
+                </div>
+                <div class="flex flex-wrap items-center gap-2 flex-none">
+                    <button id="castToggleAll" onclick="toggleAllCast()" class="vy-ghost min-h-[42px] px-4 rounded-lg border border-cyber-border bg-cyber-darker/80 text-slate-200 text-sm"><i class="fa-solid fa-up-right-and-down-left-from-center mr-1"></i>Abrir todas</button>
+                    <button id="genMissingPhotosBtn" onclick="generateMissingCharacterPhotos()" class="hidden vy-cta min-h-[42px] px-5 rounded-lg bg-gradient-to-r from-cyber-cyan to-cyber-violet text-white text-sm font-bold" title="Genera con Gemini las fotos de cara que faltan, todas en el mismo estilo"></button>
                 </div>
             </div>
-            <div id="castGrid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start"></div>
+            <div id="vyCastStats" class="vy-cast-stats"></div>
+            <div id="castGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 items-start"></div>
             <input type="file" id="charImageInput" accept="image/jpeg,image/png,image/webp" class="hidden" onchange="handleCharacterImage(this.files[0])">
         </section>
 
         <!-- MEMORIA VISUAL: imagen fija de cada lugar (series.visual_memory) -->
-        <section id="locationsSection" class="glass-panel rounded-2xl p-6">
+        <section id="locationsSection" class="glass-panel rounded-2xl p-6" data-vy-view="lugares">
             <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-cyber-border pb-4 mb-5">
-                <div>
-                    <h3 class="font-display font-bold text-lg text-white flex items-center gap-2">
-                        <i class="fa-solid fa-map-location-dot text-cyber-violet"></i>
-                        <span>MEMORIA VISUAL // LUGARES</span>
-                    </h3>
-                    <p id="locationsSubtitle" class="text-xs text-slate-400 font-mono">Cada lugar tiene una imagen fija que se reutiliza en todas sus tomas.</p>
+                <div class="flex flex-col gap-1 min-w-0">
+                    <span class="vy-lab text-cyber-cyan">// Lugares</span>
+                    <h3 class="vy-novela text-2xl font-bold text-white">Dónde pasa la historia</h3>
+                    <p id="locationsSubtitle" class="text-sm text-slate-400 max-w-3xl">Cada lugar tiene una imagen fija que se reutiliza en todas sus tomas.</p>
                 </div>
-                <button id="locToggleAll" onclick="toggleLocations()" class="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 text-xs font-mono hover:bg-slate-700"><i class="fa-solid fa-chevron-down mr-1"></i>Ver lugares</button>
+                <!-- En su propia página la lista siempre se ve; el botón se conserva (oculto) porque toggleLocations() lo usa -->
+                <button id="locToggleAll" onclick="toggleLocations()" class="hidden px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 text-xs font-mono hover:bg-slate-700"><i class="fa-solid fa-chevron-down mr-1"></i>Ver lugares</button>
             </div>
-            <div id="locationsGrid" class="hidden grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4"></div>
+            <div id="vyLocStats" class="vy-cast-stats"></div>
+            <p id="vyLocEmpty" class="hidden text-sm text-slate-400 py-8 text-center">Esta novela no tiene lugares definidos en su guion.</p>
+            <div id="locationsGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5"></div>
             <input type="file" id="locImageInput" accept="image/jpeg,image/png,image/webp" class="hidden" onchange="handleLocationImage(this.files[0])">
+        </section>
+
+        <!-- PRODUCCIÓN · siguiente episodio (antes estaba al final de Revisar) -->
+        <section id="vySiguiente" class="glass-panel rounded-2xl p-6" data-vy-view="produccion">
+            <span class="vy-lab text-cyber-cyan block mb-4">// Siguiente episodio</span>
+                <!-- Siguiente episodio a producir (datos reales) -->
+                <div id="addChapterCard">
+                    <!-- Fila 1: icono + episodio + costo/cuota  ·  botón Producir a la derecha -->
+                    <div class="flex flex-col sm:flex-row sm:items-center gap-4">
+                        <div class="vy-next-ic shrink-0">
+                            <i class="fa-solid fa-clapperboard text-lg"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h4 id="nextEpTitle" class="vy-novela font-bold text-white text-2xl">Siguiente episodio</h4>
+                            <p id="nextEpDesc" class="text-sm text-slate-300 mt-1.5 leading-relaxed">—</p>
+                        </div>
+                        <button id="nextEpBtn" onclick="triggerPipelineRun()" class="hidden vy-cta shrink-0 min-h-[48px] px-7 rounded-xl bg-gradient-to-r from-cyber-cyan to-cyber-violet text-white text-base font-bold shadow-neon-cyan"></button>
+                    </div>
+                    <!-- Fila 2: opciones de producción a lo ancho (proveedor/modelo · narrador) -->
+                    <div id="nextEpOptions" class="hidden grid grid-cols-1 lg:grid-cols-3 gap-6 mt-4 pt-4 border-t border-cyber-border"></div>
+                </div>
         </section>
 
         <!-- PROGRESO REAL DE LA SERIE ACTIVA (calculado con los datos de Supabase).
              Reemplaza la maqueta "Orquestación del pipeline", cuyos estados eran fijos. -->
-        <section class="glass-panel rounded-2xl p-6">
+        <section id="vyProduccion" class="glass-panel rounded-2xl p-6" data-vy-view="produccion">
             <div class="flex flex-col md:flex-row md:items-center justify-between gap-2 mb-5">
                 <div>
-                    <h2 class="font-display font-bold text-lg text-white flex items-center gap-2"><i class="fa-solid fa-route text-cyber-cyan"></i>PROGRESO DE LA SERIE</h2>
-                    <p class="text-xs text-slate-400 font-mono">Datos reales de la serie activa. Haz clic en un paso para ir a su sección.</p>
+                    <h2 class="font-display font-bold text-lg text-white flex items-center gap-2"><i class="fa-solid fa-route text-cyber-cyan"></i>Cómo va la novela</h2>
+                    <p class="text-xs text-slate-400 font-mono">Cada paso con datos reales. Haz clic en uno para ir a su sección.</p>
                 </div>
             </div>
             <div id="pipelineSteps" class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3"></div>
-            <div id="pipelineNext" class="mt-4 bg-cyber-darker border border-cyber-border rounded-xl px-4 py-3 text-xs font-mono text-slate-300"></div>
+            <div id="pipelineNext" class="vy-tip"></div>
         </section>
 
-        <!-- STORY BIBLE & CHARACTER CONSISTENCY CENTRAL -->
-        <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- PRODUCCIÓN · fila de episodios por producir (panel.js) -->
+        <section id="vyFila" class="glass-panel rounded-2xl" data-vy-view="produccion" aria-labelledby="vyFilaTitle">
+            <div class="flex flex-wrap items-center justify-between gap-3 px-6 pt-6 pb-3">
+                <div class="flex flex-col gap-1">
+                    <h2 id="vyFilaTitle" class="vy-novela text-xl font-bold text-white">Fila de producción</h2>
+                    <span class="text-xs text-slate-400">Episodios que faltan por terminar, en orden.</span>
+                </div>
+                <span id="vyFilaCount" class="font-mono text-xs text-slate-400"></span>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full border-collapse min-w-[640px]">
+                    <thead><tr><th class="vy-th">Episodio</th><th class="vy-th">Etapa</th><th class="vy-th">Progreso</th><th class="vy-th text-right">Tomas</th><th class="vy-th"><span class="sr-only">Acción</span></th></tr></thead>
+                    <tbody id="vyFilaRows"><tr><td class="vy-td" colspan="5"><span class="vy-sk" style="width:60%"></span></td></tr><tr><td class="vy-td" colspan="5"><span class="vy-sk" style="width:45%"></span></td></tr></tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- STORY BIBLE & CHARACTER CONSISTENCY CENTRAL (páginas Guiones y Reglas) -->
+        <section class="grid grid-cols-1 lg:grid-cols-3 gap-6 vy-split" data-vy-view="guiones reglas">
             
             <!-- Story Bible & Rules Engine -->
-            <div class="glass-panel rounded-2xl p-6 lg:col-span-1 space-y-4">
+            <div id="vyReglas" class="glass-panel rounded-2xl p-6 lg:col-span-1 space-y-4">
                 <div class="flex items-center justify-between border-b border-cyber-border pb-3">
                     <div class="flex items-center space-x-2">
                         <i class="fa-solid fa-book-bookmark text-cyber-pink"></i>
-                        <h3 class="font-display font-bold text-white text-base">STORY BIBLE & REGLAS</h3>
+                        <h3 class="font-display font-bold text-white text-base">Reglas de la novela</h3>
                     </div>
                     <span class="text-[10px] font-mono bg-cyber-pink/20 text-cyber-pink border border-cyber-pink/40 px-2 py-0.5 rounded">SUPABASE JSON</span>
                 </div>
@@ -337,106 +413,146 @@
                         <p><strong class="text-cyber-pink">Estado Pendiente:</strong> <span id="continuityPending">—</span></p>
                     </div>
                 </div>
+                <!-- Zona peligrosa: borrar la novela completa (antes estaba en Personajes) -->
+                <div class="vy-danger">
+                    <div class="flex flex-col gap-1"><strong class="text-white text-sm">Zona peligrosa</strong>
+                    <span class="text-xs text-slate-400">Borra la novela completa: episodios, personajes, tomas y archivos. No se puede deshacer.</span></div>
+                    <button id="deleteSeriesBtn" onclick="deleteSeries()" class="hidden vy-danger-btn" title="Borra la serie completa: episodios, personajes, tomas y archivos"><i class="fa-solid fa-trash mr-1"></i>Eliminar esta novela</button>
+                </div>
             </div>
 
             <!-- ARCO COMPLETO: los guiones de todos los episodios (datos reales) -->
-            <div class="glass-panel rounded-2xl p-6 lg:col-span-2">
-                <div class="flex items-center justify-between border-b border-cyber-border pb-3 mb-4">
-                    <div class="flex items-center space-x-2">
-                        <i class="fa-solid fa-scroll text-cyber-cyan"></i>
-                        <h3 id="arcSection" class="font-display font-bold text-white text-base">ARCO COMPLETO // GUIONES</h3>
+            <div id="vyGuiones" class="glass-panel rounded-2xl p-6 lg:col-span-2">
+                <div class="flex flex-wrap items-end justify-between gap-3 mb-3">
+                    <div class="flex flex-col gap-1">
+                        <span class="vy-lab text-cyber-cyan">// Guiones</span>
+                        <h3 id="arcSection" class="vy-novela text-2xl font-bold text-white">Todos los episodios</h3>
                     </div>
                     <span id="arcCountLabel" class="text-xs font-mono text-slate-400"></span>
                 </div>
-                <p id="arcSynopsis" class="text-[11px] text-slate-400 mb-3"></p>
-                <div id="arcList" class="space-y-2 max-h-[620px] overflow-y-auto pr-1"></div>
+                <p id="arcSynopsis" class="vy-synopsis"></p>
+                <!-- Filtros y búsqueda (panel.js) -->
+                <div class="vy-arc-tools">
+                    <div id="vyArcChips" class="flex flex-wrap gap-2" role="group" aria-label="Filtrar episodios"></div>
+                    <label class="vy-search"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i><span class="sr-only">Buscar episodio</span>
+                        <input id="vyArcSearch" type="search" placeholder="Buscar por título o número…" autocomplete="off">
+                    </label>
+                </div>
+                <p id="vyArcEmpty" class="hidden text-sm text-slate-400 py-6 text-center">Ningún episodio coincide con el filtro.</p>
+                <div id="arcList" class="space-y-3 max-h-[620px] overflow-y-auto pr-1"></div>
             </div>
         </section>
 
         <!-- EPISODE PRODUCTION QUEUE & REVIEW PANEL -->
-        <section class="glass-panel rounded-2xl p-6">
-            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 border-b border-cyber-border pb-4">
-                <div>
-                    <h3 class="font-display font-bold text-lg text-white flex items-center gap-2">
-                        <i class="fa-solid fa-sliders text-cyber-gold"></i>
-                        <span id="reviewSection">PANEL DE REVISIÓN HUMANA Y COLA DE PRODUCCIÓN</span>
-                    </h3>
-                    <p class="text-xs text-slate-400 font-mono">Filtro humano rápido de 1-2 minutos para evitar "looks IA" o inconsistencias antes de publicar.</p>
-                    <p id="dataStatusBanner" class="text-[11px] font-mono text-cyber-gold mt-1"></p>
-                    <div id="finalRenderPanel" class="mt-3 hidden"></div>
-                </div>
-
+        <section id="vyRevisar" class="vy-rev" data-vy-view="revisar">
+            <!-- Encabezado: qué episodio estás revisando y en qué paso va (panel.js) -->
+            <div class="glass-panel rounded-2xl p-6 flex flex-col gap-3">
+                <span class="vy-lab text-cyber-cyan">// <span id="reviewSection">Revisar, aprobar y publicar</span></span>
+                <h2 id="vyRevTitle" class="vy-novela vy-grad vy-rev-title">&nbsp;</h2>
+                <p id="dataStatusBanner" class="text-sm text-cyber-gold"></p>
+                <ol id="vyRevSteps" class="vy-revsteps" aria-label="Pasos para publicar"></ol>
             </div>
 
-            <!-- Textos para publicar (copiar y pegar): desplegable -->
-            <details id="copyTextsDetails" class="mb-4 rounded-xl border border-cyber-pink/40 bg-cyber-darker/30 hidden">
-                <summary id="copyTextsSummary" class="cursor-pointer list-none px-4 py-3 text-sm font-mono text-cyber-pink hover:text-white select-none"></summary>
-                <div id="copyTextsInner" class="p-4 pt-0 space-y-3"></div>
-            </details>
+            <!-- Paso 1: tomas (desplegable; se abre solo si hay tomas por revisar) -->
+            <div class="vy-step" data-n="1" data-t="Revisa cada toma">
+                <details id="shotCardsDetails" class="vy-det hidden">
+                    <summary id="shotCardsSummary" class="vy-sum"></summary>
+                    <div id="shotCardsInner" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5 gap-4 p-5 pt-1"></div>
+                </details>
+            </div>
 
-            <!-- Publicar en redes (TikTok / Instagram / Facebook / YouTube): desplegable -->
-            <details id="publishDetails" class="mb-4 rounded-xl border border-cyber-pink/40 bg-cyber-darker/30 hidden">
-                <summary id="publishSummary" class="cursor-pointer list-none px-4 py-3 text-sm font-mono text-cyber-pink hover:text-white select-none"></summary>
-                <div id="publishInner" class="p-4 pt-0"></div>
-            </details>
+            <!-- Paso 2: video final (unir, editar, ver) -->
+            <div class="vy-step" data-n="2" data-t="Video final">
+                <div id="finalRenderPanel" class="vy-det vy-final hidden"></div>
+            </div>
 
-            <!-- Tomas del episodio en revisión: desplegable (cerrado si ya están todas aprobadas) -->
-            <details id="shotCardsDetails" class="mb-6 rounded-xl border border-cyber-border bg-cyber-darker/30 hidden">
-                <summary id="shotCardsSummary" class="cursor-pointer list-none px-4 py-3 text-sm font-mono text-cyber-cyan hover:text-white select-none"></summary>
-                <div id="shotCardsInner" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 p-4 pt-0"></div>
-            </details>
+            <!-- Paso 3: textos para publicar (copiar y pegar) -->
+            <div class="vy-step" data-n="3" data-t="Textos para publicar">
+                <details id="copyTextsDetails" class="vy-det hidden">
+                    <summary id="copyTextsSummary" class="vy-sum"></summary>
+                    <div id="copyTextsInner" class="p-5 pt-1 space-y-3"></div>
+                </details>
+            </div>
 
-            <!-- Vertical 9:16 Shot Breakdown & Scene Cards Grid -->
-            <div id="shotCardsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                
-                <!-- Siguiente episodio a producir (datos reales) -->
-                <div id="addChapterCard" class="md:col-span-2 lg:col-span-4 bg-cyber-darker/40 rounded-xl border border-dashed border-cyber-border p-5 hover:border-cyber-cyan transition-all">
-                    <!-- Fila 1: icono + episodio + costo/cuota  ·  botón Producir a la derecha -->
-                    <div class="flex flex-col sm:flex-row sm:items-center gap-4">
-                        <div class="w-12 h-12 shrink-0 rounded-full bg-cyber-cyan/10 border border-cyber-cyan/30 flex items-center justify-center text-cyber-cyan">
-                            <i class="fa-solid fa-clapperboard text-lg"></i>
-                        </div>
-                        <div class="flex-1 min-w-0">
-                            <h4 id="nextEpTitle" class="font-display font-bold text-white text-base">Siguiente episodio</h4>
-                            <p id="nextEpDesc" class="text-xs text-slate-400 font-mono mt-1">—</p>
-                        </div>
-                        <button id="nextEpBtn" onclick="triggerPipelineRun()" class="hidden shrink-0 px-6 py-3 rounded-lg bg-cyber-cyan/20 text-cyber-cyan border border-cyber-cyan/40 text-sm font-mono font-bold hover:bg-cyber-cyan/30 transition-all"></button>
-                    </div>
-                    <!-- Fila 2: opciones de producción a lo ancho (proveedor/modelo · narrador) -->
-                    <div id="nextEpOptions" class="hidden grid grid-cols-1 lg:grid-cols-3 gap-6 mt-4 pt-4 border-t border-cyber-border"></div>
-                </div>
+            <!-- Paso 4: publicar en redes (TikTok / Instagram / Facebook / YouTube) -->
+            <div class="vy-step" data-n="4" data-t="Publicar en redes">
+                <details id="publishDetails" class="vy-det hidden">
+                    <summary id="publishSummary" class="vy-sum"></summary>
+                    <div id="publishInner" class="p-5 pt-1"></div>
+                </details>
+            </div>
+
+            <!-- Sin nada que revisar -->
+            <div id="vyRevEmpty" class="glass-panel rounded-2xl p-10 text-center flex flex-col items-center gap-3 hidden">
+                <div class="vy-next-ic"><i class="fa-regular fa-eye"></i></div>
+                <h3 class="vy-novela text-2xl font-bold text-white">No hay nada por revisar</h3>
+                <p class="text-sm text-slate-400 max-w-md">Cuando un episodio termine de producirse, sus tomas aparecen aquí para que las apruebes y lo publiques.</p>
+                <a href="#produccion" data-vy-go="produccion" class="vy-next-btn mt-2">Ir a Producción <i class="fa-solid fa-arrow-right"></i></a>
+            </div>
+
+            <div id="shotCardsGrid" class="hidden"></div>
+        </section>
+
+        <!-- CUENTA · API: claves de todos los servicios (panel.js + /.netlify/functions/api-keys) -->
+        <section id="vyApi" class="flex flex-col gap-5" data-vy-view="api" aria-labelledby="vyApiTitle">
+            <div class="flex flex-col gap-1">
+                <span class="vy-lab text-cyber-cyan">// Cuenta · API</span>
+                <h2 id="vyApiTitle" class="vy-novela text-3xl font-bold text-white">Conexiones del programa</h2>
+                <p class="text-sm text-slate-400 max-w-3xl">Pega aquí la clave de cada servicio. Se guarda <strong class="text-slate-200">cifrada</strong> en tu base de datos, nunca se vuelve a mostrar completa y reemplaza a la del archivo <code>.env</code>. Los cambios se aplican en menos de 1 minuto.</p>
+            </div>
+            <div id="vyApiBody" class="flex flex-col gap-5">
+                <div class="glass-panel rounded-2xl p-6"><span class="vy-sk"></span></div>
+            </div>
+        </section>
+
+        <!-- GASTOS · resumen (panel.js) -->
+        <section id="vyGastosTop" class="flex flex-col gap-4" data-vy-view="gastos" aria-label="Resumen de gastos">
+            <div class="flex flex-col gap-1">
+                <span class="vy-lab text-cyber-cyan">// Gastos</span>
+                <h2 class="vy-novela text-3xl font-bold text-white">Cuánto llevas gastado</h2>
+                <p class="text-sm text-slate-400">El límite de $150 es por mes y para todas tus novelas juntas.</p>
+            </div>
+            <div id="vyCostKpis" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+                <div class="glass-panel rounded-xl p-5"><span class="vy-sk"></span></div><div class="glass-panel rounded-xl p-5"><span class="vy-sk"></span></div>
+                <div class="glass-panel rounded-xl p-5"><span class="vy-sk"></span></div><div class="glass-panel rounded-xl p-5"><span class="vy-sk"></span></div>
             </div>
         </section>
 
         <!-- API & INFRASTRUCTURE TELEMETRY ANALYTICS -->
-        <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <section id="vyGastos" class="grid grid-cols-1 lg:grid-cols-3 gap-6" data-vy-view="gastos">
             
             <!-- Real-time Cost & Usage Chart -->
             <div class="glass-panel rounded-2xl p-6 lg:col-span-2">
                 <div class="flex items-center justify-between border-b border-cyber-border pb-3 mb-4">
                     <div>
-                        <h3 class="font-display font-bold text-white text-base">COSTO REAL POR TOMA (VEO)</h3>
-                        <p class="text-xs text-slate-400 font-mono">Datos reales de la tabla `assets` en Supabase — no simulados</p>
+                        <h3 class="vy-novela font-bold text-white text-xl">Costo de cada toma</h3>
+                        <p class="text-xs text-slate-400">Cada barra es una toma de esta novela, con lo que costó de verdad.</p>
                     </div>
                     <span id="budgetBadge" class="text-xs font-mono text-cyber-emerald bg-cyber-emerald/10 border border-cyber-emerald/30 px-2 py-1 rounded">SIN DATOS AÚN</span>
                 </div>
 
-                <div class="h-64">
+                <div class="h-80">
                     <canvas id="costChart"></canvas>
                 </div>
             </div>
 
+            <div class="lg:col-span-1 flex flex-col gap-6">
+            <!-- Gasto por motor de video (panel.js) -->
+            <div class="glass-panel rounded-2xl p-6 flex flex-col gap-4">
+                <h3 class="vy-novela font-bold text-white text-xl">Por motor de video</h3>
+                <div id="vyCostModels" class="flex flex-col gap-4"><span class="vy-sk"></span><span class="vy-sk"></span></div>
+            </div>
             <!-- Supabase Storage Breakdown & Database Metadatos -->
-            <div class="glass-panel rounded-2xl p-6 lg:col-span-1 space-y-4">
+            <div class="glass-panel rounded-2xl p-6 space-y-4">
                 <div class="flex items-center justify-between border-b border-cyber-border pb-3">
-                    <h3 class="font-display font-bold text-white text-base">SUPABASE STORAGE & DB</h3>
+                    <h3 class="font-display font-bold text-white text-base">Detalles técnicos</h3>
                     <i class="fa-solid fa-server text-cyber-violet"></i>
                 </div>
 
                 <div class="space-y-3 font-mono text-xs">
                     <div>
                         <div class="flex justify-between text-slate-300 mb-1">
-                            <span>Clips de video generados:</span>
+                            <span>Videos de tomas generados:</span>
                             <span id="clipsCountLabel" class="text-cyber-violet font-bold">0</span>
                         </div>
                         <div class="w-full bg-slate-800 rounded-full h-1.5">
@@ -447,15 +563,15 @@
 
                     <div class="p-3 bg-cyber-darker rounded-lg border border-cyber-border space-y-2">
                         <div class="flex justify-between">
-                            <span class="text-slate-400">Canales Registrados:</span>
+                            <span class="text-slate-400">Canales registrados:</span>
                             <span id="channelsCountLabel" class="text-white font-bold">0</span>
                         </div>
                         <div class="flex justify-between">
-                            <span class="text-slate-400">Filas en `episodes` (serie actual):</span>
+                            <span class="text-slate-400">Episodios guardados (esta novela):</span>
                             <span id="episodeRowsLabel" class="text-white font-bold">0</span>
                         </div>
                         <div class="flex justify-between">
-                            <span class="text-slate-400">Tamaño Story Bible (JSON):</span>
+                            <span class="text-slate-400">Tamaño de las reglas de la novela:</span>
                             <span id="storyBibleSizeLabel" class="text-white font-bold">— KB</span>
                         </div>
                     </div>
@@ -470,9 +586,13 @@
                     </div>
                 </div>
             </div>
+            </div>
         </section>
 
     </main>
+    <footer class="vy-foot">VYRALES · Estudio de video IA &copy; 2026</footer>
+    </div><!-- /vy-body -->
+    </div><!-- /vy-shell -->
 
     <!-- INTERACTIVE NODE INSPECTOR MODAL -->
     <div id="nodeModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
@@ -513,10 +633,7 @@
         </div>
     </div>
 
-    <!-- FOOTER -->
-    <footer class="border-t border-cyber-border/60 py-6 mt-12 glass-panel text-center font-mono text-xs text-slate-500">
-        <p>VYRALES Micro-drama Architecture &copy; 2026 &middot; Powered by Veo 3.1, Claude Max & Supabase Orchestration</p>
-    </footer>
+
 
     <script>
         // Data Store for Nodes
@@ -1524,7 +1641,8 @@
         );
         const labels = sorted.map(a => 'Ep' + a.episode_number + '-T' + String(a.shot_number).padStart(2, '0'));
         const costs = sorted.map(a => Number(a.cost_usd) || 0);
-        const colors = sorted.map(a => a.model === 'veo_fast' ? '#ff007f' : '#00ff88');
+        const vyc = (v, f) => { try { const x = getComputedStyle(document.documentElement).getPropertyValue(v).trim(); return x ? 'rgb(' + x.split(/\s+/).join(',') + ')' : f; } catch (_) { return f; } };
+        const colors = sorted.map(a => a.model === 'veo_fast' ? vyc('--vy-b', '#ff3ea5') : vyc('--vy-a', '#00ff88'));
 
         if (costChartRef) {
           costChartRef.data.labels = labels;
@@ -1541,18 +1659,21 @@
             datasets: [{
               label: 'Costo real por toma ($)',
               data: costs,
-              backgroundColor: colors
+              backgroundColor: colors,
+              borderRadius: 4,
+              maxBarThickness: 28
             }]
           },
           options: {
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
-              legend: { labels: { color: '#94a3b8', font: { family: 'JetBrains Mono', size: 11 } } }
+              legend: { display: false },
+              tooltip: { callbacks: { label: (c) => ' $' + Number(c.parsed.y || 0).toFixed(3) } }
             },
             scales: {
               x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8', font: { family: 'JetBrains Mono' } } },
-              y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8', font: { family: 'JetBrains Mono' } } }
+              y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8', font: { family: 'JetBrains Mono' }, callback: (v) => '$' + Number(v).toFixed(2) } }
             }
           }
         });
@@ -1705,6 +1826,12 @@
         m.addEventListener('click', (e) => { if (e.target === m) close(); });
       }
 
+      // Elegir qué episodio se revisa/publica (se recuerda por serie). Sin id = volver al automático.
+      window.vyReviewEp = function (id) {
+        window.__reviewEpId = id || null;
+        try { const k = 'vyrales_review_ep_' + (((lastLoadedData || {}).series || {}).slug || ''); if (id) localStorage.setItem(k, id); else localStorage.removeItem(k); } catch (_) {}
+        loadDashboard();
+      };
       function narrationBoxHtml(episode) {
         const v = ((episode && episode.continuity) || {}).voice;
         if (v && v.url) {
@@ -1771,6 +1898,7 @@
         if (!list.find(x => x.slug === DEFAULT_SERIES)) list.unshift({ slug: DEFAULT_SERIES, title: DEFAULT_SERIES, genre: 'no importada' });
         const active = list.find(x => x.slug === DEFAULT_SERIES);
         document.getElementById('seriesPickerLabel').textContent = active ? active.title : 'Elegir serie';
+        if (window.vyTema) window.vyTema.apply((current && typeof current === 'object' && current.slug === DEFAULT_SERIES) ? current : (active || DEFAULT_SERIES));
         document.getElementById('seriesMenu').innerHTML =
           '<p class="px-3 pt-1.5 pb-2 text-[10px] font-mono text-slate-500 tracking-wider">CAMBIAR DE SERIE</p>' +
           list.map(x => {
@@ -2897,7 +3025,7 @@
               '<summary class="cursor-pointer list-none p-3 flex items-center justify-between gap-2">' +
                 '<span class="text-sm text-white font-display font-semibold truncate"><span class="font-mono text-cyber-cyan mr-2">EP ' + String(e.episode_number).padStart(2, '0') + '</span>' + esc(e.title || 'Sin título') + '</span>' +
                 '<span class="flex items-center gap-2 flex-shrink-0">' +
-                  (clips ? '<span class="text-[10px] font-mono text-slate-400">' + clips + '/' + (shots.length || 8) + ' clips</span>' : '') +
+                  (clips ? '<span class="text-[10px] font-mono text-slate-400">' + clips + '/' + (shots.length || 8) + ' tomas</span>' : '') +
                   (words ? '<span class="text-[10px] font-mono text-slate-500 hidden sm:inline">' + words + ' palabras</span>' : '') +
                   '<span class="text-[10px] font-mono px-1.5 py-0.5 rounded border ' + st[1] + '">' + st[0] + '</span>' +
                 '</span>' +
@@ -2972,11 +3100,11 @@
         const locWithImg = locKeys.filter(k => vmLocs[k] && vmLocs[k].url).length;
         const frames = eps.flatMap(e => (e.assets || []).filter(a => a.kind === 'image')).length;
         document.getElementById('pipelineSteps').innerHTML = [
-          step(1, 'fa-feather', 'Novela escrita', eps.length + ' eps', totalShots + ' tomas · creada con PROMPT', eps.length ? 'ok' : 'todo', 'arcSection'),
+          step(1, 'fa-feather', 'Novela escrita', eps.length + ' eps', totalShots + ' tomas en total', eps.length ? 'ok' : 'todo', 'arcSection'),
           step(2, 'fa-shield-halved', 'Validación', '0 errores', warnings ? warnings + ' avisos de riesgo visual' : 'sin avisos', eps.length ? (warnings ? 'warn' : 'ok') : 'todo', 'arcSection'),
-          step(3, 'fa-masks-theater', 'Memoria visual', withPhoto + '/' + chars.length + ' caras', rules.keyframes ? (locWithImg + '/' + locKeys.length + ' lugares · ' + frames + ' cuadros') : (rules.reference_images ? 'las fotos se envían a Veo' : 'fotos solo de referencia'), photoState, 'castSection'),
-          step(4, 'fa-video', 'Tomas en Veo', clips.length + '/' + totalShots, generating ? 'generando EP ' + generating.episode_number + '…' : (finals + ' episodio(s) unido(s)'), generating ? 'work' : (totalShots && clips.length >= totalShots ? 'ok' : 'todo'), 'arcSection'),
-          step(5, 'fa-user-check', 'Revisión humana', approved + '/' + clips.length, 'tomas aprobadas', clips.length && approved === clips.length ? 'ok' : (clips.length ? 'work' : 'todo'), 'reviewSection'),
+          step(3, 'fa-masks-theater', 'Personajes y lugares', withPhoto + '/' + chars.length + ' caras', rules.keyframes ? (locWithImg + '/' + locKeys.length + ' lugares · ' + frames + ' cuadros') : (rules.reference_images ? 'las fotos se envían a Veo' : 'fotos solo de referencia'), photoState, 'castSection'),
+          step(4, 'fa-video', 'Videos de las tomas', clips.length + '/' + totalShots, generating ? 'generando EP ' + generating.episode_number + '…' : (finals + ' episodio(s) unido(s)'), generating ? 'work' : (totalShots && clips.length >= totalShots ? 'ok' : 'todo'), 'arcSection'),
+          step(5, 'fa-user-check', 'Tu revisión', approved + '/' + clips.length, 'tomas aprobadas', clips.length && approved === clips.length ? 'ok' : (clips.length ? 'work' : 'todo'), 'reviewSection'),
           (function() {
             // Paso 6 real: episodios con video final, cuántos publicados por red y cuentas conectadas.
             const withFinal = eps.filter(e => (e.assets || []).some(a => a.kind === 'final_render'));
@@ -2994,12 +3122,12 @@
         let next;
         const nextEp = eps.find(e => e.status === 'guion_generado');
         const inReview = eps.find(e => e.status === 'en_revision');
-        if (!eps.length) next = 'Crea una novela con el botón <b>PROMPT</b>.';
-        else if (needPhotos && withPhoto < chars.length) next = 'Sube la foto de cara de los ' + (chars.length - withPhoto) + ' personaje(s) que faltan en <b>Elenco</b>: sin ellas no se puede producir.';
-        else if (rules.keyframes && locWithImg < locKeys.length) next = 'Recomendado: genera o sube la imagen fija de los ' + (locKeys.length - locWithImg) + ' lugares que faltan en <b>Memoria visual</b> (o produce igual: se usa solo el texto del lugar).';
-        else if (generating) next = 'Veo está generando el EP ' + generating.episode_number + '. Espera a que termine.';
-        else if (inReview) next = 'Revisa el <b>EP ' + inReview.episode_number + '</b> en el panel de revisión: aprueba o regenera cada toma.';
-        else if (nextEp) next = 'Siguiente: produce el <b>EP ' + nextEp.episode_number + ' — ' + esc(nextEp.title || '') + '</b> desde Arco completo (~$' + estimateEpisodeCost(nextEp).toFixed(2) + ').';
+        if (!eps.length) next = 'Crea una novela con el botón <b>Nueva novela</b>.';
+        else if (needPhotos && withPhoto < chars.length) next = 'Sube la foto de cara de los ' + (chars.length - withPhoto) + ' personaje(s) que faltan en <b>Personajes</b>: sin ellas no se puede producir.';
+        else if (rules.keyframes && locWithImg < locKeys.length) next = 'Recomendado: genera o sube la imagen fija de los ' + (locKeys.length - locWithImg) + ' lugares que faltan en <b>Lugares</b> (o produce igual: se usa solo el texto del lugar).';
+        else if (generating) next = 'Se está generando el EP ' + generating.episode_number + '. Espera a que termine.';
+        else if (inReview) next = 'Revisa el <b>EP ' + inReview.episode_number + '</b> en <b>Revisar y publicar</b>: aprueba o rehaz cada toma.';
+        else if (nextEp) next = 'Siguiente: produce el <b>EP ' + nextEp.episode_number + ' — ' + esc(nextEp.title || '') + '</b> desde Guiones (~$' + estimateEpisodeCost(nextEp).toFixed(2) + ').';
         else next = 'Todos los episodios están producidos.';
         document.getElementById('pipelineNext').innerHTML = '<i class="fa-solid fa-arrow-right text-cyber-cyan mr-2"></i>' + next;
       }
@@ -3076,7 +3204,7 @@
           opts.classList.remove('hidden');
         } else {
           title.textContent = eps.length ? 'No hay episodios pendientes' : 'Sin episodios';
-          desc.textContent = eps.length ? 'Todos los episodios ya se produjeron.' : 'Crea una novela con el botón PROMPT.';
+          desc.textContent = eps.length ? 'Todos los episodios ya se produjeron.' : 'Crea una novela con el botón Nueva novela.';
         }
       }
 
@@ -3568,7 +3696,12 @@
           renderRules(data);
           renderLocations(data);
           renderNextEpisodeCard(data);
-          const inReview =
+          // Episodio ELEGIDO para revisar/publicar (Franklin, oct-12: "siempre se ve el último aunque seleccione otro").
+          // window.vyReviewEp(id) lo fija; se recuerda por serie. Si no hay elección, el de siempre (el que espera revisión).
+          let pickedId = window.__reviewEpId;
+          try { if (!pickedId) pickedId = localStorage.getItem('vyrales_review_ep_' + ((data.series || {}).slug || '')); } catch (_) {}
+          const picked = pickedId ? episodes.find(e => e.id === pickedId) : null;
+          const inReview = picked ||
             episodes.find(e => e.status === 'en_revision') ||
             episodes.find(e => e.status === 'generando_media') ||
             episodes.find(e => (e.assets || []).some(a => a.kind === 'video_clip')) ||
@@ -3607,11 +3740,16 @@
             banner.innerHTML = inReview.status === 'generando_media'
               ? '<i class="fa-solid fa-spinner fa-spin mr-1"></i>Generando EP ' + inReview.episode_number + ' de "' + esc(data.series.title) + '": ' + sorted.length + ' de ' + ((inReview.shots || []).length || '?') + ' tomas listas. Puedes ir revisando las que ya salieron.'
               : 'Revisando EP ' + inReview.episode_number + ' de "' + esc(data.series.title) + '".';
+            // Selector: cualquier episodio con video (también los viejos o ya publicados) para verlo y publicarlo.
+            const withVideo = episodes.filter(e => (e.assets || []).some(a => a.kind === 'video_clip' || a.kind === 'final_render')).sort((a, b) => (b.episode_number || 0) - (a.episode_number || 0));
+            if (withVideo.length > 1) banner.innerHTML += ' <select onchange="vyReviewEp(this.value)" class="ml-2 bg-cyber-darker border border-slate-600 rounded px-2 py-0.5 text-xs text-slate-200">' +
+              withVideo.map(e => '<option value="' + esc(e.id) + '"' + (e.id === inReview.id ? ' selected' : '') + '>EP ' + e.episode_number + ' · ' + esc(String(e.title || '').slice(0, 50)) + (e.status === 'en_revision' ? ' (por revisar)' : e.status === 'publicado' ? ' (publicado)' : '') + '</option>').join('') + '</select>';
           } else {
             shotBox.classList.add('hidden');
             banner.textContent = 'Todavía no hay tomas generadas en esta serie.';
           }
           lastLoadedData = data;
+          try { if (window.vyPanel) window.vyPanel.render(data); } catch (e) { console.warn('vyPanel', e); } // INICIO nuevo (rediseño)
         } catch (err) {
           banner.textContent = 'No se pudo cargar la información (' + err.message + ').';
           banner.classList.remove('text-cyber-gold');

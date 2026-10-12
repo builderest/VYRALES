@@ -200,3 +200,6 @@ exports.handler = async (event) => {
 };
 
 exports.runPublish = runPublish;
+
+// Claves de la página Cuenta → API (cifradas en Supabase; mandan sobre el .env). Ver _keys.js.
+exports.handler = require('./_keys').withKeys(exports.handler);

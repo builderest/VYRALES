@@ -53,3 +53,6 @@ exports.handler = async (event) => {
   }
 };
 function list() { return Object.entries(COMMANDS).filter(([, c]) => !c.hidden).map(([key, c]) => ({ key, label: c.label, help: c.help })); }
+
+// Claves de la página Cuenta → API (cifradas en Supabase; mandan sobre el .env). Ver _keys.js.
+exports.handler = require('./_keys').withKeys(exports.handler);

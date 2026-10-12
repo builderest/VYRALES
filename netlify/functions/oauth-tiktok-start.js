@@ -7,3 +7,6 @@ exports.handler = async (event) => {
   try { return { statusCode: 302, headers: { Location: tiktokAuthUrl(), 'Cache-Control': 'no-store' }, body: '' }; }
   catch (err) { return { statusCode: 500, headers: { 'Content-Type': 'text/html; charset=utf-8' }, body: '<p style="font-family:sans-serif">' + err.message + '</p>' }; }
 };
+
+// Claves de la página Cuenta → API (cifradas en Supabase; mandan sobre el .env). Ver _keys.js.
+exports.handler = require('./_keys').withKeys(exports.handler);

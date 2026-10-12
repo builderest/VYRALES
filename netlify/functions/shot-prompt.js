@@ -91,3 +91,6 @@ exports.handler = async (event) => {
     return json(500, { error: err.message });
   }
 };
+
+// Claves de la página Cuenta → API (cifradas en Supabase; mandan sobre el .env). Ver _keys.js.
+exports.handler = require('./_keys').withKeys(exports.handler);

@@ -11,3 +11,6 @@ exports.handler = async (event) => {
   try { return json(200, await tiktokCreatorInfo(getSupabaseClient())); }
   catch (err) { return json(400, { error: err.message }); }
 };
+
+// Claves de la página Cuenta → API (cifradas en Supabase; mandan sobre el .env). Ver _keys.js.
+exports.handler = require('./_keys').withKeys(exports.handler);

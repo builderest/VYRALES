@@ -25,3 +25,6 @@ exports.handler = async (event) => {
 ${cards || '<p>Muy pronto: la primera historia completa.</p>'}<a class="ch" href="${esc(CHANNEL)}" rel="noopener">Ver el canal de YouTube</a></div></body></html>`;
   return { statusCode: 200, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'public, max-age=300' }, body: html };
 };
+
+// Claves de la página Cuenta → API (cifradas en Supabase; mandan sobre el .env). Ver _keys.js.
+exports.handler = require('./_keys').withKeys(exports.handler);

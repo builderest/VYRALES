@@ -35,3 +35,6 @@ exports.handler = async (event) => {
   }
   return { statusCode: 302, headers: { Location: safeNext(body.next), 'Set-Cookie': cookie(event, token(key), DAYS * 86400), 'Cache-Control': 'no-store' }, body: '' };
 };
+
+// Claves de la página Cuenta → API (cifradas en Supabase; mandan sobre el .env). Ver _keys.js.
+exports.handler = require('./_keys').withKeys(exports.handler);

@@ -80,3 +80,6 @@ exports.handler = async (event) => {
   }
   return { statusCode: 200, body: 'ok' };
 };
+
+// Claves de la página Cuenta → API (cifradas en Supabase; mandan sobre el .env). Ver _keys.js.
+exports.handler = require('./_keys').withKeys(exports.handler);
