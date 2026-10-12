@@ -157,6 +157,7 @@
         <button type="button" class="vy-nav" onclick="openNovelModal()"><i class="fa-solid fa-plus"></i>Nueva novela</button>
         <a class="vy-nav" href="#produccion" data-vy-go="produccion"><i class="fa-solid fa-film"></i>Producción</a>
         <a class="vy-nav" href="#revisar" data-vy-go="revisar"><i class="fa-regular fa-eye"></i>Revisar y publicar<span id="vyNavReview" class="vy-badge hidden">0</span></a>
+        <a class="vy-nav" href="#videos" data-vy-go="videos"><i class="fa-solid fa-clapperboard"></i>Videos</a>
         <a class="vy-nav" href="#guiones" data-vy-go="guiones"><i class="fa-solid fa-scroll"></i>Guiones</a>
         <a class="vy-nav" href="/analitica.html"><i class="fa-solid fa-chart-line"></i>Analítica</a>
 
@@ -467,6 +468,18 @@
         </section>
 
         <!-- EPISODE PRODUCTION QUEUE & REVIEW PANEL -->
+        <!-- VIDEOS: todos los videos terminados (largos con sus Shorts debajo) para ver y publicar (oct-12). Lo pinta vyVideosCargar(). -->
+        <section id="vyVideos" data-vy-view="videos">
+          <div class="glass-panel rounded-xl p-4 mb-4 flex flex-wrap items-center gap-3">
+            <div class="flex-1 min-w-[200px]"><h2 class="text-lg font-display font-semibold text-white">Videos listos</h2>
+              <p class="text-xs text-slate-400">Todos los videos con su video final. Los largos llevan debajo sus Shorts.</p></div>
+            <select id="vyVidFiltro" onchange="vyVideosPintar()" class="bg-cyber-darker border border-slate-600 rounded px-2 py-1 text-xs text-slate-200">
+              <option value="todos">Todos</option><option value="sin">Sin publicar</option><option value="pub">Publicados</option><option value="largos">Solo largos y sus Shorts</option>
+            </select>
+            <button type="button" onclick="vyVideosCargar()" class="px-3 py-1.5 rounded-lg border border-slate-600 text-slate-300 text-xs"><i class="fa-solid fa-rotate mr-1"></i>Actualizar</button>
+          </div>
+          <div id="vyVidLista" class="flex flex-col gap-3"><p class="text-sm text-slate-400">Cargando…</p></div>
+        </section>
         <section id="vyRevisar" class="vy-rev" data-vy-view="revisar">
             <!-- Encabezado: qué episodio estás revisando y en qué paso va (panel.js) -->
             <div class="glass-panel rounded-2xl p-6 flex flex-col gap-3">
@@ -1888,6 +1901,14 @@
         m.addEventListener('click', (e) => { if (e.target === m) close(); });
       }
 
+      // Compartir un video con alguien: vyrales.app/ve/<id> (página pública con el video; el id no se puede adivinar).
+      // En el celular abre el menú de compartir (WhatsApp, etc.); en la PC copia el enlace.
+      window.vyCompartir = async function (id, title) {
+        const url = location.origin + '/ve/' + id;
+        try { if (navigator.share) { await navigator.share({ title: title || 'VYRALES', text: title || '', url }); return; } } catch (err) { if (err && err.name === 'AbortError') return; }
+        try { await navigator.clipboard.writeText(url); alert('Enlace copiado. Pégalo en WhatsApp o donde quieras:\n\n' + url); }
+        catch (_) { prompt('Copia este enlace:', url); }
+      };
       // Elegir qué episodio se revisa/publica (se recuerda por serie). Sin id = volver al automático.
       window.vyReviewEp = function (id) {
         window.__reviewEpId = id || null;
@@ -1934,6 +1955,7 @@
               '<div class="text-xs font-mono">' +
                 '<p class="text-cyber-emerald font-bold"><i class="fa-solid fa-check-circle mr-1"></i>Video final del episodio #' + episode.episode_number + ' listo (' + clips.length + ' tomas unidas).</p>' +
                 '<button type="button" onclick="openMedia(this)" data-src="' + esc(finalRender.storage_path) + '" data-kind="video" data-title="EP ' + episode.episode_number + ' · Video final" class="text-cyber-cyan hover:underline"><i class="fa-solid fa-circle-play mr-1"></i>🇪🇸 Ver en español</button>' +
+                ' · <button type="button" onclick="vyCompartir(\'' + episode.id + '\', this.dataset.t)" data-t="' + esc(episode.title || '') + '" class="text-cyber-cyan hover:underline" title="Enlace para mandarle este video a alguien (no necesita entrar al panel)"><i class="fa-solid fa-share-nodes mr-1"></i>Compartir</button>' +
                 (((episode.continuity || {}).english || {}).audio_url ? ' · <button type="button" onclick="openVideoEn(this)" data-src="' + esc(finalRender.storage_path) + '" data-audio="' + esc(episode.continuity.english.audio_url) + '" data-title="EP ' + episode.episode_number + ' · Video final en inglés" class="text-cyber-cyan hover:underline"><i class="fa-solid fa-circle-play mr-1"></i>🇺🇸 Ver en inglés' + (String(episode.continuity.english.at || '') < String(finalRender.created_at || '') ? ' <span class="text-cyber-gold">(audio de una versión anterior)</span>' : '') + '</button>' : '') +
                 ' · <button onclick="vyEditor.open(\'' + episode.id + '\')" class="text-cyber-gold hover:underline"><i class="fa-solid fa-scissors mr-1"></i>Editar episodio</button>' +
                 ' · <button onclick="goPublish(\'' + episode.id + '\')" class="text-cyber-pink hover:underline font-bold"><i class="fa-solid fa-bullhorn mr-1"></i>Publicar</button>' +
@@ -4150,6 +4172,60 @@
         const upd = () => { const box = document.getElementById('vyEpJump'); if (box) box.classList.toggle('hidden', !current()); };
         window.addEventListener('scroll', () => { clearTimeout(t); t = setTimeout(upd, 120); }, { passive: true });
         document.addEventListener('toggle', () => setTimeout(upd, 50), true);
+      })();
+    </script>
+
+    <script>
+      // ---------- Página VIDEOS (oct-12) ----------
+      (function () {
+        let VIDS = [];
+        const e = (t) => String(t == null ? '' : t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        const ICON = { youtube: 'fa-brands fa-youtube', tiktok: 'fa-brands fa-tiktok', instagram: 'fa-brands fa-instagram', facebook: 'fa-brands fa-facebook' };
+        const isPub = (v) => Object.values(v.published || {}).some((x) => x && x !== 'privado');
+        window.vyVideosCargar = async function () {
+          const box = document.getElementById('vyVidLista'); if (!box) return;
+          try {
+            const r = await fetch('/.netlify/functions/videos', { cache: 'no-store' });
+            const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status);
+            VIDS = j.videos || []; window.vyVideosPintar();
+          } catch (err) { box.innerHTML = '<p class="text-sm text-cyber-pink">No se pudieron cargar los videos (' + e(err.message) + ').</p>'; }
+        };
+        window.vyVideosPintar = function () {
+          const box = document.getElementById('vyVidLista'); if (!box) return;
+          const f = (document.getElementById('vyVidFiltro') || {}).value || 'todos';
+          let list = VIDS;
+          if (f === 'sin') list = VIDS.filter((v) => !isPub(v));
+          else if (f === 'pub') list = VIDS.filter(isPub);
+          else if (f === 'largos') list = VIDS.filter((v) => v.kind === 'largo' || v.child);
+          if (!list.length) { box.innerHTML = '<p class="text-sm text-slate-400">No hay videos en este filtro.</p>'; return; }
+          box.innerHTML = list.map((v) => {
+            const chips = Object.keys(ICON).map((p) => { const st = (v.published || {})[p];
+              const cls = st && st !== 'privado' ? 'text-cyber-emerald border-cyber-emerald/50' : st === 'privado' ? 'text-cyber-gold border-cyber-gold/50' : 'text-slate-500 border-slate-700';
+              const tip = st && st !== 'privado' ? 'Publicado' : st === 'privado' ? 'Subido en privado' : 'Sin publicar';
+              const inner = '<i class="' + ICON[p] + '"></i>';
+              return typeof st === 'string' && /^https?:/.test(st) ? '<a href="' + e(st) + '" target="_blank" rel="noopener" title="' + tip + '" class="inline-flex items-center justify-center w-7 h-7 rounded border ' + cls + '">' + inner + '</a>'
+                : '<span title="' + tip + '" class="inline-flex items-center justify-center w-7 h-7 rounded border ' + cls + '">' + inner + '</span>'; }).join('');
+            const th = v.thumb ? '<img src="' + e(v.thumb) + '" alt="" loading="lazy" class="w-full h-full object-cover">' : '<i class="fa-solid fa-film text-slate-600"></i>';
+            const dur = v.seconds ? Math.floor(v.seconds / 60) + ':' + String(v.seconds % 60).padStart(2, '0') : '';
+            return '<div class="glass-panel rounded-xl p-3 flex gap-3 items-center' + (v.child ? ' ml-6 sm:ml-10 border-l-2 border-cyber-pink/40' : '') + '">' +
+              '<button type="button" onclick="openMedia(this)" data-src="' + e(v.final_url) + '" data-kind="video" data-title="' + e('EP ' + v.episode_number + ' · ' + v.title) + '" class="relative shrink-0 rounded-lg overflow-hidden bg-black flex items-center justify-center ' + (v.landscape ? 'w-32 h-[72px]' : 'w-14 h-24') + '">' + th +
+                '<span class="absolute inset-0 flex items-center justify-center"><i class="fa-solid fa-circle-play text-white/90 text-2xl drop-shadow"></i></span></button>' +
+              '<div class="flex-1 min-w-0">' +
+                '<div class="text-[10px] font-mono uppercase tracking-wider ' + (v.kind === 'largo' ? 'text-cyber-cyan' : 'text-cyber-pink') + '">' + (v.kind === 'largo' ? 'Largo' : v.child ? 'Short del largo' : 'Short') + ' · EP ' + v.episode_number + (dur ? ' · ' + dur : '') + ' · ' + e(v.series_title || '') + '</div>' +
+                '<div class="text-sm font-semibold text-white truncate">' + e(v.title) + '</div>' +
+                '<div class="flex flex-wrap gap-1.5 mt-1.5">' + chips + '</div>' +
+              '</div>' +
+              '<button type="button" onclick="vyVideoAbrir(\'' + e(v.id) + '\',\'' + e(v.series_slug) + '\')" class="shrink-0 px-3 py-1.5 rounded-lg bg-cyber-pink/15 border border-cyber-pink/50 text-cyber-pink text-xs font-semibold"><i class="fa-solid fa-bullhorn mr-1"></i><span class="hidden sm:inline">Revisar y </span>publicar</button>' +
+            '</div>';
+          }).join('');
+        };
+        // Abre ese video en "Revisar y publicar" (si es de otra serie, cambia de serie y lo deja elegido).
+        window.vyVideoAbrir = function (id, slug) {
+          try { localStorage.setItem('vyrales_review_ep_' + slug, id); } catch (_) {}
+          let same = false; try { same = !!(lastLoadedData && lastLoadedData.series && lastLoadedData.series.slug === slug); } catch (_) {}
+          if (same && window.vyReviewEp) { window.vyReviewEp(id); if (window.vyPanel) vyPanel.setView('revisar'); }
+          else { try { localStorage.setItem('vyrales_series', slug); } catch (_) {} location.href = location.pathname + '?series=' + encodeURIComponent(slug) + '#revisar'; }
+        };
       })();
     </script>
 </body>

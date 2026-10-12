@@ -100,7 +100,7 @@
   // ---------- Páginas (cada opción del menú muestra solo su pantalla) ----------
   var VIEWS = {
     inicio: 'Inicio', produccion: 'Producción', revisar: 'Revisar y publicar', guiones: 'Guiones',
-    personajes: 'Personajes', lugares: 'Lugares', reglas: 'Reglas de la novela', gastos: 'Gastos', api: 'API', usuarios: 'Usuarios', creditos: 'Créditos'
+    videos: 'Videos', personajes: 'Personajes', lugares: 'Lugares', reglas: 'Reglas de la novela', gastos: 'Gastos', api: 'API', usuarios: 'Usuarios', creditos: 'Créditos'
   };
   var current = 'inicio';
 
@@ -121,6 +121,7 @@
     document.title = VIEWS[v] + ' · VYRALES';
     try { history.replaceState(null, '', location.pathname + location.search + '#' + v); } catch (_) {}
     if (!keepScroll) window.scrollTo({ top: 0, behavior: 'auto' });
+    if (v === 'videos' && window.vyVideosCargar) window.vyVideosCargar();
     if (v === 'api') apiCargar();
     if (v === 'usuarios') usersCargar();
     if (v === 'creditos') credCargar();
