@@ -171,3 +171,8 @@ Este documento es la memoria del proyecto. Cada vez que Franklin corrige algo, l
 - Arreglo: `_analytics.js → viralRefs(sb)` trae con la API de YouTube los Shorts VIRALES REALES del nicho (search.list order=viewCount, español, últimos 6 meses, ≥50k vistas, 5 temas) con sus vistas reales. $0 (cuota gratis). Se inyectan en el prompt como "inspírate, no copies".
 - `ideasPrompt`: VARIEDAD OBLIGATORIA (≥4 temas distintos, máx 2 por tema); "por_que" cita el viral o el dato. Primero investiga, después propone.
 - `_claude.js runClaude({web:true})`: permite WebSearch/WebFetch SOLO en el trabajo de ideas; el resto sigue bloqueado. claude_ideas: maxMin 16 en agente.js.
+
+## Fila del agente en paralelo (oct-12)
+- King (video con LTX/Flow: gen_local, regen_local, toma_local, prueba_ltx/flux, qa_tomas, flow_*): SIEMPRE de a uno (una sola GPU). push: de a uno (git).
+- Claude (claude_*: guiones, ideas, largos) y General (voces, voz_ingles, portadas, subtítulos, short_reusar, publicar…): hasta 3 EN PARALELO cada uno (claudeRunning<CLAUDE_MAX, generalRunning<GENERAL_MAX; env VYRALES_CLAUDE_MAX / VYRALES_GENERAL_MAX). Cada trabajo hace funciones distintas → no se pisan. La lógica de claude_guion NO se tocó.
+- Nota: 3 procesos `claude -p` a la vez consumen más del límite del plan al mismo tiempo; si choca con el límite, bajar VYRALES_CLAUDE_MAX.

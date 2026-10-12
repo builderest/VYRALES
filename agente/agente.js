@@ -451,8 +451,10 @@ function codeChanged() { return WATCH.some((f, i) => { try { return fs.statSync(
 // --- bucle principal ---
 let busy = false;
 let pushBusy = false;
-let claudeBusy = false; // fila paralela de guiones con Claude
-let generalBusy = false; // fila paralela de lo que NO usa king
+let claudeRunning = 0; // cuántos guiones/ideas de Claude corren ahora (varios a la vez)
+let generalRunning = 0; // cuántos trabajos generales corren ahora (varios a la vez)
+const CLAUDE_MAX = +(process.env.VYRALES_CLAUDE_MAX || 3); // Claude en paralelo (Franklin oct-12: que no esperen de a uno)
+const GENERAL_MAX = +(process.env.VYRALES_GENERAL_MAX || 3); // voces/portadas/subtítulos/publicar en paralelo
 // Lo que usa king (GPU) o el Chrome de Flow: de a uno. yt_relacionado usa su propio perfil de Chrome.
 const KING_RE = /^(gen_local|regen_local|toma_local|prueba_ltx|prueba_flux|qa_tomas|flow_)/;
 async function tick() {
@@ -470,28 +472,30 @@ async function tick() {
     }
     // Guiones con Claude (claude_*) tampoco usan king: van en su propia fila en paralelo, así una producción no espera
     // 35 min detrás de un guion largo (oct-11: "se está quedando estancada king" — king estaba libre esperando).
-    if (!claudeBusy) {
-      const { data: cj } = await onlyAdminWs(sb.from('agent_jobs').select('*').eq('status', 'pending').like('command', 'claude_%'), wsl).order('created_at').limit(1);
-      if (cj && cj[0]) {
-        const { data: cl2 } = await sb.from('agent_jobs').update({ status: 'running' }).eq('id', cj[0].id).eq('status', 'pending').select();
-        if (cl2 && cl2.length) { claudeBusy = true; runJob(cj[0]).catch((e) => log('claude:', e.message)).finally(() => { claudeBusy = false; }); }
+    if (claudeRunning < CLAUDE_MAX) {
+      const { data: cj } = await onlyAdminWs(sb.from('agent_jobs').select('*').eq('status', 'pending').like('command', 'claude_%'), wsl).order('created_at').limit(CLAUDE_MAX);
+      for (const j of (cj || [])) {
+        if (claudeRunning >= CLAUDE_MAX) break;
+        const { data: cl2 } = await sb.from('agent_jobs').update({ status: 'running' }).eq('id', j.id).eq('status', 'pending').select();
+        if (cl2 && cl2.length) { claudeRunning++; runJob(j).catch((e) => log('claude:', e.message)).finally(() => { claudeRunning--; }); }
       }
     }
     // FILA GENERAL (oct-11, Franklin: "las tareas que no dependen de king no deberían frenarse"): voces, inglés,
     // calidad completa, publicar, portadas, subtítulos, Shorts del largo… corren mientras king genera video.
     // Publicar va primero (lo pidió una persona y es rápido).
-    if (!generalBusy) {
+    if (generalRunning < GENERAL_MAX) {
       const { data: gp } = await onlyAllowed(sb.from('agent_jobs').select('*').eq('status', 'pending'), wsl).order('created_at').limit(50);
       const free = (gp || []).filter((x) => x.command !== 'push' && !/^claude_/.test(x.command) && !KING_RE.test(x.command));
-      const gj = free.find((x) => /^publish:/.test(x.command)) || free[0];
-      if (gj) {
+      const ordered = free.filter((x) => /^publish:/.test(x.command)).concat(free.filter((x) => !/^publish:/.test(x.command))); // publicar primero
+      for (const gj of ordered) {
+        if (generalRunning >= GENERAL_MAX) break;
         const { data: cl3 } = await sb.from('agent_jobs').update({ status: 'running' }).eq('id', gj.id).eq('status', 'pending').select();
-        if (cl3 && cl3.length) { generalBusy = true; runJob(gj).catch((e) => log('general:', e.message)).finally(() => { generalBusy = false; }); }
+        if (cl3 && cl3.length) { generalRunning++; runJob(gj).catch((e) => log('general:', e.message)).finally(() => { generalRunning--; }); }
       }
     }
     await queueFullRenders().catch((e) => log('calidad completa: ' + String(e.message).slice(0, 100)));
     if (busy) return;
-    if (codeChanged() && !pushBusy && !claudeBusy && !generalBusy) { log('el código del agente cambió: reiniciando para cargarlo...'); devStop(); process.exit(0); }
+    if (codeChanged() && !pushBusy && claudeRunning === 0 && generalRunning === 0) { log('el código del agente cambió: reiniciando para cargarlo...'); devStop(); process.exit(0); }
     migrateLocalFinales();
     organizeBySeries();
     // Cada 10 min: videos que Franklin hizo PÚBLICOS en YouTube Studio → se marcan publicados (vyrales.app/ver, enlaces de los Shorts).
