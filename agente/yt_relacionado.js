@@ -40,8 +40,8 @@ function loadPlaywright() { try { return require('playwright-core'); } catch (_)
   try {
     await page.goto('https://studio.youtube.com/video/' + shortId + '/edit', { waitUntil: 'domcontentloaded', timeout: 60000 });
     const trigger = page.locator('ytcp-shorts-content-links-picker #linked-video-editor-link');
-    try { await trigger.waitFor({ timeout: mode === 'ver' ? 300000 : 45000 }); }
-    catch (_) { throw new Error(/accounts\.google\.com/.test(page.url()) ? 'El Chrome del agente no tiene sesión en YouTube. Corre "yt_relacionado:' + epId + ':ver" e inicia sesión con la cuenta del canal (una sola vez).' : 'No apareció el campo "Video relacionado" en Studio (' + page.url().slice(0, 80) + ').'); }
+    try { await trigger.waitFor({ timeout: mode === 'ver' ? 300000 : 75000 }); }
+    catch (_) { try { await page.screenshot({ path: path.join(ROOT, 'publicar', 'yt_relacionado_error.png') }); console.log('captura: publicar/yt_relacionado_error.png'); } catch (_) {} throw new Error(/accounts\.google\.com/.test(page.url()) ? 'El Chrome del agente no tiene sesión en YouTube. Corre "yt_relacionado:' + epId + ':ver" e inicia sesión con la cuenta del canal (una sola vez).' : 'No apareció el campo "Video relacionado" en Studio (' + page.url().slice(0, 80) + ').'); }
     const cur = (await trigger.innerText().catch(() => '')) || '';
     if (cur.includes(longTitle.slice(0, 30))) { console.log('Ya tenía puesto el video relacionado ✅'); return; }
     await trigger.click();
