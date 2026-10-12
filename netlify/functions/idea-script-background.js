@@ -49,7 +49,7 @@ async function finishScript(data, { idea = {}, tipo, llm = null }) {
   ep.shots = applyChanges(ep.shots, vc.changes);
   ep.continuity = Object.assign({}, ep.continuity || {}, { visual_checked: new Date().toISOString(), from_idea: idea.titulo || '' });
   const { handler: imp } = require('./import-series');
-  const v = await imp({ httpMethod: 'POST', queryStringParameters: {}, body: JSON.stringify({ series: data, dry_run: true }) });
+  const v = await imp({ httpMethod: 'POST', headers: { 'x-vyrales-key': process.env.DASHBOARD_KEY || '' }, /* llamada interna = "sistema" (multiusuario) */ queryStringParameters: {}, body: JSON.stringify({ series: data, dry_run: true }) });
   return { validation: JSON.parse(v.body || '{}'), reviewCost: vc.costUsd };
 }
 

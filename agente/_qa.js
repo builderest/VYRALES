@@ -174,7 +174,7 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
         }
       } catch (e) { log(`QA toma ${sh.n}: no pude reescribir (${String(e.message).slice(0, 120)})`); }
     }
-    const r = await handler({ httpMethod: 'POST', body: JSON.stringify({ assetId: clip.id, provider: 'king', new_frame: false }) });
+    const r = await handler({ httpMethod: 'POST', headers: { 'x-vyrales-key': process.env.DASHBOARD_KEY || '' }, /* llamada interna = "sistema" (multiusuario) */ body: JSON.stringify({ assetId: clip.id, provider: 'king', new_frame: false }) });
     if (r.statusCode >= 400) log(`QA toma ${sh.n}: FALLÓ ${String(r.body).slice(0, 200)}`); else { log(`QA toma ${sh.n}: lista ✅`); redone.push(sh.n); }
   }
   // 3) Revisión visual con Claude ($0). Una sola vuelta por toma (shot.qa.redone) para no entrar en bucles.
@@ -242,7 +242,7 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
           }
         } catch (e) { log(`QA toma ${t.n}: no pude reescribir (${String(e.message).slice(0, 120)}) → reintento igual`); }
       }
-      const r = await handler({ httpMethod: 'POST', body: JSON.stringify({ assetId: t.clip.id, provider: 'king', new_frame: t.newFrame }) });
+      const r = await handler({ httpMethod: 'POST', headers: { 'x-vyrales-key': process.env.DASHBOARD_KEY || '' }, /* llamada interna = "sistema" (multiusuario) */ body: JSON.stringify({ assetId: t.clip.id, provider: 'king', new_frame: t.newFrame }) });
       if (r.statusCode >= 400) log(`QA visual toma ${t.n}: FALLÓ ${String(r.body).slice(0, 200)}`); else { await bumpTry(t.n, t.boost); log(`QA visual toma ${t.n}: rehecha ✅`); if (!redone.includes(t.n)) redone.push(t.n); }
     }
   }

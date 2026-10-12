@@ -4127,5 +4127,30 @@
         </div>
     </div>
     <script src="editor.js?v=20"></script>
+
+    <!-- Episodios largos (100+ tomas): botones flotantes ↑ / ↓ para ir al principio o al final del episodio abierto
+         que se está viendo (Franklin, oct-12). Solo lógica; el estilo usa las clases del tema. -->
+    <div id="vyEpJump" class="hidden fixed right-4 bottom-20 z-50 flex flex-col gap-2">
+      <button type="button" title="Ir al principio del episodio" onclick="vyEpJump('top')" class="w-10 h-10 rounded-full bg-cyber-darker border border-cyber-cyan/50 text-cyber-cyan shadow-lg hover:bg-cyber-cyan/20"><i class="fa-solid fa-arrow-up"></i></button>
+      <button type="button" title="Ir al final del episodio" onclick="vyEpJump('end')" class="w-10 h-10 rounded-full bg-cyber-darker border border-cyber-cyan/50 text-cyber-cyan shadow-lg hover:bg-cyber-cyan/20"><i class="fa-solid fa-arrow-down"></i></button>
+    </div>
+    <script>
+      (function () {
+        // El episodio abierto que ocupa la pantalla ahora (el que cruza la mitad de la ventana).
+        function current() {
+          const mid = window.innerHeight / 2;
+          return [...document.querySelectorAll('details[data-ep-id][open]')].find((d) => { const r = d.getBoundingClientRect(); return r.top < mid && r.bottom > mid && r.height > window.innerHeight * 1.5; }) || null;
+        }
+        window.vyEpJump = function (where) {
+          const d = current(); if (!d) return;
+          if (where === 'top') d.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          else { const last = d.lastElementChild || d; last.scrollIntoView({ behavior: 'smooth', block: 'end' }); }
+        };
+        let t = null;
+        const upd = () => { const box = document.getElementById('vyEpJump'); if (box) box.classList.toggle('hidden', !current()); };
+        window.addEventListener('scroll', () => { clearTimeout(t); t = setTimeout(upd, 120); }, { passive: true });
+        document.addEventListener('toggle', () => setTimeout(upd, 50), true);
+      })();
+    </script>
 </body>
 </html>

@@ -28,7 +28,7 @@ async function main() {
     const asset = (ep.assets || []).filter((x) => x.kind === 'video_clip' && x.shot_number === n).sort((x, y) => String(y.updated_at || y.created_at).localeCompare(String(x.updated_at || x.created_at)))[0];
     if (!asset) { console.log(`toma ${n}: no tiene video, la salto`); continue; }
     console.log(`\nTOMA ${n}: rehaciendo ${frame ? 'cuadro inicial + video' : 'video'} en king...`);
-    const r = await handler({ httpMethod: 'POST', body: JSON.stringify({ assetId: asset.id, provider: 'king', new_frame: frame }) });
+    const r = await handler({ httpMethod: 'POST', headers: { 'x-vyrales-key': process.env.DASHBOARD_KEY || '' }, /* llamada interna = "sistema" (multiusuario) */ body: JSON.stringify({ assetId: asset.id, provider: 'king', new_frame: frame }) });
     if (r.statusCode >= 400) { console.log(`TOMA ${n}: FALLÓ ${String(r.body).slice(0, 300)}`); fallas.push(n); } else console.log(`TOMA ${n}: lista ✅`);
   }
   // Control de calidad automático (duración contra la voz + clips congelados).

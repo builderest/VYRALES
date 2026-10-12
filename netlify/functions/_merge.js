@@ -160,7 +160,7 @@ async function mergeWithNarration(supabase, { episode, series, log, skipNarratio
   if (!skipNarration) {
   const { handler: narrate } = require('./narration-background');
   log('narrador de voz fija: revisando narraciones que falten...');
-  const nr = await narrate({ httpMethod: 'POST', body: JSON.stringify({ episode_id: episode.id }) });
+  const nr = await narrate({ httpMethod: 'POST', headers: { 'x-vyrales-key': process.env.DASHBOARD_KEY || '' }, /* llamada interna = "sistema" (multiusuario) */ body: JSON.stringify({ episode_id: episode.id }) });
   const nb = JSON.parse(nr.body || '{}');
   if (nr.statusCode !== 200) throw new Error('No se pudo generar la narración: ' + (nb.error || nr.statusCode));
   if ((nb.created || []).length) log('narraciones generadas ahora:', nb.created.map((c) => 'T' + c.shot).join(', '));
@@ -180,7 +180,7 @@ async function mergeWithNarration(supabase, { episode, series, log, skipNarratio
       const prompt = `Instrumental background score, no vocals, for a ${series.genre || 'dramatic'} vertical short series. Mood: ${String(sbx.tone || '').slice(0, 300)}. Cinematic and emotional, steady low intensity so a voice can speak over it, gradual build, no abrupt drops.`;
       log('la serie no tiene música: generando una pista con Lyria...');
       const { handler: makeMusic } = require('./music-generate-background');
-      const mr = await makeMusic({ httpMethod: 'POST', body: JSON.stringify({ series: series.slug, prompt, name: 'Tema de ' + (series.title || series.slug) }) });
+      const mr = await makeMusic({ httpMethod: 'POST', headers: { 'x-vyrales-key': process.env.DASHBOARD_KEY || '' }, /* llamada interna = "sistema" (multiusuario) */ body: JSON.stringify({ series: series.slug, prompt, name: 'Tema de ' + (series.title || series.slug) }) });
       if (mr.statusCode === 200) {
         const { data: sNow } = await supabase.from('series').select('story_bible').eq('slug', series.slug).single();
         lib = (sNow && sNow.story_bible && sNow.story_bible.music_tracks) || [];

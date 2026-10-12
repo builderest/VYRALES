@@ -9,7 +9,7 @@ for (const line of fs.readFileSync(path.join(ROOT, '.env'), 'utf8').split(/\r?\n
 (async () => {
   const epId = process.argv[2];
   const { handler } = require(path.join(ROOT, 'netlify', 'functions', 'publish-package-background'));
-  const r = await handler({ httpMethod: 'POST', body: JSON.stringify({ episode_id: epId }) });
+  const r = await handler({ httpMethod: 'POST', headers: { 'x-vyrales-key': process.env.DASHBOARD_KEY || '' }, /* llamada interna = "sistema" (multiusuario) */ body: JSON.stringify({ episode_id: epId }) });
   console.log('RESULTADO', r.statusCode, r.body);
   if (r.statusCode >= 400) process.exit(1);
 })().catch((e) => { console.error('ERROR:', e.message); process.exit(1); });

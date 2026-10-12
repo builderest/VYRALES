@@ -52,7 +52,7 @@ exports.handler = async (event) => {
     const { data: vert } = await sb.from('series').select('story_bible').eq('slug', p.slug).maybeSingle();
     const narration = vert && vert.story_bible && vert.story_bible.narration ? Object.assign({}, vert.story_bible.narration, { mode: 'continuous' }) : null;
     const { handler: imp } = require('./import-series');
-    const doImport = async (data) => { const res = await imp({ httpMethod: 'POST', queryStringParameters: {}, body: JSON.stringify({ series: data }) }); const o = JSON.parse(res.body || '{}'); if (res.statusCode >= 400) throw new Error((o.error || res.statusCode) + (o.errors ? ': ' + o.errors.slice(0, 4).join(' · ') : '')); return o; };
+    const doImport = async (data) => { const res = await imp({ httpMethod: 'POST', headers: { 'x-vyrales-key': process.env.DASHBOARD_KEY || '' }, /* llamada interna = "sistema" (multiusuario) */ queryStringParameters: {}, body: JSON.stringify({ series: data }) }); const o = JSON.parse(res.body || '{}'); if (res.statusCode >= 400) throw new Error((o.error || res.statusCode) + (o.errors ? ': ' + o.errors.slice(0, 4).join(' · ') : '')); return o; };
     const L = g.long;
     const longSlug = p.slug + '_completa';
     const longEp = { title: L.title, continuity: { summary: L.description || '', hook_text: L.hook_text || '', sources: L.sources || [], chapters: L.chapters || [], youtube_description: L.description || '', visual_checked: new Date().toISOString(), from_job: job, kind: 'largo' }, shots: L.shots };

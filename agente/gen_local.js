@@ -40,7 +40,7 @@ async function main() {
   }
   console.log(`Produciendo "${series.title}" EP ${ep.episode_number}${Number(process.argv[3]) ? ' (solo la toma ' + process.argv[3] + ')' : ''} con LTX-2.5 en king...`);
   const { handler } = require(path.join(ROOT, 'netlify', 'functions', 'generate-media-background'));
-  const res = await handler({ httpMethod: 'POST', body: JSON.stringify(Object.assign({ series: series.slug, episode_id: episodeId, provider: 'king', force: ep.status === 'generando_media' }, Number(process.argv[3]) ? { shot: Number(process.argv[3]) } : {})), queryStringParameters: {}, headers: {} });
+  const res = await handler({ httpMethod: 'POST', headers: { 'x-vyrales-key': process.env.DASHBOARD_KEY || '' }, /* llamada interna = "sistema" (multiusuario) */ body: JSON.stringify(Object.assign({ series: series.slug, episode_id: episodeId, provider: 'king', force: ep.status === 'generando_media' }, Number(process.argv[3]) ? { shot: Number(process.argv[3]) } : {})), queryStringParameters: {}, headers: {} });
   console.log('RESULTADO', res.statusCode, String(res.body || '').slice(0, 800));
   if (res.statusCode >= 400) process.exit(1);
   // Control de calidad automático: si alguna toma salió corta o congelada, se rehace sola y se vuelve a unir.
