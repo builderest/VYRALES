@@ -165,3 +165,9 @@ Este documento es la memoria del proyecto. Cada vez que Franklin corrige algo, l
 - yt_relacionado usa su propio perfil de Chrome (VYRALES_yt_perfil), separado del de Flow. Hay que iniciar sesión una vez con `yt_relacionado:<ep>:ver`.
 - Importar guion largo: si Claude dejó tomas sin camera/action_en/start_en, import-largo pone valores por defecto (antes fallaba TODA la importación y el guion no aparecía). claude_largo además repasa y vuelve a pedir esas tomas.
 - Multiusuario (oct-12): toda llamada interna a un handler (agente, unir, importar) lleva headers {"x-vyrales-key": DASHBOARD_KEY} → modo "sistema". Sin eso _tenant responde 401 "Inicia sesión." (gen_local fallaba así). Ojo con un "headers: {}" más adelante en el mismo objeto: lo pisa.
+
+## Ideas de guion (oct-12): no repetir siempre el mismo tema
+- HECHO del problema: `analytics.js → ideasPrompt` solo le daba a Claude NUESTROS videos + lista fija de temas, con la orden de "priorizar lo que ya funcionó". Como el mejor era Humanos antiguos, repetía ese tema siempre. Y la búsqueda web estaba apagada en `_claude.js`.
+- Arreglo: `_analytics.js → viralRefs(sb)` trae con la API de YouTube los Shorts VIRALES REALES del nicho (search.list order=viewCount, español, últimos 6 meses, ≥50k vistas, 5 temas) con sus vistas reales. $0 (cuota gratis). Se inyectan en el prompt como "inspírate, no copies".
+- `ideasPrompt`: VARIEDAD OBLIGATORIA (≥4 temas distintos, máx 2 por tema); "por_que" cita el viral o el dato. Primero investiga, después propone.
+- `_claude.js runClaude({web:true})`: permite WebSearch/WebFetch SOLO en el trabajo de ideas; el resto sigue bloqueado. claude_ideas: maxMin 16 en agente.js.

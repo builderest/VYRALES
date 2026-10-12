@@ -177,4 +177,37 @@ async function collect(sb) {
   return { at: new Date().toISOString(), youtube: yt, instagram: ig, facebook: fb, tiktok: tt };
 }
 
-module.exports = { collect, topicOf, TOPICS };
+// VIRALES de afuera (Franklin oct-12: "buscar videos que ya se han vuelto virales en mi nicho").
+// Usa la API de YouTube (search.list ordenado por vistas, Shorts en español de los últimos 6 meses) para traer
+// referencias REALES por tema, con sus vistas reales. $0 (cuota gratis de la API). Si falla, devuelve '' y las ideas igual salen.
+const VIRAL_QUERIES = [
+  ['Humanos antiguos', 'prehistoria humanos antiguos'],
+  ['Guerras y batallas', 'historia guerra batalla'],
+  ['Espacio y planeta Tierra', 'espacio universo asombroso'],
+  ['Dinosaurios y bestias', 'dinosaurios bestias prehistoricas'],
+  ['Misterios', 'misterios de la historia']
+];
+async function viralRefs(sb) {
+  let t;
+  try { t = await ytToken(sb); } catch (_) { t = null; }
+  if (!t || !t.token) return '';
+  const H = { headers: { Authorization: 'Bearer ' + t.token } };
+  const after = new Date(Date.now() - 180 * 86400000).toISOString();
+  const seen = new Set(); const refs = [];
+  for (const [topic, q] of VIRAL_QUERIES) {
+    try {
+      const su = 'https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=8&order=viewCount&relevanceLanguage=es&regionCode=US&videoDuration=short&publishedAfter=' + after + '&q=' + encodeURIComponent(q);
+      const sr = await getJson(su, H);
+      const ids = (sr.body.items || []).map((i) => i.id && i.id.videoId).filter(Boolean);
+      if (!ids.length) continue;
+      const vr = await getJson('https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=' + ids.join(','), H);
+      (vr.body.items || []).map((x) => ({ title: x.snippet.title, views: +(x.statistics && x.statistics.viewCount) || 0 }))
+        .filter((x) => x.views >= 50000)
+        .sort((a, b) => b.views - a.views).slice(0, 3)
+        .forEach((x) => { if (!seen.has(x.title)) { seen.add(x.title); refs.push(`- [${topic}] "${x.title}" — ${x.views.toLocaleString('es')} vistas`); } });
+    } catch (_) {}
+  }
+  return refs.join('\n');
+}
+
+module.exports = { collect, topicOf, TOPICS, viralRefs };

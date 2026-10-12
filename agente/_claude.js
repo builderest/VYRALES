@@ -30,7 +30,7 @@ async function withMemory(prompt) {
 async function runClaude(prompt, opts = {}) {
   return runClaudeRaw(opts.memory === false ? prompt : await withMemory(prompt), opts);
 }
-function runClaudeRaw(prompt, { timeoutMin = 12, log = () => {}, files = [] } = {}) {
+function runClaudeRaw(prompt, { timeoutMin = 12, log = () => {}, files = [], web = false } = {}) {
   const exe = claudePath();
   if (!exe) return Promise.reject(new Error('Claude Code no está instalado en esta PC (usa el botón "Claude: instalar / revisar").'));
   const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'vy-claude-'));
@@ -38,7 +38,13 @@ function runClaudeRaw(prompt, { timeoutMin = 12, log = () => {}, files = [] } = 
   const env = Object.assign({}, process.env);
   delete env.ANTHROPIC_API_KEY; delete env.ANTHROPIC_AUTH_TOKEN; // usar el PLAN, nunca la API
   if (!env.CLAUDE_CODE_MAX_OUTPUT_TOKENS) env.CLAUDE_CODE_MAX_OUTPUT_TOKENS = '32000'; // guiones largos
-  const args = ['-p', 'Sigue al pie de la letra las instrucciones del texto que recibiste por la entrada estándar y responde SOLO con el JSON pedido, sin explicaciones ni bloques de código.', '--output-format', 'stream-json', '--verbose', '--disallowedTools', 'Bash,Edit,Write,MultiEdit,NotebookEdit,WebFetch,WebSearch,Task'].concat(files.length ? ['--allowedTools', 'Read'] : []);
+  // web:true → se permite WebSearch/WebFetch SOLO para este trabajo (ideas que miran lo viral de afuera). El resto sigue bloqueado.
+  const disallowed = ['Bash', 'Edit', 'Write', 'MultiEdit', 'NotebookEdit', 'Task'];
+  if (!web) disallowed.push('WebFetch', 'WebSearch');
+  const allowed = [];
+  if (files.length) allowed.push('Read');
+  if (web) allowed.push('WebSearch', 'WebFetch');
+  const args = ['-p', 'Sigue al pie de la letra las instrucciones del texto que recibiste por la entrada estándar y responde SOLO con el JSON pedido, sin explicaciones ni bloques de código.', '--output-format', 'stream-json', '--verbose', '--disallowedTools', disallowed.join(',')].concat(allowed.length ? ['--allowedTools', allowed.join(',')] : []);
   return new Promise((resolve, reject) => {
     // claude.cmd (npm en Windows) necesita shell: los argumentos con espacios van entre comillas (si no, se parten).
     const viaShell = /\.cmd$/i.test(exe);

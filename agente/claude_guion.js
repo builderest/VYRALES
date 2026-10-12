@@ -143,7 +143,7 @@ async function ideas(job) {
     const req = await (await fetch(u.publicUrl + '?t=' + Date.now())).json();
     console.log('Ideas con Claude (leyendo tus estadísticas reales)...');
     const prompt = await A.ideasPrompt(sb, req, await A.collectData(sb));
-    const out = parseJson(await runClaude(prompt, { log: console.log }));
+    const out = parseJson(await runClaude(prompt, { log: console.log, web: true, timeoutMin: 16 }));
     await save({ ok: true, ideas: (out.ideas || []).slice(0, 8), costUsd: 0, model: 'Claude (tu plan)', at: new Date().toISOString() });
     console.log('LISTO:', (out.ideas || []).length, 'ideas');
   } catch (e) { console.log('ERROR:', e.message); await save({ ok: false, error: e.message, at: new Date().toISOString() }).catch(() => {}); process.exit(1); }

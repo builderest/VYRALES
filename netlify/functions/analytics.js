@@ -3,7 +3,7 @@
 //      (~$0.002 por llamada, se anota en generation_log). Solo con la sesión/llave del panel.
 const { getSupabaseClient } = require('./_supabase');
 const { checkDashboardKey } = require('./_auth');
-const { collect, TOPICS } = require('./_analytics');
+const { collect, TOPICS, viralRefs } = require('./_analytics');
 const { logSpend } = require('./_spend');
 const { TEXT_MODEL } = require('./_publish');
 const TEXT_PRICE = { input: 0.75, output: 3.75 };
@@ -30,17 +30,24 @@ function summary(d) {
 async function ideasPrompt(sb, body, data) {
   const d = data || await getData(sb, false);
   const focus = String(body.focus || '').slice(0, 200);
+  const temas = TOPICS.map((t) => t[0]).join(', ') + ', Otros';
+  let viral = '';
+  try { viral = await viralRefs(sb); } catch (_) {}
   const prompt = [
     'Eres estratega de contenido de VYRALES: canal en español (Latinoamérica y EE. UU.) de documentales cortos verticales (YouTube Shorts, TikTok, Reels), hechos con IA, narrados por una sola voz solemne con pausas dramáticas.',
-    'Analiza el rendimiento REAL de nuestros videos y propone los próximos videos con más probabilidad de funcionar.',
-    'REGLAS: temas reales y verificables (historia, ciencia, prehistoria, guerras, espacio, misterios con base científica); apto para toda la familia; nada de desinformación ni clickbait que el video no cumpla; el gancho EMPIEZA por el tema que más llama la atención (como "La Tercera Guerra Mundial estuvo a punto de empezar…"); cada video se entiende solo (no depende de partes); duración 60–110 s.',
-    'Prioriza los temas y estilos que ya funcionaron en nuestros datos, pero incluye 1 idea de un tema nuevo para probar. Sé honesto: "por_que" debe citar el dato de nuestros videos en que te basas (o decir que es una prueba).',
+    'TU TRABAJO: primero BUSCA EN LA WEB qué está siendo VIRAL AHORA en nuestro nicho, y recién después propón los próximos videos. No te limites a repetir lo que ya hicimos.',
+    'PASO 1 — Investiga (usa WebSearch varias veces): busca Shorts/TikTok/Reels de historia, prehistoria, ciencia, guerras, espacio y misterios que se hayan vuelto virales en los últimos meses (millones de vistas). Busca cosas como "historia shorts viral", "prehistoria tiktok millones vistas", "datos historia virales 2026", "science shorts viral history", etc. Fíjate en el ÁNGULO y el GANCHO que los hizo virales (la pregunta, el dato impactante, el "no sabías que…").',
+    'PASO 2 — Cruza esos ángulos virales con lo que YA nos funciona a nosotros (ver datos abajo) y propón videos nuevos que aún no hayamos hecho.',
+    'REGLAS: temas reales y verificables; apto para toda la familia; nada de desinformación ni clickbait que el video no cumpla; el gancho EMPIEZA por el dato que más llama la atención (ej. "La Tercera Guerra Mundial estuvo a punto de empezar…"); cada video se entiende solo; duración 60–110 s.',
+    'VARIEDAD OBLIGATORIA: las 6 ideas deben cubrir AL MENOS 4 temas distintos de la lista. Máximo 2 ideas del mismo tema. No propongas 6 veces el mismo tema aunque sea el que más vistas nos da.',
+    'HONESTIDAD: en "por_que" cita en qué te basas — el video/tendencia viral que viste al buscar (con nº aproximado de vistas si lo sabes) o nuestro propio dato. Si es una prueba de tema nuevo, dilo.',
     focus ? `El creador pide enfocarse en: ${focus}` : '',
-    '', 'Nuestros videos (YouTube):', summary(d) || '(sin datos)',
-    '', 'Temas posibles: ' + TOPICS.map((t) => t[0]).join(', ') + ', Otros.',
+    viral ? '' : '', viral ? 'VIRALES REALES de nuestro nicho AHORA MISMO (Shorts en español con muchas vistas, sacados de YouTube). Inspírate en estos ÁNGULOS, adáptalos a nuestro estilo y a hechos verificables, NO los copies literal:' : '', viral || '',
+    '', 'Nuestros videos (YouTube), para saber qué ya funciona y qué NO repetir:', summary(d) || '(sin datos)',
+    '', 'Temas posibles (usa estos nombres en "tema"): ' + temas + '.',
     '', 'Devuelve SOLO este JSON:',
-    '{"ideas":[{"titulo":"título de YouTube, máx 70 caracteres","gancho":"primera frase exacta del narrador","tema":"uno de los temas","por_que":"1 frase con el dato en que se basa","duracion_s":75,"tags":["3 palabras clave"],"nuevo":false}]}',
-    'Exactamente 6 ideas.'
+    '{"ideas":[{"titulo":"título de YouTube, máx 70 caracteres","gancho":"primera frase exacta del narrador","tema":"uno de los temas","por_que":"1 frase: el video viral o dato en que te basas","duracion_s":75,"tags":["3 palabras clave"],"nuevo":false}]}',
+    'Exactamente 6 ideas, con temas variados.'
   ].filter(Boolean).join('\n');
   return prompt;
 }
