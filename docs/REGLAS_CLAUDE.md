@@ -161,3 +161,5 @@ Este documento es la memoria del proyecto. Cada vez que Franklin corrige algo, l
 - "King se estanca": en realidad king estaba LIBRE. El agente hacía un guion largo con Claude (35 min) y la producción esperaba detrás. Ahora los trabajos claude_* van en su propia fila en paralelo, igual que push.
 - claude_largo ya no escribe prompts de imagen/video para los Shorts (usan las tomas del largo): solo su narración (dialogue). Ahorra ~5–10 min por guion.
 - gen_local de un Short del largo sin tomas todavía → error claro: "produce primero el largo".
+- FILAS del agente: king (gen_local, regen_local, toma_local, prueba_ltx/flux, qa_tomas, flow_*): de a uno. Claude (claude_*): en paralelo. General (voces, voz_ingles, render_full, publicar, portada, subtítulos, short_reusar, yt_relacionado…): en paralelo, publicar primero. push: en paralelo.
+- yt_relacionado usa su propio perfil de Chrome (VYRALES_yt_perfil), separado del de Flow. Hay que iniciar sesión una vez con `yt_relacionado:<ep>:ver`.

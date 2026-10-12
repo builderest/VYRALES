@@ -408,6 +408,9 @@ function codeChanged() { return WATCH.some((f, i) => { try { return fs.statSync(
 let busy = false;
 let pushBusy = false;
 let claudeBusy = false; // fila paralela de guiones con Claude
+let generalBusy = false; // fila paralela de lo que NO usa king
+// Lo que usa king (GPU) o el Chrome de Flow: de a uno. yt_relacionado usa su propio perfil de Chrome.
+const KING_RE = /^(gen_local|regen_local|toma_local|prueba_ltx|prueba_flux|qa_tomas|flow_)/;
 async function tick() {
   let mine = false;
   try {
@@ -429,8 +432,20 @@ async function tick() {
         if (cl2 && cl2.length) { claudeBusy = true; runJob(cj[0]).catch((e) => log('claude:', e.message)).finally(() => { claudeBusy = false; }); }
       }
     }
+    // FILA GENERAL (oct-11, Franklin: "las tareas que no dependen de king no deberían frenarse"): voces, inglés,
+    // calidad completa, publicar, portadas, subtítulos, Shorts del largo… corren mientras king genera video.
+    // Publicar va primero (lo pidió una persona y es rápido).
+    if (!generalBusy) {
+      const { data: gp } = await sb.from('agent_jobs').select('*').eq('status', 'pending').order('created_at').limit(50);
+      const free = (gp || []).filter((x) => x.command !== 'push' && !/^claude_/.test(x.command) && !KING_RE.test(x.command));
+      const gj = free.find((x) => /^publish:/.test(x.command)) || free[0];
+      if (gj) {
+        const { data: cl3 } = await sb.from('agent_jobs').update({ status: 'running' }).eq('id', gj.id).eq('status', 'pending').select();
+        if (cl3 && cl3.length) { generalBusy = true; runJob(gj).catch((e) => log('general:', e.message)).finally(() => { generalBusy = false; }); }
+      }
+    }
     if (busy) return;
-    if (codeChanged() && !pushBusy && !claudeBusy) { log('el código del agente cambió: reiniciando para cargarlo...'); devStop(); process.exit(0); }
+    if (codeChanged() && !pushBusy && !claudeBusy && !generalBusy) { log('el código del agente cambió: reiniciando para cargarlo...'); devStop(); process.exit(0); }
     migrateLocalFinales();
     organizeBySeries();
     await queueFullRenders();
@@ -446,9 +461,9 @@ async function tick() {
     // Publicar espera hasta 6 h: si la PC estaba generando un episodio (25+ min), a los 15 min se
     // vencía sin publicar (oct-7: EP3 a YouTube y TikTok se perdieron así).
     await sb.from('agent_jobs').update({ status: 'expired', finished_at: new Date().toISOString() }).eq('status', 'pending').like('command', 'publish:%').lt('created_at', new Date(Date.now() - 6 * 3600000).toISOString());
-    // Publicar va PRIMERO (lo pidió una persona y es rápido); después lo demás en orden de llegada.
-    const { data: pubs } = await sb.from('agent_jobs').select('*').eq('status', 'pending').like('command', 'publish:%').order('created_at').limit(1);
-    const { data } = pubs && pubs.length ? { data: pubs } : await sb.from('agent_jobs').select('*').eq('status', 'pending').neq('command', 'push').not('command', 'like', 'claude_%').order('created_at').limit(1);
+    // FILA DE KING (la GPU): solo lo que genera video con LTX o usa el Chrome de Flow. Lo demás va en la fila general.
+    const { data: pend } = await sb.from('agent_jobs').select('*').eq('status', 'pending').order('created_at').limit(50);
+    const data = [(pend || []).find((x) => KING_RE.test(x.command))].filter(Boolean);
     const job = data && data[0];
     if (!job) return;
     // "Reclamar" la orden (si hubiera dos agentes, solo uno la toma).

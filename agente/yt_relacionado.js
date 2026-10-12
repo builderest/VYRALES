@@ -1,12 +1,13 @@
 // "VIDEO RELACIONADO" de un Short de YouTube → su video largo (Franklin, oct-11: en los Shorts los enlaces del texto no
 // se pueden tocar; el botón ▶ "video relacionado" sí). La API de YouTube no tiene ese campo, así que se pone en
-// YouTube Studio con el Chrome propio del agente (mismo perfil que Flow; sesión de Google de Franklin).
+// YouTube Studio con el Chrome propio del agente (perfil propio VYRALES_yt_perfil; sesión de la cuenta del canal).
 // Uso: yt_relacionado:<short_ep>[:ver]   (":ver" muestra la ventana, p. ej. para iniciar sesión la primera vez).
 const fs = require('fs'); const path = require('path'); const { execFileSync } = require('child_process');
 const ROOT = path.join(__dirname, '..');
 for (const l of fs.readFileSync(path.join(ROOT, '.env'), 'utf8').split(/\r?\n/)) { const m = /^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/.exec(l); if (m && !process.env[m[1]]) process.env[m[1]] = m[2].replace(/^(['"])(.*)\1$/, '$2'); }
 const F = path.join(ROOT, 'netlify/functions');
-const PROFILE = path.join(process.env.LOCALAPPDATA || ROOT, 'VYRALES_flow_perfil');
+// Perfil PROPIO (no el de Flow): así puede correr mientras Flow genera imágenes. Sesión: la del canal de YouTube.
+const PROFILE = path.join(process.env.LOCALAPPDATA || ROOT, 'VYRALES_yt_perfil');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 function loadPlaywright() { try { return require('playwright-core'); } catch (_) {} return require(path.join(ROOT, 'node_modules', 'playwright-core')); }
 
@@ -35,7 +36,7 @@ function loadPlaywright() { try { return require('playwright-core'); } catch (_)
     try { ctx = await chromium.launchPersistentContext(PROFILE, { channel, headless: false, viewport: { width: 1500, height: 900 }, ignoreDefaultArgs: ['--enable-automation'], args: ['--window-size=1520,1000', '--disable-blink-features=AutomationControlled'].concat(mode === 'ver' ? ['--window-position=40,20'] : ['--window-position=-3000,-3000']) }); break; }
     catch (e) { console.log('No pude abrir', channel, '→', String(e.message).split('\n')[0]); }
   }
-  if (!ctx) throw new Error('No pude abrir Chrome ni Edge (¿está abierto el perfil de Flow en otra ventana?).');
+  if (!ctx) throw new Error('No pude abrir Chrome ni Edge (¿está abierto el perfil de YouTube en otra ventana?).');
   const page = ctx.pages()[0] || (await ctx.newPage());
   try {
     await page.goto('https://studio.youtube.com/video/' + shortId + '/edit', { waitUntil: 'domcontentloaded', timeout: 60000 });
