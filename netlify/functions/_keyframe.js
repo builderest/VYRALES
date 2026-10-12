@@ -144,7 +144,7 @@ async function createLocationImage(supabase, { seriesId, slug, storyBible, key, 
     const f = await flowMod().flowImage({ prompt: finalPrompt, aspect: storyBible.aspect === '16:9' ? '16:9' : '9:16' });
     img = { buffer: f.buffer, mimeType: f.mimeType, costUsd: 0, model: 'flow' };
     log('lugar hecho con Google Flow ($0)');
-  } else img = await generateImage({ prompt: finalPrompt });
+  } else img = await generateImage({ prompt: finalPrompt, aspectRatio: storyBible.aspect === '16:9' ? '16:9' : '9:16' });
   await logSpend(supabase, { seriesId, kind: 'location', model: img.model, costUsd: img.costUsd, note: key });
   await ensureMediaBucket(supabase);
   const ext = img.mimeType.includes('jpeg') ? 'jpg' : 'png';
@@ -205,18 +205,20 @@ async function createKeyframe(supabase, { series, episode, shot, characters, log
   log('generando cuadro inicial de la toma', shot.n, flux ? 'con FLUX en king (gratis)...' : 'con ' + refs.length + ' imagen(es) de referencia...');
   // image_engine 'flow': cuadro inicial con Google Flow (tu plan) y, si falla, FLUX en king. Ambos $0.
   let img;
+  // El formato del episodio manda en TODOS los caminos (Flow, FLUX, Gemini). Antes solo Flow lo recibía: cuando Flow
+  // fallaba, el respaldo salía VERTICAL dentro de un largo 16:9 (EP 11: 20 tomas verticales; oct-12).
+  const aspect = (episode && episode.continuity && episode.continuity.aspect) || (series.story_bible && series.story_bible.aspect) || '9:16';
   if (flux && (shot.image_engine || series.story_bible.image_engine) === 'flow') {
-    const aspect = (episode && episode.continuity && episode.continuity.aspect) || (series.story_bible && series.story_bible.aspect) || '9:16';
     try { img = await flowMod().flowImage({ prompt: fluxText, aspect }); log('cuadro inicial de Google Flow' + (aspect === '16:9' ? ' (16:9)' : '')); }
-    catch (e) { log('Flow falló (' + String(e.message).slice(0, 160) + ') → FLUX en king'); img = await fluxImage({ prompt: fluxText }); }
+    catch (e) { log('Flow falló (' + String(e.message).slice(0, 160) + ') → FLUX en king'); img = await fluxImage({ prompt: fluxText, aspect }); }
   } else if (!flux && (shot.characters || []).length && series.story_bible.flow_characters === true && (shot.image_engine || series.story_bible.image_engine) === 'flow') {
     // Personajes con Google Flow: se suben sus fotos de cara como "ingredientes" ($0). Si falla → Gemini.
     try {
       const refPrompt = 'Reference images in order: ' + refs.map((r, i) => `image ${i + 1} = ${r.label}`).join('; ') + '. ' + prompt;
       img = await flowMod().flowImage({ prompt: refPrompt, refs });
       log('cuadro inicial de Google Flow (con fotos de los personajes)');
-    } catch (e) { log('Flow con personajes falló (' + String(e.message).slice(0, 160) + ') → Gemini'); img = await generateImage({ prompt, references: refs }); }
-  } else img = flux ? await fluxImage({ prompt: fluxText }) : await generateImage({ prompt, references: refs });
+    } catch (e) { log('Flow con personajes falló (' + String(e.message).slice(0, 160) + ') → Gemini'); img = await generateImage({ prompt, references: refs, aspectRatio: aspect }); }
+  } else img = flux ? await fluxImage({ prompt: fluxText, aspect }) : await generateImage({ prompt, references: refs, aspectRatio: aspect });
   await logSpend(supabase, { seriesId, episodeId: episode.id, shotNumber: shot.n, kind: 'keyframe', model: img.model, costUsd: img.costUsd });
 
   await ensureMediaBucket(supabase);
@@ -301,8 +303,8 @@ async function createEndFrame(supabase, { series, episode, shot, startImage, anc
     const p = attempt === 0 ? prompt : prompt + (lastSim != null && lastSim < 0.5 ? ' IMPORTANT: the previous attempt changed too much. Stay much closer to the reference: same camera angle, same framing, same place; only a small step of the action.' : ' IMPORTANT: the previous attempt looked almost identical to the reference. The final frame must show the described action clearly advanced, with a slightly different framing.');
     const fl = require('./_flux');
     const cand = fl.useFlux(sb, shot)
-      ? await fl.fluxImage({ prompt: 'Same scene, same lighting and style, a few seconds later: ' + String(shot.end_en).trim() + (attempt === 0 ? '' : (lastSim != null && lastSim < 0.5 ? ' Keep the same camera angle and framing; only a small step of the action.' : ' The action is clearly advanced and the framing slightly closer.')), reference: startImage })
-      : await generateImage({ prompt: p, references: ref });
+      ? await fl.fluxImage({ prompt: 'Same scene, same lighting and style, a few seconds later: ' + String(shot.end_en).trim() + (attempt === 0 ? '' : (lastSim != null && lastSim < 0.5 ? ' Keep the same camera angle and framing; only a small step of the action.' : ' The action is clearly advanced and the framing slightly closer.')), reference: startImage , aspect: ((episode && episode.continuity && episode.continuity.aspect) || (sb && sb.aspect) || '9:16') })
+      : await generateImage({ prompt: p, references: ref, aspectRatio: ((episode && episode.continuity && episode.continuity.aspect) || (sb && sb.aspect) || '9:16') });
     await logSpend(supabase, { seriesId: series.id || episode.series_id, episodeId: episode.id, shotNumber: shot.n, kind: 'keyframe', model: cand.model, costUsd: cand.costUsd, note: 'cuadro final' });
     // Si sale casi igual al inicial (SSIM alto) la toma queda quieta: se reintenta una vez; si no, sin cuadro final.
     const sim = await similarity(startImage, cand);

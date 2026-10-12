@@ -18,7 +18,8 @@ async function j(url, opts) {
   return r.json();
 }
 
-function graph(prompt, refName) {
+function graph(prompt, refName, aspect) {
+  const [W, H] = aspect === '16:9' ? [1344, 768] : [768, 1344]; // largos 16:9 (oct-12: salían cuadros verticales en el largo)
   const wf = JSON.parse(fs.readFileSync(TEMPLATE, 'utf8'));
   delete wf['81'];
   if (refName) {
@@ -30,8 +31,8 @@ function graph(prompt, refName) {
     wf['75:63'].inputs.positive = ['75:74', 0];
     wf['75:63'].inputs.negative = ['75:67', 0];
   }
-  wf['75:66'].inputs.width = 768; wf['75:66'].inputs.height = 1344;
-  wf['75:62'].inputs.width = 768; wf['75:62'].inputs.height = 1344;
+  wf['75:66'].inputs.width = W; wf['75:66'].inputs.height = H;
+  wf['75:62'].inputs.width = W; wf['75:62'].inputs.height = H;
   wf['75:74'].inputs.text = prompt;
   wf['75:67'].inputs.text = NEG;
   wf['75:73'].inputs.noise_seed = crypto.randomInt(1, 2 ** 31);
@@ -40,7 +41,7 @@ function graph(prompt, refName) {
 }
 
 // prompt: descripción corta de lo que se ve. reference: { imageBytes, mimeType } → edita esa imagen.
-async function fluxImage({ prompt, reference = null }) {
+async function fluxImage({ prompt, reference = null, aspect = '9:16' }) {
   if (!fs.existsSync(TEMPLATE)) throw new Error('Falta agente/flux2_edit_api.json (flux solo funciona desde el agente local).');
   let refName = null;
   if (reference) {
@@ -52,7 +53,7 @@ async function fluxImage({ prompt, reference = null }) {
   }
   const text = (reference ? 'Edit this image: ' : '') + String(prompt).trim().replace(/\.?$/, '.') + RULE;
   const t0 = Date.now();
-  const { prompt_id } = await j(GEN() + '/prompt', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt: graph(text, refName), client_id: 'vyrales' }) });
+  const { prompt_id } = await j(GEN() + '/prompt', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt: graph(text, refName, aspect), client_id: 'vyrales' }) });
   for (;;) {
     await sleep(3000);
     if (Date.now() - t0 > 10 * 60000) throw new Error('king (flux) tardó más de 10 min');
