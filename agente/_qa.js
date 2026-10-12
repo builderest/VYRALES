@@ -231,6 +231,13 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
       await supabase.from('episodes').update({ shots: (fr.shots || []).map((x) => x.n === n ? Object.assign({}, x, { qa: Object.assign({}, x.qa || {}, { redone: true, tries: prevTries[n] + 1 }) }, boost ? { qa_boost: true } : {}) : x) }).eq('id', epId);
     };
     for (const t of todo) {
+      // Franklin puede aprobar a mano MIENTRAS el QA corre (un largo tarda horas): justo antes de rehacer se vuelve a
+      // mirar; si ya la aprobó, no se toca (oct-12).
+      try {
+        const { data: now } = await supabase.from('assets').select('approved, updated_at, created_at').eq('episode_id', epId).eq('kind', 'video_clip').eq('shot_number', t.n);
+        const last = (now || []).sort((a, b) => String(b.updated_at || b.created_at).localeCompare(String(a.updated_at || a.created_at)))[0];
+        if (last && last.approved && !(t.sh.qa && t.sh.qa.force)) { log(`QA toma ${t.n}: la aprobaste a mano → no se rehace`); continue; }
+      } catch (_) {}
       if (t.rewrite) {
         try {
           const fix = await rewriteShot(t.sh, t.reason, log, { allowImage: t.newFrame, allowSplit: true });
