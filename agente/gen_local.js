@@ -29,6 +29,7 @@ async function main() {
     const parent = e1 && e1.continuity && e1.continuity.parent_episode_id;
     if (parent && process.env.VYRALES_SHORT_NUEVO !== '1') {
       const { count } = await supabase.from('assets').select('id', { count: 'exact', head: true }).eq('episode_id', parent).eq('kind', 'video_clip');
+      if (!count) throw new Error('Este Short sale de un video largo que todavía no tiene tomas: produce primero el largo (el Short usa sus tomas).');
       if (count > 0) {
         console.log('Este Short sale de un video largo ya hecho → uso sus tomas (sin generar video nuevo).');
         const { spawnSync } = require('child_process');

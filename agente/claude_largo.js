@@ -64,11 +64,10 @@ async function detail(shots, { aspect, context, title, log }) {
     const context = story.title + '. ' + (story.chapters || []).map((c) => c.title).join(' → ');
     console.log('Prompts detallados del video largo (16:9)...');
     const detailed = await detail(longShots, { aspect: '16:9', context, title: story.title, log: console.log });
-    const shorts = [];
-    for (const [i, sh] of (story.shorts || []).entries()) {
-      console.log(`Prompts detallados del Short ${i + 1} (9:16): ${sh.title}`);
-      shorts.push(Object.assign({}, sh, { shots: await detail(sh.shots || [], { aspect: '9:16', context, title: sh.title, log: console.log }) }));
-    }
+    // Los Shorts del largo usan las TOMAS DEL LARGO (short_reusar.js, Franklin oct-11): no se escriben prompts de
+    // imagen/video para ellos (ahorra ~5–10 min por guion). Solo su narración.
+    const shorts = (story.shorts || []).map((sh) => Object.assign({}, sh, { reuse_long: true, shots: (sh.shots || []).map((x, i) => ({ n: i + 1, camera: x.camera || '', start_en: x.visual_es || '', scene_es: x.visual_es || x.line, dialogue: [{ speaker: 'Narrador', line: x.line }], characters: [], location: 'escena' })) }));
+    if (shorts.length) console.log(`${shorts.length} Shorts: usarán las tomas del largo (sin prompts propios).`);
     const result = { ok: true, kind: 'largo', tipo, model: 'Claude (tu plan)', costUsd: 0, words, minutes: +(words / 2.3 / 60).toFixed(1),
       long: { title: story.title, hook_text: story.hook_text, description: story.description, sources: story.sources || [], chapters: (story.chapters || []).map((c) => c.title), shots: detailed },
       shorts, at: new Date().toISOString() };

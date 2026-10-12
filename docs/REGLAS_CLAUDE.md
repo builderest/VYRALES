@@ -156,3 +156,8 @@ Este documento es la memoria del proyecto. Cada vez que Franklin corrige algo, l
 - Facebook e Instagram también se suben en CALIDAD COMPLETA desde la PC (rupload: FB video_reels con el archivo en binario; IG upload_type=resumable). Si Meta rechaza el archivo, se reintenta con el enlace de Supabase.
 - _yt_sync.js (agente, cada 10 min): si Franklin hace PÚBLICO un video en Studio, se marca publicado (sale en vyrales.app/ver y los Shorts enlazan a él) y se publica el comentario de fuentes/enlace que YouTube rechazaba mientras era privado.
 - YouTube Shorts: en descripción y comentarios los enlaces NO se pueden tocar (YouTube, desde 2023). Lo que sí se toca es el "video relacionado": `yt_relacionado:<short_ep>` lo pone en Studio con el Chrome del agente (perfil de Flow). Se hace solo al publicar un Short que lleva al largo. El texto de YouTube dice "toca el video relacionado".
+
+## Fila del agente (oct-11)
+- "King se estanca": en realidad king estaba LIBRE. El agente hacía un guion largo con Claude (35 min) y la producción esperaba detrás. Ahora los trabajos claude_* van en su propia fila en paralelo, igual que push.
+- claude_largo ya no escribe prompts de imagen/video para los Shorts (usan las tomas del largo): solo su narración (dialogue). Ahorra ~5–10 min por guion.
+- gen_local de un Short del largo sin tomas todavía → error claro: "produce primero el largo".
