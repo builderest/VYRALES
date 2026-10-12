@@ -61,7 +61,7 @@ async function runPublish({ supabase, epId, platform, privacy, loadVideo, qualit
         const SITE = (process.env.PUBLIC_SITE_HOST || 'vyrales.app') + '/ver';
         const lineBio = '👉 Historia completa: toca el enlace de mi perfil (' + SITE + ')';
         const add = (t, ln = line) => { t = String(t || ''); if (!t || t.includes(longUrl) || t.includes(SITE)) return t; const i = t.indexOf('👇'); if (i < 0) return ln + '\n' + t; const end = t.indexOf('\n', i); return end < 0 ? t + '\n' + ln : t.slice(0, end) + '\n' + ln + t.slice(end); };
-        pk = Object.assign({}, pk, { tiktok: add(pk.tiktok, lineBio), instagram: add(pk.instagram, lineBio), facebook: add(pk.facebook || pk.instagram), youtube: add(pk.youtube),
+        pk = Object.assign({}, pk, { tiktok: add(pk.tiktok, lineBio), instagram: add(pk.instagram, lineBio), facebook: add(pk.facebook || pk.instagram), youtube: add(pk.youtube, '▶ Historia completa: toca el video relacionado (arriba del título)'),
           pinned_comment: String(pk.pinned_comment || '').replace(/\(pega aquí el enlace del video largo\)/, longUrl) || line });
         log('enlace al video largo agregado a los textos:', longUrl);
         if (yt.privacy === 'private' || /uploaded_private/.test(String(yt.status || ''))) log('AVISO: el video largo sigue en PRIVADO en YouTube; el enlace no funcionará para el público hasta que lo hagas público.');

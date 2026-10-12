@@ -51,6 +51,13 @@ async function main() {
   if (platform === 'youtube') {
     const { data: e2 } = await supabase.from('episodes').select('continuity, validator_report').eq('id', epId).single();
     const vid = (((e2.validator_report || {}).social_runs || {}).youtube || {}).video_id;
+    if (vid && (e2.continuity || {}).parent_episode_id) {
+      // Short que lleva al largo: "video relacionado" en Studio (el único enlace que se puede tocar en un Short).
+      console.log('Poniendo el video relacionado (el largo) en el Short...');
+      const { spawnSync } = require('child_process');
+      const pr = spawnSync(process.execPath, [path.join(__dirname, 'yt_relacionado.js'), epId], { encoding: 'utf8', timeout: 8 * 60000 });
+      console.log(String(pr.stdout || '').split(/\r?\n/).filter((l) => /relacionado|LISTO|ERROR|AVISO/.test(l)).join('\n'));
+    }
     if (vid && (e2.continuity || {}).kind === 'largo') {
       console.log('Haciendo la portada de YouTube...');
       const { spawnSync } = require('child_process');
