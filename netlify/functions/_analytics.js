@@ -28,7 +28,7 @@ async function ytToken(sb) {
     body: new URLSearchParams({ client_id: process.env.YOUTUBE_CLIENT_ID, client_secret: process.env.YOUTUBE_CLIENT_SECRET, grant_type: 'refresh_token', refresh_token: acc.refresh_token })
   });
   if (!r.body.access_token) throw new Error('El permiso de YouTube venció: reconecta YouTube.');
-  await sb.from('social_accounts').update({ access_token: r.body.access_token, expires_at: new Date(Date.now() + (r.body.expires_in || 3600) * 1000).toISOString() }).eq('platform', 'youtube');
+  { const T = require('./_tenant'); let uq = sb.from('social_accounts').update({ access_token: r.body.access_token, expires_at: new Date(Date.now() + (r.body.expires_in || 3600) * 1000).toISOString() }).eq('platform', 'youtube'); if (await T.tenancyOn(sb)) uq = uq.eq('workspace_id', T.currentWs()); await uq; }
   return { token: r.body.access_token, scopes: r.body.scope || acc.scopes || '' };
 }
 

@@ -76,4 +76,4 @@ exports.handler = async (event) => {
 exports._seriesJson = seriesJson;
 
 // Claves de la página Cuenta → API (cifradas en Supabase; mandan sobre el .env). Ver _keys.js.
-exports.handler = require('./_keys').withKeys(exports.handler);
+exports.handler = require('./_keys').withKeys(exports.handler, { adminOnly: true }); // solo el administrador

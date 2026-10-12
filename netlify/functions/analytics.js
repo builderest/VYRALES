@@ -78,7 +78,7 @@ exports.handler = async (event) => {
         const job = 'ideas-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
         const { uploadFile } = require('./_storage');
         await uploadFile(sb, { path: `guiones/${job}.req.json`, buffer: Buffer.from(JSON.stringify({ focus: String(body.focus || '').slice(0, 200), at: new Date().toISOString() })), contentType: 'application/json' });
-        const { error } = await sb.from('agent_jobs').insert({ command: 'claude_ideas:' + job });
+        const { error } = await sb.from('agent_jobs').insert(await require('./_tenant').jobRow(sb, 'claude_ideas:' + job));
         if (error) return json(500, { error: error.message });
         return json(200, { queued: true, job });
       }
@@ -91,7 +91,7 @@ exports.handler = async (event) => {
         const { uploadFile } = require('./_storage');
         await uploadFile(sb, { path: `guiones/${job}.req.json`, buffer: Buffer.from(JSON.stringify({ tipo, topic, idea, at: new Date().toISOString() })), contentType: 'application/json' });
         const online = await agentOnline();
-        const { error } = await sb.from('agent_jobs').insert({ command: 'claude_largo:' + job });
+        const { error } = await sb.from('agent_jobs').insert(await require('./_tenant').jobRow(sb, 'claude_largo:' + job));
         if (error) return json(500, { error: error.message });
         return json(200, { queued: true, job, online, titulo: idea.titulo || '' });
       }
@@ -102,7 +102,7 @@ exports.handler = async (event) => {
         await uploadFile(sb, { path: `guiones/${job}.req.json`, buffer: Buffer.from(JSON.stringify({ idea: body.idea || {}, at: new Date().toISOString() })), contentType: 'application/json' });
         const { data: st } = await sb.from('agent_state').select('last_seen').eq('id', 1).maybeSingle();
         const online = !!(st && st.last_seen && Date.now() - new Date(st.last_seen).getTime() < 90000);
-        const { error } = await sb.from('agent_jobs').insert({ command: 'claude_guion:' + job });
+        const { error } = await sb.from('agent_jobs').insert(await require('./_tenant').jobRow(sb, 'claude_guion:' + job));
         if (error) return json(500, { error: error.message });
         return json(200, { queued: true, online });
       }

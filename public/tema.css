@@ -15,6 +15,9 @@
   --vy-emerald: 0 255 136;
   --vy-gold: 255 183 0;
   --vy-font-novela: 'Playfair Display', serif;
+  /* Colores de las LETRAS de la novela (lo único que cambia por novela; tema.js) */
+  --vy-na: 45 140 255;
+  --vy-nb: 255 62 165;
 }
 
 /* ---------- Base ---------- */
@@ -133,16 +136,25 @@ main tbody tr:hover {
 @media (min-width: 1024px) {
   .vy-side { position: sticky; top: 0; height: 100vh; overflow-y: auto; align-self: flex-start; }
 }
+/* Botón ☰ y fondo oscuro: solo existen en tablet/celular */
+.vy-menu-btn { display: none; }
+.vy-scrim { display: none; }
 @media (max-width: 1023px) {
-  /* En tablet/celular el menú es una franja que se desliza de lado */
-  .vy-side { max-width: none; flex-basis: 100%; flex-direction: row; flex-wrap: nowrap; align-items: center;
-             overflow-x: auto; padding: 10px 12px; border-right: 0; border-bottom: 1px solid #1b253e; scrollbar-width: none; }
-  .vy-side::-webkit-scrollbar { display: none; }
-  .vy-side .vy-side-sec, .vy-side .vy-status { display: none; }
-  .vy-side .vy-brand { padding: 0 10px 0 2px; flex: none; }
-  .vy-side .vy-brand .flex-col { display: none; }
-  .vy-side .vy-nav { flex: none; white-space: nowrap; }
+  /* En tablet/celular el menú es un cajón que sale por la izquierda con el botón ☰ */
+  .vy-side { position: fixed; top: 0; left: 0; bottom: 0; width: 280px; max-width: 86vw; z-index: 70;
+             overflow-y: auto; overscroll-behavior: contain; transform: translateX(-105%);
+             transition: transform .28s cubic-bezier(.2,.8,.2,1); background: rgb(2 3 7 / .97);
+             padding-top: max(20px, env(safe-area-inset-top)); padding-bottom: max(20px, env(safe-area-inset-bottom)); }
+  html.vy-menu-open .vy-side { transform: none; box-shadow: 20px 0 60px rgb(0 0 0 / .6), 0 0 30px rgb(var(--vy-a) / .15); }
+  .vy-scrim { display: block; position: fixed; inset: 0; z-index: 65; background: rgb(0 0 0 / .55);
+              backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); opacity: 0; pointer-events: none; transition: opacity .25s; }
+  html.vy-menu-open .vy-scrim { opacity: 1; pointer-events: auto; }
+  html.vy-menu-open body { overflow: hidden; }
+  .vy-menu-btn { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 44px; height: 44px;
+                 border-radius: 11px; border: 1px solid #1b253e; background: rgb(2 3 7 / .7); color: #fff; font-size: 17px; cursor: pointer; }
+  .vy-menu-btn:hover, .vy-menu-btn:focus-visible { border-color: rgb(var(--vy-a)); box-shadow: 0 0 14px rgb(var(--vy-a) / .35); color: rgb(var(--vy-a)); }
 }
+@media (prefers-reduced-motion: reduce) { .vy-side, .vy-scrim { transition: none; } }
 .vy-body { flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; }
 .vy-content { box-sizing: border-box; width: 100%; max-width: 1500px; margin: 0 auto; padding: 24px 36px 56px; }
 .vy-content > * + * { margin-top: 24px; }
@@ -174,7 +186,6 @@ html { scroll-behavior: smooth; }
   color: #a8b3cf; font: inherit; font-size: 14px; font-weight: 500; text-align: left; cursor: pointer;
   transition: all .25s ease; overflow: hidden;
 }
-@media (max-width: 1023px) { .vy-nav { width: auto; } }
 .vy-nav i { width: 18px; text-align: center; transition: color .2s, filter .2s; }
 .vy-nav::before {
   content: ''; position: absolute; left: 0; top: 50%; width: 3px; height: 0; border-radius: 2px;
@@ -210,6 +221,12 @@ html { scroll-behavior: smooth; }
   -webkit-background-clip: text; background-clip: text; color: transparent;
   filter: drop-shadow(0 0 18px rgb(var(--vy-a) / .35));
 }
+/* Nombre de la novela: colores propios de cada novela */
+.vy-novela.vy-grad {
+  background-image: linear-gradient(90deg, rgb(var(--vy-na)), rgb(var(--vy-nb)));
+  filter: drop-shadow(0 0 18px rgb(var(--vy-na) / .35));
+}
+#seriesPickerLabel { color: rgb(var(--vy-na)) !important; }
 
 /* Aviso "lo que sigue" */
 .vy-next { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; padding: 18px 20px; }
@@ -552,3 +569,123 @@ details[open] > .vy-sum::after { transform: translateY(-50%) rotate(180deg); }
 .vy-api-setup { border-color: rgb(var(--vy-gold) / .45) !important; }
 .vy-api-sql { margin: 0; padding: 14px; border-radius: 10px; background: #020307; border: 1px solid #1b253e; color: #b9c3dc; font-size: 12px; white-space: pre-wrap; max-height: 260px; overflow: auto; }
 #vyApi code { font-family: 'JetBrains Mono', monospace; font-size: .9em; color: #fff; background: rgb(255 255 255 / .06); padding: 1px 6px; border-radius: 5px; }
+
+/* =====================================================================
+   MULTIUSUARIO: menú según la cuenta, Usuarios y Créditos
+   ===================================================================== */
+/* Hasta saber quién eres, no se muestran opciones de admin ni de usuario */
+html:not(.vy-admin) [data-vy-admin] { display: none !important; }
+html:not(.vy-user) [data-vy-user] { display: none !important; }
+.vy-badge-cred { background: rgb(var(--vy-a)); color: #05070f; box-shadow: 0 0 10px rgb(var(--vy-a) / .6); }
+.vy-toggle { position: relative; display: inline-flex; cursor: pointer; }
+.vy-toggle input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.vy-toggle span {
+  display: inline-flex; align-items: center; min-height: 40px; padding: 0 14px; border-radius: 999px; font-size: 13px; font-weight: 600;
+  border: 1px solid #2a3550; background: rgb(2 3 7 / .6); color: #a8b3cf; transition: all .2s;
+}
+.vy-toggle span::before { content: '\f00d'; font-family: 'Font Awesome 6 Free'; font-weight: 900; font-size: 11px; margin-right: 8px; color: #66728e; }
+.vy-toggle input:checked + span { color: #fff; border-color: rgb(var(--vy-emerald) / .6); background: rgb(var(--vy-emerald) / .1); box-shadow: 0 0 12px rgb(var(--vy-emerald) / .2); }
+.vy-toggle input:checked + span::before { content: '\f00c'; color: rgb(var(--vy-emerald)); }
+.vy-toggle input:focus-visible + span { outline: 2px solid rgb(var(--vy-a)); outline-offset: 2px; }
+.vy-toggle:hover span { border-color: rgb(var(--vy-a) / .6); }
+.vy-paused { opacity: .6; }
+.vy-paused:hover { opacity: 1; }
+
+/* =====================================================================
+   CELULAR (≤ 640 px) · barra superior en una sola fila:
+   [☰] [● Novela ▾] ··· [⚡ Producir]   ("Nueva novela" queda en el menú ☰)
+   ===================================================================== */
+html, body { max-width: 100%; overflow-x: hidden; }
+@media (max-width: 1023px) {
+  .vy-top { flex-wrap: nowrap; gap: 10px; }
+  .vy-top > .vy-page, .vy-top > .vy-sep { display: none; }
+  #seriesPicker { min-width: 0; flex: 1 1 auto; }
+  #seriesPickerBtn { max-width: 100%; min-width: 0; }
+  #seriesPickerLabel { min-width: 0; max-width: none; }
+  .vy-top > .ml-auto { flex: none; flex-wrap: nowrap; }
+}
+@media (max-width: 640px) {
+  .vy-top-new { display: none !important; }
+  .vy-hide-xs { display: none; }
+  .vy-top .vy-cta { padding-left: 14px; padding-right: 14px; }
+  #seriesMenu { width: min(320px, calc(100vw - 28px)); }
+  .vy-hero h1 { font-size: clamp(30px, 9vw, 40px); overflow-wrap: anywhere; }
+}
+
+/* =====================================================================
+   CELULAR TIPO APP
+   - Sin zoom (ni con doble toque ni al escribir en un campo)
+   - La pantalla no se mueve de lado ni "rebota"
+   - Pestañas abajo: Inicio · Producción · Revisar · Guiones · Más (☰)
+   ===================================================================== */
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; touch-action: manipulation; }
+body { -webkit-tap-highlight-color: transparent; overscroll-behavior: none; }
+.vy-tabs { display: none; }
+@media (max-width: 640px) {
+  html, body { overscroll-behavior: none; }
+  /* iPhone hace zoom si un campo tiene letra < 16 px: aquí todos quedan en 16 */
+  input, select, textarea { font-size: 16px !important; }
+  /* Botones y textos no se seleccionan al tocarlos (como en una app) */
+  .vy-nav, .vy-tab, .vy-top button, .vy-cta, .vy-ghost { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+  /* En el celular el ☰ vive en la pestaña "Más" */
+  .vy-menu-btn { display: none; }
+  .vy-top { padding-top: max(10px, env(safe-area-inset-top)); }
+  .vy-content { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
+  .vy-tabs {
+    display: grid; grid-template-columns: repeat(5, 1fr); position: fixed; left: 0; right: 0; bottom: 0; z-index: 60;
+    padding: 6px 6px max(6px, env(safe-area-inset-bottom)); background: rgb(5 7 15 / .92);
+    backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border-top: 1px solid #1b253e;
+  }
+  .vy-tab {
+    position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+    min-height: 54px; border: 0; border-radius: 12px; background: transparent; color: #8c98b8; cursor: pointer;
+    font: inherit; font-size: 11px; font-weight: 600; letter-spacing: .01em; transition: color .2s, background .2s;
+  }
+  .vy-tab i { font-size: 18px; transition: transform .2s, filter .2s; }
+  .vy-tab span { white-space: nowrap; }
+  .vy-tab.act { color: #fff; background: linear-gradient(180deg, rgb(var(--vy-a) / .16), rgb(var(--vy-b) / .06)); }
+  .vy-tab.act i { color: rgb(var(--vy-a)); filter: drop-shadow(0 0 8px rgb(var(--vy-a) / .8)); transform: translateY(-1px); }
+  .vy-tab.act::before { content: ''; position: absolute; top: -7px; left: 30%; right: 30%; height: 3px; border-radius: 0 0 3px 3px;
+    background: linear-gradient(90deg, rgb(var(--vy-a)), rgb(var(--vy-b))); box-shadow: 0 0 10px rgb(var(--vy-a)); }
+  .vy-tab:active { transform: scale(.94); }
+  .vy-tab-dot { position: absolute; top: 4px; left: calc(50% + 6px); min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px;
+    background: rgb(var(--vy-gold)); color: #05070f; font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center; box-shadow: 0 0 8px rgb(var(--vy-gold) / .7); }
+  .vy-tab-dot.hidden { display: none; }
+  /* El cajón del menú queda por encima de las pestañas */
+  .vy-side { z-index: 80; }
+  .vy-scrim { z-index: 75; }
+  /* Ventanas (modales) de pantalla completa no quedan tapadas por las pestañas */
+  html.vy-menu-open .vy-tabs { visibility: hidden; }
+  /* Con una ventana abierta (editor de toma, nueva novela, video…) las pestañas se esconden para no taparla */
+  body:has(.fixed.inset-0:not(.hidden):not([style*="display: none"])) .vy-tabs { display: none; }
+
+  /* Guiones: el título del episodio se ve completo (antes se cortaba en "L…") */
+  #arcList summary { flex-wrap: wrap; row-gap: 6px; }
+  #arcList summary > span:first-child { white-space: normal; overflow: visible; text-overflow: clip; flex: 1 1 100%; }
+  #arcList { max-height: none; }
+
+  /* Tablas de Episodios / Fila de producción → tarjetas apiladas */
+  table.vy-cards { min-width: 0 !important; }
+  table.vy-cards thead { display: none; }
+  table.vy-cards, table.vy-cards tbody { display: block; }
+  table.vy-cards tr { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 8px 12px;
+    padding: 14px 16px; border-top: 1px solid #1b253e; }
+  table.vy-cards td { display: block; padding: 0 !important; border: 0 !important; text-align: left !important; }
+  table.vy-cards tr > td:first-child { grid-column: 1 / -1; }
+  table.vy-cards tr > td[colspan] { grid-column: 1 / -1; }
+  table.vy-cards tr > td:nth-child(2):not([colspan]) { grid-column: 1; grid-row: 2; }
+  table.vy-cards tr > td:nth-child(3) { grid-column: 1; grid-row: 3; }
+  table.vy-cards tr > td:nth-child(4) { grid-column: 2; grid-row: 2; justify-self: end; }
+  table.vy-cards tr > td:nth-child(5) { grid-column: 2; grid-row: 3; justify-self: end; }
+}
+
+/* =====================================================================
+   TERMINAL DE TU PC · un color por tipo de comando (lo pone --c en cada grupo)
+   ===================================================================== */
+.vy-term-cat-h { display: flex; align-items: center; gap: 8px; margin: 0 0 6px; font-family: 'JetBrains Mono', monospace;
+  font-size: 10px; letter-spacing: .16em; text-transform: uppercase; color: rgb(var(--c)); }
+.vy-term-cat-h i { filter: drop-shadow(0 0 6px rgb(var(--c) / .7)); }
+.vy-term-btn { color: rgb(var(--c)); border-color: rgb(var(--c) / .4); background: rgb(var(--c) / .04); transition: background .2s, box-shadow .2s, transform .15s; min-height: 40px; }
+.vy-term-btn:hover, .vy-term-btn:focus-visible { background: rgb(var(--c) / .13); border-color: rgb(var(--c) / .8); box-shadow: 0 0 14px rgb(var(--c) / .3); }
+.vy-term-btn:active { transform: scale(.97); }

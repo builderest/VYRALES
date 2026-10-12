@@ -1,6 +1,6 @@
 /* =====================================================================
    VYRALES · tema.js  (rediseño "Estudio futurista", fase 1)
-   1) Tema por novela: colores + letra (window.vyTema.apply(serie))
+   1) Por novela solo cambian sus letras (color + tipo); el panel es siempre azul + rosado
    2) Ola de color que deja el mouse al moverse (desaparece sola)
    3) Bordes de los paneles que se encienden cerca del mouse
    No toca datos ni funciones del panel: solo apariencia.
@@ -27,7 +27,7 @@
     return 'azul_rosa';
   }
 
-  var actual = TEMAS.azul_rosa;
+  var actual = TEMAS.azul_rosa; // colores del panel (fijos)
 
   function apply(serie) {
     var t = null;
@@ -39,11 +39,13 @@
     } else {
       t = TEMAS[temaPorSlug(serie)];
     }
-    actual = t || TEMAS.azul_rosa;
+    t = t || TEMAS.azul_rosa;
+    // Franklin: el fondo y los colores del panel quedan FIJOS en azul + rosado.
+    // Lo único que cambia por novela son las LETRAS de la novela (color + tipo de letra).
     var r = document.documentElement.style;
-    r.setProperty('--vy-a', actual.a);
-    r.setProperty('--vy-b', actual.b);
-    if (actual.font) r.setProperty('--vy-font-novela', actual.font);
+    r.setProperty('--vy-na', t.a);
+    r.setProperty('--vy-nb', t.b);
+    if (t.font) r.setProperty('--vy-font-novela', t.font);
   }
 
   window.vyTema = { apply: apply, temas: TEMAS };

@@ -110,7 +110,13 @@ exports.handler = async (event) => {
     }
 
     const validation = validateSeries(data);
-    const { data: existingSeries } = await supabase.from('series').select('id, title, story_bible').eq('slug', data.slug || '').maybeSingle();
+    const T = require('./_tenant');
+    const tenancy = await T.tenancyOn(supabase);
+    const { data: existingSeries } = await supabase.from('series').select(tenancy ? 'id, title, story_bible, workspace_id' : 'id, title, story_bible').eq('slug', data.slug || '').maybeSingle();
+    // MULTIUSUARIO: el "slug" es único en todo el sistema. Si ya lo usa OTRA cuenta, no se toca (ni se dice de quién es).
+    if (tenancy && existingSeries && existingSeries.workspace_id !== T.currentWs()) {
+      return json(409, { error: 'Ya existe una novela con el identificador "' + data.slug + '" en otra cuenta. Cambia el "slug" en el JSON (por ejemplo agrega tu nombre).' });
+    }
     // Videos narrados sueltos (narrado_unico): cada guion pegado es un VIDEO NUEVO dentro de su canal/serie,
     // no un reemplazo de la serie (antes se quedaba el video viejo y el nuevo no aparecía).
     const standalone = !!(data.story_bible && data.story_bible.format === 'narrado_unico' && existingSeries);
@@ -157,7 +163,8 @@ exports.handler = async (event) => {
           synopsis: data.synopsis || null,
           story_bible: storyBibleWithVoices(data, existingSeries),
           is_active: true,
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
+          ...(tenancy ? { workspace_id: T.currentWs() } : {}) // dueño: la cuenta que importa
         },
         { onConflict: 'slug' }
       )

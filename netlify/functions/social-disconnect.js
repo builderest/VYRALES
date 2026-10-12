@@ -11,7 +11,10 @@ exports.handler = async (event) => {
   try {
     const { platform } = JSON.parse(event.body || '{}');
     if (!['tiktok', 'instagram', 'facebook', 'meta', 'youtube'].includes(platform)) return json(400, { error: 'Plataforma no válida.' });
-    const { error } = await getSupabaseClient().from('social_accounts').delete().in('platform', platform === 'meta' ? ['facebook', 'instagram'] : [platform]);
+    const T = require('./_tenant'); const sb = getSupabaseClient();
+    let q = sb.from('social_accounts').delete().in('platform', platform === 'meta' ? ['facebook', 'instagram'] : [platform]);
+    if (await T.tenancyOn(sb)) q = q.eq('workspace_id', T.currentWs()); // solo desconecta las de tu cuenta
+    const { error } = await q;
     if (error) throw error;
     return json(200, { ok: true });
   } catch (err) { return json(500, { error: err.message }); }

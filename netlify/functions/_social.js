@@ -39,12 +39,21 @@ function stateProblem(platform, state) {
 }
 function checkState(platform, state) { return stateProblem(platform, state) === null; }
 
+// MULTIUSUARIO: una cuenta por red POR ESPACIO (migración 009). wsFields() agrega workspace_id si ya existe.
 async function saveAccount(supabase, row) {
-  const { error } = await supabase.from('social_accounts').upsert(Object.assign({ updated_at: new Date().toISOString() }, row));
+  const T = require('./_tenant');
+  await T.tenancyOn(supabase);
+  // Sin sesión no se sabe de qué cuenta es la red: no se guarda (si no, quedaría en la cuenta del admin).
+  const c = T.current();
+  if (T.tenancyKnownOn() && c && c.mode === 'anon') throw new Error('No se encontró tu sesión. Abre VYRALES, inicia sesión y vuelve a darle "Conectar" desde la misma dirección.');
+  const { error } = await supabase.from('social_accounts').upsert(T.wsFields(Object.assign({ updated_at: new Date().toISOString() }, row)), { onConflict: T.tenancyKnownOn() ? 'workspace_id,platform' : 'platform' });
   if (error) throw new Error('No se pudo guardar la cuenta (¿corriste la migración 006?): ' + error.message);
 }
 async function getAccount(supabase, platform) {
-  const { data, error } = await supabase.from('social_accounts').select('*').eq('platform', platform).maybeSingle();
+  const T = require('./_tenant');
+  let q = supabase.from('social_accounts').select('*').eq('platform', platform);
+  if (await T.tenancyOn(supabase)) q = q.eq('workspace_id', T.currentWs());
+  const { data, error } = await q.maybeSingle();
   if (error) throw new Error('No se pudo leer la cuenta (¿corriste la migración 006?): ' + error.message);
   return data;
 }

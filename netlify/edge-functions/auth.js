@@ -1,6 +1,7 @@
 // Candado de VYRALES (corre en Netlify ANTES de servir cualquier página o función).
 // Sin sesión: las páginas redirigen a /login.html y las funciones responden 401.
-// Sesión = cookie vyrales_auth = "<vence>.<HMAC-SHA256(DASHBOARD_KEY, 'vyrales:'+vence)>"
+// Sesión = cookie vyrales_auth = "<vence>.<HMAC-SHA256(DASHBOARD_KEY, 'vyrales:'+vence)>" (admin)
+// o "u.<id>.<vence>.<HMAC(DASHBOARD_KEY, 'vyrales:'+id+':'+vence)>" (usuario, multiusuario)
 // (la crea netlify/functions/login.js). Llamadas internas servidor→servidor pueden mandar
 // el header x-vyrales-key con la DASHBOARD_KEY.
 // Lo único público: privacidad/términos, login, el archivo de verificación de TikTok y las
@@ -8,6 +9,8 @@
 const PUBLIC = [
   /^\/privacidad\.html$/, /^\/eliminar-datos\.html$/, /^\/terminos\.html$/, /^\/login\.html$/, /^\/robots\.txt$/,
   /^\/tiktok[\w.-]*\.txt$/, /^\/favicon/,
+  // Ícono y manifest de la app para el celular ("Agregar a pantalla de inicio"): no tienen datos
+  /^\/manifest\.webmanifest$/, /^\/(icon-[\w-]+|apple-touch-icon)\.png$/,
   /^\/\.netlify\/functions\/login$/,
   /^\/\.netlify\/functions\/oauth-(tiktok|instagram|meta|youtube)-callback$/,
   /^\/auth\/(tiktok|instagram|meta|youtube)\/callback$/,
@@ -42,8 +45,15 @@ export default async (request, context) => {
 
   const token = cookieOf(request, 'vyrales_auth');
   if (token) {
-    const [exp, sig] = token.split('.');
-    if (Number(exp) > Date.now() && same(sig || '', await hmacHex(key, 'vyrales:' + exp))) return context.next();
+    const p = token.split('.');
+    // Usuario (multiusuario): "u.<id>.<vence>.<firma>" — si está activo y qué puede ver lo decide cada función (_tenant.js).
+    if (p[0] === 'u' && p.length === 4) {
+      const [, uid, exp, sig] = p;
+      if (Number(exp) > Date.now() && /^[0-9a-f-]{36}$/i.test(uid) && same(sig || '', await hmacHex(key, 'vyrales:' + uid + ':' + exp))) return context.next();
+    } else {
+      const [exp, sig] = p;
+      if (Number(exp) > Date.now() && same(sig || '', await hmacHex(key, 'vyrales:' + exp))) return context.next();
+    }
   }
   if (url.pathname.startsWith('/.netlify/')) {
     return new Response(JSON.stringify({ error: 'No autorizado: inicia sesión en VYRALES.' }), { status: 401, headers: { 'content-type': 'application/json' } });

@@ -1,21 +1,24 @@
-// Claves de las APIs guardadas desde el panel (Cuenta → API).
+// Claves de las APIs (página Cuenta → API), ahora POR ESPACIO (multiusuario).
 //
-// * Se guardan CIFRADAS (AES-256-GCM) en la tabla app_secrets de Supabase (ver supabase/migrations/008_app_secrets.sql).
-// * La clave del PANEL manda sobre la del .env / Netlify (decisión de Franklin, oct-11). Si se quita
-//   del panel, vuelve a usarse la del .env / Netlify.
-// * applyKeys() las copia a process.env (máx. 1 consulta por minuto por instancia), así todo el código
-//   que ya lee process.env.X sigue igual. withKeys() envuelve cada handler para que se apliquen antes.
+// * Se guardan CIFRADAS (AES-256-GCM) en app_secrets (migraciones 008 y 009), una fila por (espacio, nombre).
+// * En cada petición se aplican a process.env las claves del espacio que llama:
+//     - Admin: la del panel manda sobre la del .env / Netlify (decisión de Franklin, oct-11).
+//     - Otro usuario: SU clave; si no tiene y el admin le PRESTÓ ese servicio (y tiene créditos para
+//       Google / fal), usa la del admin y queda marcada como "prestada" (se cobra en créditos, ver _spend.js);
+//       si no, la variable queda VACÍA: nunca ve ni usa las claves del admin sin permiso.
+// * withKeys() envuelve cada función: primero la guardia de espacios (_tenant.js), después las claves.
 // * Lista blanca: solo estos nombres. Supabase, DASHBOARD_KEY y VYRALES_SECRET NUNCA vienen de aquí.
 const crypto = require('crypto');
+const T = require('./_tenant');
 
 const SERVICES = [
   { id: 'google', name: 'Google AI', sub: 'Gemini · Veo · Imagen · voces', icon: 'fa-brands fa-google',
     desc: 'Guiones, imágenes, videos con Veo, voces y revisión de calidad.',
-    url: 'https://aistudio.google.com/apikey', test: true,
+    url: 'https://aistudio.google.com/apikey', test: true, charged: true,
     fields: [{ name: 'GOOGLE_AI_API_KEY', label: 'API key', secret: true }] },
   { id: 'fal', name: 'fal.ai', sub: 'Veo por fal.ai', icon: 'fa-solid fa-bolt',
-    desc: 'Videos con Veo a través de fal.ai (opcional si usas Google o tu PC).',
-    url: 'https://fal.ai/dashboard/keys', test: false,
+    desc: 'Videos con Veo a través de fal.ai (opcional si usas Google o la PC).',
+    url: 'https://fal.ai/dashboard/keys', test: false, charged: true,
     fields: [{ name: 'FAL_KEY', label: 'API key', secret: true }] },
   { id: 'tiktok', name: 'TikTok', sub: 'Publicar en TikTok', icon: 'fa-brands fa-tiktok',
     desc: 'La app de TikTok for Developers. Después conecta tu cuenta en Redes conectadas.',
@@ -27,7 +30,7 @@ const SERVICES = [
     url: 'https://developers.facebook.com/apps', test: true,
     fields: [{ name: 'META_APP_ID', label: 'App ID (Facebook)', secret: false },
              { name: 'META_APP_SECRET', label: 'App secret (Facebook)', secret: true },
-             { name: 'META_PAGE_ID', label: 'ID de la página de Facebook', secret: false },
+             { name: 'META_PAGE_ID', label: 'ID de la página de Facebook', secret: false, own: true },
              { name: 'INSTAGRAM_APP_ID', label: 'App ID (Instagram)', secret: false },
              { name: 'INSTAGRAM_APP_SECRET', label: 'App secret (Instagram)', secret: true }] },
   { id: 'youtube', name: 'YouTube', sub: 'Publicar en YouTube', icon: 'fa-brands fa-youtube',
@@ -35,8 +38,8 @@ const SERVICES = [
     url: 'https://console.cloud.google.com/apis/credentials', test: true,
     fields: [{ name: 'YOUTUBE_CLIENT_ID', label: 'Client ID', secret: false },
              { name: 'YOUTUBE_CLIENT_SECRET', label: 'Client secret', secret: true },
-             { name: 'YOUTUBE_CHANNEL_URL', label: 'Enlace del canal', secret: false }] },
-  { id: 'sitio', name: 'Sitio', sub: 'Dirección pública', icon: 'fa-solid fa-globe',
+             { name: 'YOUTUBE_CHANNEL_URL', label: 'Enlace del canal', secret: false, own: true }] },
+  { id: 'sitio', name: 'Sitio', sub: 'Dirección pública', icon: 'fa-solid fa-globe', adminOnly: true,
     desc: 'La dirección donde está publicado el panel (para enlaces y regresos de las redes).',
     url: '', test: false,
     fields: [{ name: 'PUBLIC_BASE_URL', label: 'Dirección pública (https://…)', secret: false }] }
@@ -48,7 +51,12 @@ const SERVER_ONLY = [
   { name: 'DASHBOARD_KEY', label: 'Llave del panel (login)' }
 ];
 const ALLOWED = new Set(SERVICES.flatMap((s) => s.fields.map((f) => f.name)));
-const FIELD = Object.fromEntries(SERVICES.flatMap((s) => s.fields.map((f) => [f.name, f])));
+const FIELD = Object.fromEntries(SERVICES.flatMap((s) => s.fields.map((f) => [f.name, Object.assign({ service: s.id }, f)])));
+const SERVICE = Object.fromEntries(SERVICES.map((s) => [s.id, s]));
+
+// Valores del .env / Netlify al arrancar (son del ADMIN). Nunca se pierden aunque se reemplacen en process.env.
+const BASE = {};
+for (const n of ALLOWED) if (process.env[n]) BASE[n] = process.env[n];
 
 // ---------- cifrado ----------
 function cryptoKey() {
@@ -72,64 +80,102 @@ function decrypt(blob) {
   } catch (_) { return null; } // otra llave de cifrado o dato dañado: se ignora
 }
 
-// ---------- aplicar al proceso ----------
-const ORIGINAL = {};           // valor del .env / Netlify antes de que el panel lo reemplace
-let panelNames = new Set();    // nombres que hoy vienen del panel
-let lastAt = 0;
-let lastRows = [];
-let lastError = null;
-
 function isMissingTable(err) {
   const m = String((err && (err.message || err.code)) || '');
   return /42P01|PGRST205|does not exist|Could not find the table/i.test(m) || (err && (err.code === '42P01' || err.code === 'PGRST205'));
 }
 
-async function applyKeys(sb, force) {
-  if (!force && Date.now() - lastAt < 60000) return { rows: lastRows, error: lastError };
-  lastAt = Date.now();
+// ---------- filas del panel por espacio (caché 60 s) ----------
+const ROWS = new Map(); // wsId → { at, vals: {name: valor}, updated: {name: fecha}, error }
+async function rowsFor(sb, wsId, force) {
+  const c = ROWS.get(wsId);
+  if (!force && c && Date.now() - c.at < 60000) return c;
+  const out = { at: Date.now(), vals: {}, updated: {}, error: null };
   try {
-    if (!sb) sb = require('./_supabase').getSupabaseClient();
-    let q = sb.from('app_secrets').select('name, value_enc, updated_at');
+    const on = await T.tenancyOn(sb);
+    let q = sb.from('app_secrets').select(on ? 'name, value_enc, updated_at, workspace_id' : 'name, value_enc, updated_at');
+    if (on) q = q.eq('workspace_id', wsId);
+    else if (wsId !== T.ADMIN_WS) { ROWS.set(wsId, out); return out; } // sin multiusuario solo existe el admin
     if (q && typeof q.abortSignal === 'function' && typeof AbortSignal !== 'undefined' && AbortSignal.timeout) q = q.abortSignal(AbortSignal.timeout(2500));
     const { data, error } = await q;
-    if (error) { lastError = error; return { rows: lastRows, error }; }
-    lastError = null;
-    const now = new Set();
+    if (error) { out.error = error; if (c) { c.error = error; c.at = Date.now(); return c; } ROWS.set(wsId, out); return out; }
     for (const row of data || []) {
       if (!ALLOWED.has(row.name)) continue;
       const v = decrypt(row.value_enc);
       if (v == null || v === '') continue;
-      if (!panelNames.has(row.name) && !Object.prototype.hasOwnProperty.call(ORIGINAL, row.name)) ORIGINAL[row.name] = process.env[row.name];
-      process.env[row.name] = v;
-      now.add(row.name);
+      out.vals[row.name] = v;
+      out.updated[row.name] = row.updated_at;
     }
-    // Lo que se quitó del panel vuelve a su valor del .env / Netlify
-    for (const name of panelNames) {
-      if (now.has(name)) continue;
-      if (ORIGINAL[name] === undefined) delete process.env[name]; else process.env[name] = ORIGINAL[name];
-      delete ORIGINAL[name];
+  } catch (e) { out.error = e; }
+  ROWS.set(wsId, out);
+  return out;
+}
+function forgetRows(wsId) { if (wsId) ROWS.delete(wsId); else ROWS.clear(); }
+
+// Qué valor usa cada nombre para un espacio y de dónde sale.
+//   source: 'panel' (su clave) · 'servidor' (.env/Netlify, solo admin) · 'prestada' (del admin, con permiso) · 'falta'
+async function resolveFor(sb, ctx, force) {
+  const wsId = (ctx && ctx.wsId) || T.ADMIN_WS;
+  const admin = await rowsFor(sb, T.ADMIN_WS, force);
+  const adminVal = (n) => admin.vals[n] || BASE[n];
+  const isAdminWs = wsId === T.ADMIN_WS;
+  const own = isAdminWs ? admin : await rowsFor(sb, wsId, force);
+  const ws = ctx && ctx.ws ? ctx.ws : (isAdminWs ? null : await T.loadWs(sb, wsId));
+  const perms = (ws && ws.perms && ws.perms.keys) || {};
+  const credits = Number(ws && ws.credits) || 0;
+  const vals = {}, src = {}, borrowed = new Set();
+  for (const n of ALLOWED) {
+    const f = FIELD[n];
+    if (isAdminWs) {
+      if (admin.vals[n]) { vals[n] = admin.vals[n]; src[n] = 'panel'; }
+      else if (BASE[n]) { vals[n] = BASE[n]; src[n] = 'servidor'; }
+      else src[n] = 'falta';
+      continue;
     }
-    panelNames = now;
-    lastRows = (data || []).filter((r) => ALLOWED.has(r.name)).map((r) => ({ name: r.name, updated_at: r.updated_at }));
-    return { rows: lastRows, error: null };
-  } catch (e) {
-    lastError = e;
-    return { rows: lastRows, error: e }; // nunca rompe la función: sigue con el .env / Netlify
+    if (own.vals[n]) { vals[n] = own.vals[n]; src[n] = 'panel'; continue; }
+    if (SERVICE[f.service].adminOnly) { if (adminVal(n)) { vals[n] = adminVal(n); src[n] = 'servidor'; } else src[n] = 'falta'; continue; }
+    const canBorrow = !f.own && perms[f.service] === true && adminVal(n) && (!SERVICE[f.service].charged || credits > 0);
+    if (canBorrow) { vals[n] = adminVal(n); src[n] = 'prestada'; borrowed.add(f.service); }
+    else src[n] = (!f.own && perms[f.service] === true && SERVICE[f.service].charged && credits <= 0) ? 'sin_creditos' : 'falta';
   }
+  return { vals, src, borrowed, updated: own.updated, error: own.error || admin.error };
 }
 
-// Valor del servidor (.env / Netlify) aunque el panel lo esté reemplazando
-function serverValue(name) {
-  return panelNames.has(name) ? ORIGINAL[name] : process.env[name];
-}
-function fromPanel(name) { return panelNames.has(name); }
-
-function withKeys(handler) {
-  return async function (event, context) {
-    // Máximo 2.5 s esperando a Supabase: si tarda, la función sigue con las claves que ya tenía (.env / Netlify)
-    await Promise.race([applyKeys(), new Promise((r) => setTimeout(r, 2500))]);
-    return handler(event, context);
-  };
+// Aplica a process.env las claves del espacio de esta petición (lo llama _tenant.withTenant).
+async function applyForCtx(sb, ctx, force) {
+  const r = await resolveFor(sb, ctx, force);
+  for (const n of ALLOWED) {
+    if (r.vals[n]) process.env[n] = r.vals[n];
+    else delete process.env[n];
+  }
+  if (ctx) { ctx.borrowed = r.borrowed; ctx.keySources = r.src; }
+  return r;
 }
 
-module.exports = { SERVICES, SERVER_ONLY, ALLOWED, FIELD, encrypt, decrypt, applyKeys, withKeys, serverValue, fromPanel, isMissingTable };
+// Compatibilidad: el agente y api-keys usan applyKeys (siempre como admin).
+async function applyKeys(sb, force) {
+  const r = await applyForCtx(sb, { wsId: T.ADMIN_WS, isAdmin: true }, force);
+  return { rows: Object.keys(r.updated).map((name) => ({ name, updated_at: r.updated[name] })), error: r.error };
+}
+
+// Para el agente: variables de entorno de un trabajo de OTRO espacio (valor o '' si no tiene).
+async function keysEnvFor(sb, wsId) {
+  const ws = await T.loadWs(sb, wsId);
+  const r = await resolveFor(sb, { wsId, ws }, true);
+  const env = {};
+  for (const n of ALLOWED) env[n] = r.vals[n] || '';
+  env.VYRALES_WS = wsId;
+  env.VYRALES_BORROWED = [...r.borrowed].join(',');
+  return env;
+}
+
+const serverValue = (name) => BASE[name];
+
+function withKeys(handler, opts) {
+  return T.withTenant(handler, opts || {}, (sb, ctx) => applyForCtx(sb, ctx));
+}
+
+module.exports = {
+  SERVICES, SERVER_ONLY, ALLOWED, FIELD, SERVICE, encrypt, decrypt, isMissingTable,
+  rowsFor, forgetRows, resolveFor, applyForCtx, applyKeys, keysEnvFor, withKeys, serverValue
+};

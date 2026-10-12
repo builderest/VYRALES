@@ -2,7 +2,15 @@
 <html lang="es" class="dark">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Celular tipo app: sin zoom, ocupa toda la pantalla (también bajo la "isla"/muesca) -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#05070f">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="VYRALES">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
     <title>VYRALES · Estudio de video IA</title>
 
     <!-- Tailwind CSS -->
@@ -13,9 +21,9 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700&family=Cinzel:wght@700&family=Orbitron:wght@700&display=swap" rel="stylesheet">
     <!-- Rediseño: tema por novela + efectos (fase 1) -->
-    <link rel="stylesheet" href="tema.css?v=10">
-    <script src="tema.js?v=3" defer></script>
-    <script src="panel.js?v=9" defer></script>
+    <link rel="stylesheet" href="tema.css?v=13">
+    <script src="tema.js?v=4" defer></script>
+    <script src="panel.js?v=11" defer></script>
     
     <!-- Font Awesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -156,25 +164,40 @@
         <a class="vy-nav" href="#personajes" data-vy-go="personajes"><i class="fa-solid fa-users"></i>Personajes</a>
         <a class="vy-nav" href="#lugares" data-vy-go="lugares"><i class="fa-solid fa-location-dot"></i>Lugares</a>
         <a class="vy-nav" href="#reglas" data-vy-go="reglas"><i class="fa-solid fa-book-bookmark"></i>Reglas de la novela</a>
-        <button type="button" class="vy-nav" onclick="openMemoria()" title="Lo que Claude aprendió de tus correcciones"><i class="fa-solid fa-brain"></i>Reglas aprendidas</button>
+        <button type="button" class="vy-nav" data-vy-admin onclick="openMemoria()" title="Lo que Claude aprendió de tus correcciones"><i class="fa-solid fa-brain"></i>Reglas aprendidas</button>
 
         <div class="vy-lab vy-side-sec">Cuenta</div>
         <a class="vy-nav" href="#api" data-vy-go="api"><i class="fa-solid fa-plug"></i>API</a>
+        <a class="vy-nav" href="#usuarios" data-vy-go="usuarios" data-vy-admin><i class="fa-solid fa-user-group"></i>Usuarios</a>
+        <a class="vy-nav" href="#creditos" data-vy-go="creditos" data-vy-user><i class="fa-solid fa-coins"></i>Créditos<span id="vyCredBadge" class="vy-badge vy-badge-cred">—</span></a>
         <button type="button" class="vy-nav" onclick="openSocialModal()" title="Conectar TikTok / Facebook / Instagram / YouTube"><i class="fa-solid fa-share-nodes"></i>Redes conectadas</button>
         <a class="vy-nav" href="#gastos" data-vy-go="gastos"><i class="fa-solid fa-wallet"></i>Gastos</a>
-        <button type="button" class="vy-nav" onclick="openTerminal()" title="Comandos en tu PC"><i class="fa-solid fa-terminal"></i>Terminal</button>
+        <button type="button" class="vy-nav" data-vy-admin onclick="openTerminal()" title="Comandos en tu PC"><i class="fa-solid fa-terminal"></i>Terminal</button>
         <a class="vy-nav" href="/.netlify/functions/login?logout=1" title="Cerrar sesión"><i class="fa-solid fa-right-from-bracket"></i>Salir</a>
 
         <div class="glass-panel rounded-xl vy-status">
             <span class="font-mono text-xs inline-flex items-center gap-2.5"><span id="vyAgentDot" class="vy-live" aria-hidden="true"></span><span id="vyAgentLabel" class="text-slate-300">REVISANDO TU PC…</span></span>
             <span id="vyAgentSub" class="text-xs text-slate-400">Un momento</span>
+            <span id="vyWhoAmI" class="text-[11px] text-slate-500 truncate"></span>
         </div>
+    </nav>
+
+    <div id="vyScrim" class="vy-scrim" aria-hidden="true"></div>
+
+    <!-- Celular: pestañas abajo, como una app -->
+    <nav id="vyTabs" class="vy-tabs" aria-label="Pestañas">
+        <a class="vy-tab act" href="#inicio" data-vy-go="inicio"><i class="fa-solid fa-house"></i><span>Inicio</span></a>
+        <a class="vy-tab" href="#produccion" data-vy-go="produccion"><i class="fa-solid fa-film"></i><span>Producción</span></a>
+        <a class="vy-tab" href="#revisar" data-vy-go="revisar"><i class="fa-regular fa-eye"></i><span>Revisar</span><b id="vyTabReview" class="vy-tab-dot hidden">0</b></a>
+        <a class="vy-tab" href="#guiones" data-vy-go="guiones"><i class="fa-solid fa-scroll"></i><span>Guiones</span></a>
+        <button type="button" class="vy-tab" data-vy-menu aria-controls="vySide"><i class="fa-solid fa-bars"></i><span>Más</span></button>
     </nav>
 
     <div class="vy-body">
 
     <!-- BARRA SUPERIOR -->
     <header class="vy-top">
+        <button type="button" id="vyMenuBtn" class="vy-menu-btn" aria-label="Abrir menú" aria-controls="vySide" aria-expanded="false"><i class="fa-solid fa-bars"></i></button>
         <h2 id="vyPageTitle" class="vy-page">Inicio</h2>
         <span class="vy-sep" aria-hidden="true"></span>
         <!-- Selector de novela (mismo menú y mismas funciones de antes) -->
@@ -191,12 +214,12 @@
         </div>
         <div class="flex flex-wrap items-center gap-3 ml-auto">
             <!-- Crear novela nueva pegando el JSON que escribe Claude (antes: PROMPT) -->
-            <button type="button" onclick="openNovelModal()" class="vy-ghost px-4 rounded-lg border border-cyber-border bg-cyber-darker/80 text-white text-sm font-semibold">
+            <button type="button" onclick="openNovelModal()" class="vy-top-new vy-ghost px-4 rounded-lg border border-cyber-border bg-cyber-darker/80 text-white text-sm font-semibold">
                 <i class="fa-solid fa-wand-magic-sparkles text-cyber-violet mr-1.5"></i>Nueva novela
             </button>
             <!-- Producir el siguiente episodio (antes: EJECUTAR PIPELINE) -->
             <button type="button" onclick="triggerPipelineRun()" class="vy-cta bg-gradient-to-r from-cyber-cyan to-cyber-violet text-white text-sm font-bold px-5 rounded-lg shadow-neon-cyan">
-                <i class="fa-solid fa-bolt mr-1.5"></i>Producir siguiente
+                <i class="fa-solid fa-bolt mr-1.5"></i>Producir<span class="vy-hide-xs"> siguiente</span>
             </button>
         </div>
     </header>
@@ -268,7 +291,7 @@
                     </div>
                 </div>
                 <div class="overflow-x-auto">
-                    <table class="w-full border-collapse min-w-[620px]">
+                    <table class="vy-cards w-full border-collapse min-w-[620px]">
                         <thead><tr>
                             <th class="vy-th">Episodio</th><th class="vy-th">Progreso</th><th class="vy-th">Estado</th><th class="vy-th text-right">Tomas</th><th class="vy-th"><span class="sr-only">Acción</span></th>
                         </tr></thead>
@@ -292,7 +315,7 @@
                 <section class="glass-panel rounded-2xl p-5 flex flex-col gap-3">
                     <div class="flex items-center justify-between">
                         <h2 class="vy-novela text-lg font-bold text-white">Fila de tu PC</h2>
-                        <button type="button" onclick="openTerminal()" class="vy-link text-xs">Ver terminal</button>
+                        <button type="button" onclick="openTerminal()" class="vy-link text-xs" data-vy-admin>Ver terminal</button>
                     </div>
                     <div id="vyQueue" class="flex flex-col gap-3"><span class="vy-sk"></span><span class="vy-sk" style="width:70%"></span></div>
                 </section>
@@ -379,7 +402,7 @@
                 <span id="vyFilaCount" class="font-mono text-xs text-slate-400"></span>
             </div>
             <div class="overflow-x-auto">
-                <table class="w-full border-collapse min-w-[640px]">
+                <table class="vy-cards w-full border-collapse min-w-[640px]">
                     <thead><tr><th class="vy-th">Episodio</th><th class="vy-th">Etapa</th><th class="vy-th">Progreso</th><th class="vy-th text-right">Tomas</th><th class="vy-th"><span class="sr-only">Acción</span></th></tr></thead>
                     <tbody id="vyFilaRows"><tr><td class="vy-td" colspan="5"><span class="vy-sk" style="width:60%"></span></td></tr><tr><td class="vy-td" colspan="5"><span class="vy-sk" style="width:45%"></span></td></tr></tbody>
                 </table>
@@ -491,6 +514,26 @@
             </div>
 
             <div id="shotCardsGrid" class="hidden"></div>
+        </section>
+
+        <!-- CUENTA · USUARIOS (solo admin): cuentas, permisos, créditos y precios (panel.js + /.netlify/functions/users) -->
+        <section id="vyUsuarios" class="flex flex-col gap-5" data-vy-view="usuarios" aria-labelledby="vyUsersTitle">
+            <div class="flex flex-col gap-1">
+                <span class="vy-lab text-cyber-cyan">// Cuenta · Usuarios</span>
+                <h2 id="vyUsersTitle" class="vy-novela text-3xl font-bold text-white">Usuarios y permisos</h2>
+                <p class="text-sm text-slate-400 max-w-3xl">Cada usuario tiene su propia cuenta: sus novelas, videos, redes, claves y gastos. <strong class="text-slate-200">Nadie ve lo tuyo.</strong> Tú decides qué le prestas (tus claves de API y tu PC) y se le cobra en créditos.</p>
+            </div>
+            <div id="vyUsersBody" class="flex flex-col gap-5"><div class="glass-panel rounded-2xl p-6"><span class="vy-sk"></span></div></div>
+        </section>
+
+        <!-- CUENTA · CRÉDITOS (usuarios): saldo, precios e historial (panel.js + /.netlify/functions/me) -->
+        <section id="vyCreditos" class="flex flex-col gap-5" data-vy-view="creditos" aria-labelledby="vyCredTitle">
+            <div class="flex flex-col gap-1">
+                <span class="vy-lab text-cyber-cyan">// Cuenta · Créditos</span>
+                <h2 id="vyCredTitle" class="vy-novela text-3xl font-bold text-white">Tus créditos</h2>
+                <p class="text-sm text-slate-400 max-w-3xl">Los créditos se usan cuando produces con las APIs o la PC que te presta el administrador. Lo que haces con <strong class="text-slate-200">tus propias claves</strong> (página API) no gasta créditos.</p>
+            </div>
+            <div id="vyCredBody" class="flex flex-col gap-5"><div class="glass-panel rounded-2xl p-6"><span class="vy-sk"></span></div></div>
         </section>
 
         <!-- CUENTA · API: claves de todos los servicios (panel.js + /.netlify/functions/api-keys) -->
@@ -1106,12 +1149,31 @@
           : '<span class="text-cyber-pink">● Agente apagado</span> <span class="text-slate-500">— en tu PC abre <b>INICIAR_AGENTE.bat</b> (carpeta VYRALE).</span>';
         window.__termState = st;
         const cmds = (st && st.commands) || [];
-        const btns = cmds.map(c => '<button type="button" onclick="runAgentCommand(\'' + c.key + '\')" ' + (st && st.online ? '' : 'style="opacity:.4"') + ' title="' + esc(c.help || '') + '" class="text-[11px] font-mono px-2 py-1.5 rounded border border-cyber-emerald/40 text-cyber-emerald hover:bg-cyber-emerald/10 disabled:opacity-40 text-left">' + esc(c.label) + '</button>').join('');
+        // Un color por tipo de comando (Franklin: "un color para cada cosa")
+        const TERM_CATS = [
+          { id: 'git',    name: 'Proyecto (git)',         rgb: '45 140 255',  icon: 'fa-code-branch',     test: k => /^(estado|push|pull)$/.test(k) },
+          { id: 'dev',    name: 'Servidor local',         rgb: '0 220 255',   icon: 'fa-server',          test: k => /^dev_/.test(k) },
+          { id: 'king',   name: 'PC generadora (king)',   rgb: '155 92 255',  icon: 'fa-microchip',       test: k => /^(prueba_|gen_|toma_local|regen_local|render_full)/.test(k) },
+          { id: 'flow',   name: 'Google Flow',            rgb: '255 183 0',   icon: 'fa-wand-magic-sparkles', test: k => /^flow_/.test(k) },
+          { id: 'claude', name: 'Claude',                 rgb: '255 128 74',  icon: 'fa-brain',           test: k => /^claude_/.test(k) },
+          { id: 'redes',  name: 'Redes y publicación',    rgb: '255 62 165',  icon: 'fa-share-nodes',     test: k => /tiktok|^publish|^yt_|^portada|^subtitulos/.test(k) },
+          { id: 'pc',     name: 'Sistema de esta PC',     rgb: '0 230 140',   icon: 'fa-desktop',         test: () => true }
+        ];
+        const off = st && st.online ? '' : 'opacity:.4;';
+        const btns = TERM_CATS.map(cat => {
+          const mine = cmds.filter(c => TERM_CATS.find(t => t.test(c.key)) === cat);
+          if (!mine.length) return '';
+          return '<div class="vy-term-cat" style="--c:' + cat.rgb + '">' +
+            '<p class="vy-term-cat-h"><i class="fa-solid ' + cat.icon + '"></i>' + esc(cat.name) + '</p>' +
+            '<div class="grid grid-cols-2 sm:grid-cols-3 gap-1.5">' + mine.map(c =>
+              '<button type="button" onclick="runAgentCommand(\'' + c.key + '\')" style="' + off + '" title="' + esc(c.help || '') + '" class="vy-term-btn text-[11px] font-mono px-2 py-1.5 rounded border text-left">' + esc(c.label) + '</button>').join('') +
+            '</div></div>';
+        }).join('');
         const hist = ((st && st.jobs) || []).map(j => '<button type="button" onclick="openTerminal(\'' + j.id + '\')" class="block w-full text-left text-[10px] font-mono hover:text-white ' + (j.status === 'done' ? 'text-cyber-emerald' : j.status === 'error' ? 'text-cyber-pink' : 'text-slate-400') + '">' + new Date(j.created_at).toLocaleTimeString() + ' · ' + esc(j.command) + ' · ' + esc(j.status) + '</button>').join('');
         m.innerHTML = '<div class="bg-cyber-darker border border-cyber-border rounded-xl p-4 w-full max-w-2xl max-h-[90vh] overflow-auto">' +
           '<div class="flex justify-between items-center mb-1"><h3 class="text-white font-display font-bold"><i class="fa-solid fa-terminal mr-2 text-cyber-emerald"></i>Terminal de tu PC</h3><button type="button" onclick="closeTerminal()" class="text-slate-400 hover:text-white p-2 -m-2" title="Cerrar"><i class="fa-solid fa-xmark text-lg"></i></button></div>' +
           '<p class="text-[11px] font-mono mb-3">' + head + '</p>' +
-          '<div class="grid grid-cols-2 sm:grid-cols-3 gap-1.5 mb-3">' + btns + '</div>' +
+          '<div class="flex flex-col gap-3 mb-3">' + btns + '</div>' +
           '<pre id="termOut" class="bg-black border border-slate-800 rounded p-2 text-[11px] text-slate-200 font-mono whitespace-pre-wrap min-h-[140px] max-h-[45vh] overflow-auto">' + (jobId ? 'Cargando…' : 'Elige un comando. Solo se pueden ejecutar los de esta lista (se editan en agente/comandos.js de tu PC).') + '</pre>' +
           (hist ? '<details class="mt-2"><summary class="text-[10px] font-mono text-slate-500 cursor-pointer">Historial</summary><div class="mt-1 space-y-0.5">' + hist + '</div></details>' : '') +
         '</div>';
@@ -1895,7 +1957,8 @@
 
       function renderSeriesSelector(allSeries, current) {
         const list = allSeries.slice();
-        if (!list.find(x => x.slug === DEFAULT_SERIES)) list.unshift({ slug: DEFAULT_SERIES, title: DEFAULT_SERIES, genre: 'no importada' });
+        // (cuenta nueva sin novelas: no se muestra la novela por defecto del admin como opción)
+        if (list.length && !list.find(x => x.slug === DEFAULT_SERIES)) list.unshift({ slug: DEFAULT_SERIES, title: DEFAULT_SERIES, genre: 'no importada' });
         const active = list.find(x => x.slug === DEFAULT_SERIES);
         document.getElementById('seriesPickerLabel').textContent = active ? active.title : 'Elegir serie';
         if (window.vyTema) window.vyTema.apply((current && typeof current === 'object' && current.slug === DEFAULT_SERIES) ? current : (active || DEFAULT_SERIES));
@@ -3668,7 +3731,11 @@
             const nf = await res.json().catch(() => ({}));
             renderSeriesSelector(nf.all_series || [], null);
             const others = (nf.all_series || []).filter(x => x.slug !== DEFAULT_SERIES);
-            document.getElementById('castSubtitle').textContent = 'No hay ninguna serie "' + DEFAULT_SERIES + '". Crea una con el botón PROMPT.';
+            // Multiusuario: la novela guardada en este navegador puede ser de otra cuenta → abrir la primera de la tuya.
+            if (others.length && !window.__vyAutoSeries) { window.__vyAutoSeries = 1; return switchSeries(others[0].slug); }
+            document.getElementById('castSubtitle').textContent = others.length ? 'No hay ninguna serie "' + DEFAULT_SERIES + '". Elige una arriba.' : 'Todavía no tienes novelas. Crea la primera con el botón Nueva novela.';
+            if (!(nf.all_series || []).length) { const lb = document.getElementById('seriesPickerLabel'); if (lb) lb.textContent = 'Sin novelas todavía'; const tt = document.getElementById('vyNovelTitle'); if (tt) tt.textContent = 'Tu primera novela'; const tg = document.getElementById('vyNovelTag'); if (tg) tg.textContent = 'cuenta nueva'; }
+            if (window.vyPanel && window.vyPanel.sinNovela) window.vyPanel.sinNovela(!(nf.all_series || []).length);
             document.getElementById('castGrid').innerHTML = '';
             document.getElementById('deleteSeriesBtn').classList.add('hidden');
             banner.textContent = others.length ? 'Elige una serie arriba o crea una nueva con PROMPT.' : 'Crea tu primera novela con el botón PROMPT.';

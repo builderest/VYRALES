@@ -1,6 +1,7 @@
 // GET /.netlify/functions/get-episodes?series=dragon_silicio
 // Devuelve los episodios de una serie con sus assets, para pintar el dashboard.
 const { getSupabaseClient } = require('./_supabase');
+const T = require('./_tenant');
 
 exports.handler = async (event) => {
   try {
@@ -9,17 +10,22 @@ exports.handler = async (event) => {
       process.env.DEFAULT_SERIES_SLUG ||
       'dragon_silicio';
     const supabase = getSupabaseClient();
+    // MULTIUSUARIO: solo las series de tu espacio. Una serie de otro espacio responde "no encontrada"
+    // (igual que si no existiera), así nadie puede ni confirmar que existe.
+    const on = await T.tenancyOn(supabase);
+    const ws = T.currentWs();
+    const byWs = (q) => (on ? q.eq('workspace_id', ws) : q);
 
     // Lista de todas las series para el selector del dashboard.
-    const { data: allSeries } = await supabase
+    const { data: allSeries } = await byWs(supabase
       .from('series')
-      .select('id, slug, title, genre, created_at')
+      .select('id, slug, title, genre, created_at'))
       .order('created_at', { ascending: false });
 
-    const { data: series, error: seriesError } = await supabase
+    const { data: series, error: seriesError } = await byWs(supabase
       .from('series')
       .select('id, slug, title, genre, synopsis, story_bible, visual_memory')
-      .eq('slug', seriesSlug)
+      .eq('slug', seriesSlug))
       .maybeSingle();
 
     if (seriesError || !series) {
@@ -51,7 +57,7 @@ exports.handler = async (event) => {
     const monthStart = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1)).toISOString();
     const [{ data: seriesSpend }, { data: monthSpend }] = await Promise.all([
       supabase.from('generation_log').select('kind, cost_usd').eq('series_id', series.id),
-      supabase.from('generation_log').select('cost_usd').gte('created_at', monthStart)
+      byWs(supabase.from('generation_log').select('cost_usd').gte('created_at', monthStart))
     ]);
     const spend = { series_total: 0, month_total: 0, by_kind: {}, generations: 0 };
     (seriesSpend || []).forEach((r) => {
@@ -72,8 +78,8 @@ exports.handler = async (event) => {
     const ptAsUtc = Date.UTC(+parts.year, +parts.month - 1, +parts.day, +parts.hour, +parts.minute, +parts.second);
     const offsetMs = ptAsUtc - Math.floor(now.getTime() / 1000) * 1000;
     const dayStartUtc = new Date(Date.UTC(+parts.year, +parts.month - 1, +parts.day) - offsetMs);
-    const { data: todayVideos } = await supabase
-      .from('generation_log').select('model').eq('kind', 'video').gte('created_at', dayStartUtc.toISOString());
+    const { data: todayVideos } = await byWs(supabase
+      .from('generation_log').select('model').eq('kind', 'video').gte('created_at', dayStartUtc.toISOString()));
     spend.veo_today = { by_model: {}, day_start: dayStartUtc.toISOString(), limits: { veo_lite: 10, veo_fast: 10 } };
     (todayVideos || []).forEach((r) => { spend.veo_today.by_model[r.model] = (spend.veo_today.by_model[r.model] || 0) + 1; });
 
@@ -85,7 +91,7 @@ exports.handler = async (event) => {
 
     // Órdenes de la PC en curso (para que los botones sigan "trabajando" aunque recargues el panel).
     let agentJobs = [];
-    try { const { data: aj } = await supabase.from('agent_jobs').select('command, status, created_at').in('status', ['pending', 'running']).order('created_at').limit(20); agentJobs = aj || []; } catch (_) {}
+    try { const { data: aj } = await byWs(supabase.from('agent_jobs').select('command, status, created_at').in('status', ['pending', 'running'])).order('created_at').limit(20); agentJobs = aj || []; } catch (_) {}
     return {
       statusCode: 200,
       headers: { 'Content-Type': 'application/json' },
@@ -106,4 +112,4 @@ exports.handler = async (event) => {
 };
 
 // Claves de la página Cuenta → API (cifradas en Supabase; mandan sobre el .env). Ver _keys.js.
-exports.handler = require('./_keys').withKeys(exports.handler);
+exports.handler = require('./_keys').withKeys(exports.handler, { softSeries: true }); // la serie de otro espacio = "no encontrada"

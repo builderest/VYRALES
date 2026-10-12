@@ -100,7 +100,7 @@
   // ---------- Páginas (cada opción del menú muestra solo su pantalla) ----------
   var VIEWS = {
     inicio: 'Inicio', produccion: 'Producción', revisar: 'Revisar y publicar', guiones: 'Guiones',
-    personajes: 'Personajes', lugares: 'Lugares', reglas: 'Reglas de la novela', gastos: 'Gastos', api: 'API'
+    personajes: 'Personajes', lugares: 'Lugares', reglas: 'Reglas de la novela', gastos: 'Gastos', api: 'API', usuarios: 'Usuarios', creditos: 'Créditos'
   };
   var current = 'inicio';
 
@@ -115,13 +115,15 @@
       if (on) el.removeAttribute('data-vy-off'); else el.setAttribute('data-vy-off', '');
     });
     Array.prototype.forEach.call(document.querySelectorAll('[data-vy-go]'), function (a) {
-      if (a.classList.contains('vy-nav')) a.classList.toggle('act', a.getAttribute('data-vy-go') === v);
+      if (a.classList.contains('vy-nav') || a.classList.contains('vy-tab')) a.classList.toggle('act', a.getAttribute('data-vy-go') === v);
     });
     var t = $('vyPageTitle'); if (t) t.textContent = VIEWS[v];
     document.title = VIEWS[v] + ' · VYRALES';
     try { history.replaceState(null, '', location.pathname + location.search + '#' + v); } catch (_) {}
     if (!keepScroll) window.scrollTo({ top: 0, behavior: 'auto' });
     if (v === 'api') apiCargar();
+    if (v === 'usuarios') usersCargar();
+    if (v === 'creditos') credCargar();
   }
 
   // ¿En qué página vive este elemento? (los botones viejos del panel saltan a secciones con scrollIntoView)
@@ -146,7 +148,34 @@
     return nativeScroll.apply(this, arguments);
   };
 
+  // ---------- Celular/tablet: menú tipo cajón (botón ☰) ----------
+  function menu(open) {
+    var h = document.documentElement, btn = $('vyMenuBtn');
+    if (open == null) open = !h.classList.contains('vy-menu-open');
+    h.classList.toggle('vy-menu-open', open);
+    if (btn) { btn.setAttribute('aria-expanded', open ? 'true' : 'false'); btn.setAttribute('aria-label', open ? 'Cerrar menú' : 'Abrir menú'); }
+    if (open) { var act = document.querySelector('#vySide .vy-nav.act') || document.querySelector('#vySide .vy-nav'); if (act) act.focus({ preventScroll: true }); }
+    else if (btn && document.activeElement && $('vySide') && $('vySide').contains(document.activeElement)) btn.focus({ preventScroll: true });
+  }
+  function initMenu() {
+    var btn = $('vyMenuBtn'), scrim = $('vyScrim'), side = $('vySide');
+    if (btn) btn.addEventListener('click', function () { menu(); });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-vy-menu]'), function (b) { b.addEventListener('click', function () { menu(); }); });
+    if (scrim) scrim.addEventListener('click', function () { menu(false); });
+    // Al elegir cualquier opción del menú, se cierra (también los botones que abren ventanas)
+    if (side) side.addEventListener('click', function (ev) { if (ev.target.closest('.vy-nav, .vy-brand')) menu(false); });
+    document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape' && document.documentElement.classList.contains('vy-menu-open')) menu(false); });
+    // Celular tipo app: iPhone ignora "user-scalable=no", así que también bloqueamos el pellizco aquí
+    ['gesturestart', 'gesturechange'].forEach(function (t) { document.addEventListener(t, function (e) { e.preventDefault(); }, { passive: false }); });
+    document.addEventListener('touchmove', function (e) { if (e.touches && e.touches.length > 1) e.preventDefault(); }, { passive: false });
+    // Si giran el teléfono o agrandan la ventana a escritorio, el cajón no se queda abierto
+    var mq = window.matchMedia('(min-width: 1024px)');
+    var off = function () { if (mq.matches) menu(false); };
+    if (mq.addEventListener) mq.addEventListener('change', off); else if (mq.addListener) mq.addListener(off);
+  }
+
   function initViews() {
+    initMenu();
     document.addEventListener('click', function (ev) {
       var a = ev.target.closest && ev.target.closest('[data-vy-go]');
       if (!a) return;
@@ -165,6 +194,7 @@
       if (VIEWS[v] && v !== current) setView(v);
     });
     setView((location.hash || '').replace('#', ''), true);
+    meCargar();
   }
 
   // ---------- Guiones: filtros ----------
@@ -220,9 +250,9 @@
     return fetch('/.netlify/functions/api-keys', { method: method, headers: apiHeaders(), credentials: 'same-origin', cache: 'no-store', body: body ? JSON.stringify(body) : undefined })
       .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { if (!r.ok && !j.services) throw new Error(j.error || ('HTTP ' + r.status)); return j; }); });
   }
-  var SRC = { panel: ['Desde el panel', 'a'], servidor: ['Desde el servidor (.env)', 'muted'], falta: ['Falta', 'gold'] };
+  var SRC = { panel: ['Desde el panel', 'a'], servidor: ['Desde el servidor (.env)', 'muted'], prestada: ['Prestada por el administrador', 'a'], sin_creditos: ['Prestada · sin créditos', 'gold'], falta: ['Falta', 'gold'] };
   function apiEstado(s) {
-    var n = s.fields.length, ok = s.fields.filter(function (f) { return f.source !== 'falta'; }).length;
+    var n = s.fields.length, ok = s.fields.filter(function (f) { return f.source === 'panel' || f.source === 'servidor' || f.source === 'prestada'; }).length;
     if (s.id === 'sitio' || s.id === 'fal') return ok ? ['Configurado', 'ok'] : ['Opcional', 'muted'];
     if (ok === n) return ['Conectada', 'ok'];
     if (s.id === 'meta' && s.fields.slice(0, 2).every(function (f) { return f.source !== 'falta'; })) return ['Conectada', 'ok'];
@@ -271,6 +301,13 @@
         '</div>' +
       '</form>';
     }).join('') + '</div>';
+    if (d.is_admin === false) {
+      h += '<div class="glass-panel rounded-2xl p-6 flex flex-col gap-2"><h3 class="vy-novela text-xl font-bold text-white"><i class="fa-solid fa-circle-info mr-2 text-cyber-cyan"></i>Cómo funciona</h3>' +
+        '<p class="text-sm text-slate-300">Si pones <b class="text-white">tu propia clave</b>, lo que hagas con ese servicio lo pagas directo a ese servicio y no gasta créditos. Si un servicio dice <b class="text-white">"Prestada por el administrador"</b>, se usa la suya y se descuenta de tus créditos (página Créditos). Claude de la PC del administrador no se presta.</p></div>';
+      box.innerHTML = h;
+      Object.keys(typed).forEach(function (n) { var i = box.querySelector('input[name="' + n + '"]'); if (i) i.value = typed[n]; });
+      return;
+    }
     h += '<div class="grid grid-cols-1 xl:grid-cols-2 gap-5">' +
       '<div class="glass-panel rounded-2xl p-6 flex flex-col gap-3"><h3 class="vy-novela text-xl font-bold text-white"><i class="fa-solid fa-shield-halved mr-2 text-cyber-cyan"></i>Solo en el servidor</h3>' +
         '<p class="text-sm text-slate-400">Por seguridad estas no se cambian desde la web: van en Netlify (Site configuration → Environment variables) y en el <code>.env</code> de tu PC.</p>' +
@@ -315,8 +352,200 @@
       .catch(function (e) { apiMsg[id] = { ok: false, msg: e.message }; apiRender(); });
   }
 
+  // ---------- MULTIUSUARIO: quién soy, Usuarios (admin) y Créditos (usuarios) ----------
+  var me = null;
+  function fnCall(name, method, body) {
+    return fetch('/.netlify/functions/' + name, { method: method || 'GET', headers: apiHeaders(), credentials: 'same-origin', cache: 'no-store', body: body ? JSON.stringify(body) : undefined })
+      .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { if (!r.ok) { var e = new Error(j.error || ('HTTP ' + r.status)); e.status = r.status; e.data = j; throw e; } return j; }); });
+  }
+  function meCargar() {
+    return fnCall('me').then(function (j) {
+      me = j; window.vyMe = j;
+      var root = document.documentElement;
+      root.classList.toggle('vy-admin', !!j.is_admin);
+      root.classList.toggle('vy-user', !j.is_admin);
+      var who = $('vyWhoAmI'); if (who) who.textContent = j.tenancy === false ? '' : (j.is_admin ? 'Administrador' : (j.name || ''));
+      var b = $('vyCredBadge'); if (b && j.credits != null) b.textContent = Number(j.credits).toLocaleString('es');
+      // Usuarios: la cajita de abajo del menú muestra SU cuenta (no el estado de la PC del admin)
+      if (!j.is_admin && j.tenancy !== false) {
+        var dot = $('vyAgentDot'), lab = $('vyAgentLabel'), sub = $('vyAgentSub');
+        if (dot) dot.style.background = 'rgb(var(--vy-a))';
+        if (lab) { lab.textContent = 'CRÉDITOS: ' + Number(j.credits || 0).toLocaleString('es'); lab.style.color = 'rgb(var(--vy-a))'; }
+        if (sub) sub.textContent = 'PC del administrador: ' + (j.perms && j.perms.pc ? 'sí' : 'no');
+      }
+      // Si estás en una página que no es para tu cuenta, vuelve al inicio
+      if ((current === 'usuarios' && !j.is_admin) || (current === 'creditos' && j.is_admin)) setView('inicio');
+      return j;
+    }).catch(function () { document.documentElement.classList.add('vy-admin'); });
+  }
+  var NOMBRE_SERV = { google: 'Google AI', fal: 'fal.ai', tiktok: 'TikTok', meta: 'Meta', youtube: 'YouTube' };
+  var usersData = null, usersMsg = {};
+  function precioEj(st, usd) { return Math.max(1, Math.ceil(usd * st.markup / st.credit_usd - 1e-9)); }
+  function usersRender() {
+    var box = $('vyUsersBody'); if (!box) return;
+    var d = usersData;
+    if (!d) return;
+    if (d.setup_needed) {
+      box.innerHTML = '<div class="glass-panel rounded-2xl p-6 vy-api-setup flex flex-col gap-3"><strong class="text-white text-lg"><i class="fa-solid fa-database mr-2 text-cyber-gold"></i>Falta un paso (una sola vez)</strong>' +
+        '<p class="text-sm text-slate-300">Para tener usuarios hay que correr la migración <code>supabase/migrations/009_multiusuario.sql</code> en <b>Supabase → SQL Editor → Run</b>. Tus datos de hoy quedan en tu cuenta de administrador.</p></div>';
+      return;
+    }
+    var st = d.settings, m = usersMsg;
+    var h = '';
+    // Precios
+    h += '<form class="glass-panel rounded-2xl p-6 flex flex-col gap-4" onsubmit="event.preventDefault(); vyPanel.usersPrecios(this)">' +
+      '<h3 class="vy-novela text-xl font-bold text-white"><i class="fa-solid fa-tags mr-2 text-cyber-cyan"></i>Precios de los créditos</h3>' +
+      '<div class="grid grid-cols-2 lg:grid-cols-4 gap-4">' +
+        '<label class="flex flex-col gap-1.5 text-sm text-white font-semibold">Margen sobre tu costo (×)<input class="vy-input" name="markup" type="number" step="0.1" min="1" max="20" value="' + st.markup + '"></label>' +
+        '<label class="flex flex-col gap-1.5 text-sm text-white font-semibold">Valor de 1 crédito ($)<input class="vy-input" name="credit_usd" type="number" step="0.001" min="0.001" max="1" value="' + st.credit_usd + '"></label>' +
+        '<label class="flex flex-col gap-1.5 text-sm text-white font-semibold">Tu PC: créditos por trabajo<input class="vy-input" name="pc_job_credits" type="number" min="0" value="' + st.pc_job_credits + '"></label>' +
+        '<label class="flex flex-col gap-1.5 text-sm text-white font-semibold">Tu PC: créditos por toma<input class="vy-input" name="pc_shot_credits" type="number" min="0" value="' + st.pc_shot_credits + '"></label>' +
+      '</div>' +
+      '<p class="text-sm text-slate-300">Ejemplo con estos valores: un video de Veo que a ti te cuesta <b>$0.24</b> le cuesta al usuario <b>0.24 × ' + st.markup + ' ÷ ' + st.credit_usd + ' = ' + precioEj(st, 0.24) + ' créditos</b> ($' + (precioEj(st, 0.24) * st.credit_usd).toFixed(2) + '). Una imagen de $0.067 = <b>' + precioEj(st, 0.067) + ' créditos</b>. Un episodio de 8 tomas en tu PC = <b>' + (8 * st.pc_shot_credits) + ' créditos</b>.</p>' +
+      (m.precios ? '<div class="vy-api-alert vy-api-alert-' + (m.precios.ok ? 'ok' : 'pink') + '"><i class="fa-solid ' + (m.precios.ok ? 'fa-circle-check' : 'fa-circle-xmark') + '"></i><span>' + esc(m.precios.msg) + '</span></div>' : '') +
+      '<button type="submit" class="vy-cta self-start min-h-[42px] px-5 rounded-lg bg-gradient-to-r from-cyber-cyan to-cyber-violet text-white text-sm font-bold">Guardar precios</button>' +
+    '</form>';
+    // Crear usuario
+    h += '<form class="glass-panel rounded-2xl p-6 flex flex-col gap-4" autocomplete="off" onsubmit="event.preventDefault(); vyPanel.usersCrear(this)">' +
+      '<h3 class="vy-novela text-xl font-bold text-white"><i class="fa-solid fa-user-plus mr-2 text-cyber-cyan"></i>Crear un usuario</h3>' +
+      '<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">' +
+        '<label class="flex flex-col gap-1.5 text-sm text-white font-semibold">Nombre<input class="vy-input" name="name" maxlength="80" placeholder="Ej. Juan Pérez"></label>' +
+        '<label class="flex flex-col gap-1.5 text-sm text-white font-semibold">Email<input class="vy-input" name="email" type="email" required placeholder="juan@correo.com"></label>' +
+        '<label class="flex flex-col gap-1.5 text-sm text-white font-semibold">Contraseña (mín. 8)<div class="flex gap-2"><input class="vy-input" name="password" type="text" minlength="8" required spellcheck="false"><button type="button" class="vy-ghost min-h-[44px] px-3 rounded-lg border border-cyber-border bg-cyber-darker/80 text-white" title="Generar una" aria-label="Generar contraseña" onclick="this.previousElementSibling.value = vyPanel.genPass()"><i class="fa-solid fa-dice"></i></button></div></label>' +
+        '<label class="flex flex-col gap-1.5 text-sm text-white font-semibold">Créditos de regalo<input class="vy-input" name="credits" type="number" min="0" value="0"></label>' +
+      '</div>' +
+      '<fieldset class="flex flex-col gap-2"><legend class="text-sm text-white font-semibold mb-2">Lo que le prestas (puedes cambiarlo después)</legend><div class="flex flex-wrap gap-2">' +
+        Object.keys(NOMBRE_SERV).map(function (k) { return '<label class="vy-toggle"><input type="checkbox" name="k_' + k + '"><span>' + NOMBRE_SERV[k] + '</span></label>'; }).join('') +
+        '<label class="vy-toggle"><input type="checkbox" name="pc"><span><i class="fa-solid fa-desktop mr-1"></i>Tu PC</span></label>' +
+      '</div></fieldset>' +
+      (m.crear ? '<div class="vy-api-alert vy-api-alert-' + (m.crear.ok ? 'ok' : 'pink') + '"><i class="fa-solid ' + (m.crear.ok ? 'fa-circle-check' : 'fa-circle-xmark') + '"></i><span>' + esc(m.crear.msg) + '</span></div>' : '') +
+      '<button type="submit" class="vy-cta self-start min-h-[42px] px-5 rounded-lg bg-gradient-to-r from-cyber-cyan to-cyber-violet text-white text-sm font-bold"><i class="fa-solid fa-user-plus mr-1.5"></i>Crear usuario</button>' +
+    '</form>';
+    // Cuentas
+    h += '<div class="flex items-center justify-between"><h3 class="vy-novela text-2xl font-bold text-white">Cuentas (' + d.accounts.length + ')</h3></div>';
+    h += d.accounts.length ? '<div class="grid grid-cols-1 xl:grid-cols-2 gap-5">' + d.accounts.map(function (a) {
+      var u = a.users[0] || {}, mm = m[a.id];
+      return '<div class="glass-panel rounded-2xl p-6 flex flex-col gap-4' + (a.active ? '' : ' vy-paused') + '" data-ws="' + esc(a.id) + '">' +
+        '<div class="flex items-start gap-4"><div class="vy-api-ic"><i class="fa-solid fa-user"></i></div>' +
+          '<div class="flex-1 min-w-0"><h4 class="vy-novela text-xl font-bold text-white truncate">' + esc(a.name) + '</h4><p class="text-xs font-mono text-slate-400 truncate">' + esc(u.email || '') + (u.last_login_at ? ' · entró ' + new Date(u.last_login_at).toLocaleDateString('es') : ' · nunca ha entrado') + '</p></div>' +
+          '<span class="vy-pill vy-pill-' + (a.active ? 'ok' : 'muted') + '">' + (a.active ? 'Activa' : 'Pausada') + '</span></div>' +
+        '<div class="grid grid-cols-3 gap-3">' +
+          '<div class="vy-cs"><span class="vy-lab">Créditos</span><strong class="vy-num text-2xl text-cyber-cyan">' + a.credits.toLocaleString('es') + '</strong></div>' +
+          '<div class="vy-cs"><span class="vy-lab">Novelas</span><strong class="vy-num text-2xl text-white">' + a.series + '</strong></div>' +
+          '<div class="vy-cs"><span class="vy-lab">Costo del mes</span><strong class="vy-num text-2xl text-white">$' + a.month_usd.toFixed(2) + '</strong></div></div>' +
+        '<div class="flex flex-col gap-2"><span class="text-sm text-white font-semibold">Le prestas:</span><div class="flex flex-wrap gap-2">' +
+          Object.keys(NOMBRE_SERV).map(function (k) { return '<label class="vy-toggle"><input type="checkbox" ' + (a.perms.keys[k] ? 'checked' : '') + ' onchange="vyPanel.usersPermiso(\'' + a.id + '\')" data-k="' + k + '"><span>' + NOMBRE_SERV[k] + '</span></label>'; }).join('') +
+          '<label class="vy-toggle"><input type="checkbox" ' + (a.perms.pc ? 'checked' : '') + ' onchange="vyPanel.usersPermiso(\'' + a.id + '\')" data-k="pc"><span><i class="fa-solid fa-desktop mr-1"></i>Tu PC</span></label>' +
+        '</div></div>' +
+        '<form class="flex flex-wrap gap-2" onsubmit="event.preventDefault(); vyPanel.usersCreditos(\'' + a.id + '\', this)">' +
+          '<input class="vy-input" style="max-width:130px" name="delta" type="number" placeholder="+100 / −50" aria-label="Créditos a dar o quitar">' +
+          '<input class="vy-input" name="note" maxlength="120" placeholder="Nota (ej. pagó $10 por Zelle)" aria-label="Nota">' +
+          '<button type="submit" class="vy-ghost min-h-[44px] px-4 rounded-lg border border-cyber-border bg-cyber-darker/80 text-white text-sm font-semibold"><i class="fa-solid fa-coins mr-1.5 text-cyber-gold"></i>Dar / quitar</button>' +
+        '</form>' +
+        (mm ? '<div class="vy-api-alert vy-api-alert-' + (mm.ok ? 'ok' : 'pink') + '"><i class="fa-solid ' + (mm.ok ? 'fa-circle-check' : 'fa-circle-xmark') + '"></i><span>' + esc(mm.msg) + '</span></div>' : '') +
+        '<div class="flex flex-wrap gap-2 pt-1 border-t border-cyber-border/60">' +
+          '<button type="button" class="vy-link" onclick="vyPanel.usersActiva(\'' + a.id + '\', ' + (!a.active) + ')">' + (a.active ? '<i class="fa-solid fa-pause mr-1"></i>Pausar cuenta' : '<i class="fa-solid fa-play mr-1"></i>Reactivar') + '</button>' +
+          (u.id ? '<button type="button" class="vy-link" onclick="vyPanel.usersClave(\'' + u.id + '\', \'' + a.id + '\')"><i class="fa-solid fa-key mr-1"></i>Nueva contraseña</button>' : '') +
+          '<button type="button" class="vy-link text-cyber-pink" onclick="vyPanel.usersBorrar(\'' + a.id + '\')"><i class="fa-solid fa-trash mr-1"></i>Borrar</button>' +
+        '</div>' +
+      '</div>';
+    }).join('') + '</div>' : '<div class="glass-panel rounded-2xl p-8 text-center text-slate-400">Todavía no hay usuarios. Crea el primero arriba.</div>';
+    box.innerHTML = h;
+  }
+  function usersCargar() {
+    fnCall('users').then(function (j) { usersData = j; usersRender(); })
+      .catch(function (e) { if (e.data && e.data.setup_needed) { usersData = { setup_needed: true }; usersRender(); } else { var b = $('vyUsersBody'); if (b) b.innerHTML = '<div class="vy-api-alert vy-api-alert-pink"><i class="fa-solid fa-triangle-exclamation"></i><span>' + esc(e.message) + '</span></div>'; } });
+  }
+  function usersPost(body, key, okMsg) {
+    return fnCall('users', 'POST', body).then(function (j) { usersData = j; usersMsg = {}; usersMsg[key] = { ok: true, msg: okMsg }; usersRender(); return j; })
+      .catch(function (e) { usersMsg = {}; usersMsg[key] = { ok: false, msg: e.message }; usersRender(); });
+  }
+  function genPass() {
+    var c = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789', out = '', a = new Uint32Array(12);
+    (window.crypto || window.msCrypto).getRandomValues(a);
+    for (var i = 0; i < a.length; i++) out += c[a[i] % c.length];
+    return out;
+  }
+  function usersCrear(f) {
+    var perms = { keys: {}, pc: f.elements['pc'].checked };
+    Object.keys(NOMBRE_SERV).forEach(function (k) { perms.keys[k] = f.elements['k_' + k].checked; });
+    var E = f.elements, email = E['email'].value.trim(), pass = E['password'].value;
+    usersPost({ action: 'create', name: E['name'].value, email: email, password: pass, credits: Number(E['credits'].value) || 0, perms: perms }, 'crear',
+      'Usuario creado. Pásale estos datos — Email: ' + email + ' · Contraseña: ' + pass + ' (no se vuelve a mostrar).');
+  }
+  function usersPermiso(ws) {
+    var card = document.querySelector('[data-ws="' + ws + '"]'); if (!card) return;
+    var perms = { keys: {}, pc: false };
+    Array.prototype.forEach.call(card.querySelectorAll('input[data-k]'), function (i) { if (i.getAttribute('data-k') === 'pc') perms.pc = i.checked; else perms.keys[i.getAttribute('data-k')] = i.checked; });
+    usersPost({ action: 'perms', workspace_id: ws, perms: perms }, ws, 'Permisos guardados.');
+  }
+  function usersCreditos(ws, f) {
+    var d = Number(f.delta.value);
+    if (!d) { usersMsg = {}; usersMsg[ws] = { ok: false, msg: 'Escribe cuántos créditos (ej. 100 o -50).' }; return usersRender(); }
+    usersPost({ action: 'credits', workspace_id: ws, delta: d, note: f.note.value }, ws, (d > 0 ? 'Se le dieron ' : 'Se le quitaron ') + Math.abs(d) + ' créditos.');
+  }
+  function usersActiva(ws, active) { usersPost({ action: 'active', workspace_id: ws, active: active }, ws, active ? 'Cuenta reactivada.' : 'Cuenta pausada: ya no puede entrar ni usar nada.'); }
+  function usersClave(uid, ws) {
+    var p = genPass();
+    var go = function () { usersPost({ action: 'password', user_id: uid, password: p }, ws, 'Nueva contraseña: ' + p + ' (pásasela; no se vuelve a mostrar).'); };
+    if (window.askConfirm) Promise.resolve(window.askConfirm('¿Crear una contraseña nueva para este usuario? La anterior deja de servir.')).then(function (ok) { if (ok) go(); }); else go();
+  }
+  function usersBorrar(ws) {
+    var go = function (txt) { if (txt === 'BORRAR') usersPost({ action: 'delete', workspace_id: ws, confirm: 'BORRAR' }, ws, 'Cuenta borrada.'); };
+    if (window.askText) Promise.resolve(window.askText('Escribe BORRAR para borrar esta cuenta (solo se puede si no tiene novelas; si no, mejor páusala):', '')).then(go);
+  }
+  function usersPrecios(f) {
+    usersPost({ action: 'settings', settings: { markup: f.markup.value, credit_usd: f.credit_usd.value, pc_job_credits: f.pc_job_credits.value, pc_shot_credits: f.pc_shot_credits.value } }, 'precios', 'Precios guardados. Se aplican a los próximos cobros.');
+  }
+
+  var MOV = { regalo_admin: 'Te dio el administrador', compra: 'Compra', uso_api: 'Uso de API prestada', uso_pc: 'Uso de la PC', ajuste: 'Ajuste del administrador' };
+  function credRender() {
+    var box = $('vyCredBody'); if (!box || !me) return;
+    if (me.is_admin) { box.innerHTML = '<div class="glass-panel rounded-2xl p-6 text-slate-300">Eres el administrador: tú no gastas créditos. Los créditos de tus usuarios se manejan en <a href="#usuarios" data-vy-go="usuarios">Usuarios</a>.</div>'; return; }
+    var pr = me.prices || { credit_usd: 0.01, markup: 2.5, pc_shot_credits: 10, pc_job_credits: 10 };
+    var lent = Object.keys((me.perms && me.perms.keys) || {}).filter(function (k) { return me.perms.keys[k]; }).map(function (k) { return NOMBRE_SERV[k] || k; });
+    var h = '<div class="grid grid-cols-1 lg:grid-cols-3 gap-5">' +
+      '<div class="glass-panel rounded-2xl p-6 flex flex-col gap-2 lg:col-span-1"><span class="vy-lab">Tu saldo</span><strong class="vy-num text-5xl text-cyber-cyan">' + Number(me.credits || 0).toLocaleString('es') + '</strong>' +
+        '<span class="text-sm text-slate-400">créditos · 1 crédito = $' + pr.credit_usd + ' · equivale a $' + (Number(me.credits || 0) * pr.credit_usd).toFixed(2) + '</span>' +
+        '<p class="text-sm text-slate-300 mt-2">Para recargar, pídeselo al administrador.</p></div>' +
+      '<div class="glass-panel rounded-2xl p-6 flex flex-col gap-3 lg:col-span-2"><h3 class="vy-novela text-xl font-bold text-white">Qué cuesta (aprox.)</h3>' +
+        '<div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">' +
+          '<div class="vy-cs"><span class="vy-lab">Imagen (Gemini)</span><strong class="text-white">' + precioEj(pr, 0.067) + ' créditos</strong></div>' +
+          '<div class="vy-cs"><span class="vy-lab">Toma de video (Veo)</span><strong class="text-white">' + precioEj(pr, 0.24) + ' créditos</strong></div>' +
+          '<div class="vy-cs"><span class="vy-lab">Toma en la PC del admin</span><strong class="text-white">' + pr.pc_shot_credits + ' créditos</strong></div>' +
+          '<div class="vy-cs"><span class="vy-lab">Otro trabajo en la PC</span><strong class="text-white">' + pr.pc_job_credits + ' créditos</strong></div>' +
+        '</div>' +
+        '<p class="text-xs text-slate-400">Se cobra lo que de verdad cuesta cada llamada; estos son ejemplos. Te prestan: <b class="text-slate-200">' + (lent.length ? esc(lent.join(', ')) : 'ninguna API') + '</b> · PC del administrador: <b class="text-slate-200">' + (me.perms && me.perms.pc ? 'sí' : 'no') + '</b>.</p></div>' +
+    '</div>';
+    h += '<section class="glass-panel rounded-2xl"><div class="px-6 pt-6 pb-3"><h3 class="vy-novela text-xl font-bold text-white">Historial</h3></div><div class="overflow-x-auto"><table class="w-full border-collapse min-w-[560px]"><thead><tr><th class="vy-th">Fecha</th><th class="vy-th">Movimiento</th><th class="vy-th">Detalle</th><th class="vy-th text-right">Créditos</th><th class="vy-th text-right">Saldo</th></tr></thead><tbody>' +
+      ((me.ledger || []).length ? me.ledger.map(function (x) {
+        return '<tr><td class="vy-td font-mono text-xs text-slate-400">' + new Date(x.created_at).toLocaleString('es', { dateStyle: 'short', timeStyle: 'short' }) + '</td><td class="vy-td">' + esc(MOV[x.reason] || x.reason) + '</td><td class="vy-td text-slate-400 text-sm">' + esc(x.detail || '') + '</td>' +
+          '<td class="vy-td font-mono text-right ' + (x.delta > 0 ? 'text-cyber-emerald' : 'text-cyber-pink') + '">' + (x.delta > 0 ? '+' : '') + Number(x.delta).toLocaleString('es') + '</td><td class="vy-td font-mono text-right text-slate-300">' + (x.balance_after != null ? Number(x.balance_after).toLocaleString('es') : '') + '</td></tr>';
+      }).join('') : '<tr><td class="vy-td text-slate-400" colspan="5">Todavía no hay movimientos.</td></tr>') +
+      '</tbody></table></div></section>';
+    box.innerHTML = h;
+  }
+  function credCargar() { meCargar().then(credRender); }
+
+  // Cuenta sin novelas (o novela que no es tuya): Inicio con un primer paso claro, sin esqueletos de carga eternos.
+  function sinNovela(nueva) {
+    var next = $('vyNext');
+    if (next) {
+      next.className = 'glass-panel vy-next flow vy-next-a';
+      next.innerHTML = '<div class="vy-next-ic"><i class="fa-solid fa-wand-magic-sparkles"></i></div>' +
+        '<div class="vy-next-tx"><strong>' + (nueva ? 'Bienvenido: crea tu primera novela' : 'Elige una de tus novelas arriba') + '</strong>' +
+        '<span>' + (nueva ? 'Pega el guion completo (JSON) o pídelo con una idea. Después la produces desde Producción.' : 'O crea una nueva.') + '</span></div>' +
+        '<button type="button" class="vy-next-btn" onclick="openNovelModal()">Nueva novela <i class="fa-solid fa-arrow-right"></i></button>';
+    }
+    var rows = $('vyEpRows'); if (rows) rows.innerHTML = '<tr><td class="vy-td text-slate-400" colspan="5">Todavía no hay episodios.</td></tr>';
+    var w = $('vyWork'); if (w) w.innerHTML = '<span class="vy-lab">Trabajando ahora</span><strong class="text-[15px] font-semibold text-slate-300">Nada en proceso</strong>';
+    var q = $('vyQueue'); if (q) q.innerHTML = '<p class="text-sm text-slate-400">No hay trabajos pendientes.</p>';
+    var n = $('vyNets'); if (n) n.innerHTML = '<button type="button" class="vy-link" onclick="openSocialModal()">Conectar tus redes</button>';
+  }
+
   // ---------- Pintar ----------
   function render(data) {
+    if (me && !me.is_admin) meCargar();
     if (!data || !data.series) return;
     var serie = data.series;
     var eps = (data.episodes || []).filter(function (e) { return e.status !== 'archivado'; })
@@ -340,6 +569,8 @@
     });
     var badge = $('vyNavReview');
     if (badge) { badge.textContent = pendientes; badge.classList.toggle('hidden', !pendientes); }
+    var tdot = $('vyTabReview');
+    if (tdot) { tdot.textContent = pendientes > 99 ? '99+' : pendientes; tdot.classList.toggle('hidden', !pendientes); }
 
     // Aviso "lo que sigue"
     var next = $('vyNext');
@@ -625,7 +856,7 @@
     // Estado de la PC en el menú
     var ag = window.__agent;
     var dot = $('vyAgentDot'), lab = $('vyAgentLabel'), sub = $('vyAgentSub');
-    if (dot && lab && sub) {
+    if (dot && lab && sub && !(me && !me.is_admin)) {
       var on = !!(ag && ag.online);
       dot.style.background = on ? 'rgb(var(--vy-emerald))' : 'rgb(var(--vy-gold))';
       lab.textContent = on ? 'PC EN LÍNEA' : 'PC SIN CONEXIÓN';
@@ -635,7 +866,8 @@
     }
   }
 
-  window.vyPanel = { render: render, irARevisar: irARevisar, abrirEpisodio: abrirEpisodio, setView: setView, filtro: setFiltro, apiGuardar: apiGuardar, apiQuitar: apiQuitar, apiProbar: apiProbar };
+  window.vyPanel = { render: render, irARevisar: irARevisar, abrirEpisodio: abrirEpisodio, setView: setView, filtro: setFiltro, apiGuardar: apiGuardar, apiQuitar: apiQuitar, apiProbar: apiProbar,
+    usersCrear: usersCrear, usersPermiso: usersPermiso, usersCreditos: usersCreditos, usersActiva: usersActiva, usersClave: usersClave, usersBorrar: usersBorrar, usersPrecios: usersPrecios, genPass: genPass, sinNovela: sinNovela };
   document.addEventListener('input', function (ev) { if (ev.target && ev.target.id === 'vyArcSearch') filtrarArco(); });
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initViews);
   else initViews();

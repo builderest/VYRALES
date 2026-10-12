@@ -7,7 +7,10 @@ exports.handler = async () => {
   keys.facebook = keys.meta = keys.instagram;
   keys.youtube = !!(process.env.YOUTUBE_CLIENT_ID && process.env.YOUTUBE_CLIENT_SECRET);
   try {
-    const { data, error } = await getSupabaseClient().from('social_accounts').select('platform, account_name, expires_at, refresh_expires_at, updated_at, scopes');
+    const T = require('./_tenant'); const sb = getSupabaseClient();
+    let q = sb.from('social_accounts').select('platform, account_name, expires_at, refresh_expires_at, updated_at, scopes');
+    if (await T.tenancyOn(sb)) q = q.eq('workspace_id', T.currentWs()); // solo las redes de tu cuenta
+    const { data, error } = await q;
     if (error) return json(200, { keys, accounts: {}, table_missing: true, error: error.message });
     const accounts = {};
     (data || []).forEach((a) => { accounts[a.platform] = { name: a.account_name, expires_at: (a.platform === 'tiktok' || a.platform === 'youtube') ? (a.refresh_expires_at || a.expires_at) : a.expires_at, updated_at: a.updated_at, old: (a.platform === 'instagram' || a.platform === 'facebook') && a.scopes !== 'meta', direct: a.platform === 'tiktok' && /video\.publish/.test(a.scopes || '') }; });

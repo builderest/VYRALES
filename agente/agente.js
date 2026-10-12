@@ -30,6 +30,25 @@ const PANEL_KEYS = require(path.join(ROOT, 'netlify', 'functions', '_keys.js'));
 PANEL_KEYS.applyKeys(sb, true).then((r) => { if (r && r.error && !PANEL_KEYS.isMissingTable(r.error)) console.log('Claves del panel: ' + (r.error.message || r.error)); }).catch(() => {});
 setInterval(() => { PANEL_KEYS.applyKeys(sb, true).catch(() => {}); }, 60000);
 
+// MULTIUSUARIO (migración 009): esta PC solo hace trabajos de TU cuenta y de las cuentas a las que les
+// diste permiso de usar tu PC (página Usuarios). Los guiones con Claude y "push" son solo tuyos.
+// Los trabajos de otra cuenta corren con SUS claves (o las que les prestaste) y su VYRALES_WS.
+const TEN = require(path.join(ROOT, 'netlify', 'functions', '_tenant.js'));
+let wsAllowed = null, wsAllowedAt = 0;
+async function allowedWs() {
+  if (Date.now() - wsAllowedAt < 60000) return wsAllowed;
+  wsAllowedAt = Date.now();
+  try {
+    if (!(await TEN.tenancyOn(sb))) { wsAllowed = null; return null; } // sin la migración: todo como antes
+    const { data, error } = await sb.from('workspaces').select('id, perms, active');
+    if (!error) wsAllowed = [TEN.ADMIN_WS].concat((data || []).filter((w) => w.id !== TEN.ADMIN_WS && w.active && w.perms && w.perms.pc).map((w) => w.id));
+  } catch (_) {}
+  return wsAllowed;
+}
+const onlyAllowed = (q, list) => (list ? q.in('workspace_id', list) : q);
+const onlyAdminWs = (q, list) => (list ? q.eq('workspace_id', TEN.ADMIN_WS) : q);
+const USER_OK = /^(gen_local|regen_local|toma_local|voz_continua|flow_frames|flow_cuadros|flow_lugar|render_full|publish|publish_pkg|subtitulos|portada_yt|voz_ingles):/;
+
 const MAX_OUT = 20000; // caracteres guardados por orden
 const log = (...a) => console.log(new Date().toLocaleTimeString(), ...a);
 
@@ -64,6 +83,15 @@ async function runJob(job) {
   const [name, arg] = String(job.command).split(/:(.*)/s);
   const def0 = Object.prototype.hasOwnProperty.call(COMMANDS, name) ? COMMANDS[name] : null;
   const def = def0 && (def0.arg ? def0.arg.test(arg || '') : arg === undefined) ? def0 : null;
+  // Trabajo de OTRA cuenta: sus claves y su espacio (nunca las tuyas sin permiso). Defensa extra: solo comandos de producción.
+  let jobEnv = {};
+  if (job.workspace_id && job.workspace_id !== TEN.ADMIN_WS) {
+    if (!USER_OK.test(String(job.command))) {
+      await sb.from('agent_jobs').update({ status: 'error', exit_code: 1, output: 'Comando no permitido para esta cuenta.', finished_at: new Date().toISOString() }).eq('id', job.id);
+      return;
+    }
+    try { jobEnv = await PANEL_KEYS.keysEnvFor(sb, job.workspace_id); } catch (e) { jobEnv = { VYRALES_WS: job.workspace_id }; }
+  }
   let out = '';
   let flushT = 0;
   let flushTimer = null;
@@ -162,7 +190,7 @@ async function runJob(job) {
       for (const [cmd, args] of def.steps) {
         add('$ ' + cmd + ' ' + args.join(' ') + '\n');
         code = await new Promise((resolve) => {
-          const p = spawn(cmd, args, { cwd: ROOT, shell: false, env: Object.assign({}, process.env, { GIT_TERMINAL_PROMPT: '0' }) });
+          const p = spawn(cmd, args, { cwd: ROOT, shell: false, env: Object.assign({}, process.env, jobEnv, { GIT_TERMINAL_PROMPT: '0' }) });
           const timer = setTimeout(() => { add('\n[se canceló: tardó más de 3 minutos]\n'); p.kill(); }, 180000);
           p.stdout.on('data', (d) => add(String(d)));
           p.stderr.on('data', (d) => add(String(d)));
@@ -320,12 +348,20 @@ async function queueFullRenders() {
   // Si la receta de calidad cambió (QUALITY_V en render_local.js), también se rehace.
   // Puede haber 2 archivos por episodio (el normal y el "-nuevo" si el viejo estaba abierto): vale cualquiera con la versión actual.
   filesInfo().finales.forEach((f) => { if (f.episode_id && f.quality_v >= QUALITY_V) (have[f.episode_id] = have[f.episode_id] || []).push(f.source); });
-  const todo = (fins || []).find((a) => !(have[a.episode_id] || []).includes(a.storage_path) && (failedRenders[a.storage_path] || 0) < 2);
+  let finsOk = fins || [];
+  const wsl = await allowedWs();
+  const epWs = {};
+  if (wsl && finsOk.length) {
+    const { data: eps } = await sb.from('episodes').select('id, series(workspace_id)').in('id', finsOk.map((a) => a.episode_id));
+    (eps || []).forEach((e) => { epWs[e.id] = e.series && e.series.workspace_id; });
+    finsOk = finsOk.filter((a) => wsl.includes(epWs[a.episode_id] || TEN.ADMIN_WS));
+  }
+  const todo = finsOk.find((a) => !(have[a.episode_id] || []).includes(a.storage_path) && (failedRenders[a.storage_path] || 0) < 2);
   if (!todo) return;
   const { data: open } = await sb.from('agent_jobs').select('id').in('status', ['pending', 'running']).limit(1);
   if (open && open.length) return;
   failedRenders[todo.storage_path] = (failedRenders[todo.storage_path] || 0) + 1;
-  await sb.from('agent_jobs').insert({ command: 'render_full:' + todo.episode_id });
+  await sb.from('agent_jobs').insert(Object.assign({ command: 'render_full:' + todo.episode_id }, wsl ? { workspace_id: epWs[todo.episode_id] || TEN.ADMIN_WS } : {}));
   log('nuevo video final: preparando calidad completa (episodio ' + todo.episode_id + ')');
 }
 // RESPALDO de las tomas que viven en fal.ai (desde oct-2026 ya no se copian a Supabase): cada 5 min
@@ -420,10 +456,11 @@ const KING_RE = /^(gen_local|regen_local|toma_local|prueba_ltx|prueba_flux|qa_to
 async function tick() {
   let mine = false;
   try {
+    const wsl = await allowedWs();
     await sb.from('agent_state').upsert({ id: 1, last_seen: new Date().toISOString(), host: os.hostname(), info: { commands: Object.keys(COMMANDS), dev_running: !!dev, platform: process.platform, files: filesInfo() } });
     // "push" (subir los cambios a vyrales.app) no espera detrás de producciones de horas: corre en paralelo (solo git).
     if (!pushBusy) {
-      const { data: pj } = await sb.from('agent_jobs').select('*').eq('status', 'pending').eq('command', 'push').order('created_at').limit(1);
+      const { data: pj } = await onlyAdminWs(sb.from('agent_jobs').select('*').eq('status', 'pending').eq('command', 'push'), wsl).order('created_at').limit(1);
       if (pj && pj[0]) {
         const { data: cl } = await sb.from('agent_jobs').update({ status: 'running' }).eq('id', pj[0].id).eq('status', 'pending').select();
         if (cl && cl.length) { pushBusy = true; runJob(pj[0]).catch((e) => log('push:', e.message)).finally(() => { pushBusy = false; }); }
@@ -432,7 +469,7 @@ async function tick() {
     // Guiones con Claude (claude_*) tampoco usan king: van en su propia fila en paralelo, así una producción no espera
     // 35 min detrás de un guion largo (oct-11: "se está quedando estancada king" — king estaba libre esperando).
     if (!claudeBusy) {
-      const { data: cj } = await sb.from('agent_jobs').select('*').eq('status', 'pending').like('command', 'claude_%').order('created_at').limit(1);
+      const { data: cj } = await onlyAdminWs(sb.from('agent_jobs').select('*').eq('status', 'pending').like('command', 'claude_%'), wsl).order('created_at').limit(1);
       if (cj && cj[0]) {
         const { data: cl2 } = await sb.from('agent_jobs').update({ status: 'running' }).eq('id', cj[0].id).eq('status', 'pending').select();
         if (cl2 && cl2.length) { claudeBusy = true; runJob(cj[0]).catch((e) => log('claude:', e.message)).finally(() => { claudeBusy = false; }); }
@@ -442,7 +479,7 @@ async function tick() {
     // calidad completa, publicar, portadas, subtítulos, Shorts del largo… corren mientras king genera video.
     // Publicar va primero (lo pidió una persona y es rápido).
     if (!generalBusy) {
-      const { data: gp } = await sb.from('agent_jobs').select('*').eq('status', 'pending').order('created_at').limit(50);
+      const { data: gp } = await onlyAllowed(sb.from('agent_jobs').select('*').eq('status', 'pending'), wsl).order('created_at').limit(50);
       const free = (gp || []).filter((x) => x.command !== 'push' && !/^claude_/.test(x.command) && !KING_RE.test(x.command));
       const gj = free.find((x) => /^publish:/.test(x.command)) || free[0];
       if (gj) {
@@ -468,8 +505,10 @@ async function tick() {
     // vencía sin publicar (oct-7: EP3 a YouTube y TikTok se perdieron así).
     await sb.from('agent_jobs').update({ status: 'expired', finished_at: new Date().toISOString() }).eq('status', 'pending').like('command', 'publish:%').lt('created_at', new Date(Date.now() - 6 * 3600000).toISOString());
     // FILA DE KING (la GPU): solo lo que genera video con LTX o usa el Chrome de Flow. Lo demás va en la fila general.
-    const { data: pend } = await sb.from('agent_jobs').select('*').eq('status', 'pending').order('created_at').limit(50);
-    const data = [(pend || []).find((x) => KING_RE.test(x.command))].filter(Boolean);
+    const { data: pend } = await onlyAllowed(sb.from('agent_jobs').select('*').eq('status', 'pending'), wsl).order('created_at').limit(50);
+    // Tus trabajos primero; después los de las cuentas a las que les prestas la PC.
+    const kingQ = (pend || []).filter((x) => KING_RE.test(x.command));
+    const data = [kingQ.find((x) => !x.workspace_id || x.workspace_id === TEN.ADMIN_WS) || kingQ[0]].filter(Boolean);
     const job = data && data[0];
     if (!job) return;
     // "Reclamar" la orden (si hubiera dos agentes, solo uno la toma).

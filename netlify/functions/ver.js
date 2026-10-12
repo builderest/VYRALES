@@ -6,7 +6,12 @@ const CHANNEL = process.env.YOUTUBE_CHANNEL_URL || 'https://www.youtube.com/chan
 const esc = (t) => String(t || '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 exports.handler = async (event) => {
   const sb = getSupabaseClient();
-  const { data } = await sb.from('episodes').select('id, title, continuity, validator_report, published_at').order('published_at', { ascending: false, nullsFirst: false }).limit(200);
+  // MULTIUSUARIO: esta página pública es del canal del ADMIN: solo sus historias (las de otras cuentas no salen).
+  const T = require('./_tenant');
+  const on = await T.tenancyOn(sb);
+  let q0 = sb.from('episodes').select(on ? 'id, title, continuity, validator_report, published_at, series!inner(workspace_id)' : 'id, title, continuity, validator_report, published_at');
+  if (on) q0 = q0.eq('series.workspace_id', T.ADMIN_WS);
+  const { data } = await q0.order('published_at', { ascending: false, nullsFirst: false }).limit(200);
   const longs = (data || []).filter((e) => (e.continuity || {}).kind === 'largo' && (((e.validator_report || {}).published || {}).youtube || {}).url)
     .map((e) => ({ id: e.id, title: ((e.validator_report || {}).publish_package || {}).youtube_title || e.title, url: e.validator_report.published.youtube.url, thumb: ((e.continuity || {}).thumbnail || {}).es_url || ((e.validator_report || {}).publish_package || {}).cover_url || '' }));
   const q = event.queryStringParameters || {};

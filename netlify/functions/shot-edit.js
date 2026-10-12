@@ -44,10 +44,10 @@ exports.handler = async (event) => {
       const reason = clean(body.reason || 'no está bien').slice(0, 300);
       await saveShot({ qa: Object.assign({}, shot.qa || {}, { force: true, force_reason: reason, clip_id: clip.id, ok: false, tries: Math.min(Number((shot.qa || {}).tries) || 0, 2) }) });
       // Memoria: la corrección de Franklin es una lección para Claude (la consolida claude_aprender).
-      try { await require('./_memoria').addLesson(sb, { source: 'franklin', serie: series && series.slug, ep: ep.id, toma: n, narracion: lineOf(shot), motivo: reason, imagen: shot.start_en || '', accion: shot.action_en || '', camara: shot.camera || '' }); } catch (_) {}
-      try { const { data: oa } = await sb.from('agent_jobs').select('id').eq('status', 'pending').eq('command', 'claude_aprender').limit(1); if (!(oa && oa.length)) await sb.from('agent_jobs').insert({ command: 'claude_aprender' }); } catch (_) {}
+      if (require('./_tenant').currentWs() === require('./_tenant').ADMIN_WS) try { await require('./_memoria').addLesson(sb, { source: 'franklin', serie: series && series.slug, ep: ep.id, toma: n, narracion: lineOf(shot), motivo: reason, imagen: shot.start_en || '', accion: shot.action_en || '', camara: shot.camera || '' }); } catch (_) {}
+      if (require('./_tenant').currentWs() === require('./_tenant').ADMIN_WS) try { const { data: oa } = await sb.from('agent_jobs').select('id').eq('status', 'pending').eq('command', 'claude_aprender').limit(1); if (!(oa && oa.length)) await sb.from('agent_jobs').insert(await require('./_tenant').jobRow(sb, 'claude_aprender')); } catch (_) {}
       const { data: open } = await sb.from('agent_jobs').select('id').in('status', ['pending', 'running']).like('command', 'qa_tomas:' + ep.id + '%').limit(1);
-      if (!(open && open.length)) { const { error: qe } = await sb.from('agent_jobs').insert({ command: 'qa_tomas:' + ep.id }); if (qe) return json(500, { error: qe.message }); }
+      if (!(open && open.length)) { const { error: qe } = await sb.from('agent_jobs').insert(await require('./_tenant').jobRow(sb, 'qa_tomas:' + ep.id)); if (qe) return json(500, { error: qe.message }); }
       return json(200, { queued: true });
     }
 
@@ -56,7 +56,7 @@ exports.handler = async (event) => {
       if (!(stt && stt.last_seen && Date.now() - new Date(stt.last_seen).getTime() < 90000)) return json(200, { offline: true });
       const at = new Date().toISOString();
       await saveShot({ detail_request: { at, fields: Object.fromEntries(FIELDS.map((k) => [k, clean((body.fields || {})[k] != null ? body.fields[k] : shot[k])])) } });
-      const { error: qe } = await sb.from('agent_jobs').insert({ command: 'claude_detalle:' + ep.id + ':' + n });
+      const { error: qe } = await sb.from('agent_jobs').insert(await require('./_tenant').jobRow(sb, 'claude_detalle:' + ep.id + ':' + n));
       if (qe) return json(500, { error: qe.message });
       return json(200, { queued: true, at });
     }
@@ -76,8 +76,9 @@ exports.handler = async (event) => {
       const r = await splitShotDb(sb, ep.id, n, parts, () => {});
       const list = parts.map((_, k) => r.first + k).join(',');
       const { data: stt } = await sb.from('agent_state').select('last_seen').eq('id', 1).maybeSingle();
-      const online = !!(stt && stt.last_seen && Date.now() - new Date(stt.last_seen).getTime() < 90000);
-      if (online) await sb.from('agent_jobs').insert({ command: 'claude_revisar:' + ep.id + ':' + list });
+      // Claude en la PC es solo del admin (su plan): para otros usuarios las tomas nuevas quedan sin detallar.
+      const online = require('./_tenant').currentWs() === require('./_tenant').ADMIN_WS && !!(stt && stt.last_seen && Date.now() - new Date(stt.last_seen).getTime() < 90000);
+      if (online) await sb.from('agent_jobs').insert(await require('./_tenant').jobRow(sb, 'claude_revisar:' + ep.id + ':' + list));
       return json(200, { ok: true, shots: list, detailing: online });
     }
     if (body.image_base64) {
@@ -107,7 +108,8 @@ exports.handler = async (event) => {
       try {
         const antes = {}, despues = {};
         FIELDS.concat(['camera_only']).forEach((k) => { if (patch[k] != null && String(patch[k]) !== String(shot[k] == null ? '' : shot[k])) { antes[k] = shot[k] == null ? '' : shot[k]; despues[k] = patch[k]; } });
-        await require('./_memoria').addLesson(sb, { source: 'franklin_edicion', serie: series && series.slug, ep: ep.id, toma: n, narracion: lineOf(shot), antes, despues });
+        // La memoria de Claude es del admin: las ediciones de otros usuarios no la cambian.
+        if (require('./_tenant').currentWs() === require('./_tenant').ADMIN_WS) await require('./_memoria').addLesson(sb, { source: 'franklin_edicion', serie: series && series.slug, ep: ep.id, toma: n, narracion: lineOf(shot), antes, despues });
       } catch (_) {}
     }
     return json(200, { ok: true, imgChanged, vidChanged });
