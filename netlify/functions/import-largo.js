@@ -7,7 +7,14 @@ const json = (s, b) => ({ statusCode: s, headers: { 'Content-Type': 'application
 
 const fixShots = (shots) => (shots || []).map((s, i) => {
   const line = (s.dialogue || []).map((d) => d.line).join(' ');
-  return Object.assign({ location: 'escena', characters: [], sfx: '' }, s, { n: i + 1, scene_es: s.scene_es || s.visual_es || line, location: s.location || 'escena', characters: [] });
+  // Respaldo: si Claude dejó una toma sin cámara/acción/cuadro inicial, no se cae TODA la importación (oct-11:
+  // dos guiones largos completos no se importaron por 4 tomas sin action_en). El QA corrige esas tomas al producir.
+  const clean = (t) => String(t || '').replace(/"/g, "'").trim();
+  const start = clean(s.start_en || s.visual_en || s.visual_es || s.scene_es || line);
+  return Object.assign({ location: 'escena', characters: [], sfx: '' }, s, { n: i + 1, scene_es: s.scene_es || s.visual_es || line, location: s.location || 'escena', characters: [],
+    camera: clean(s.camera) || 'slow smooth push-in',
+    start_en: start,
+    action_en: clean(s.action_en) || ('The main subject of the scene moves naturally and continuously, matching the narration: ' + start.slice(0, 160)) });
 });
 function seriesJson({ slug, title, synopsis, tipo, sbExtra, narration, ep, aspect }) {
   ep = Object.assign({}, ep, { shots: fixShots(ep.shots) });
@@ -67,3 +74,6 @@ exports.handler = async (event) => {
   }
 };
 exports._seriesJson = seriesJson;
+
+// Claves de la página Cuenta → API (cifradas en Supabase; mandan sobre el .env). Ver _keys.js.
+exports.handler = require('./_keys').withKeys(exports.handler);

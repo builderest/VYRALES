@@ -28,6 +28,17 @@ async function detail(shots, { aspect, context, title, log }) {
     out.push(...(done || part));
     log(`    prompts detallados: ${Math.min(i + 16, rows.length)}/${rows.length}`);
   }
+  // Repaso: tomas que quedaron sin acción/cámara (Claude a veces se salta alguna; oct-11 la importación fallaba
+  // por 4 tomas sin action_en). Se vuelven a pedir solas, una vez.
+  const miss = out.map((s, i) => i).filter((i) => !(out[i].action_en && String(out[i].action_en).trim()) || !(out[i].camera && String(out[i].camera).trim()));
+  if (miss.length) {
+    log(`    repaso: ${miss.length} toma(s) sin acción/cámara → las pido otra vez`);
+    try {
+      const part = miss.map((i) => out[i]);
+      const vc = await checkVisuals({ series: { title }, shots: part, rewriteStart: 'all', llm: claudeLlm(() => {}), aspect, context, log: () => {} });
+      applyChanges(part, vc.changes).forEach((x, k) => { out[miss[k]] = Object.assign({}, out[miss[k]], x); });
+    } catch (e) { log('    repaso falló (' + String(e.message).slice(0, 100) + ') → la importación pone valores por defecto'); }
+  }
   return out.map((s, i) => Object.assign({}, s, { n: i + 1, characters: [], location: s.location || 'escena' }));
 }
 
