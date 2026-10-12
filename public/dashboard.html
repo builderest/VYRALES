@@ -21,7 +21,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700&family=Cinzel:wght@700&family=Orbitron:wght@700&display=swap" rel="stylesheet">
     <!-- Rediseño: tema por novela + efectos (fase 1) -->
-    <link rel="stylesheet" href="tema.css?v=13">
+    <link rel="stylesheet" href="tema.css?v=14">
     <script src="tema.js?v=4" defer></script>
     <script src="panel.js?v=11" defer></script>
     
@@ -3080,7 +3080,12 @@
             ? '<span class="mr-2 mb-1 px-3 py-1.5 rounded-lg border border-cyber-emerald/50 text-cyber-emerald text-xs font-mono"><i class="fa-solid fa-spinner fa-spin mr-1"></i>Generando narración ' + (narrRun.done || 0) + '/' + (narrRun.total || '?') + '</span>'
             : (narrMissing ? '<button onclick="genNarration(this)" data-ep="' + e.id + '" class="mr-2 mb-1 px-3 py-1.5 rounded-lg bg-cyber-emerald/15 border border-cyber-emerald/50 text-cyber-emerald text-xs font-mono hover:bg-cyber-emerald/25"><i class="fa-solid fa-microphone mr-1"></i>Generar narración: ' + narrMissing + ' toma' + (narrMissing === 1 ? '' : 's') + ' (~$' + (narrMissing * TTS_LINE_USD).toFixed(2) + ')</button>' : '') +
               (lastNarr && lastNarr.status !== 'running' && ((lastNarr.failed || []).length || lastNarr.error) ? '<span class="text-[10px] font-mono text-cyber-pink">Narración con errores: ' + esc(lastNarr.error || (lastNarr.failed || []).map(f => 'T' + f.shot + ' ' + f.error).join(' · ')) + '</span>' : '');
-          const produceBtn = (!busyJob && nextToProduce && nextToProduce.id === e.id)
+          // Cualquier episodio con guion se puede producir (antes solo "el siguiente": el EP 11 no tenía botón).
+          // Un Short del largo sin tomas del largo todavía: aviso en vez de botón.
+          const parentNoClips = (() => { const pid = cont.parent_episode_id; if (!pid) return false; const pe = eps.find(x => x.id === pid); return pe && !(pe.assets || []).some(a => a.kind === 'video_clip'); })();
+          const produceBtn = (!busyJob && e.status === 'guion_generado' && parentNoClips)
+            ? '<span class="px-3 py-1.5 rounded-lg border border-slate-600 text-slate-400 text-xs font-mono"><i class="fa-solid fa-circle-info mr-1"></i>Produce primero su video largo (este Short usa sus tomas)</span>'
+            : (!busyJob && e.status === 'guion_generado')
             ? '<button onclick="produceEpisode(\'' + e.id + '\')" class="px-3 py-1.5 rounded-lg bg-cyber-pink/20 border border-cyber-pink/50 text-cyber-pink text-xs font-mono hover:bg-cyber-pink/30"><i class="fa-solid fa-bolt mr-1"></i>Producir este episodio ' + (videoProvider === 'king' ? 'en tu PC (LTX)' : 'con ' + seriesModels(lastLoadedData.series).shot.replace('veo_', 'Veo ')) + ' (~$' + estimateEpisodeCost(e).toFixed(2) + ')</button>'
             : '';
           return (

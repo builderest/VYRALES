@@ -149,7 +149,7 @@ main tbody tr:hover {
   .vy-scrim { display: block; position: fixed; inset: 0; z-index: 65; background: rgb(0 0 0 / .55);
               backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); opacity: 0; pointer-events: none; transition: opacity .25s; }
   html.vy-menu-open .vy-scrim { opacity: 1; pointer-events: auto; }
-  html.vy-menu-open body { overflow: hidden; }
+  html.vy-menu-open, html.vy-menu-open body { overflow: hidden; }
   .vy-menu-btn { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 44px; height: 44px;
                  border-radius: 11px; border: 1px solid #1b253e; background: rgb(2 3 7 / .7); color: #fff; font-size: 17px; cursor: pointer; }
   .vy-menu-btn:hover, .vy-menu-btn:focus-visible { border-color: rgb(var(--vy-a)); box-shadow: 0 0 14px rgb(var(--vy-a) / .35); color: rgb(var(--vy-a)); }
@@ -595,7 +595,12 @@ html:not(.vy-user) [data-vy-user] { display: none !important; }
    CELULAR (≤ 640 px) · barra superior en una sola fila:
    [☰] [● Novela ▾] ··· [⚡ Producir]   ("Nueva novela" queda en el menú ☰)
    ===================================================================== */
-html, body { max-width: 100%; overflow-x: hidden; }
+/* Que nada se salga de lado. "clip" (no "hidden") para que <body> NO se vuelva una caja con scroll propia:
+   con hidden + overscroll-behavior la rueda del mouse no bajaba la página (Franklin, oct-12). */
+html, body { max-width: 100%; overflow-x: clip; }
+@supports not (overflow-x: clip) { html { overflow-x: hidden; } body { overflow-x: visible; } }
+/* Ventanas que bloquean el fondo (ponen body overflow:hidden): con clip hay que bloquear también <html> */
+html:has(> body[style*="overflow: hidden"]) { overflow: hidden; }
 @media (max-width: 1023px) {
   .vy-top { flex-wrap: nowrap; gap: 10px; }
   .vy-top > .vy-page, .vy-top > .vy-sep { display: none; }
@@ -619,10 +624,10 @@ html, body { max-width: 100%; overflow-x: hidden; }
    - Pestañas abajo: Inicio · Producción · Revisar · Guiones · Más (☰)
    ===================================================================== */
 html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; touch-action: manipulation; }
-body { -webkit-tap-highlight-color: transparent; overscroll-behavior: none; }
+body { -webkit-tap-highlight-color: transparent; }
 .vy-tabs { display: none; }
 @media (max-width: 640px) {
-  html, body { overscroll-behavior: none; }
+  html { overscroll-behavior-y: none; } /* sin rebote en el celular (solo la página, no el <body>) */
   /* iPhone hace zoom si un campo tiene letra < 16 px: aquí todos quedan en 16 */
   input, select, textarea { font-size: 16px !important; }
   /* Botones y textos no se seleccionan al tocarlos (como en una app) */

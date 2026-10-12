@@ -48,3 +48,9 @@
   from = "/auth/youtube/callback"
   to = "/.netlify/functions/oauth-youtube-callback"
   status = 200
+
+# Manifest de la app del celular ("Agregar a pantalla de inicio"): Netlify lo mandaba como octet-stream.
+[[headers]]
+  for = "/manifest.webmanifest"
+  [headers.values]
+    Content-Type = "application/manifest+json"
