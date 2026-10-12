@@ -9,6 +9,17 @@ const { MAX_CHARACTER_REFS, generateImage } = require('./_image');
 const { ensureMediaBucket, uploadFile, removeByPublicUrl } = require('./_storage');
 const { logSpend } = require('./_spend');
 
+// Flow (Chrome + playwright) solo corre en la PC. Require dinámico: así esbuild (netlify dev / deploy) no intenta
+// empaquetar playwright-core (daba "Could not resolve chromium-bidi…" y netlify dev se cerraba).
+function flowMod() {
+  const path = require('path'); const fs = require('fs');
+  const cands = [path.join(__dirname, '..', '..', 'agente', 'flow_imagenes.js'), path.join(process.cwd(), 'agente', 'flow_imagenes.js')];
+  const f = cands.find((x) => { try { return fs.existsSync(x); } catch (_) { return false; } });
+  if (!f) throw new Error('Google Flow solo funciona en la PC (agente).');
+  return eval('require')(f);
+}
+
+
 function locationOf(sb, key) {
   const loc = sb.locations && sb.locations[key];
   if (!loc) return null;
@@ -130,7 +141,7 @@ async function createLocationImage(supabase, { seriesId, slug, storyBible, key, 
   // GRATIS PRIMERO: series con Google Flow → el lugar se hace con Flow en la PC ($0); Gemini solo fuera de la PC.
   let img;
   if (process.env.VYRALES_LOCAL_RUN && storyBible && storyBible.image_engine === 'flow') {
-    const f = await require('../../agente/flow_imagenes').flowImage({ prompt: finalPrompt, aspect: storyBible.aspect === '16:9' ? '16:9' : '9:16' });
+    const f = await flowMod().flowImage({ prompt: finalPrompt, aspect: storyBible.aspect === '16:9' ? '16:9' : '9:16' });
     img = { buffer: f.buffer, mimeType: f.mimeType, costUsd: 0, model: 'flow' };
     log('lugar hecho con Google Flow ($0)');
   } else img = await generateImage({ prompt: finalPrompt });
@@ -196,13 +207,13 @@ async function createKeyframe(supabase, { series, episode, shot, characters, log
   let img;
   if (flux && (shot.image_engine || series.story_bible.image_engine) === 'flow') {
     const aspect = (episode && episode.continuity && episode.continuity.aspect) || (series.story_bible && series.story_bible.aspect) || '9:16';
-    try { img = await require('../../agente/flow_imagenes').flowImage({ prompt: fluxText, aspect }); log('cuadro inicial de Google Flow' + (aspect === '16:9' ? ' (16:9)' : '')); }
+    try { img = await flowMod().flowImage({ prompt: fluxText, aspect }); log('cuadro inicial de Google Flow' + (aspect === '16:9' ? ' (16:9)' : '')); }
     catch (e) { log('Flow falló (' + String(e.message).slice(0, 160) + ') → FLUX en king'); img = await fluxImage({ prompt: fluxText }); }
   } else if (!flux && (shot.characters || []).length && series.story_bible.flow_characters === true && (shot.image_engine || series.story_bible.image_engine) === 'flow') {
     // Personajes con Google Flow: se suben sus fotos de cara como "ingredientes" ($0). Si falla → Gemini.
     try {
       const refPrompt = 'Reference images in order: ' + refs.map((r, i) => `image ${i + 1} = ${r.label}`).join('; ') + '. ' + prompt;
-      img = await require('../../agente/flow_imagenes').flowImage({ prompt: refPrompt, refs });
+      img = await flowMod().flowImage({ prompt: refPrompt, refs });
       log('cuadro inicial de Google Flow (con fotos de los personajes)');
     } catch (e) { log('Flow con personajes falló (' + String(e.message).slice(0, 160) + ') → Gemini'); img = await generateImage({ prompt, references: refs }); }
   } else img = flux ? await fluxImage({ prompt: fluxText }) : await generateImage({ prompt, references: refs });
