@@ -358,7 +358,9 @@ async function queueFullRenders() {
   }
   const todo = finsOk.find((a) => !(have[a.episode_id] || []).includes(a.storage_path) && (failedRenders[a.storage_path] || 0) < 2);
   if (!todo) return;
-  const { data: open } = await sb.from('agent_jobs').select('id').in('status', ['pending', 'running']).limit(1);
+  // Solo espera si ya hay una calidad completa en la fila (antes esperaba a que la PC estuviera LIBRE: con el QA de un
+  // largo corriendo 8 h, la calidad completa nunca empezaba; oct-12). Va en la fila general, en paralelo con king.
+  const { data: open } = await sb.from('agent_jobs').select('id').in('status', ['pending', 'running']).like('command', 'render_full:%').limit(1);
   if (open && open.length) return;
   failedRenders[todo.storage_path] = (failedRenders[todo.storage_path] || 0) + 1;
   await sb.from('agent_jobs').insert(Object.assign({ command: 'render_full:' + todo.episode_id }, wsl ? { workspace_id: epWs[todo.episode_id] || TEN.ADMIN_WS } : {}));
@@ -487,11 +489,11 @@ async function tick() {
         if (cl3 && cl3.length) { generalBusy = true; runJob(gj).catch((e) => log('general:', e.message)).finally(() => { generalBusy = false; }); }
       }
     }
+    await queueFullRenders().catch((e) => log('calidad completa: ' + String(e.message).slice(0, 100)));
     if (busy) return;
     if (codeChanged() && !pushBusy && !claudeBusy && !generalBusy) { log('el código del agente cambió: reiniciando para cargarlo...'); devStop(); process.exit(0); }
     migrateLocalFinales();
     organizeBySeries();
-    await queueFullRenders();
     // Cada 10 min: videos que Franklin hizo PÚBLICOS en YouTube Studio → se marcan publicados (vyrales.app/ver, enlaces de los Shorts).
     if (Date.now() - (global.__ytSyncAt || 0) > 600000) { global.__ytSyncAt = Date.now(); require('./_yt_sync').syncYoutubePublic(sb, log).catch((e) => log('sync YouTube: ' + String(e.message).slice(0, 120))); }
     await backupClips();
