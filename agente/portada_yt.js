@@ -74,6 +74,8 @@ Responde SOLO JSON: {"mejor":"${cands[0].out}","por_que":"..."}`;
 await compose(cwd,{img:byShot[win.t.n],text:j.text_en||j.text_es,hl:j.highlight_en,side:sideFor(win.t),W,H,out:'portada_en.jpg'});
 const {uploadFile}=require(F+'/_storage');const {data:se}=await sb.from('series').select('slug').eq('id',ep.series_id).single();
 const base=`${se.slug}/ep${ep.episode_number}/portada-yt-${Date.now()}`;
+// YouTube acepta portadas de hasta 2 MB: si pasa, se baja la calidad del jpg.
+for(const f of [win.out,'portada_en.jpg']){for(let q=4;q<=12&&fs.statSync(path.join(cwd,f)).size>1.9e6;q+=2){await ff(['-i',f,'-q:v',String(q),'r_'+f],cwd);fs.renameSync(path.join(cwd,'r_'+f),path.join(cwd,f));}}
 const esBuf=fs.readFileSync(path.join(cwd,win.out)),enBuf=fs.readFileSync(path.join(cwd,'portada_en.jpg'));
 const thumb={shot:win.t.n,text_es:j.text_es,text_en:j.text_en,es_url:await uploadFile(sb,{path:base+'-es.jpg',buffer:esBuf,contentType:'image/jpeg'}),en_url:await uploadFile(sb,{path:base+'-en.jpg',buffer:enBuf,contentType:'image/jpeg'}),at:new Date().toISOString()};
 const {data:fr}=await sb.from('episodes').select('continuity').eq('id',epId).single();

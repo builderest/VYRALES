@@ -129,7 +129,7 @@ Este documento es la memoria del proyecto. Cada vez que Franklin corrige algo, l
 
 ## Portada de YouTube (oct-11)
 - Franklin: "siempre la más épica del video, con texto llamativo". `portada_yt:<ep>[:<videoId>]` ($0). Claude ve todos los cuadros en hojas de contacto y elige 2: tema PRINCIPAL, sujeto grande, drama, nada fuera de época. Escribe 2–4 palabras ES/EN (1 palabra en amarillo, sin repetir el título). Se arman las 2 portadas (1280x720 para el largo), Claude elige la de más clics y se sube con thumbnails.set.
-- Se hace sola al publicar un largo en YouTube (publish_local). La versión en inglés queda en continuity.thumbnail.en_url (portada por idioma: en Studio → Idiomas).
+- Se hace sola al publicar en YouTube, largo Y Short (publish_local; Franklin oct-12: "¿por qué los Shorts no llevan portada?"). Short = 1080x1920 con el texto arriba. Máximo 2 MB (se baja la calidad del jpg si pasa). La versión en inglés queda en continuity.thumbnail.en_url (portada por idioma: en Studio → Idiomas).
 - Con 2 palabras de texto: una por línea (más grandes).
 
 ## Trabajos trabados (oct-11)
