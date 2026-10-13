@@ -135,6 +135,8 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
   // tomas rehechas usen las reglas nuevas (sin quietud, sin humo de relleno, movimiento reforzado).
   for (const k of Object.keys(require.cache)) if (/[\\/]netlify[\\/]functions[\\/](_king|regen-shot-background|_keyframe|_visual_check)\.js$/.test(k)) delete require.cache[k];
   handler = require(path.join(ROOT, 'netlify', 'functions', 'regen-shot-background')).handler;
+  // "Editando ahora" (Franklin oct-13): el QA escribe en qué toma está trabajando para que el panel lo muestre.
+  const setWorking = async (n) => { try { const { data: fr } = await supabase.from('episodes').select('validator_report').eq('id', epId).single(); await supabase.from('episodes').update({ validator_report: Object.assign({}, fr.validator_report || {}, { qa_working: n == null ? null : { n, at: new Date().toISOString() } }) }).eq('id', epId); } catch (_) {} };
   const VF = require(path.join(ROOT, 'netlify', 'functions', '_voice_full'));
   // Short armado con las tomas del LARGO (short_reusar.js): no se rehacen tomas con LTX; su QA es elegir otra
   // toma del largo (lo hace short_reusar con Claude). Franklin, oct-11.
@@ -249,6 +251,7 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
           }
         } catch (e) { log(`QA toma ${t.n}: no pude reescribir (${String(e.message).slice(0, 120)}) → reintento igual`); }
       }
+      await setWorking(t.n);
       const r = await handler({ httpMethod: 'POST', headers: { 'x-vyrales-key': process.env.DASHBOARD_KEY || '' }, /* llamada interna = "sistema" (multiusuario) */ body: JSON.stringify({ assetId: t.clip.id, provider: 'king', new_frame: t.newFrame }) });
       if (r.statusCode >= 400) log(`QA visual toma ${t.n}: FALLÓ ${String(r.body).slice(0, 200)}`); else { await bumpTry(t.n, t.boost); log(`QA visual toma ${t.n}: rehecha ✅`); if (!redone.includes(t.n)) redone.push(t.n); }
     }
@@ -297,6 +300,7 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
     if (lessons.some((l) => !l.consolidated)) { const { data: oa } = await supabase.from('agent_jobs').select('id').eq('status', 'pending').eq('command', 'claude_aprender').limit(1); if (!(oa && oa.length)) await supabase.from('agent_jobs').insert({ command: 'claude_aprender' }); }
   } catch (_) {}
   log(redone.length ? `QA: rehice ${redone.length} toma(s): ${redone.join(', ')}` : 'QA: no rehice ninguna toma en esta pasada (las marcadas con ⚠ necesitan revisión humana)');
+  await setWorking(null);
   return redone;
 }
 

@@ -190,3 +190,7 @@ Franklin (admin) quiere tener VARIOS canales en su misma cuenta y cambiar entre 
 - workspaces.js: create acepta identidad/queries/topics; action 'identidad' para editarlos.
 - Canal real creado: "MindFuel Rise" (superación personal / estilo de vida, EE. UU.). Falta conectarle sus redes.
 - Pendiente F4 (diseño de Franklin): selector de canal + botón "Nuevo canal" + editar identidad/nicho.
+
+## Estados de la toma y "editándose ahora" (oct-13)
+- Franklin: "si el QA la revisó, debe pasar de PENDIENTE a algo más". Son 2 cosas distintas: Estado (TÚ apruebas: PENDIENTE/APROBADO) y QA (control de calidad). Ahora el panel muestra 3 estados: PENDIENTE (falta QA) → REVISADA · falta tu OK (qa.ok, cian) → APROBADO (tú, verde). Aprobar sigue siendo manual (nunca auto).
+- "Editándose ahora": _qa.js escribe validator_report.qa_working={n,at} antes de rehacer cada toma y lo limpia (null) al terminar. El panel pinta un badge rosa "El QA la está rehaciendo…" en esa tarjeta (si at < 25 min) y "rehaciendo la TOMA N" en el encabezado. Contador QA: X/Y revisadas · faltan Z (también en el encabezado).
