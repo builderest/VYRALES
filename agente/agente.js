@@ -479,7 +479,7 @@ async function tick() {
     // Guiones con Claude (claude_*) tampoco usan king: van en su propia fila en paralelo, así una producción no espera
     // 35 min detrás de un guion largo (oct-11: "se está quedando estancada king" — king estaba libre esperando).
     if (claudeRunning < CLAUDE_MAX) {
-      const { data: cj } = await onlyAdminWs(sb.from('agent_jobs').select('*').eq('status', 'pending').like('command', 'claude_%'), wsl).order('created_at').limit(CLAUDE_MAX);
+      const { data: cj } = await onlyAllowed(sb.from('agent_jobs').select('*').eq('status', 'pending').like('command', 'claude_%'), wsl).order('created_at').limit(CLAUDE_MAX); // Claude corre en TODOS los canales permitidos (guionistas en paralelo); solo king se serializa
       for (const j of (cj || [])) {
         if (claudeRunning >= CLAUDE_MAX) break;
         const { data: cl2 } = await sb.from('agent_jobs').update({ status: 'running' }).eq('id', j.id).eq('status', 'pending').select();
