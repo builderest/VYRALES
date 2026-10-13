@@ -47,12 +47,13 @@ function motionStep(url, center = false) {
 const lineOf = (sh) => String(sh.voice_part || (Array.isArray(sh.dialogue) ? sh.dialogue : sh.dialogue ? [sh.dialogue] : []).map((d) => d && d.line).filter(Boolean).join(' ')).trim();
 
 // Revisa tomas de a 4 con Claude (lee las imágenes). Devuelve { n: { image_ok, action_ok, haze, broken, reason } }.
-async function visionReview(items, log) {
+async function visionReview(items, log, onBatch) {
   const { runClaude, parseJson, claudePath } = require('./_claude');
   if (!claudePath()) { log('QA visual: Claude no está instalado en esta PC → me la salto'); return {}; }
   const out = {};
   for (let i = 0; i < items.length; i += 3) {
     const group = items.slice(i, i + 3);
+    if (onBatch) { try { await onBatch(group); } catch (_) {} }
     const files = []; const desc = [];
     for (const it of group) {
       const d = it.dur || 6;
@@ -136,7 +137,7 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
   for (const k of Object.keys(require.cache)) if (/[\\/]netlify[\\/]functions[\\/](_king|regen-shot-background|_keyframe|_visual_check)\.js$/.test(k)) delete require.cache[k];
   handler = require(path.join(ROOT, 'netlify', 'functions', 'regen-shot-background')).handler;
   // "Editando ahora" (Franklin oct-13): el QA escribe en qué toma está trabajando para que el panel lo muestre.
-  const setWorking = async (n) => { try { const { data: fr } = await supabase.from('episodes').select('validator_report').eq('id', epId).single(); await supabase.from('episodes').update({ validator_report: Object.assign({}, fr.validator_report || {}, { qa_working: n == null ? null : { n, at: new Date().toISOString() } }) }).eq('id', epId); } catch (_) {} };
+  const setWorking = async (n, what) => { try { const { data: fr } = await supabase.from('episodes').select('validator_report').eq('id', epId).single(); await supabase.from('episodes').update({ validator_report: Object.assign({}, fr.validator_report || {}, { qa_working: n == null ? null : { n, at: new Date().toISOString(), what: what || 'rehacer' } }) }).eq('id', epId); } catch (_) {} };
   const VF = require(path.join(ROOT, 'netlify', 'functions', '_voice_full'));
   // Short armado con las tomas del LARGO (short_reusar.js): no se rehacen tomas con LTX; su QA es elegir otra
   // toma del largo (lo hace short_reusar con Claude). Franklin, oct-11.
@@ -191,7 +192,7 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
       if (clip && !(sh.qa && sh.qa.clip_id === clip.id && sh.qa.ok && !sh.qa.force)) items.push({ sh, clip, url: clip.storage_path, dur: await durationOf(clip.storage_path) });
     }
     log(`QA visual: revisando ${items.length} toma(s) con Claude ($0)...`);
-    const res = await visionReview(items, log);
+    const res = await visionReview(items, log, async (group) => { if (group && group[0]) await setWorking(group[0].n, 'revisar'); });
     const todo = [];
     const qaOf = {};
     for (const it of items) {
@@ -261,7 +262,7 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
       let done = false;
       while (tries < 3 && !done) {
         if (await yaAprobada(t.n, shNow)) { log(`QA toma ${t.n}: la aprobaste a mano → la dejo`); done = true; break; }
-        await setWorking(t.n);
+        await setWorking(t.n, 'rehacer');
         // 1) Reescribir el prompt con lo que vio el QA (repetir el mismo da el mismo error).
         try {
           const fix = await rewriteShot(shNow, reason, log, { allowImage: newFrame, allowSplit: true });
