@@ -176,3 +176,10 @@ Este documento es la memoria del proyecto. Cada vez que Franklin corrige algo, l
 - King (video con LTX/Flow: gen_local, regen_local, toma_local, prueba_ltx/flux, qa_tomas, flow_*): SIEMPRE de a uno (una sola GPU). push: de a uno (git).
 - Claude (claude_*: guiones, ideas, largos) y General (voces, voz_ingles, portadas, subtítulos, short_reusar, publicar…): hasta 3 EN PARALELO cada uno (claudeRunning<CLAUDE_MAX, generalRunning<GENERAL_MAX; env VYRALES_CLAUDE_MAX / VYRALES_GENERAL_MAX). Cada trabajo hace funciones distintas → no se pisan. La lógica de claude_guion NO se tocó.
 - Nota: 3 procesos `claude -p` a la vez consumen más del límite del plan al mismo tiempo; si choca con el límite, bajar VYRALES_CLAUDE_MAX.
+
+## Canales del admin — varios canales en una misma cuenta (oct-13, en construcción)
+Franklin (admin) quiere tener VARIOS canales en su misma cuenta y cambiar entre ellos SIN salir ni re-loguear. Cada canal = un workspace aparte con sus propias redes, series, videos, guionista de Claude y virales.
+- F1 (hecha): migración 010_canales.sql → columna workspaces.owner_ws (si está lleno = canal que pertenece a un admin; el principal 00…0001 tiene owner_ws NULL). Función netlify/functions/workspaces.js (admin): GET lista mis canales (principal + los míos), create/rename/delete (delete solo si el canal no tiene novelas). Sin login propio por canal.
+- Pendiente F2: cookie vyrales_ws = canal activo, que SOLO el admin puede poner; withTenant la respeta → ctx.wsId = canal elegido. Sin cookie = ADMIN_WS (como hoy).
+- Pendiente F3: en _tenant, tratar owner_ws=ADMIN_WS como admin para Claude (permitido) y créditos (no cobra); memoria del guionista por canal (memoria/<ws>/…).
+- Pendiente F4 (diseño de Franklin): selector de canal arriba + botón "Nuevo canal".
