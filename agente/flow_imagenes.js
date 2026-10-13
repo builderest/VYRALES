@@ -17,7 +17,7 @@ const PW_VERSION = '1.48.2';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // Formato: vertical 9:16 (Shorts) u horizontal 16:9 (videos largos). flowImages({aspect}) lo cambia.
 let ASPECT = process.env.FLOW_ASPECT === '16:9' ? '16:9' : '9:16';
-const ruleBaseFor = () => (ASPECT === '16:9' ? ' Horizontal 16:9 landscape widescreen image.' : ' Vertical 9:16 portrait image.') + ' Photorealistic, cinematic documentary, dramatic lighting, sharp detail. No text.';
+const ruleBaseFor = () => (ASPECT === '16:9' ? ' Horizontal 16:9 landscape widescreen image.' : ' Vertical 9:16 portrait image.') + ' Photorealistic, cinematic documentary, dramatic lighting, sharp detail. Real photograph captured with a real camera — NOT a 3D render, NOT CGI, NOT a video game, NOT an illustration, cartoon or painting; real-world textures, not smooth plastic. No text.';
 let RULE_BASE = ruleBaseFor();
 // Sin personas SOLO si la escena no las menciona (el oficial del búnker, siluetas, manos…).
 const PEOPLE_RE = /\b(person|people|persons|man|men|woman|women|officer|soldier|soldiers|silhouette|silhouettes|child|children|boy|girl|hand|hands|crowd|figure|figures|worker|operator|pilot|scientist|human|humans|hunter|hunters|survivor|survivors|clan|tribe|band|members|family|families|warrior|warriors|villagers|pedestrians|sapiens|hominid|hominids)\b/i;

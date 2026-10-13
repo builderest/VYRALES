@@ -72,6 +72,7 @@ ${desc.join('\n\n')}
 
 Para cada toma decide (sé justo: marca false solo si el problema se ve claro):
 - image_ok: la imagen muestra el sujeto principal que dice la narración (no otra cosa distinta).
+- style_ok: la imagen parece una FOTO REAL (cámara, luz y texturas reales). Es false si parece 3D, render CGI, videojuego, dibujo animado, caricatura, ilustración o pintura, o si el sujeto se ve liso/plástico/brillante tipo juguete (false = problema; hay que rehacer la imagen).
 - action_ok: SE VE la acción pedida en el sujeto principal. Sé ESTRICTO: compara la posición de 2 objetos concretos del sujeto (ej. "roca grande arriba a la izquierda") entre la imagen 1 y la 5 RESPECTO a lo que los rodea. Si solo cambia el encuadre (zoom, giro o inclinación de cámara) y los objetos siguen igual entre sí, es false. Si la imagen muestra algo que debería estar en movimiento (derrumbe, caída, explosión, corriente) y entre 1 y 5 no avanza, es false. Si el movimiento medido es menor que 6, desconfía y mira con más cuidado. Solo para acciones sutiles por naturaleza (una luz que brilla, alguien leyendo) basta con que se note algo.
   Personas PEQUEÑAS en planos abiertos (arqueólogos al fondo, un grupo lejano): mira de cerca, las imágenes son grandes. Si hacen la acción aunque se vea pequeña (raspan, caminan, levantan algo), action_ok es true. Marca false solo cuando estés SEGURO de que la acción no ocurre; si dudas en personas pequeñas, true.
   El SUJETO PRINCIPAL es lo que nombra la narración (la columna de humo, las rocas, el grupo, la ola). Si lo que se mueve es el fondo, las nubes de alrededor o los bordes, pero el sujeto principal queda igual (misma forma, mismo tamaño, mismos bultos en el mismo sitio), action_ok es false.
@@ -80,7 +81,7 @@ Para cada toma decide (sé justo: marca false solo si el problema se ve claro):
 - haze: aparece humo, neblina o bruma blanca que NO tiene que ver con la narración (true = problema).
 - broken: algo deforme, caras o manos rotas, letras/texto inventado, cosas que aparecen o desaparecen (true = problema).
 - reason: una frase corta en español con lo que viste (vacío si todo bien).
-Responde SOLO este JSON: {"tomas":[{"n":1,"image_ok":true,"action_ok":true,"haze":false,"broken":false,"evidence":"","reason":""}]}`;
+Responde SOLO este JSON: {"tomas":[{"n":1,"image_ok":true,"style_ok":true,"action_ok":true,"haze":false,"broken":false,"evidence":"","reason":""}]}`;
     try {
       const j = parseJson(await runClaude(prompt, { files, timeoutMin: 8, log }));
       for (const t of (j.tomas || [])) if (t && t.n != null) out[Number(t.n)] = t;
@@ -203,19 +204,19 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
       // Franklin la marcó a mano ("no se mueve", etc.): se rehace aunque Claude la apruebe.
       const forced = !!(it.sh.qa && it.sh.qa.force && (it.sh.qa.clip_id === it.clip.id || it.sh.qa.force_any));
       if (forced) { r.action_ok = false; r.reason = 'Marcada a mano: ' + (it.sh.qa.force_reason || 'no está bien') + (r.reason ? ' · QA: ' + r.reason : ''); }
-      const bad = forced || r.image_ok === false || r.action_ok === false || r.haze === true || r.broken === true;
+      const bad = forced || r.image_ok === false || r.style_ok === false || r.action_ok === false || r.haze === true || r.broken === true;
       // Hasta 3 intentos por toma; en TODOS Claude reescribe cámara/acción/final con lo que vio el QA (repetir el mismo
       // prompt daba el mismo error, ej. T6 Toba). Imagen nueva si no cuadra o desde el 2º intento (solo sin personajes).
       // Después de 3 queda para revisión humana.
       const tries = it.sh.qa ? (Number(it.sh.qa.tries) || (it.sh.qa.redone ? 1 : 0)) : 0;
       const already = tries >= 3;
-      qaOf[it.sh.n] = { clip_id: it.clip.id, ok: !bad, image_ok: r.image_ok !== false, action_ok: r.action_ok !== false, haze: !!r.haze, broken: !!r.broken, reason: String(r.reason || '').slice(0, 300), at: new Date().toISOString(), redone: tries > 0, tries };
+      qaOf[it.sh.n] = { clip_id: it.clip.id, ok: !bad, image_ok: r.image_ok !== false, style_ok: r.style_ok !== false, action_ok: r.action_ok !== false, haze: !!r.haze, broken: !!r.broken, reason: String(r.reason || '').slice(0, 300), at: new Date().toISOString(), redone: tries > 0, tries };
       if (bad && !already) {
         const freeFrame = !(it.sh.characters || []).length; // cuadro nuevo solo por el camino gratis (Flow/FLUX)
         // Franklin (oct-11): si se rehace con el MISMO prompt, sale el mismo error → SIEMPRE se reescribe el prompt
         // (Claude guionista, con lo que vio el QA) y la imagen se cambia si no cuadra o desde el 2º intento.
         // keep_image: Franklin quiere ESA imagen (ej. el estadio de T35 como comparación); solo se arregla el movimiento.
-        const newFrame = freeFrame && !(it.sh.qa && it.sh.qa.keep_image) && (r.image_ok === false || tries >= 1);
+        const newFrame = freeFrame && !(it.sh.qa && it.sh.qa.keep_image) && (r.image_ok === false || r.style_ok === false || tries >= 1);
         const rewrite = true;
         todo.push({ n: it.sh.n, clip: it.clip, newFrame, boost: r.action_ok === false, rewrite, reason: r.reason || '', sh: it.sh });
         log(`QA visual toma ${it.sh.n}: ${r.reason || 'no pasó'} → intento ${tries + 1}/3: Claude reescribe el prompt${newFrame ? ' + imagen nueva' : ''}`);
