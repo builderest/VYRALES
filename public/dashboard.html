@@ -2692,7 +2692,8 @@
             '<div><div class="aspect-[9/16] bg-slate-950 rounded-lg overflow-hidden border border-cyber-border relative">' + (d.frame ? '<img src="' + esc(vyMedia(d.frame)) + '" class="w-full h-full object-cover">' : '<div class="absolute inset-0 flex items-center justify-center text-[11px] text-slate-600">sin imagen</div>') +
               (d.frame_stale ? '<div class="absolute bottom-0 inset-x-0 bg-black/80 text-cyber-gold text-[10px] p-1 text-center">⚠ imagen vieja (el prompt cambió)</div>' : '') + '</div>' +
               (d.clip ? '<video src="' + esc(vyMedia(d.clip)) + '" controls preload="none" class="w-full mt-2 rounded-lg border border-cyber-border"></video>' : '') +
-              '<label class="mt-2 block text-center text-[11px] font-mono px-2 py-1.5 rounded border border-cyber-violet/50 text-cyber-violet bg-cyber-violet/10 hover:bg-cyber-violet/20 cursor-pointer"><i class="fa-solid fa-upload mr-1"></i>Subir mi propia imagen<input type="file" accept="image/*" id="se_file" class="hidden"></label></div>' +
+              '<label class="mt-2 block text-center text-[11px] font-mono px-2 py-1.5 rounded border border-cyber-violet/50 text-cyber-violet bg-cyber-violet/10 hover:bg-cyber-violet/20 cursor-pointer"><i class="fa-solid fa-upload mr-1"></i>Subir mi propia imagen<input type="file" accept="image/*" id="se_file" class="hidden"></label>' +
+              '<button id="se_reimg" class="mt-2 w-full text-[11px] font-mono px-2 py-1.5 rounded border border-cyber-cyan/60 text-cyber-cyan bg-cyber-cyan/10 hover:bg-cyber-cyan/20" title="Crea de nuevo SOLO la imagen de esta toma con el prompt de abajo (el video no cambia)"><i class="fa-solid fa-rotate mr-1"></i>Crear imagen de nuevo</button></div>' +
             '<div>' +
               ta('start_en', '🖼 IMAGEN (prompt)', '45–80 palabras: plano y lente, sujeto con detalles, lugar, luz, ambiente', 5) +
               ta('action_en', '🎬 MOVIMIENTO 0–6 s', '25–45 palabras: UN movimiento simple que se vea; qué se mueve y hacia dónde (no escribas lo que se queda quieto: LTX congela todo)', 3) +
@@ -2706,7 +2707,7 @@
             '<button id="se_ai" class="px-3 py-2 rounded-lg border border-cyber-gold/50 text-cyber-gold bg-cyber-gold/10 hover:bg-cyber-gold/20 text-xs font-mono" title="Claude en tu PC (tu plan, $0) propone prompts súper detallados desde la narración (no guarda)"><i class="fa-solid fa-wand-magic-sparkles mr-1"></i>Detallar con IA ($0)</button>' +
             '<button id="se_save" class="px-3 py-2 rounded-lg border border-cyber-border text-slate-200 hover:border-cyber-cyan text-xs font-mono"><i class="fa-solid fa-floppy-disk mr-1"></i>Guardar</button>' +
             (d.clip_id ? '<button id="se_vid" class="px-3 py-2 rounded-lg border border-cyber-emerald/50 text-cyber-emerald bg-cyber-emerald/10 hover:bg-cyber-emerald/20 text-xs font-mono" title="Mantiene la imagen y rehace el video con el movimiento nuevo (LTX, $0)"><i class="fa-solid fa-film mr-1"></i>Guardar + rehacer solo el video</button>' : '') +
-            '<button id="se_img" class="px-3 py-2 rounded-lg bg-gradient-to-r from-cyber-cyan to-cyber-violet text-black font-bold text-xs font-mono" title="Imagen nueva con este prompt y, si ya había video, también el video"><i class="fa-solid fa-rotate mr-1"></i>Guardar + nueva imagen y video</button>' +
+            '<button id="se_img" class="px-3 py-2 rounded-lg bg-gradient-to-r from-cyber-cyan to-cyber-violet text-black font-bold text-xs font-mono" title="Guarda el prompt y crea SOLO la imagen de nuevo (el video no cambia hasta que le des rehacer video)"><i class="fa-solid fa-rotate mr-1"></i>Guardar + crear imagen de nuevo</button>' +
           '</div></div>';
         const msg = (t, c) => { const el = document.getElementById('se_msg'); if (el) { el.className = 'text-[11px] font-mono mt-2 ' + (c || 'text-slate-400'); el.innerHTML = t; } };
         const fields = () => Object.assign(Object.fromEntries(['start_en', 'action_en', 'reaction_en', 'background_en', 'camera', 'end_en'].map(k => [k, document.getElementById('se_' + k).value])), { camera_only: !!(document.getElementById('se_camera_only') || {}).checked });
@@ -2745,6 +2746,7 @@
         };
         document.getElementById('se_save').onclick = async () => { try { const j = await save(); msg('✔ Guardado.' + (j.imgChanged ? ' La imagen quedó marcada para rehacer.' : '') + (j.vidChanged && !j.imgChanged ? ' El video quedó marcado para rehacer.' : ''), 'text-cyber-emerald'); loadDashboard(); } catch (err) { msg('No se pudo guardar: ' + esc(err.message), 'text-cyber-pink'); } };
         document.getElementById('se_img').onclick = async () => { try { await save(); m.remove(); await loadDashboard(); generateKeyframe(episodeId, n); } catch (err) { msg('No se pudo: ' + esc(err.message), 'text-cyber-pink'); } };
+        { var _rb = document.getElementById('se_reimg'); if (_rb) _rb.onclick = document.getElementById('se_img').onclick; }
         const vb = document.getElementById('se_vid'); if (vb) vb.onclick = async () => { try { await save(); m.remove(); await loadDashboard(); runRegenShot(d.clip_id, 'king'); } catch (err) { msg('No se pudo: ' + esc(err.message), 'text-cyber-pink'); } };
         document.getElementById('se_file').onchange = async (ev) => {
           const file = ev.target.files && ev.target.files[0]; if (!file) return;
