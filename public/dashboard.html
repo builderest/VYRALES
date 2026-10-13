@@ -2099,7 +2099,8 @@
           }).join('') +
           '<div class="border-t border-cyber-border my-1.5"></div>' +
           '<button type="button" onclick="nuevoCanal()" class="w-full text-left flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-semibold text-cyber-cyan hover:bg-cyber-cyan/10 border border-transparent hover:border-cyber-cyan/30">' +
-          '<i class="fa-solid fa-plus"></i> Nuevo canal</button>';
+          '<i class="fa-solid fa-plus"></i> Nuevo canal</button>' +
+          ((activo && !activo.principal) ? '<button type="button" onclick="editarIdentidad(\'' + esc(activo.id) + '\')" class="w-full text-left flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-semibold text-cyber-violet hover:bg-cyber-violet/10 border border-transparent hover:border-cyber-violet/30"><i class="fa-solid fa-pen"></i> Identidad de este canal</button>' : '');
       }
       function setCanalMenu(open) {
         document.getElementById('canalMenu').classList.toggle('hidden', !open);
@@ -2130,6 +2131,38 @@
           const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status);
           await switchCanal(j.created);
         } catch (e) { alert('No pude crear el canal: ' + e.message); }
+      };
+
+      // Identidad del canal: de esto escribe el guionista de ESE canal (tema, tono, nicho). Guarda en settings.
+      window.editarIdentidad = function(id) {
+        const c = __canales.find(x => x.id === id);
+        if (!c || c.principal) return;
+        setCanalMenu(false);
+        const m = document.createElement('div'); m.id = 'idModal';
+        m.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:16px';
+        m.innerHTML = '<div class="bg-cyber-darker border border-cyber-border rounded-xl p-5 w-full max-w-lg text-slate-200" onclick="event.stopPropagation()">' +
+          '<h3 class="text-white font-display font-bold text-lg mb-1">Identidad del canal · ' + esc(c.name) + '</h3>' +
+          '<p class="text-[11px] text-slate-400 mb-3">De esto escribe el guionista de ESTE canal (tema, tono, p\u00fablico, nicho). Manda sobre la plantilla gen\u00e9rica.</p>' +
+          '<label class="text-[11px] text-slate-400 font-mono">\u00bfDe qu\u00e9 trata el canal? (m\u00e1x 800)</label>' +
+          '<textarea id="idIdent" rows="5" maxlength="800" class="w-full mt-1 mb-3 bg-slate-950 border border-slate-700 rounded p-2 text-sm text-white" placeholder="Ej.: Canal de superaci\u00f3n personal para EE. UU. Tono inspirador y directo, no acad\u00e9mico. Temas: motivaci\u00f3n, h\u00e1bitos, disciplina, mentalidad.">' + esc(c.identidad || '') + '</textarea>' +
+          '<label class="text-[11px] text-slate-400 font-mono">Temas (separados por coma)</label>' +
+          '<input id="idTopics" class="w-full mt-1 mb-3 bg-slate-950 border border-slate-700 rounded p-2 text-sm text-white" value="' + esc((c.topics || []).join(', ')) + '" placeholder="Motivaci\u00f3n, H\u00e1bitos, Mentalidad, Productividad">' +
+          '<label class="text-[11px] text-slate-400 font-mono">B\u00fasquedas para encontrar virales (opcional, separadas por coma)</label>' +
+          '<input id="idQueries" class="w-full mt-1 mb-4 bg-slate-950 border border-slate-700 rounded p-2 text-sm text-white" value="' + esc((c.queries || []).join(', ')) + '" placeholder="motivation shorts viral, discipline tiktok millones">' +
+          '<div class="flex gap-2 justify-end"><button onclick="document.getElementById(\'idModal\').remove()" class="px-4 py-2 rounded border border-slate-600 text-sm">Cancelar</button>' +
+          '<button id="idSave" class="px-4 py-2 rounded bg-cyber-violet text-white text-sm font-bold">Guardar</button></div></div>';
+        m.onclick = () => m.remove();
+        document.body.appendChild(m);
+        document.getElementById('idSave').onclick = async () => {
+          const btn = document.getElementById('idSave'); btn.disabled = true; btn.textContent = 'Guardando\u2026';
+          const split = (v) => v.split(',').map(x => x.trim()).filter(Boolean).slice(0, 8);
+          try {
+            const k = __ckey();
+            const r = await fetch('/.netlify/functions/workspaces', { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, k ? { 'x-vyrales-key': k } : {}), body: JSON.stringify({ action: 'identidad', workspace_id: id, identidad: document.getElementById('idIdent').value, topics: split(document.getElementById('idTopics').value), queries: split(document.getElementById('idQueries').value) }) });
+            const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status);
+            m.remove(); await cargarCanales();
+          } catch (e) { btn.disabled = false; btn.textContent = 'Guardar'; alert('No se pudo guardar: ' + e.message); }
+        };
       };
 
       function initials(name) {

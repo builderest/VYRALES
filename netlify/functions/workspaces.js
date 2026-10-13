@@ -29,7 +29,7 @@ function cleanNicho(b) {
 const MISSING_COL = (e) => e && /owner_ws|column .* does not exist|42703/i.test(e.message || e.code || '');
 
 async function misCanales(sb, activeId) {
-  const { data: wss, error } = await sb.from('workspaces').select('id, name, is_admin, owner_ws, active, created_at').order('created_at');
+  const { data: wss, error } = await sb.from('workspaces').select('id, name, is_admin, owner_ws, active, created_at, settings').order('created_at');
   if (error) { const err = new Error(error.message); err.code = error.code; throw err; }
   const { data: series } = await sb.from('series').select('workspace_id');
   const count = {}; (series || []).forEach((s) => { count[s.workspace_id] = (count[s.workspace_id] || 0) + 1; });
@@ -42,7 +42,10 @@ async function misCanales(sb, activeId) {
       active: w.active !== false,
       activo: w.id === (activeId || T.ADMIN_WS),
       series: count[w.id] || 0,
-      created_at: w.created_at
+      created_at: w.created_at,
+      identidad: ((w.settings || {}).identidad) || '',
+      topics: (((w.settings || {}).nicho || {}).topics) || [],
+      queries: (((w.settings || {}).nicho || {}).queries) || []
     }))
   };
 }
