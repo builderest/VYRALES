@@ -228,3 +228,8 @@ Franklin (admin) quiere tener VARIOS canales en su misma cuenta y cambiar entre 
 - Franklin: el rehacer debe ser más independiente/creativo, NO quedarse con la misma imagen mala, y escribir prompts SÚPER específicos para LTX (movimiento) y Flow (imagen).
 - _qa.js rewriteShot: ahora (1) si la toma ya falló, REPIENSA la imagen desde cero (otro ángulo/composición), no un ajuste tímido; (2) imagen SÚPER específica para Flow: material y textura real (grietas, poros, rugosidad, barro, óxido…), colores apagados, para que NUNCA salga lisa/brillante/tipo comida (helado, chocolate); (3) nada se inunda, aparece, desaparece ni se transforma; agua que fluye solo si la escena ES de agua (si no, LTX la vuelve inundación que tapa todo); (4) recibe CONTEXTO (narración de antes y después) para que la imagen conecte con el relato (ej. T6 "algo redondo" → T7 "es un cráneo" → imagen de hueso).
 - Reglas nuevas en memoria: bola de helado/comida; agua=inundación.
+
+## 2026-10-13 — Menos "gente señalando"
+- Causa: LTX (cfg=1) rellena con un gesto genérico (señalar/levantar el brazo) cuando la acción escrita es débil o la persona queda solo parada hablando. Poner "no señalar" en el prompt de video lo EMPEORA (LTX lee en negativo).
+- Arreglo (en el TEXTO de la acción, no en el prompt de LTX): regla en _guionista.js y _visual_check.js — si hay una persona, darle una acción física concreta de la escena; no recurrir por defecto a señalar/levantar el brazo; solo señalar si la línea trata literalmente de eso.
+- Efecto: aplica a tomas nuevas y a las que el QA reescriba; no cambia las ya renderizadas salvo que se rehagan.
