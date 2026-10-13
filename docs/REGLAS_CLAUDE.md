@@ -200,3 +200,8 @@ Franklin (admin) quiere tener VARIOS canales en su misma cuenta y cambiar entre 
 - _qa.js: el bucle de regeneración ahora es POR TOMA: rehace → verifica SOLO esa toma → si sigue mal, reintenta la MISMA (hasta 3) → cuando queda bien, pasa a la siguiente. Antes era una pasada completa sobre TODAS por cada intento (muy lento). Las que ya tienen qa.ok de su clip NO se re-escanean (línea del items: salta qa.ok). setWorking marca la toma en curso.
 - Memoria: antes casi no había lecciones "qa_arreglo" (lo que funcionó). El bucle nuevo guarda qa_arreglo (problema→solución) cada vez que arregla una toma, y qa_falla tras 3 intentos. claude_aprender las consolida en reglas.json (lo lee el guionista).
 - Panel (dashboard.html): el encabezado distingue "N listas para tu OK" (qa.ok, falta aprobar) vs "N el QA todavía trabaja". Botón "Aprobar las listas".
+
+## Memoria: aprender de los fallos de LTX (oct-13)
+- Franklin: "demasiados videos fallan en la primera toma; la memoria debe aprender para no repetir errores; entender LTX al 100%".
+- HECHO: el conocimiento de LTX ya está metido en _guionista.js (al escribir: nunca still/steady, no humo de relleno, cámara en movimiento, cfg=1) y en _king.ltxPromptFor (limpia quietud, humo, cámara "held"). El hueco era que NO se guardaban soluciones (0 qa_arreglo). Arreglado: el bucle nuevo del QA guarda problema→solución.
+- _memoria.memoryBlock ahora añade "ERRORES RECIENTES DE LTX QUE NO DEBES REPETIR" (últimos 6 qa_arreglo + 4 qa_falla) → el guionista los ve al escribir cada episodio, para no repetirlos desde la primera toma. Se antepone a todas las llamadas creativas de Claude. Por canal (dir()).
