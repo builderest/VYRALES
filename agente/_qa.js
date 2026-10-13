@@ -232,58 +232,69 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
       const { data: fr } = await supabase.from('episodes').select('shots').eq('id', epId).single();
       await supabase.from('episodes').update({ shots: (fr.shots || []).map((x) => x.n === n ? Object.assign({}, x, { qa: Object.assign({}, x.qa || {}, { redone: true, tries: prevTries[n] + 1 }) }, boost ? { qa_boost: true } : {}) : x) }).eq('id', epId);
     };
+    // Franklin (oct-13): TERMINAR cada toma antes de pasar a la otra. Se reintenta la MISMA toma hasta que quede
+    // bien (hasta 3 intentos en total), reescribiendo el prompt con lo que vio el QA y verificando solo esa toma.
+    // Así NO se re-escanean las demás en cada intento (antes: una pasada completa por intento = mucho tiempo perdido).
+    const bumpTryTo = async (n, tries, boost) => {
+      const { data: fr } = await supabase.from('episodes').select('shots').eq('id', epId).single();
+      await supabase.from('episodes').update({ shots: (fr.shots || []).map((x) => x.n === n ? Object.assign({}, x, { qa: Object.assign({}, x.qa || {}, { redone: true, tries }) }, boost ? { qa_boost: true } : {}) : x) }).eq('id', epId);
+    };
+    const yaAprobada = async (n, sh) => { try { const { data } = await supabase.from('assets').select('approved').eq('episode_id', epId).eq('kind', 'video_clip').eq('shot_number', n).order('updated_at', { ascending: false }).limit(1); return !!(data && data[0] && data[0].approved && !(sh && sh.qa && sh.qa.force)); } catch (_) { return false; } };
     for (const t of todo) {
-      // Franklin puede aprobar a mano MIENTRAS el QA corre (un largo tarda horas): justo antes de rehacer se vuelve a
-      // mirar; si ya la aprobó, no se toca (oct-12).
-      try {
-        const { data: now } = await supabase.from('assets').select('approved, updated_at, created_at').eq('episode_id', epId).eq('kind', 'video_clip').eq('shot_number', t.n);
-        const last = (now || []).sort((a, b) => String(b.updated_at || b.created_at).localeCompare(String(a.updated_at || a.created_at)))[0];
-        if (last && last.approved && !(t.sh.qa && t.sh.qa.force)) { log(`QA toma ${t.n}: la aprobaste a mano → no se rehace`); continue; }
-      } catch (_) {}
-      if (t.rewrite) {
+      if (await yaAprobada(t.n, t.sh)) { log(`QA toma ${t.n}: la aprobaste a mano → no se rehace`); continue; }
+      let tries = prevTries[t.n];
+      let reason = t.reason;
+      let newFrame = t.newFrame;
+      let clipId = t.clip.id;
+      let shNow = t.sh;
+      let done = false;
+      while (tries < 3 && !done) {
+        if (await yaAprobada(t.n, shNow)) { log(`QA toma ${t.n}: la aprobaste a mano → la dejo`); done = true; break; }
+        await setWorking(t.n);
+        // 1) Reescribir el prompt con lo que vio el QA (repetir el mismo da el mismo error).
         try {
-          const fix = await rewriteShot(t.sh, t.reason, log, { allowImage: t.newFrame, allowSplit: true });
-          if (fix && fix.split) { splits.push({ n: t.n, parts: fix.split }); log(`QA toma ${t.n}: Claude la parte en ${fix.split.length} tomas (misma narración)`); continue; }
+          const fix = await rewriteShot(shNow, reason, log, { allowImage: newFrame, allowSplit: true });
+          if (fix && fix.split) { splits.push({ n: t.n, parts: fix.split }); log(`QA toma ${t.n}: Claude la parte en ${fix.split.length} tomas (misma narración)`); done = true; break; }
           if (fix) {
             const { data: fr } = await supabase.from('episodes').select('shots').eq('id', epId).single();
             await supabase.from('episodes').update({ shots: (fr.shots || []).map((x) => x.n === t.n ? Object.assign({}, x, fix, { prompt_override: null, ltx_en: null, keyframe_prompt_override: fix.start_en ? null : x.keyframe_prompt_override, qa_rewrite_from: { camera: x.camera, action_en: x.action_en, reaction_en: x.reaction_en, start_en: x.start_en } }) : x) }).eq('id', epId);
             log(`QA toma ${t.n}: prompt nuevo → cámara "${fix.camera}" · ${fix.action_en}`);
           }
         } catch (e) { log(`QA toma ${t.n}: no pude reescribir (${String(e.message).slice(0, 120)}) → reintento igual`); }
-      }
-      await setWorking(t.n);
-      const r = await handler({ httpMethod: 'POST', headers: { 'x-vyrales-key': process.env.DASHBOARD_KEY || '' }, /* llamada interna = "sistema" (multiusuario) */ body: JSON.stringify({ assetId: t.clip.id, provider: 'king', new_frame: t.newFrame }) });
-      if (r.statusCode >= 400) log(`QA visual toma ${t.n}: FALLÓ ${String(r.body).slice(0, 200)}`); else { await bumpTry(t.n, t.boost); log(`QA visual toma ${t.n}: rehecha ✅`); if (!redone.includes(t.n)) redone.push(t.n); }
-    }
-  }
-  // Verificación inmediata de lo que se rehízo en esta pasada: si ya quedó bien, la tarjeta pasa a "✓ corregida"
-  // (guardando cuál era el problema); si no, queda pendiente para la siguiente pasada (con su intento ya contado).
-  if (process.env.VYRALES_QA_VISUAL !== '0' && redone.length) {
-    try {
-      const { data: ep3 } = await supabase.from('episodes').select('shots, assets(*)').eq('id', epId).single();
-      const items3 = [];
-      for (const n of redone) {
-        const sh = (ep3.shots || []).find((x) => x.n === n);
-        const clip = (ep3.assets || []).filter((a) => a.kind === 'video_clip' && a.shot_number === n).sort((a, b) => String(b.updated_at || b.created_at).localeCompare(String(a.updated_at || a.created_at)))[0];
-        if (sh && clip) items3.push({ sh, clip, url: clip.storage_path, dur: await durationOf(clip.storage_path) });
-      }
-      log(`QA: verificando ${items3.length} toma(s) recién rehechas...`);
-      const res3 = await visionReview(items3, log);
-      const { data: fr } = await supabase.from('episodes').select('shots').eq('id', epId).single();
-      const upd = {};
-      for (const it of items3) {
-        const r = res3[it.sh.n]; if (!r) continue;
-        const ok = !(r.image_ok === false || r.action_ok === false || r.haze === true || r.broken === true);
-        const prev = it.sh.qa || {};
-        upd[it.sh.n] = Object.assign({}, prev, { clip_id: it.clip.id, ok, image_ok: r.image_ok !== false, action_ok: r.action_ok !== false, haze: !!r.haze, broken: !!r.broken, reason: ok ? '' : String(r.reason || '').slice(0, 300), fixed_from: ok ? (prev.reason || prev.force_reason || 'tenía un problema') : prev.fixed_from, force: false, force_any: false, at: new Date().toISOString() });
-        log(`QA toma ${it.sh.n}: ${ok ? 'quedó bien ✓' : 'todavía no (' + (r.reason || '') + ')'}`);
-        // Memoria: un arreglo que FUNCIONÓ (problema → cómo se resolvió) es una lección para Claude.
-        if (ok && (prev.reason || prev.force_reason)) {
-          try { await require(path.join(ROOT, 'netlify', 'functions', '_memoria')).addLesson(supabase, { source: 'qa_arreglo', ep: epId, toma: it.sh.n, narracion: lineOf(it.sh), problema: prev.reason || prev.force_reason, solucion: { camara: it.sh.camera, accion: it.sh.action_en, imagen: it.sh.start_en, solo_camara: !!it.sh.camera_only } }); } catch (_) {}
+        // 2) Rehacer en king (ESPERA a que termine el render).
+        const rr = await handler({ httpMethod: 'POST', headers: { 'x-vyrales-key': process.env.DASHBOARD_KEY || '' }, body: JSON.stringify({ assetId: clipId, provider: 'king', new_frame: newFrame }) });
+        tries++;
+        if (rr.statusCode >= 400) { log(`QA toma ${t.n}: FALLÓ al rehacer ${String(rr.body).slice(0, 160)}`); await bumpTryTo(t.n, tries, t.boost); break; }
+        log(`QA toma ${t.n}: rehecha (intento ${tries}/3) ✅ — verificando solo esta toma...`);
+        // 3) Verificar SOLO esta toma (no las demás).
+        const { data: ep3 } = await supabase.from('episodes').select('shots, assets(*)').eq('id', epId).single();
+        shNow = (ep3.shots || []).find((x) => x.n === t.n) || shNow;
+        const clip = (ep3.assets || []).filter((a) => a.kind === 'video_clip' && a.shot_number === t.n).sort((a, b) => String(b.updated_at || b.created_at).localeCompare(String(a.updated_at || a.created_at)))[0];
+        clipId = clip ? clip.id : clipId;
+        const res3 = await visionReview([{ sh: shNow, clip, url: clip && clip.storage_path, dur: clip ? await durationOf(clip.storage_path) : 0 }], log);
+        const vr = res3[t.n] || {};
+        const ok = !(vr.image_ok === false || vr.action_ok === false || vr.haze === true || vr.broken === true);
+        const prevReason = (shNow.qa && (shNow.qa.reason || shNow.qa.force_reason)) || reason;
+        const qaFinal = { clip_id: clipId, ok, image_ok: vr.image_ok !== false, action_ok: vr.action_ok !== false, haze: !!vr.haze, broken: !!vr.broken, reason: ok ? '' : String(vr.reason || reason).slice(0, 300), fixed_from: ok ? prevReason : (shNow.qa && shNow.qa.fixed_from), redone: true, tries, force: false, force_any: false, at: new Date().toISOString() };
+        const { data: fr2 } = await supabase.from('episodes').select('shots').eq('id', epId).single();
+        await supabase.from('episodes').update({ shots: (fr2.shots || []).map((x) => x.n === t.n ? Object.assign({}, x, { qa: qaFinal }) : x) }).eq('id', epId);
+        if (!redone.includes(t.n)) redone.push(t.n);
+        log(`QA toma ${t.n}: ${ok ? 'quedó bien ✓' : 'todavía no (' + (vr.reason || '') + ')'}`);
+        if (ok) {
+          done = true;
+          if (prevReason) { try { await require(path.join(ROOT, 'netlify', 'functions', '_memoria')).addLesson(supabase, { source: 'qa_arreglo', ep: epId, toma: t.n, narracion: lineOf(shNow), problema: prevReason, solucion: { camara: shNow.camera, accion: shNow.action_en, imagen: shNow.start_en, solo_camara: !!shNow.camera_only } }); } catch (_) {} }
+        } else {
+          reason = vr.reason || reason;
+          const freeFrame = !(shNow.characters || []).length;
+          newFrame = freeFrame && !(shNow.qa && shNow.qa.keep_image) && (vr.image_ok === false || tries >= 1);
         }
       }
-      await supabase.from('episodes').update({ shots: (fr.shots || []).map((x) => upd[x.n] ? Object.assign({}, x, { qa: upd[x.n] }) : x) }).eq('id', epId);
-    } catch (e) { log('QA: no pude verificar las rehechas (' + String(e.message).slice(0, 120) + ')'); }
+      if (!done && tries >= 3) {
+        log(`QA toma ${t.n}: 3 intentos y sigue con problema → queda para que la revises`);
+        try { await require(path.join(ROOT, 'netlify', 'functions', '_memoria')).addLesson(supabase, { source: 'qa_falla', ep: epId, toma: t.n, narracion: lineOf(shNow), problema: reason, imagen: shNow.start_en, accion: shNow.action_en, camara: shNow.camera }); } catch (_) {}
+      }
+    }
+    await setWorking(null);
   }
   // Tomas que Claude decidió PARTIR: se parten de la última a la primera (así la renumeración no mueve las pendientes),
   // con la MISMA narración, y se piden sus cuadros (Flow, $0) + videos (king) → flow_frames en modo solo.

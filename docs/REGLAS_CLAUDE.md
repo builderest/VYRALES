@@ -194,3 +194,9 @@ Franklin (admin) quiere tener VARIOS canales en su misma cuenta y cambiar entre 
 ## Estados de la toma y "editándose ahora" (oct-13)
 - Franklin: "si el QA la revisó, debe pasar de PENDIENTE a algo más". Son 2 cosas distintas: Estado (TÚ apruebas: PENDIENTE/APROBADO) y QA (control de calidad). Ahora el panel muestra 3 estados: PENDIENTE (falta QA) → REVISADA · falta tu OK (qa.ok, cian) → APROBADO (tú, verde). Aprobar sigue siendo manual (nunca auto).
 - "Editándose ahora": _qa.js escribe validator_report.qa_working={n,at} antes de rehacer cada toma y lo limpia (null) al terminar. El panel pinta un badge rosa "El QA la está rehaciendo…" en esa tarjeta (si at < 25 min) y "rehaciendo la TOMA N" en el encabezado. Contador QA: X/Y revisadas · faltan Z (también en el encabezado).
+
+## QA toma por toma + memoria (oct-13)
+- Franklin: "que termine una toma antes de volar a otra; no re-escanear las buenas; pierde mucho tiempo".
+- _qa.js: el bucle de regeneración ahora es POR TOMA: rehace → verifica SOLO esa toma → si sigue mal, reintenta la MISMA (hasta 3) → cuando queda bien, pasa a la siguiente. Antes era una pasada completa sobre TODAS por cada intento (muy lento). Las que ya tienen qa.ok de su clip NO se re-escanean (línea del items: salta qa.ok). setWorking marca la toma en curso.
+- Memoria: antes casi no había lecciones "qa_arreglo" (lo que funcionó). El bucle nuevo guarda qa_arreglo (problema→solución) cada vez que arregla una toma, y qa_falla tras 3 intentos. claude_aprender las consolida en reglas.json (lo lee el guionista).
+- Panel (dashboard.html): el encabezado distingue "N listas para tu OK" (qa.ok, falta aprobar) vs "N el QA todavía trabaja". Botón "Aprobar las listas".
