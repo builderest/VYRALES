@@ -648,10 +648,10 @@
         r = await fetch('/.netlify/functions/analytics', { method: 'POST', headers: H, body: JSON.stringify({ action: 'ideas', focus: $('focus').value, paid: true }) }); j = await r.json();
         if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
       } else if (j.queued) {
-        b.innerHTML = SPARK + ' CLAUDE ESTÁ LEYENDO TU CANAL… (~1–2 min)';
+        b.innerHTML = SPARK + ' CLAUDE ESTÁ LEYENDO TU CANAL… (puede tardar varios min)';
         let out = null; const t0 = Date.now();
-        while (!out && Date.now() - t0 < 6 * 60000) { await new Promise((ok) => setTimeout(ok, 5000)); const g = await (await fetch('/.netlify/functions/analytics?script=' + j.job, { cache: 'no-store' })).json(); if (!g.pending) out = g; }
-        if (!out) throw new Error('Claude no respondió en 6 min (mira la Terminal del panel).');
+        while (!out && Date.now() - t0 < 16 * 60000) { await new Promise((ok) => setTimeout(ok, 5000)); const g = await (await fetch('/.netlify/functions/analytics?script=' + j.job, { cache: 'no-store' })).json(); if (!g.pending) out = g; }
+        if (!out) throw new Error('Claude no respondió en 16 min (mira la Terminal del panel).');
         if (!out.ok) throw new Error(out.error || 'falló');
         j = out;
       }
