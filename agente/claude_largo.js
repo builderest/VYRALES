@@ -51,12 +51,13 @@ async function detail(shots, { aspect, context, title, log }) {
     const { data: u } = supabase.storage.from('media').getPublicUrl(`guiones/${job}.req.json`);
     const req = await (await fetch(u.publicUrl + '?t=' + Date.now())).json();
     const tipo = req.tipo || 'historia';
-    console.log('Guionista largo (Claude) →', String(req.topic).slice(0, 120));
+    const canal = await F('_memoria').memoryBlock(supabase).catch(() => '');
+    console.log('Guionista largo (Claude) →', String(req.topic).slice(0, 120), canal ? '· con identidad/memoria del canal (' + (process.env.VYRALES_WS || 'principal') + ')' : '');
     const t0 = Date.now();
     let story = null;
     for (let k = 1; k <= 2 && !story; k++) {
       let raw = '';
-      try { raw = await runClaude(F('_guionista').buildLongPrompt(tipo, { topic: req.topic }), { timeoutMin: 25, log: console.log }); fs.mkdirSync(path.join(ROOT, '_to_delete'), { recursive: true }); fs.writeFileSync(path.join(ROOT, '_to_delete', `claude_raw_${k}.txt`), raw); story = parseJson(raw); }
+      try { raw = await runClaude(F('_guionista').buildLongPrompt(tipo, { topic: req.topic, canal }), { timeoutMin: 25, log: console.log }); fs.mkdirSync(path.join(ROOT, '_to_delete'), { recursive: true }); fs.writeFileSync(path.join(ROOT, '_to_delete', `claude_raw_${k}.txt`), raw); story = parseJson(raw); }
       catch (e) { console.log(`  intento ${k}: ${String(e.message).slice(0, 200)}`); if (k === 2) throw e; }
     }
     // Pulido de la narración (largo y cada Short): sin "Y" muletilla, sin saltos, sin palabras raras. Claude, $0.

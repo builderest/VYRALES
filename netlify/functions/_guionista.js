@@ -191,11 +191,12 @@ function buildNarratedPrompt(tipo = 'curiosidades', { topic = '' } = {}) {
 // "enfocar el canal en la historia completa que mantenga al oyente pegado"; los Shorts/Reels/TikTok son el
 // tráiler con llamada a la acción). Paso 1 = la HISTORIA (narración + qué se ve en cada toma, en español);
 // los prompts detallados en inglés para Flow/LTX los escribe después el revisor (_visual_check), por capítulos.
-function buildLongPrompt(tipo = 'historia', { topic = '' } = {}) {
+function buildLongPrompt(tipo = 'historia', { topic = '', canal = '' } = {}) {
   const p = TIPOS[tipo] || TIPOS.historia;
   const voz = (buildNarratedPromptRaw(tipo, p).match(/=== VOZ HUMANA[\s\S]*?(?=\n=== REGLAS TÉCNICAS)/) || [''])[0];
+  const canalBlock = canal ? `\n=== IDENTIDAD DEL CANAL (MANDA SOBRE TODO) ===\nEscribe para ESTE canal: respeta su nicho, su voz y lo que ya aprendió. Si algo aquí choca con la plantilla de género de abajo, GANA esto.\n${canal}\n` : '';
   return `Eres uno de los mejores guionistas de documentales del mundo: escribes historias reales que la gente escucha completas, sin poder despegarse, como un gran narrador que se sienta frente a ti y te cuenta lo que pasó. Especialidad: ${p.nombre}. Tu trabajo se mide en una sola cosa: que el espectador se quede hasta el último segundo.
-
+${canalBlock}
 === IDENTIDAD ===
 - TONO: ${p.tono}
 - LA MISMA VOZ DE PRINCIPIO A FIN: un solo narrador, siempre con la misma personalidad, el mismo registro y la misma forma de hablar en el video largo y en los Shorts. Nunca cambia de estilo entre capítulos.
