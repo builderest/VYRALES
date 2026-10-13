@@ -3936,15 +3936,16 @@
             // Progreso del QA (Franklin oct-13: "decir cuántas tienes que revisar y cuántas ya revisó").
             // Una toma está "revisada por el QA" cuando su qa.ok es true y la revisión es de ESTE clip (no de uno viejo).
             const qaOk = (a) => { const sh = (inReview.shots || []).find(x => x.n === a.shot_number); const q = sh && sh.qa; return !!(q && q.ok && (!q.clip_id || q.clip_id === a.id)); };
-            const qaDone = sorted.filter(qaOk).length;
-            const qaPend = sorted.length - qaDone;
+            const readyForOk = sorted.filter(a => !a.approved && qaOk(a)).length;   // QA ya las aprobó, falta tu OK
+            const qaWorking = sorted.filter(a => !a.approved && !qaOk(a)).length;    // el QA todavía trabaja en estas
             const _qw = (inReview.validator_report || {}).qa_working;
             const editingN = (_qw && _qw.at && (Date.now() - new Date(_qw.at).getTime() < 25 * 60000)) ? _qw.n : null;
             document.getElementById('shotCardsSummary').innerHTML = '<i class="fa-solid fa-film mr-2"></i>TOMAS DEL EP ' + inReview.episode_number + ' · ' + (sorted.length - pending) + '/' + sorted.length + ' aprobadas' +
-              ' · <span class="' + (qaPend ? 'text-cyber-cyan' : 'text-cyber-emerald') + '" title="El control de calidad (Claude) revisa cada toma contra la narración">QA: ' + qaDone + '/' + sorted.length + ' revisadas' + (qaPend ? ' · faltan ' + qaPend : '') + '</span>' +
+              (readyForOk ? ' · <span class="text-cyber-cyan" title="El control de calidad ya las dio por buenas; solo falta que tú las apruebes">' + readyForOk + ' listas para tu OK</span>' : '') +
+              (qaWorking ? ' · <span class="text-cyber-gold" title="El control de calidad todavía las está revisando o rehaciendo">' + qaWorking + ' el QA todavía trabaja</span>' : '') +
               (editingN ? ' · <span class="text-cyber-pink"><i class="fa-solid fa-spinner fa-spin mr-1"></i>rehaciendo la TOMA ' + String(editingN).padStart(2, '0') + '</span>' : '') +
-              (pending ? ' · <span class="text-cyber-gold">' + pending + ' por revisar</span>' : ' · <span class="text-cyber-emerald">todas aprobadas ✓</span>') + ' <span class="text-slate-500">▾ ver / ocultar</span>' +
-              (pending ? ' <button type="button" onclick="event.preventDefault();event.stopPropagation();approveAllShots()" class="ml-2 mt-1 sm:mt-0 px-3 py-1 rounded bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/40 text-xs font-semibold"><i class="fa-solid fa-check-double mr-1"></i>Aprobar todas (' + pending + ')</button>' : '');
+              (!pending ? ' · <span class="text-cyber-emerald">todas aprobadas ✓</span>' : '') + ' <span class="text-slate-500">▾ ver / ocultar</span>' +
+              (readyForOk ? ' <button type="button" onclick="event.preventDefault();event.stopPropagation();approveAllShots()" class="ml-2 mt-1 sm:mt-0 px-3 py-1 rounded bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/40 text-xs font-semibold" title="Aprueba las que el QA ya dio por buenas"><i class="fa-solid fa-check-double mr-1"></i>Aprobar las listas (' + readyForOk + ')</button>' : (pending ? ' <button type="button" onclick="event.preventDefault();event.stopPropagation();approveAllShots()" class="ml-2 mt-1 sm:mt-0 px-3 py-1 rounded bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/40 text-xs font-semibold"><i class="fa-solid fa-check-double mr-1"></i>Aprobar todas (' + pending + ')</button>' : ''));
             // Desplegable normal: empieza cerrado y se abre/cierra con un clic (el refresco no lo toca).
             banner.innerHTML = inReview.status === 'generando_media'
               ? '<i class="fa-solid fa-spinner fa-spin mr-1"></i>Generando EP ' + inReview.episode_number + ' de "' + esc(data.series.title) + '": ' + sorted.length + ' de ' + ((inReview.shots || []).length || '?') + ' tomas listas. Puedes ir revisando las que ya salieron.'
