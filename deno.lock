@@ -11,7 +11,9 @@
   "workspace": {
     "packageJson": {
       "dependencies": [
-        "npm:@supabase/supabase-js@^2.45.4"
+        "npm:@google/genai@^1.5.1",
+        "npm:@supabase/supabase-js@^2.45.4",
+        "npm:ffmpeg-static@^5.2.0"
       ]
     }
   }

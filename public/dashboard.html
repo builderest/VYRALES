@@ -3920,6 +3920,8 @@
           window.__agent = await agentP;   // videos en calidad completa en la PC (Tailscale)
           await probePc(window.__agent);   // ¿se puede reproducir desde la PC? (si no, Supabase)
           lastAgentSig = agentSig(window.__agent);
+          // Si la serie activa quedó OCULTA (is_active=false → no está en all_series), cambiar a una visible.
+          if ((data.all_series || []).length && data.series && !(data.all_series || []).find(s => s.slug === data.series.slug)) { switchSeries((data.all_series)[0].slug); return; }
           renderSeriesSelector(data.all_series || [], data.series);
           renderVeoMode(data.series);
           renderCast(data);

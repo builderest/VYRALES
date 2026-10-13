@@ -9,12 +9,14 @@ const { TEXT_MODEL } = require('./_publish');
 const TEXT_PRICE = { input: 0.75, output: 3.75 };
 const json = (s, b) => ({ statusCode: s, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }, body: JSON.stringify(b) });
 
-let cache = null; // { at, data } — 3 min, para no gastar cuota de la API en cada recarga
+let cache = {}; // { [ws]: { at, data } } — 3 min POR CANAL (antes era global: en un canal salía la data de otro)
 async function getData(sb, fresh) {
-  if (!fresh && cache && Date.now() - cache.at < 180000) return cache.data;
+  const ws = (() => { try { return require('./_tenant').currentWs(); } catch (_) { return 'x'; } })();
+  const c = cache[ws];
+  if (!fresh && c && Date.now() - c.at < 180000) return c.data;
   const data = await collect(sb);
   // Si YouTube Analytics falló por un error temporal, no se guarda en caché (el siguiente Actualizar reintenta).
-  if (!(data.youtube && data.youtube.analytics && data.youtube.analytics.reason === 'temporal')) cache = { at: Date.now(), data };
+  if (!(data.youtube && data.youtube.analytics && data.youtube.analytics.reason === 'temporal')) cache[ws] = { at: Date.now(), data };
   return data;
 }
 

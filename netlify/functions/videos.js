@@ -10,7 +10,7 @@ exports.handler = async () => {
     const sb = getSupabaseClient();
     const on = await T.tenancyOn(sb);
     const ws = T.currentWs();
-    let q = sb.from('series').select('id, slug, title');
+    let q = sb.from('series').select('id, slug, title').neq('is_active', false);
     if (on) q = q.eq('workspace_id', ws);
     const { data: series } = await q;
     const byId = Object.fromEntries((series || []).map((s) => [s.id, s]));
