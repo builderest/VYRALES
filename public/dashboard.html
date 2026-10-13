@@ -2086,6 +2086,7 @@
         } catch (_) { pick.classList.add('hidden'); }
       }
       function renderCanalMenu() {
+        const activo = __canales.find(c => c.activo) || __canales.find(c => c.principal) || __canales[0];
         document.getElementById('canalMenu').innerHTML =
           '<p class="px-3 pt-1.5 pb-2 text-[10px] font-mono text-slate-500 tracking-wider">CAMBIAR DE CANAL</p>' +
           __canales.map(c => {
