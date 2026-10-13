@@ -62,7 +62,7 @@
     var qw = ep && ep.validator_report && ep.validator_report.qa_working;
     if (qw && qw.n) toma = String(qw.n);
     else { var m = String(r.command).match(/:(\d+)(?::\d+)?$/); if (m) toma = m[1]; }
-    if (toma) { txt = /toma/i.test(txt) ? txt.replace(/una toma/i, 'toma ' + toma) : (txt + ' (toma ' + toma + ')'); }
+    if (toma) { txt = /una toma/i.test(txt) ? txt.replace(/una toma/i, 'toma ' + toma) : (txt + ' \u00b7 toma ' + toma); }
     if (ep) txt += ' \u00b7 Ep. ' + ep.episode_number;
     return txt;
   }
