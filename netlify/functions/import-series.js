@@ -57,7 +57,20 @@ exports.handler = async (event) => {
     // Guionistas de videos únicos narrados, UNO POR TIPO: ?master=curiosidades|historia|misterios|motivacion[&topic=…]
     if (event.httpMethod === 'GET' && qs.master && qs.master !== '1') {
       const { TIPOS, buildNarratedPrompt } = require('./_guionista');
-      if (TIPOS[qs.master]) return { statusCode: 200, headers: { 'Content-Type': 'text/plain; charset=utf-8' }, body: buildNarratedPrompt(qs.master, { topic: qs.topic || '' }) };
+      if (TIPOS[qs.master]) {
+        // Guion maestro POR CANAL: si hay un canal activo (cookie vyrales_ws) con identidad, se antepone su identidad
+        // para que el prompt manual salga en el nicho/voz/idioma de ESE canal, no el genérico.
+        let canal = '';
+        try {
+          const T = require('./_tenant');
+          const ws = T.parseActiveWs(event) || T.ADMIN_WS;
+          if (ws && ws !== T.ADMIN_WS) {
+            const sb = require('./_supabase').getSupabaseClient();
+            canal = await require('./_memoria').identidad(sb, ws);
+          }
+        } catch (_) {}
+        return { statusCode: 200, headers: { 'Content-Type': 'text/plain; charset=utf-8' }, body: buildNarratedPrompt(qs.master, { topic: qs.topic || '', canal }) };
+      }
     }
     if (event.httpMethod === 'GET' && qs.master) {
       return {
