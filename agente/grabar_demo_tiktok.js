@@ -152,7 +152,26 @@ async function main() {
     await page.evaluate((id) => window.vyReviewEp && window.vyReviewEp(id), DEMO_EP);
     const postBtn = page.locator('#ttPostBtn_' + DEMO_EP);
     // Esperar a que el panel de ESTE episodio se dibuje (recarga asíncrona), luego abrir la caja y verlo.
-    await postBtn.waitFor({ state: 'attached', timeout: 45000 });
+    try {
+      await postBtn.waitFor({ state: 'attached', timeout: 45000 });
+    } catch (e) {
+      const d = await page.evaluate((id) => {
+        const soc = window.__social || {};
+        const tt = (soc.accounts || {}).tiktok || null;
+        const box = document.getElementById('publishDetails');
+        return {
+          url: location.href,
+          tiktok_en_sesion: tt ? { name: tt.name, direct: tt.direct, old: tt.old } : 'TikTok NO conectado en esta sesión',
+          llave_tiktok: !!((soc.keys || {}).tiktok),
+          tiktok_mode: soc.tiktok_mode || '?',
+          episodio_en_revision: window.__reviewEpId || '(ninguno)',
+          caja_publicar: box ? (box.classList.contains('hidden') ? 'oculta' : 'visible') : 'no existe',
+          botones_post_presentes: [...document.querySelectorAll('[id^="ttPostBtn_"]')].map((b) => b.id),
+        };
+      }, DEMO_EP).catch(() => null);
+      console.log('\n[diag Step 3] por qué no salió el botón:\n' + JSON.stringify(d, null, 1) + '\n');
+      throw e;
+    }
     await page.evaluate(() => window.goPublish && window.goPublish()); await sleep(1500);
     await postBtn.waitFor({ state: 'visible', timeout: 30000 });
     await cap('They click "Post to TikTok". VYRALES first asks TikTok for the creator’s current info (creator_info API).', 3500);
