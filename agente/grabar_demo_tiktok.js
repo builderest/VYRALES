@@ -22,7 +22,7 @@ for (const line of fs.readFileSync(path.join(ROOT, '.env'), 'utf8').split(/\r?\n
 const SITE = (process.env.PUBLIC_BASE_URL || 'https://vyrales.app').replace(/\/$/, '');
 const FINALES = process.env.VYRALES_FINALES_DIR || path.join(ROOT, 'finales');
 const OUT = path.join(FINALES, 'tiktok_demo');
-const DEMO_EP = process.argv[2] || '30fc0466-e501-43ff-be69-3b39b144c475'; // "Cuando el día duraba seis horas"
+const DEMO_EP = process.argv[2] || 'fc77aadf-7d3f-4328-9ac1-1dc0ef819abb'; // Test User · "Cuando el día duraba seis horas" (serie test_curiosidades)
 const PW_VERSION = '1.48.2';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -41,7 +41,8 @@ async function main() {
   const supabase = getSupabaseClient();
   const { data: ep, error } = await supabase.from('episodes').select('id, episode_number, series_id, validator_report').eq('id', DEMO_EP).single();
   if (error || !ep) throw new Error('No encontré el episodio del demo');
-  const { data: series } = await supabase.from('series').select('slug').eq('id', ep.series_id).single();
+  const { data: series } = await supabase.from('series').select('slug, workspace_id').eq('id', ep.series_id).single();
+  const ownerWs = series && series.workspace_id;
   if (!(((ep.validator_report || {}).publish_package || {}).status === 'done')) throw new Error('El episodio no tiene "Preparar textos y portada" hecho.');
 
   // DEMO LIMPIO: borra la marca de "ya publicado en TikTok" de este episodio, para que la grabación
@@ -73,8 +74,21 @@ async function main() {
   const context = await browser.newContext({ viewport: { width: 1920, height: 1080 }, recordVideo: { dir: rawDir, size: { width: 1920, height: 1080 } }, locale: 'en-US' });
   // Sesión de VYRALES: la misma cookie firmada que da el login (netlify/edge-functions/auth.js).
   const exp = String(Date.now() + 3 * 3600 * 1000);
-  const sig = crypto.createHmac('sha256', key).update('vyrales:' + exp).digest('hex');
-  await context.addCookies([{ name: 'vyrales_auth', value: exp + '.' + sig, domain: new URL(SITE).hostname, path: '/', httpOnly: true, secure: true, sameSite: 'Lax' }]);
+  // Sesión del DUEÑO del episodio: si la serie es de un USUARIO (no admin), la cookie es de ese usuario
+  // (u.<id>...), aunque el demo se lance desde la terminal del Admin. Así el demo muestra al Test User.
+  let authValue;
+  if (ownerWs && ownerWs !== '00000000-0000-0000-0000-000000000001') {
+    const { data: owner } = await supabase.from('app_users').select('id, email').eq('workspace_id', ownerWs).eq('active', true).order('created_at').limit(1).single();
+    if (!owner) throw new Error('No encontré el usuario dueño de la serie del demo (workspace ' + ownerWs + ')');
+    const sigU = crypto.createHmac('sha256', key).update('vyrales:' + owner.id + ':' + exp).digest('hex');
+    authValue = 'u.' + owner.id + '.' + exp + '.' + sigU;
+    console.log('Sesión del demo: usuario ' + owner.email + ' (workspace ' + ownerWs + ')');
+  } else {
+    const sig = crypto.createHmac('sha256', key).update('vyrales:' + exp).digest('hex');
+    authValue = exp + '.' + sig;
+    console.log('Sesión del demo: admin');
+  }
+  await context.addCookies([{ name: 'vyrales_auth', value: authValue, domain: new URL(SITE).hostname, path: '/', httpOnly: true, secure: true, sameSite: 'Lax' }]);
   await context.addInitScript((slug) => { try { if (location.hostname.endsWith('vyrales.app')) localStorage.setItem('vyrales_series', slug); window.__ttNoPc = true; } catch (_) {} }, series.slug);
   // __ttNoPc: el video lo sube Netlify (no el agente), porque el agente está ocupado grabando este demo.
   let page = await context.newPage();
