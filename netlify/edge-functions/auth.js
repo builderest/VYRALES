@@ -7,7 +7,7 @@
 // Lo único público: privacidad/términos, login, el archivo de verificación de TikTok y las
 // URLs a las que TikTok/Instagram regresan después de autorizar.
 const PUBLIC = [
-  /^\/privacidad\.html$/, /^\/eliminar-datos\.html$/, /^\/terminos\.html$/, /^\/login\.html$/, /^\/robots\.txt$/,
+  /^\/privacidad(\.html)?$/, /^\/eliminar-datos(\.html)?$/, /^\/terminos(\.html)?$/, /^\/login(\.html)?$/, /^\/robots\.txt$/,
   /^\/tiktok[\w.-]*\.txt$/, /^\/favicon/,
   // Ícono y manifest de la app para el celular ("Agregar a pantalla de inicio"): no tienen datos
   /^\/manifest\.webmanifest$/, /^\/(icon-[\w-]+|apple-touch-icon)\.png$/,
