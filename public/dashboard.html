@@ -217,6 +217,19 @@
         <button type="button" id="vyMenuBtn" class="vy-menu-btn" aria-label="Abrir menú" aria-controls="vySide" aria-expanded="false"><i class="fa-solid fa-bars"></i></button>
         <h2 id="vyPageTitle" class="vy-page">Inicio</h2>
         <span class="vy-sep" aria-hidden="true"></span>
+        <!-- Selector de CANAL (varios canales en una misma cuenta; oct-13) -->
+        <div id="canalPicker" class="relative hidden">
+            <button id="canalPickerBtn" type="button" onclick="toggleCanalMenu(event)" aria-haspopup="listbox" aria-expanded="false"
+                    class="vy-ghost flex items-center gap-2.5 bg-cyber-darker/80 border border-cyber-border px-3 rounded-lg">
+                <span class="w-2.5 h-2.5 rounded-full bg-cyber-violet"></span>
+                <span class="text-[10px] text-slate-400 font-mono hidden sm:inline whitespace-nowrap tracking-wider">CANAL</span>
+                <span id="canalPickerLabel" class="vy-novela text-sm font-semibold text-white whitespace-nowrap max-w-[160px] truncate">…</span>
+                <i id="canalPickerChevron" class="fa-solid fa-chevron-down text-[10px] text-slate-400 transition-transform"></i>
+            </button>
+            <div id="canalMenu" role="listbox"
+                 class="hidden absolute left-0 mt-2 w-72 bg-cyber-card border border-cyber-border rounded-xl shadow-neon-cyan p-1.5 z-50"></div>
+        </div>
+        <span class="vy-sep" aria-hidden="true"></span>
         <!-- Selector de novela (mismo menú y mismas funciones de antes) -->
         <div id="seriesPicker" class="relative">
             <button id="seriesPickerBtn" type="button" onclick="toggleSeriesMenu(event)" aria-haspopup="listbox" aria-expanded="false"
@@ -2039,6 +2052,71 @@
       window.switchSeries = function(slug) {
         try { localStorage.setItem('vyrales_series', slug); } catch (_) {}
         location.search = '?series=' + encodeURIComponent(slug);
+      };
+
+      // ---------- CANALES (varios canales en una misma cuenta admin; oct-13) ----------
+      let __canales = [];
+      const __ckey = () => { try { return localStorage.getItem('vyrales_key'); } catch (_) { return null; } };
+      async function cargarCanales() {
+        const pick = document.getElementById('canalPicker');
+        if (!pick) return;
+        try {
+          const k = __ckey();
+          const r = await fetch('/.netlify/functions/workspaces', { cache: 'no-store', headers: k ? { 'x-vyrales-key': k } : {} });
+          if (!r.ok) { pick.classList.add('hidden'); return; }
+          const j = await r.json();
+          __canales = j.channels || [];
+          const activo = __canales.find(c => c.activo) || __canales.find(c => c.principal) || __canales[0];
+          document.getElementById('canalPickerLabel').textContent = activo ? activo.name : 'Canal';
+          pick.classList.remove('hidden');
+          renderCanalMenu();
+        } catch (_) { pick.classList.add('hidden'); }
+      }
+      function renderCanalMenu() {
+        document.getElementById('canalMenu').innerHTML =
+          '<p class="px-3 pt-1.5 pb-2 text-[10px] font-mono text-slate-500 tracking-wider">CAMBIAR DE CANAL</p>' +
+          __canales.map(c => {
+            const on = !!c.activo;
+            return '<button type="button" role="option" aria-selected="' + on + '" onclick="switchCanal(\'' + esc(c.id) + '\')" ' +
+              'class="w-full text-left flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg transition-all ' +
+              (on ? 'bg-cyber-violet/10 border border-cyber-violet/40' : 'border border-transparent hover:bg-white/5 hover:border-cyber-border') + '">' +
+              '<span class="min-w-0 flex-1"><span class="block text-sm font-semibold truncate ' + (on ? 'text-cyber-violet' : 'text-white') + '" title="' + esc(c.name) + '">' + esc(c.name) + '</span>' +
+              '<span class="text-[10px] font-mono text-slate-500">' + (c.principal ? 'principal' : (c.series + ' novela' + (c.series === 1 ? '' : 's'))) + '</span></span>' +
+              (on ? '<i class="fa-solid fa-check text-cyber-violet text-xs flex-shrink-0"></i>' : '') + '</button>';
+          }).join('') +
+          '<div class="border-t border-cyber-border my-1.5"></div>' +
+          '<button type="button" onclick="nuevoCanal()" class="w-full text-left flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-semibold text-cyber-cyan hover:bg-cyber-cyan/10 border border-transparent hover:border-cyber-cyan/30">' +
+          '<i class="fa-solid fa-plus"></i> Nuevo canal</button>';
+      }
+      function setCanalMenu(open) {
+        document.getElementById('canalMenu').classList.toggle('hidden', !open);
+        document.getElementById('canalPickerChevron').classList.toggle('rotate-180', open);
+        document.getElementById('canalPickerBtn').setAttribute('aria-expanded', String(open));
+      }
+      window.toggleCanalMenu = function(ev) { ev.stopPropagation(); setCanalMenu(document.getElementById('canalMenu').classList.contains('hidden')); };
+      document.addEventListener('click', (ev) => { const p = document.getElementById('canalPicker'); if (p && !p.contains(ev.target)) setCanalMenu(false); });
+      window.switchCanal = async function(id) {
+        const activo = __canales.find(c => c.activo);
+        if (activo && activo.id === id) { setCanalMenu(false); return; }
+        try {
+          const k = __ckey();
+          const r = await fetch('/.netlify/functions/workspaces', { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, k ? { 'x-vyrales-key': k } : {}), body: JSON.stringify({ action: 'switch', workspace_id: id }) });
+          const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status);
+          // Cambió el canal: se recarga todo (series, videos, redes son de ese canal). Se olvida la serie recordada.
+          try { localStorage.removeItem('vyrales_series'); } catch (_) {}
+          location.href = location.pathname;
+        } catch (e) { alert('No pude cambiar de canal: ' + e.message); }
+      };
+      window.nuevoCanal = async function() {
+        setCanalMenu(false);
+        const name = await askText('Nombre del canal nuevo (ej. MindFuel Rise):', '');
+        if (!name) return;
+        try {
+          const k = __ckey();
+          const r = await fetch('/.netlify/functions/workspaces', { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, k ? { 'x-vyrales-key': k } : {}), body: JSON.stringify({ action: 'create', name }) });
+          const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status);
+          await switchCanal(j.created);
+        } catch (e) { alert('No pude crear el canal: ' + e.message); }
       };
 
       function initials(name) {
@@ -4007,6 +4085,7 @@
       };
 
       document.addEventListener('DOMContentLoaded', loadDashboard);
+      document.addEventListener('DOMContentLoaded', cargarCanales);
 
       // ---------- Auto-actualización (la página instalada como app en el iPhone no tiene botón de recargar) ----------
       // Cada 15 s (solo con la página visible) revisa si algo cambió en el servidor: video final listo,
