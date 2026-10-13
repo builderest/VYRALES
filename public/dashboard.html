@@ -3941,11 +3941,15 @@
             const qaWorking = sorted.filter(a => !a.approved && !qaOk(a)).length;    // el QA todavía trabaja en estas
             const _qw = (inReview.validator_report || {}).qa_working;
             const editingN = (_qw && _qw.at && (Date.now() - new Date(_qw.at).getTime() < 25 * 60000)) ? _qw.n : null;
-            const editingVerbo = (_qw && _qw.what === 'revisar') ? 'revisando' : 'rehaciendo';
+            // "Trabajando ahora" robusto: si hay un trabajo CORRIENDO para este episodio, siempre se muestra (aunque la
+            // marca de la toma parpadee). El verbo sale del comando; la toma exacta, de qa_working cuando está.
+            const _job = (data.agent_jobs || []).find(j => j.status === 'running' && String(j.command || '').includes(inReview.id));
+            const editingVerbo = _job ? (/^qa_tomas/.test(_job.command) ? ((_qw && _qw.what === 'revisar') ? 'revisando' : 'rehaciendo') : /^regen_local/.test(_job.command) ? 'rehaciendo' : 'generando') : ((_qw && _qw.what === 'revisar') ? 'revisando' : 'rehaciendo');
+            const trabajandoHtml = _job ? (' · <span class="text-cyber-pink"><i class="fa-solid fa-spinner fa-spin mr-1"></i>' + editingVerbo + (editingN ? ' la TOMA ' + String(editingN).padStart(2, '0') : '\u2026') + '</span>') : '';
             document.getElementById('shotCardsSummary').innerHTML = '<i class="fa-solid fa-film mr-2"></i>TOMAS DEL EP ' + inReview.episode_number + ' · ' + (sorted.length - pending) + '/' + sorted.length + ' aprobadas' +
               (readyForOk ? ' · <span class="text-cyber-cyan" title="El control de calidad ya las dio por buenas; solo falta que tú las apruebes">' + readyForOk + ' listas para tu OK</span>' : '') +
               (qaWorking ? ' · <span class="text-cyber-gold" title="El control de calidad todavía las está revisando o rehaciendo">' + qaWorking + ' el QA todavía trabaja</span>' : '') +
-              (editingN ? ' · <span class="text-cyber-pink"><i class="fa-solid fa-spinner fa-spin mr-1"></i>' + editingVerbo + ' la TOMA ' + String(editingN).padStart(2, '0') + '</span>' : '') +
+              trabajandoHtml +
               (!pending ? ' · <span class="text-cyber-emerald">todas aprobadas ✓</span>' : '') + ' <span class="text-slate-500">▾ ver / ocultar</span>' +
               (readyForOk ? ' <button type="button" onclick="event.preventDefault();event.stopPropagation();approveAllShots()" class="ml-2 mt-1 sm:mt-0 px-3 py-1 rounded bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/40 text-xs font-semibold" title="Aprueba las que el QA ya dio por buenas"><i class="fa-solid fa-check-double mr-1"></i>Aprobar las listas (' + readyForOk + ')</button>' : (pending ? ' <button type="button" onclick="event.preventDefault();event.stopPropagation();approveAllShots()" class="ml-2 mt-1 sm:mt-0 px-3 py-1 rounded bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/40 text-xs font-semibold"><i class="fa-solid fa-check-double mr-1"></i>Aprobar todas (' + pending + ')</button>' : ''));
             // Desplegable normal: empieza cerrado y se abre/cierra con un clic (el refresco no lo toca).

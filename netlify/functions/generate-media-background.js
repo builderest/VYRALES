@@ -292,6 +292,8 @@ exports.handler = async (event) => {
     const results = [];
     let quotaStop = null;
     let stoppedByUser = false;
+    // "Generando ahora" en el panel (Franklin oct-13): marca la toma que se está generando.
+    const setWorking = async (n, what) => { try { const { data: fr } = await supabase.from('episodes').select('validator_report').eq('id', episode.id).single(); await supabase.from('episodes').update({ validator_report: Object.assign({}, fr.validator_report || {}, { qa_working: n == null ? null : { n, at: new Date().toISOString(), what: what || 'generar' } }) }).eq('id', episode.id); } catch (_) {} };
     for (const scene of scenes) {
       if (await stopRequested(supabase, episode.id, startedAt)) {
         stoppedByUser = true;
@@ -307,6 +309,7 @@ exports.handler = async (event) => {
       const modelKey = isCliffhanger ? cliffhangerModel : shotModel;
       const prompt = prompts[scene.number];
 
+      await setWorking(scene.number, 'generar');
       console.log(LOG, `toma ${scene.number}/${total} (${provider === 'king' ? 'LTX king' : modelKey}): arrancando generación con ${provider === 'king' ? 'LTX' : 'Veo'}...`);
       try {
         const referenceImages = refUrls[scene.number] ? await loadReferenceImages(refUrls[scene.number]) : [];
