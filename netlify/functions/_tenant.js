@@ -70,6 +70,13 @@ function parseSession(event) {
   return null;
 }
 
+// Canal activo elegido por el admin (cookie vyrales_ws): un UUID. Solo se respeta para admin (ver withTenant).
+function parseActiveWs(event) {
+  const h = (event && event.headers) || {};
+  const m = String(h.cookie || h.Cookie || '').match(/(?:^|;\s*)vyrales_ws=([0-9a-f-]{36})(?:;|$)/i);
+  return m ? m[1] : null;
+}
+
 // ---------- ¿ya se corrió la migración 009? ----------
 let tenancy = { at: 0, on: null };
 async function tenancyOn(sb) {
@@ -216,6 +223,15 @@ function withTenant(handler, opts, applyKeysForCtx) {
       } else {
         ctx = { mode: 'anon', isAdmin: false, wsId: null, ws: null, user: null };
       }
+      // CANAL ACTIVO (oct-13): el admin puede trabajar en otro canal suyo sin re-loguear.
+      // Solo para admin, y solo a su canal principal o a un canal que le pertenece (owner_ws = admin).
+      if (ctx.mode === 'user' && ctx.isAdmin) {
+        const selWs = parseActiveWs(event);
+        if (selWs && selWs !== ctx.wsId) {
+          const w = await loadWs(sb, selWs);
+          if (w && (w.id === ADMIN_WS || w.owner_ws === ADMIN_WS)) { ctx.wsId = w.id; ctx.ws = w; ctx.isAdmin = true; }
+        }
+      }
       if (opts.adminOnly && !(ctx.isAdmin && (ctx.mode === 'user' || ctx.mode === 'system'))) {
         return jsonRes(403, { error: 'Solo el administrador puede usar esta función.' });
       }
@@ -294,6 +310,7 @@ async function agentJobFields(sb, command) {
   const wsId = currentWs();
   if (wsId === ADMIN_WS) return { workspace_id: wsId };
   const ws = (c && c.ws && c.ws.id === wsId) ? c.ws : await loadWs(sb, wsId);
+  if (ws && ws.owner_ws === ADMIN_WS) return { workspace_id: wsId }; // canal del admin: usa SU Claude y SU PC, sin cobrar créditos (oct-13)
   if (/^claude_/.test(command)) throw Object.assign(new Error('Los guiones con Claude en la PC son solo del administrador (su plan de Claude no se puede compartir). Usa la opción pagada con tus créditos o tu propia clave.'), { status: 403 });
   if (!PC_ALLOWED_FOR_USERS.test(command)) throw Object.assign(new Error('Tu cuenta no puede usar ese comando de la PC.'), { status: 403 });
   if (!ws || !(ws.perms && ws.perms.pc)) throw Object.assign(new Error('Tu cuenta no tiene permiso para usar la PC del administrador. Usa tus propias APIs o pide acceso.'), { status: 403 });
@@ -321,7 +338,7 @@ async function jobRow(sb, command) { return Object.assign({ command }, await age
 module.exports = {
   jobRow, wsOfJob,
   ADMIN_WS, current, currentWs, wsFields, withTenant, tenancyOn, tenancyKnownOn,
-  hashPassword, verifyPassword, userCookieValue, parseSession,
+  hashPassword, verifyPassword, userCookieValue, parseSession, parseActiveWs,
   loadWs, loadUser, forget, wsOfSeriesSlug, wsOfEpisode, readBody,
   adminSettings, creditMove, chargeApiUse, agentJobFields
 };

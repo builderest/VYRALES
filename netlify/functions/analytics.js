@@ -30,15 +30,32 @@ function summary(d) {
 async function ideasPrompt(sb, body, data) {
   const d = data || await getData(sb, false);
   const focus = String(body.focus || '').slice(0, 200);
-  const temas = TOPICS.map((t) => t[0]).join(', ') + ', Otros';
+  let temas = TOPICS.map((t) => t[0]).join(', ') + ', Otros';
+  // Cada canal propone ideas de SU nicho (oct-13). El principal = historia; un canal usa su identidad y sus temas.
+  let ident = '';
+  try {
+    const T = require('./_tenant'); const ws = T.currentWs();
+    if (ws && ws !== T.ADMIN_WS) {
+      const { data: w } = await sb.from('workspaces').select('settings').eq('id', ws).maybeSingle();
+      const st = (w && w.settings) || {};
+      if (st.identidad) ident = String(st.identidad).slice(0, 800);
+      if (st.nicho && Array.isArray(st.nicho.topics) && st.nicho.topics.length) temas = st.nicho.topics.join(', ') + ', Otros';
+    }
+  } catch (_) {}
   let viral = '';
   try { viral = await viralRefs(sb); } catch (_) {}
   const prompt = [
-    'Eres estratega de contenido de VYRALES: canal en español (Latinoamérica y EE. UU.) de documentales cortos verticales (YouTube Shorts, TikTok, Reels), hechos con IA, narrados por una sola voz solemne con pausas dramáticas.',
-    'TU TRABAJO: primero BUSCA EN LA WEB qué está siendo VIRAL AHORA en nuestro nicho, y recién después propón los próximos videos. No te limites a repetir lo que ya hicimos.',
-    'PASO 1 — Investiga (usa WebSearch varias veces): busca Shorts/TikTok/Reels de historia, prehistoria, ciencia, guerras, espacio y misterios que se hayan vuelto virales en los últimos meses (millones de vistas). Busca cosas como "historia shorts viral", "prehistoria tiktok millones vistas", "datos historia virales 2026", "science shorts viral history", etc. Fíjate en el ÁNGULO y el GANCHO que los hizo virales (la pregunta, el dato impactante, el "no sabías que…").',
+    ident
+      ? 'Eres estratega de contenido de este canal. IDENTIDAD DEL CANAL (manda sobre todo; propón SOLO de este nicho, nada de otros temas): ' + ident + ' Formato: Shorts/TikTok/Reels verticales cortos, hechos con IA, una sola voz.'
+      : 'Eres estratega de contenido de VYRALES: canal en español (Latinoamérica y EE. UU.) de documentales cortos verticales (YouTube Shorts, TikTok, Reels), hechos con IA, narrados por una sola voz solemne con pausas dramáticas.',
+    'TU TRABAJO: primero BUSCA qué está siendo VIRAL AHORA en nuestro nicho, y recién después propón los próximos videos. No te limites a repetir lo que ya hicimos.',
+    ident
+      ? 'PASO 1 — Investiga (usa WebSearch): busca Shorts/TikTok/Reels de ESTE nicho que se hayan vuelto virales en los últimos meses (millones de vistas). Fíjate en el ÁNGULO y el GANCHO que los hizo virales.'
+      : 'PASO 1 — Investiga (usa WebSearch varias veces): busca Shorts/TikTok/Reels de historia, prehistoria, ciencia, guerras, espacio y misterios que se hayan vuelto virales en los últimos meses (millones de vistas). Busca cosas como "historia shorts viral", "prehistoria tiktok millones vistas", "datos historia virales 2026", "science shorts viral history", etc. Fíjate en el ÁNGULO y el GANCHO que los hizo virales (la pregunta, el dato impactante, el "no sabías que…").',
     'PASO 2 — Cruza esos ángulos virales con lo que YA nos funciona a nosotros (ver datos abajo) y propón videos nuevos que aún no hayamos hecho.',
-    'REGLAS: temas reales y verificables; apto para toda la familia; nada de desinformación ni clickbait que el video no cumpla; el gancho EMPIEZA por el dato que más llama la atención (ej. "La Tercera Guerra Mundial estuvo a punto de empezar…"); cada video se entiende solo; duración 60–110 s.',
+    ident
+      ? 'REGLAS: contenido útil y honesto del nicho del canal; nada de clickbait que el video no cumpla; el gancho EMPIEZA por lo que más engancha; cada video se entiende solo; duración 30–90 s.'
+      : 'REGLAS: temas reales y verificables; apto para toda la familia; nada de desinformación ni clickbait que el video no cumpla; el gancho EMPIEZA por el dato que más llama la atención (ej. "La Tercera Guerra Mundial estuvo a punto de empezar…"); cada video se entiende solo; duración 60–110 s.',
     'VARIEDAD OBLIGATORIA: las 6 ideas deben cubrir AL MENOS 4 temas distintos de la lista. Máximo 2 ideas del mismo tema. No propongas 6 veces el mismo tema aunque sea el que más vistas nos da.',
     'HONESTIDAD: en "por_que" cita en qué te basas — el video/tendencia viral que viste al buscar (con nº aproximado de vistas si lo sabes) o nuestro propio dato. Si es una prueba de tema nuevo, dilo.',
     focus ? `El creador pide enfocarse en: ${focus}` : '',

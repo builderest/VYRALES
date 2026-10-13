@@ -191,10 +191,20 @@ async function viralRefs(sb) {
   let t;
   try { t = await ytToken(sb); } catch (_) { t = null; }
   if (!t || !t.token) return '';
+  // Cada canal busca virales de SU nicho (oct-13). El principal usa historia; un canal usa sus términos (settings.nicho).
+  let queries = VIRAL_QUERIES;
+  try {
+    const T = require('./_tenant'); const ws = T.currentWs();
+    if (ws && ws !== T.ADMIN_WS) {
+      const { data: w } = await sb.from('workspaces').select('settings').eq('id', ws).maybeSingle();
+      const nq = w && w.settings && w.settings.nicho && w.settings.nicho.queries;
+      if (Array.isArray(nq) && nq.length) queries = nq.map((q) => ['Nicho', q]);
+    }
+  } catch (_) {}
   const H = { headers: { Authorization: 'Bearer ' + t.token } };
   const after = new Date(Date.now() - 180 * 86400000).toISOString();
   const seen = new Set(); const refs = [];
-  for (const [topic, q] of VIRAL_QUERIES) {
+  for (const [topic, q] of queries) {
     try {
       const su = 'https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=8&order=viewCount&relevanceLanguage=es&regionCode=US&videoDuration=short&publishedAfter=' + after + '&q=' + encodeURIComponent(q);
       const sr = await getJson(su, H);

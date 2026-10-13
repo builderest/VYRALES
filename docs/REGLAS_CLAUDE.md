@@ -183,3 +183,10 @@ Franklin (admin) quiere tener VARIOS canales en su misma cuenta y cambiar entre 
 - Pendiente F2: cookie vyrales_ws = canal activo, que SOLO el admin puede poner; withTenant la respeta → ctx.wsId = canal elegido. Sin cookie = ADMIN_WS (como hoy).
 - Pendiente F3: en _tenant, tratar owner_ws=ADMIN_WS como admin para Claude (permitido) y créditos (no cobra); memoria del guionista por canal (memoria/<ws>/…).
 - Pendiente F4 (diseño de Franklin): selector de canal arriba + botón "Nuevo canal".
+
+## Canales — F2 y F3 (oct-13, probadas)
+- F2 (cambiar sin salir): cookie vyrales_ws = canal activo. _tenant.parseActiveWs + en withTenant: SOLO admin y SOLO a su principal o a un canal suyo (owner_ws=admin) → ctx.wsId = canal, sigue isAdmin. Sin cookie = principal. workspaces.js action 'switch' pone/borra la cookie (Set-Cookie, mismos candados que el login).
+- F3 (Claude gratis + guionista por canal): _tenant.agentJobFields → un canal del admin (owner_ws=admin) se trata como admin (claude_ permitido, sin cobrar créditos). _memoria por canal con BASE compartida (opción A de Franklin): el canal lee las reglas GENERALES del principal (memoria/) + las suyas (memoria/<ws>/); escribe solo en las suyas. cache por carpeta (ojo: filas en paralelo). IDENTIDAD por canal en workspaces.settings.identidad (va primero en cada prompt de Claude). NICHO en settings.nicho {queries, topics}: viralRefs busca virales de ese nicho y ideasPrompt propone de ese nicho (el principal sigue en historia).
+- workspaces.js: create acepta identidad/queries/topics; action 'identidad' para editarlos.
+- Canal real creado: "MindFuel Rise" (superación personal / estilo de vida, EE. UU.). Falta conectarle sus redes.
+- Pendiente F4 (diseño de Franklin): selector de canal + botón "Nuevo canal" + editar identidad/nicho.
