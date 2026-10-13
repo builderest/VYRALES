@@ -205,3 +205,9 @@ Franklin (admin) quiere tener VARIOS canales en su misma cuenta y cambiar entre 
 - Franklin: "demasiados videos fallan en la primera toma; la memoria debe aprender para no repetir errores; entender LTX al 100%".
 - HECHO: el conocimiento de LTX ya está metido en _guionista.js (al escribir: nunca still/steady, no humo de relleno, cámara en movimiento, cfg=1) y en _king.ltxPromptFor (limpia quietud, humo, cámara "held"). El hueco era que NO se guardaban soluciones (0 qa_arreglo). Arreglado: el bucle nuevo del QA guarda problema→solución.
 - _memoria.memoryBlock ahora añade "ERRORES RECIENTES DE LTX QUE NO DEBES REPETIR" (últimos 6 qa_arreglo + 4 qa_falla) → el guionista los ve al escribir cada episodio, para no repetirlos desde la primera toma. Se antepone a todas las llamadas creativas de Claude. Por canal (dir()).
+
+## Quietud de LTX: depende de la escena (oct-13)
+- Franklin: "still/steady/stay depende de la escena, solo en casos específicos; y cuando el objeto principal NO debe moverse".
+- Causa del "NUNCA" tan estricto: LTX cfg=1 lee literal y "stays still/motionless" CONGELA toda la toma (Toba T16/T33).
+- _guionista.js (regla de action_en): ya no es "NUNCA quietud" a secas. Ahora: no escribas órdenes de quietud (still/steady/stay/...), pero la quietud SÍ se logra según la escena: (a) calma = ESTADO con movimiento mínimo real ("agua en calma, ondas lentas"); (b) OBJETO PRINCIPAL que no debe moverse (maqueta, cráneo, mapa, pieza rígida) = poner "camera_only": true (el objeto queda EXACTO, solo se mueve la cámara y la luz).
+- El resto ya lo soportaba: _king.ltxPromptFor arma el prompt rígido para camera_only; _qa.js NO castiga por "no action" en camera_only (action_ok=true con el paneo; broken si el objeto cambia de forma); rewriteShot respeta camera_only; import-largo.fixShots preserva el campo (no hay lista blanca).
