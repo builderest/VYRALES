@@ -30,7 +30,7 @@ async function write(model, price, prompt) {
   return { data, costUsd: ((u.promptTokenCount || 5000) * price.input + ((u.candidatesTokenCount || 5000) + (u.thoughtsTokenCount || 0)) * price.output) / 1e6, model };
 }
 
-function ideaPrompt(idea) {
+function ideaPrompt(idea, canal = '') {
   const tipo = tipoFor(idea.tema);
   const topic = [
     idea.titulo ? `Título: ${idea.titulo}` : '',
@@ -38,7 +38,7 @@ function ideaPrompt(idea) {
     idea.por_que ? `Por qué este tema (dato del canal): ${idea.por_que}` : '',
     `Duración objetivo: ${Math.max(60, Math.min(110, Number(idea.duracion_s) || 80))} s. Video que se entiende solo (no es parte de una serie).`
   ].filter(Boolean).join('\n');
-  return { tipo, prompt: buildNarratedPrompt(tipo, { topic }) };
+  return { tipo, prompt: buildNarratedPrompt(tipo, { topic, canal }) };
 }
 
 // Revisor (prompts detallados) + validación. llm = null → Gemini por API; o Claude en la PC.

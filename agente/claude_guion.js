@@ -59,7 +59,8 @@ async function job(id) {
     const req = await (await fetch(u.publicUrl + '?t=' + Date.now())).json();
     const idea = req.idea || {};
     console.log('Guionista Claude →', idea.titulo || '(sin título)');
-    const { tipo, prompt } = ideaPrompt(idea);
+    const canal = await require(path.join(ROOT, 'netlify', 'functions', '_memoria')).memoryBlock(supabase).catch(() => '');
+    const { tipo, prompt } = ideaPrompt(idea, canal);
     const t = Date.now();
     let data;
     for (let k = 1; k <= 2 && !data; k++) {

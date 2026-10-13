@@ -170,7 +170,7 @@ function continuousVariant(raw) {
 // Prompt maestro LIMPIO (oct-2026: "solo el prompt maestro y ya"): sin temas ni frases de ejemplo
 // metidas (Claude las copiaba). Las reglas se quedan; los ejemplos entre paréntesis con comillas se quitan
 // de la parte de instrucciones (el JSON de ejemplo no se toca). La idea la escribe el usuario al final.
-function buildNarratedPrompt(tipo = 'curiosidades', { topic = '' } = {}) {
+function buildNarratedPrompt(tipo = 'curiosidades', { topic = '', canal = '' } = {}) {
   const p = TIPOS[tipo] || TIPOS.curiosidades;
   const raw = buildNarratedPromptRaw(tipo, p);
   const cut = raw.indexOf('=== JSON A ENTREGAR');
@@ -184,7 +184,8 @@ function buildNarratedPrompt(tipo = 'curiosidades', { topic = '' } = {}) {
   const idea = tipo === 'frases'
     ? `=== MI IDEA ===\nFrase exacta (va en continuity.voice_text palabra por palabra, sin cambiar nada):\n${topic || '<escribe aquí tu frase>'}\n`
     : `=== MI IDEA ===\nTema del video:\n${topic || '<escribe aquí tu tema>'}\n(Si no escribes tema, elige tú ${p.temaDefault}.)\n`;
-  return head + (cut2 > 0 ? body.slice(cut2) : '') + '\n\n' + idea;
+  const canalBlock = canal ? '=== IDENTIDAD DEL CANAL (MANDA SOBRE TODO) ===\nEscribe para ESTE canal: su nicho, su voz, su IDIOMA y lo que ya aprendió. Si algo choca con la plantilla de abajo, GANA esto.\n' + canal + '\n\n' : '';
+  return canalBlock + head + (cut2 > 0 ? body.slice(cut2) : '') + '\n\n' + idea;
 }
 
 // VIDEO LARGO (8–15 min, YouTube horizontal) + SHORTS VERTICALES QUE LLEVAN AL LARGO (Franklin, oct-11:
