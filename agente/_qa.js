@@ -93,12 +93,14 @@ Responde SOLO este JSON: {"tomas":[{"n":1,"image_ok":true,"action_ok":true,"haze
 // Claude ($0) reescribe la toma usando lo que vio el control de calidad. NUNCA toca la narración (la voz es fija):
 // solo cámara/acción/final, la imagen (start_en) si no cuadra con la narración, o propone PARTIR la toma cuando la
 // frase nombra 2+ cosas distintas (los pedazos son la MISMA frase cortada, palabra por palabra).
-async function rewriteShot(sh, reason, log, { allowImage = false, allowSplit = true } = {}) {
+async function rewriteShot(sh, reason, log, { allowImage = false, allowSplit = true, context = '' } = {}) {
   const { runClaude, parseJson } = require('./_claude');
   const prompt = `Eres el director de fotografía de un documental hecho con LTX (modelo de video que parte de una imagen fija y HACE todo lo que lee).
-Una toma salió mal. Arréglala para que no vuelva a pasar${sh.camera_only ? ' (es una toma de SOLO CÁMARA: el objeto no se mueve ni cambia de forma; solo cambia el movimiento de cámara, y la acción describe ese paneo y la luz que lo recorre)' : ''} (si ya se reescribió antes, cambia de enfoque: otro movimiento de cámara, una acción más simple).
+Una toma salió mal${sh.camera_only ? ' (es una toma de SOLO CÁMARA: el objeto no se mueve ni cambia de forma; solo cambia el movimiento de cámara, y la acción describe ese paneo y la luz que lo recorre)' : ''}. Arréglala de verdad.
+SÉ INDEPENDIENTE Y CREATIVO: si esta toma YA falló antes, NO hagas un ajuste tímido ni repitas casi lo mismo — REPIENSA la imagen desde cero (otro ángulo, otra composición, otra forma concreta de mostrar lo que dice la narración). El objetivo es que salga BIEN, no que se parezca al intento anterior. Piensa a dónde va la escena (ver contexto) para que la imagen tenga sentido con lo que viene.
 
 Narración (FIJA: NO la cambies, no la reescribas, no la resumas): "${lineOf(sh)}"
+${context ? 'Contexto (lo que se dice ANTES y DESPUÉS, para que la imagen conecte con el relato): ' + context + '\n' : ''}
 La imagen inicial muestra: ${sh.start_en || ''}
 Cámara actual: ${sh.camera || ''}
 Acción actual: ${sh.action_en || ''}
@@ -111,8 +113,9 @@ Reglas:
 - La acción (25–45 palabras, inglés) describe SOLO lo que se mueve en el sujeto principal, con verbos visibles y una dirección. Tiene que VERSE claramente en 6 segundos: nada de "respira", "parpadea" o gestos mínimos; si el sujeto es una persona pequeña o lejana, que camine, se agache, levante algo o señale. Si una persona se salía del cuadro, que se mueva DENTRO del cuadro (hacia la cámara o de lado corto), nunca hacia fuera. Nunca uses still, steady, stay, remain, fixed, motionless, frozen, static, suspended.
 - Si el sujeto es humo, una columna de erupción, nubes o polvo: usa verbos de turbulencia visibles (billows, churns, rolls, swells and expands outward, grows taller) para que su forma CAMBIE durante la toma.
 - No nombres objetos que no estén en la imagen. No humo ni neblina de relleno (solo si la narración trata de eso).
+- NADA se inunda, aparece, desaparece ni se transforma: el sujeto y el suelo mantienen su forma. Si hay agua y la escena NO es de agua, NO la hagas fluir ni encharcar (LTX la vuelve una inundación que tapa todo); logra el movimiento con la cámara y un brillo de luz leve.
 - El final (12–25 palabras, inglés) es el estado final de ESE mismo movimiento, con el sujeto todavía en cuadro.
-${allowImage ? '- Puedes cambiar la imagen: "start_en" (45–80 palabras, inglés) describe el cuadro inicial en el momento JUSTO ANTES o DURANTE el movimiento (nunca "frozen mid-fall"), plano y lente, sujeto con detalles, lugar, luz.' : '- No cambies la imagen (no devuelvas start_en).'}
+${allowImage ? '- CAMBIA la imagen (es parte del problema): "start_en" (45–80 palabras, inglés) SÚPER específica para Flow. Di el MATERIAL y la TEXTURA REAL del sujeto (grietas, poros, rugosidad, desgaste, suciedad, barro, óxido, pelo, piel) y colores apagados y realistas, para que NUNCA salga liso, brillante ni apetitoso tipo comida (bola de helado, chocolate, caramelo). Di plano y lente, 2–3 detalles concretos del sujeto, el lugar, la luz. Si el intento anterior salió liso o irreconocible, descríbelo de otra forma más clara y reconocible de lo que ES.' : '- No cambies la imagen (no devuelvas start_en).'}
 ${allowSplit ? '- Si la narración nombra 2 a 4 cosas visualmente distintas que no caben en una sola imagen, PARTE la toma: "split" = lista de pedazos; cada "line" es un trozo EXACTO y seguido de la narración (todas juntas forman la narración palabra por palabra, mínimo 3 palabras cada una) con su propia imagen y movimiento. Si no hace falta, no la partas.' : ''}
 Responde SOLO uno de estos JSON:
 {"camera":"...","action_en":"...","reaction_en":"..."${allowImage ? ',"start_en":"...","background_en":"3–4 cosas del lugar de la NUEVA imagen, solo nombradas"' : ''}}
@@ -263,9 +266,13 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
       while (tries < 3 && !done) {
         if (await yaAprobada(t.n, shNow)) { log(`QA toma ${t.n}: la aprobaste a mano → la dejo`); done = true; break; }
         await setWorking(t.n, 'rehacer');
+        // Contexto: lo que se dice ANTES y DESPUÉS, para que la imagen conecte con el relato (ej. T6 "algo redondo" → T7 "es un cráneo").
+        const ctxA = (ep2.shots || []).find((x) => x.n === t.n - 1);
+        const ctxB = (ep2.shots || []).find((x) => x.n === t.n + 1);
+        const context = [ctxA ? 'antes: "' + lineOf(ctxA) + '"' : '', ctxB ? 'después: "' + lineOf(ctxB) + '"' : ''].filter(Boolean).join(' · ');
         // 1) Reescribir el prompt con lo que vio el QA (repetir el mismo da el mismo error).
         try {
-          const fix = await rewriteShot(shNow, reason, log, { allowImage: newFrame, allowSplit: true });
+          const fix = await rewriteShot(shNow, reason, log, { allowImage: newFrame, allowSplit: true, context });
           if (fix && fix.split) { splits.push({ n: t.n, parts: fix.split }); log(`QA toma ${t.n}: Claude la parte en ${fix.split.length} tomas (misma narración)`); done = true; break; }
           if (fix) {
             const { data: fr } = await supabase.from('episodes').select('shots').eq('id', epId).single();

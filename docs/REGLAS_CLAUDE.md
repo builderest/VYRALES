@@ -223,3 +223,8 @@ Franklin (admin) quiere tener VARIOS canales en su misma cuenta y cambiar entre 
 - queueFullRenders (agente.js): NO encola la calidad completa (726 MB en la PC) si hay un qa_tomas/regen_local/gen_local del MISMO episodio pendiente o corriendo. Espera a que termine el QA; entonces la arma una sola vez.
 - qa_tomas.js y regen_local.js: NO unen el video final si quedó un qa_tomas:<ep> pendiente (cedió el turno a un manual o sigue). Se une cuando termina todo.
 - Manual: botón "Unir sin editar" (mergeEpisode) une las tomas cuando el usuario quiera. (Posible: botón para armar calidad completa a mano.)
+
+## QA "rehacer" más creativo y específico — que ni LTX ni Flow inventen (oct-13)
+- Franklin: el rehacer debe ser más independiente/creativo, NO quedarse con la misma imagen mala, y escribir prompts SÚPER específicos para LTX (movimiento) y Flow (imagen).
+- _qa.js rewriteShot: ahora (1) si la toma ya falló, REPIENSA la imagen desde cero (otro ángulo/composición), no un ajuste tímido; (2) imagen SÚPER específica para Flow: material y textura real (grietas, poros, rugosidad, barro, óxido…), colores apagados, para que NUNCA salga lisa/brillante/tipo comida (helado, chocolate); (3) nada se inunda, aparece, desaparece ni se transforma; agua que fluye solo si la escena ES de agua (si no, LTX la vuelve inundación que tapa todo); (4) recibe CONTEXTO (narración de antes y después) para que la imagen conecte con el relato (ej. T6 "algo redondo" → T7 "es un cráneo" → imagen de hueso).
+- Reglas nuevas en memoria: bola de helado/comida; agua=inundación.
