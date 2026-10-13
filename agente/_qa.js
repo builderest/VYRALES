@@ -240,7 +240,18 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
       await supabase.from('episodes').update({ shots: (fr.shots || []).map((x) => x.n === n ? Object.assign({}, x, { qa: Object.assign({}, x.qa || {}, { redone: true, tries }) }, boost ? { qa_boost: true } : {}) : x) }).eq('id', epId);
     };
     const yaAprobada = async (n, sh) => { try { const { data } = await supabase.from('assets').select('approved').eq('episode_id', epId).eq('kind', 'video_clip').eq('shot_number', n).order('updated_at', { ascending: false }).limit(1); return !!(data && data[0] && data[0].approved && !(sh && sh.qa && sh.qa.force)); } catch (_) { return false; } };
+    // Franklin (oct-13): si mandas un video MANUAL (gen_local/regen_local/toma_local) mientras el QA corre,
+    // el QA NO se traba: termina la toma actual, le CEDE el turno al manual (prioridad) y se re-encola para
+    // seguir después justo donde quedó (las tomas ya buenas no se re-escanean).
+    const hayTrabajoManual = async () => { try { const { data } = await supabase.from('agent_jobs').select('command').eq('status', 'pending'); return (data || []).some((j) => /^(gen_local|regen_local|toma_local):/.test(j.command)); } catch (_) { return false; } };
+    const reencolarQA = async () => { try { const { data: ex } = await supabase.from('agent_jobs').select('id').eq('status', 'pending').eq('command', 'qa_tomas:' + epId).limit(1); if (ex && ex.length) return; const row = { command: 'qa_tomas:' + epId }; if (process.env.VYRALES_WS) row.workspace_id = process.env.VYRALES_WS; await supabase.from('agent_jobs').insert(row); } catch (_) {} };
     for (const t of todo) {
+      if (await hayTrabajoManual()) {
+        log('QA: hay un video manual en cola → le doy prioridad. Termino aquí; el QA se re-encola y sigue después donde quedó (sin re-escanear las buenas).');
+        await reencolarQA();
+        await setWorking(null);
+        return redone;
+      }
       if (await yaAprobada(t.n, t.sh)) { log(`QA toma ${t.n}: la aprobaste a mano → no se rehace`); continue; }
       let tries = prevTries[t.n];
       let reason = t.reason;
