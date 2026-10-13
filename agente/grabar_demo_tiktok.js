@@ -172,7 +172,14 @@ async function main() {
       console.log('\n[diag Step 3] por qué no salió el botón:\n' + JSON.stringify(d, null, 1) + '\n');
       throw e;
     }
-    await page.evaluate(() => window.goPublish && window.goPublish()); await sleep(1500);
+    // Panel nuevo por SECCIONES: el panel de publicar vive en la vista "Revisar y publicar".
+    // En "Inicio" el botón existe pero queda OCULTO, por eso hay que cambiar de vista.
+    await page.evaluate(() => {
+      if (window.vyPanel && window.vyPanel.setView) window.vyPanel.setView('revisar');
+      else { try { location.hash = '#revisar'; } catch (_) {} }
+    });
+    await sleep(1200);
+    await page.evaluate(() => window.goPublish && window.goPublish()); await sleep(1200);
     await postBtn.waitFor({ state: 'visible', timeout: 30000 });
     await cap('They click "Post to TikTok". VYRALES first asks TikTok for the creator’s current info (creator_info API).', 3500);
     await click(postBtn, 4000);
@@ -212,7 +219,7 @@ async function main() {
     await cap('The creator clicks "Post". Nothing is posted without this explicit action.', 3000);
     await click(page.locator('#ttSubmit'), 3500);
     await cap('VYRALES uploads the video with the Content Posting API (Direct Post). TikTok may take a few minutes to process it; the creator is told this.', 5000);
-    await page.evaluate(() => { const m = document.getElementById('ttModal'); if (m) m.remove(); window.goPublish && window.goPublish(); });
+    await page.evaluate(() => { const m = document.getElementById('ttModal'); if (m) m.remove(); if (window.vyPanel && window.vyPanel.setView) window.vyPanel.setView('revisar'); window.goPublish && window.goPublish(); });
 
     // 4) Esperar a TikTok (consulta Supabase) y mostrar el resultado
     let run = null;
@@ -223,7 +230,7 @@ async function main() {
       if (run && run.status !== 'running') break;
     }
     await page.reload({ waitUntil: 'domcontentloaded' }).catch(() => {}); await sleep(4000);
-    await page.evaluate(() => window.goPublish && window.goPublish()); await sleep(1500);
+    await page.evaluate(() => { if (window.vyPanel && window.vyPanel.setView) window.vyPanel.setView('revisar'); window.goPublish && window.goPublish(); }); await sleep(1500);
     if (!run || run.status === 'error') {
       await cap('Status: ' + ((run && run.error) || 'no answer from TikTok'), 6000);
       throw new Error('La publicación en TikTok falló: ' + ((run && run.error) || 'sin respuesta') + ' (el video demo quedó grabado igual hasta aquí)');
