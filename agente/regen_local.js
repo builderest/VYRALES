@@ -22,15 +22,19 @@ async function main() {
   const { data: ep } = await supabase.from('episodes').select('id, episode_number, series_id, assets(id, kind, shot_number, created_at, updated_at)').eq('id', epId).single();
   const { data: series } = await supabase.from('series').select('id, slug, title, genre, story_bible').eq('id', ep.series_id).single();
   const { handler } = require(path.join(ROOT, 'netlify', 'functions', 'regen-shot-background'));
+  // "Rehaciendo ahora" en el panel (Franklin oct-13): marca la toma en curso (como el QA).
+  const setWorking = async (n, what) => { try { const { data: fr } = await supabase.from('episodes').select('validator_report').eq('id', epId).single(); await supabase.from('episodes').update({ validator_report: Object.assign({}, fr.validator_report || {}, { qa_working: n == null ? null : { n, at: new Date().toISOString(), what: what || 'rehacer' } }) }).eq('id', epId); } catch (_) {} };
   const todo = [...withFrame.map((n) => [n, true]), ...videoOnly.filter((n) => !withFrame.includes(n)).map((n) => [n, false])].sort((x, y) => x[0] - y[0]);
   const fallas = [];
   for (const [n, frame] of todo) {
     const asset = (ep.assets || []).filter((x) => x.kind === 'video_clip' && x.shot_number === n).sort((x, y) => String(y.updated_at || y.created_at).localeCompare(String(x.updated_at || x.created_at)))[0];
     if (!asset) { console.log(`toma ${n}: no tiene video, la salto`); continue; }
     console.log(`\nTOMA ${n}: rehaciendo ${frame ? 'cuadro inicial + video' : 'video'} en king...`);
+    await setWorking(n, 'rehacer');
     const r = await handler({ httpMethod: 'POST', headers: { 'x-vyrales-key': process.env.DASHBOARD_KEY || '' }, /* llamada interna = "sistema" (multiusuario) */ body: JSON.stringify({ assetId: asset.id, provider: 'king', new_frame: frame }) });
     if (r.statusCode >= 400) { console.log(`TOMA ${n}: FALLÓ ${String(r.body).slice(0, 300)}`); fallas.push(n); } else console.log(`TOMA ${n}: lista ✅`);
   }
+  await setWorking(null);
   // Control de calidad automático (duración contra la voz + clips congelados).
   try { await require('./_qa').qaShots({ supabase, epId, handler, log: (...x) => console.log(...x) }); }
   catch (e) { console.log('QA: no se pudo (' + String(e.message).slice(0, 200) + ')'); }
