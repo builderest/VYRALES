@@ -44,6 +44,17 @@ async function main() {
   const { data: series } = await supabase.from('series').select('slug').eq('id', ep.series_id).single();
   if (!(((ep.validator_report || {}).publish_package || {}).status === 'done')) throw new Error('El episodio no tiene "Preparar textos y portada" hecho.');
 
+  // DEMO LIMPIO: borra la marca de "ya publicado en TikTok" de este episodio, para que la grabación
+  // muestre el flujo de publicación DESDE CERO (sin "Ya publicado en TikTok como Solo yo" ni el aviso
+  // de video duplicado). No despublica nada en TikTok; solo limpia el estado en el panel.
+  {
+    const vr = ep.validator_report || {};
+    if (vr.social_runs && vr.social_runs.tiktok) delete vr.social_runs.tiktok;
+    if (vr.published && vr.published.tiktok) delete vr.published.tiktok;
+    await supabase.from('episodes').update({ validator_report: vr, published_at: null }).eq('id', DEMO_EP);
+    console.log('Demo limpio: quité la marca de "publicado en TikTok" de este episodio.');
+  }
+
   const { chromium } = loadPlaywright();
   // Playwright graba con SU propio ffmpeg (C:\Users\<tú>\AppData\Local\ms-playwright\ffmpeg-*). Se baja una vez (~1 MB).
   try {
@@ -55,11 +66,11 @@ async function main() {
   const rawDir = path.join(OUT, 'raw_' + Date.now());
   let browser = null;
   for (const channel of ['chrome', 'msedge']) {
-    try { browser = await chromium.launch({ channel, headless: false, args: ['--window-size=1300,900'] }); console.log('Navegador:', channel); break; }
+    try { browser = await chromium.launch({ channel, headless: false, args: ['--window-size=1940,1180'] }); console.log('Navegador:', channel); break; }
     catch (e) { console.log('No pude abrir', channel, '→', String(e.message).split('\n')[0]); }
   }
   if (!browser) throw new Error('No encontré Microsoft Edge ni Google Chrome en esta PC.');
-  const context = await browser.newContext({ viewport: { width: 1280, height: 800 }, recordVideo: { dir: rawDir, size: { width: 1280, height: 800 } }, locale: 'en-US' });
+  const context = await browser.newContext({ viewport: { width: 1920, height: 1080 }, recordVideo: { dir: rawDir, size: { width: 1920, height: 1080 } }, locale: 'en-US' });
   // Sesión de VYRALES: la misma cookie firmada que da el login (netlify/edge-functions/auth.js).
   const exp = String(Date.now() + 3 * 3600 * 1000);
   const sig = crypto.createHmac('sha256', key).update('vyrales:' + exp).digest('hex');
@@ -91,7 +102,7 @@ async function main() {
 
   try {
     // 1) VYRALES
-    await page.goto(SITE + '/', { waitUntil: 'domcontentloaded' });
+    await page.goto(SITE + '/?series=' + encodeURIComponent(series.slug), { waitUntil: 'domcontentloaded' });
     await sleep(2500);
     await cap('VYRALES (vyrales.app) is a web app where a creator produces short vertical videos with AI and publishes them to their OWN TikTok account.', 6000);
     await cap('The creator is signed in to VYRALES. Step 1: connect TikTok from the "Redes" (Social accounts) button.', 4000);
@@ -122,8 +133,13 @@ async function main() {
 
     // 3) Panel PUBLICAR → Post to TikTok
     await cap('Step 3: the creator opens the PUBLISH panel of a finished video.', 3000);
-    await page.evaluate(() => window.goPublish && window.goPublish()); await sleep(2500);
+    // Panel nuevo: hay que FIJAR el episodio a revisar (vyReviewEp recarga el panel con ese episodio);
+    // sin esto el panel muestra "el último de la serie" y el botón de este episodio no se dibuja.
+    await page.evaluate((id) => window.vyReviewEp && window.vyReviewEp(id), DEMO_EP);
     const postBtn = page.locator('#ttPostBtn_' + DEMO_EP);
+    // Esperar a que el panel de ESTE episodio se dibuje (recarga asíncrona), luego abrir la caja y verlo.
+    await postBtn.waitFor({ state: 'attached', timeout: 45000 });
+    await page.evaluate(() => window.goPublish && window.goPublish()); await sleep(1500);
     await postBtn.waitFor({ state: 'visible', timeout: 30000 });
     await cap('They click "Post to TikTok". VYRALES first asks TikTok for the creator’s current info (creator_info API).', 3500);
     await click(postBtn, 4000);
