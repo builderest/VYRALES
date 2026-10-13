@@ -19,6 +19,8 @@ process.env.VYRALES_LOCAL_RUN = '1';
   const { data: chk } = await supabase.from('episodes').select('assets(kind, created_at)').eq('id', epId).single();
   const lastClip = (chk.assets || []).filter((a) => a.kind === 'video_clip').map((a) => a.created_at).sort().pop() || '';
   const lastFinal = (chk.assets || []).filter((a) => a.kind === 'final_render').map((a) => a.created_at).sort().pop() || '';
+  const { data: cont } = await supabase.from('agent_jobs').select('id').eq('status', 'pending').eq('command', 'qa_tomas:' + epId).limit(1);
+  if (cont && cont.length) { console.log('QA: quedó pendiente (cedió el turno a un trabajo manual o sigue en otra corrida) → NO uno el video todavía, se une cuando termine todo.'); return; }
   if (redone.length || lastFinal < lastClip) {
     const { mergeEpisodeVideo } = require(path.join(ROOT, 'netlify', 'functions', '_merge'));
     const { data: ep } = await supabase.from('episodes').select('*, assets(*)').eq('id', epId).single();

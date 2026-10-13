@@ -38,6 +38,8 @@ async function main() {
   // Control de calidad automático (duración contra la voz + clips congelados).
   try { await require('./_qa').qaShots({ supabase, epId, handler, log: (...x) => console.log(...x) }); }
   catch (e) { console.log('QA: no se pudo (' + String(e.message).slice(0, 200) + ')'); }
+  const { data: cont } = await supabase.from('agent_jobs').select('id').eq('status', 'pending').eq('command', 'qa_tomas:' + epId).limit(1);
+  if (cont && cont.length) { console.log('QA quedó pendiente (cedió el turno a un manual) → NO uno el video todavía; se une cuando termine todo el QA.'); return; }
   console.log('\nUniendo el video final de nuevo...');
   const { mergeEpisodeVideo } = require(path.join(ROOT, 'netlify', 'functions', '_merge'));
   const { data: fresh } = await supabase.from('episodes').select('*, assets(*)').eq('id', epId).single();

@@ -358,6 +358,12 @@ async function queueFullRenders() {
   }
   const todo = finsOk.find((a) => !(have[a.episode_id] || []).includes(a.storage_path) && (failedRenders[a.storage_path] || 0) < 2);
   if (!todo) return;
+  // No armar la calidad completa (726 MB) mientras el QA, un regen o la generación del MISMO episodio siguen
+  // corriendo (Franklin oct-13: "no renderices el video completo hasta que termine todo el QA"). Espera a que acaben.
+  try {
+    const { data: ocup } = await sb.from('agent_jobs').select('command').in('status', ['pending', 'running']);
+    if ((ocup || []).some((j) => new RegExp('^(qa_tomas|regen_local|gen_local):' + todo.episode_id).test(j.command))) return;
+  } catch (_) {}
   // Solo espera si ya hay una calidad completa en la fila (antes esperaba a que la PC estuviera LIBRE: con el QA de un
   // largo corriendo 8 h, la calidad completa nunca empezaba; oct-12). Va en la fila general, en paralelo con king.
   const { data: open } = await sb.from('agent_jobs').select('id').in('status', ['pending', 'running']).like('command', 'render_full:%').limit(1);

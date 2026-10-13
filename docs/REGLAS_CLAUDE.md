@@ -217,3 +217,9 @@ Franklin (admin) quiere tener VARIOS canales en su misma cuenta y cambiar entre 
 - Antes: qa_tomas era un trabajo monolítico que tomaba la fila de king por horas; un regen_local/gen_local manual esperaba a que TODO el QA terminara (y con el bug viejo se trababa).
 - Ahora, _qa.js: entre toma y toma el QA revisa si hay un gen_local/regen_local/toma_local PENDIENTE. Si lo hay: termina la toma actual, se re-encola (qa_tomas:<ep>, sin duplicar) y hace return → el manual corre primero (FIFO por created_at), y el qa_tomas re-encolado sigue después SIN re-escanear las buenas (salta qa.ok). Así el manual tiene prioridad y el QA retoma donde quedó, y el manual queda revisado por ese qa_tomas re-encolado.
 - También: toma 75 EP6 tenía camera_only=true en una acción de sacar carne (dejaba el elefante rígido/entero). Arreglado (camera_only=false) + regla: nunca camera_only en cortar/descuartizar/sacar carne.
+
+## No armar el video completo hasta que termine el QA (oct-13)
+- Franklin: "después de cada toma no debe renderizar el video completo hasta que no termine todo el QA; pérdida de tiempo; que haya forma manual".
+- queueFullRenders (agente.js): NO encola la calidad completa (726 MB en la PC) si hay un qa_tomas/regen_local/gen_local del MISMO episodio pendiente o corriendo. Espera a que termine el QA; entonces la arma una sola vez.
+- qa_tomas.js y regen_local.js: NO unen el video final si quedó un qa_tomas:<ep> pendiente (cedió el turno a un manual o sigue). Se une cuando termina todo.
+- Manual: botón "Unir sin editar" (mergeEpisode) une las tomas cuando el usuario quiera. (Posible: botón para armar calidad completa a mano.)
