@@ -19,7 +19,8 @@ exports.handler = async (event) => {
     // Lista de todas las series para el selector del dashboard.
     const { data: allSeries } = await byWs(supabase
       .from('series')
-      .select('id, slug, title, genre, created_at'))
+      .select('id, slug, title, genre, created_at')
+      .neq('is_active', false))
       .order('created_at', { ascending: false });
 
     const { data: series, error: seriesError } = await byWs(supabase
