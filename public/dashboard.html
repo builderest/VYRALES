@@ -1623,6 +1623,17 @@
       function renderShotCard(asset, index, total) {
         const shotNo = asset.shot_number || (index + 1);
         const isCliff = shotNo === total;
+        // Estados (Franklin oct-13): PENDIENTE (falta QA) → REVISADA (QA ok, falta tu OK) → APROBADO (tú). Y "editándose ahora".
+        const _ep0 = ((lastLoadedData && lastLoadedData.episodes) || []).find(e => (e.assets || []).some(x => x.id === asset.id));
+        const _sh0 = _ep0 && (_ep0.shots || []).find(x => x.n === shotNo);
+        const _qa0 = _sh0 && _sh0.qa;
+        const qaReviewed = !!(_qa0 && _qa0.ok && (!_qa0.clip_id || _qa0.clip_id === asset.id));
+        const _qw = (_ep0 && _ep0.validator_report && _ep0.validator_report.qa_working) || null;
+        const editingNow = !!(_qw && _qw.n === shotNo && _qw.at && (Date.now() - new Date(_qw.at).getTime() < 25 * 60000) && !asset.approved);
+        const est = asset.approved ? { t: 'APROBADO', c: 'text-cyber-emerald' }
+          : editingNow ? { t: 'EDITÁNDOSE AHORA', c: 'text-cyber-pink' }
+          : qaReviewed ? { t: 'REVISADA · falta tu OK', c: 'text-cyber-cyan' }
+          : { t: 'PENDIENTE', c: 'text-cyber-gold' };
         // Tomas de king se guardan con model veo_* pero costo $0: se muestran como LTX.
         const modelLabel = (Number(asset.cost_usd) === 0 && /^veo_/.test(asset.model || '')) ? 'LTX KING' : asset.model === 'veo_fast' ? 'VEO FAST' : asset.model === 'veo_lite' ? 'VEO LITE' : String(asset.model || '').toUpperCase();
         const cost = asset.cost_usd != null ? ('$' + Number(asset.cost_usd).toFixed(2)) : '—';
@@ -1639,10 +1650,11 @@
                   '<span class="bg-black/80 text-cyber-cyan border border-cyber-cyan/30 px-2 py-0.5 rounded">' + (function() { const e0 = ((lastLoadedData && lastLoadedData.episodes) || []).find(e => (e.assets || []).some(x => x.id === asset.id)); return e0 ? shotLabel(e0, shotNo).label : 'TOMA ' + String(shotNo).padStart(2, '0') + ' / ' + total; })() + '</span>' +
                   '<span class="bg-cyber-emerald/90 text-black font-bold px-2 py-0.5 rounded">' + modelLabel + ' (' + cost + ')</span>' +
                 '</div>' +
+                (editingNow ? '<div class="absolute bottom-12 left-1/2 -translate-x-1/2 bg-cyber-pink text-black text-[10px] font-mono font-bold px-2.5 py-1 rounded-full flex items-center gap-1.5 shadow-neon-pink animate-pulse whitespace-nowrap"><i class="fa-solid fa-wand-magic-sparkles"></i>El QA la está rehaciendo…</div>' : '') +
               '</div>' +
               '<div class="p-3 text-[11px] font-mono space-y-1.5 border-t border-cyber-border">' +
                 '<div class="flex justify-between text-slate-400">' +
-                  '<span>Estado: <strong class="' + (asset.approved ? 'text-cyber-emerald' : 'text-cyber-gold') + '">' + (asset.approved ? 'APROBADO' : 'PENDIENTE') + '</strong></span>' +
+                  '<span>Estado: <strong class="' + est.c + '">' + (editingNow ? '<i class=\'fa-solid fa-spinner fa-spin mr-1\'></i>' : '') + est.t + '</strong></span>' +
                 '</div>' +
                 (function() { const ep0 = ((lastLoadedData && lastLoadedData.episodes) || []).find(e => (e.assets || []).some(x => x.id === asset.id)); const sh0 = ep0 && (ep0.shots || []).find(x => x.n === shotNo); if (!sh0) return '';
                   const ln = (sh0.voice_part || (sh0.dialogue || []).map(d => d.line).join(' ') || '').trim();
@@ -3921,7 +3933,16 @@
             const pending = sorted.filter(a => !a.approved).length;
             window.__pendingShotIds = sorted.filter(a => !a.approved).map(a => a.id);
             shotBox.classList.toggle('hidden', !sorted.length);
+            // Progreso del QA (Franklin oct-13: "decir cuántas tienes que revisar y cuántas ya revisó").
+            // Una toma está "revisada por el QA" cuando su qa.ok es true y la revisión es de ESTE clip (no de uno viejo).
+            const qaOk = (a) => { const sh = (inReview.shots || []).find(x => x.n === a.shot_number); const q = sh && sh.qa; return !!(q && q.ok && (!q.clip_id || q.clip_id === a.id)); };
+            const qaDone = sorted.filter(qaOk).length;
+            const qaPend = sorted.length - qaDone;
+            const _qw = (inReview.validator_report || {}).qa_working;
+            const editingN = (_qw && _qw.at && (Date.now() - new Date(_qw.at).getTime() < 25 * 60000)) ? _qw.n : null;
             document.getElementById('shotCardsSummary').innerHTML = '<i class="fa-solid fa-film mr-2"></i>TOMAS DEL EP ' + inReview.episode_number + ' · ' + (sorted.length - pending) + '/' + sorted.length + ' aprobadas' +
+              ' · <span class="' + (qaPend ? 'text-cyber-cyan' : 'text-cyber-emerald') + '" title="El control de calidad (Claude) revisa cada toma contra la narración">QA: ' + qaDone + '/' + sorted.length + ' revisadas' + (qaPend ? ' · faltan ' + qaPend : '') + '</span>' +
+              (editingN ? ' · <span class="text-cyber-pink"><i class="fa-solid fa-spinner fa-spin mr-1"></i>rehaciendo la TOMA ' + String(editingN).padStart(2, '0') + '</span>' : '') +
               (pending ? ' · <span class="text-cyber-gold">' + pending + ' por revisar</span>' : ' · <span class="text-cyber-emerald">todas aprobadas ✓</span>') + ' <span class="text-slate-500">▾ ver / ocultar</span>' +
               (pending ? ' <button type="button" onclick="event.preventDefault();event.stopPropagation();approveAllShots()" class="ml-2 mt-1 sm:mt-0 px-3 py-1 rounded bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/40 text-xs font-semibold"><i class="fa-solid fa-check-double mr-1"></i>Aprobar todas (' + pending + ')</button>' : '');
             // Desplegable normal: empieza cerrado y se abre/cierra con un clic (el refresco no lo toca).
