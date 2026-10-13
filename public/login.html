@@ -36,7 +36,7 @@
   button:hover { transform: translateY(-2px); box-shadow: 0 0 26px rgb(var(--a) / .7), 0 0 46px rgb(var(--b) / .4); }
   .err { display: none; margin-top: 14px; padding: 10px 12px; border-radius: 10px; font-size: 13px; color: #ffd3e6; border: 1px solid rgb(var(--b) / .45); background: rgb(var(--b) / .08); }
   @media (prefers-reduced-motion: reduce) { form::after { animation: none; } }
-</style></head>
+</style><link rel="icon" href="/favicon.ico" sizes="any"><link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png"><link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png"></head>
 <body>
 <form method="post" action="/.netlify/functions/login">
   <div class="logo"><div class="mark"><span>V</span></div><div><div class="name">VYRALES</div><div class="lab">Estudio de video IA</div></div></div>
@@ -50,6 +50,7 @@
   <button type="submit">Entrar</button>
   <div class="err" id="err" role="alert">Email o contraseña incorrectos (o la cuenta está pausada).</div>
 </form>
+<div id="vylegal" style="margin-top:20px;text-align:center;font-size:12px;opacity:.65;line-height:1.8"><a href="/privacidad.html" style="color:inherit;text-decoration:underline">Política de privacidad</a> · <a href="/terminos.html" style="color:inherit;text-decoration:underline">Términos de servicio</a> · <a href="/eliminar-datos.html" style="color:inherit;text-decoration:underline">Eliminar mis datos</a></div>
 <script>
   var q = new URLSearchParams(location.search);
   document.getElementById('next').value = q.get('next') || '/';
