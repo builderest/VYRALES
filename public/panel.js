@@ -89,6 +89,12 @@
     if (d) { d.open = true; d.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
     else setView('guiones');
   }
+  // Desde "Trabajando ahora" / "Fila de tu PC": abre el episodio de ese trabajo en Revisar y publicar.
+  function irATrabajo(id) {
+    if (!id) return;
+    setView('revisar');
+    irARevisar(id);
+  }
   function irARevisar(id) {
     // Con id: ese episodio (también uno viejo o ya publicado) pasa a la pantalla de revisar/publicar.
     if (id && window.vyReviewEp) window.vyReviewEp(id);
@@ -728,7 +734,10 @@
     // ---------- REVISAR Y PUBLICAR ----------
     // Mismo episodio que elige loadDashboard() para el panel de revisión
     var asc = eps.slice().sort(function (a, b) { return (a.episode_number || 0) - (b.episode_number || 0); });
-    var rev = asc.find(function (e) { return e.status === 'en_revision'; }) ||
+    // El episodio que elegiste en el selector de "Revisar y publicar" manda (si no, el encabezado mostraba otro).
+    var pickId = window.__reviewEpId; try { if (!pickId && data.series) pickId = localStorage.getItem('vyrales_review_ep_' + data.series.slug); } catch (_) {}
+    var rev = (pickId && asc.find(function (e) { return e.id === pickId; })) ||
+              asc.find(function (e) { return e.status === 'en_revision'; }) ||
               asc.find(function (e) { return e.status === 'generando_media'; }) ||
               asc.find(function (e) { return (e.assets || []).some(function (a) { return a.kind === 'video_clip'; }); }) || null;
     var rt = $('vyRevTitle'), rs = $('vyRevSteps'), re = $('vyRevEmpty');
@@ -818,12 +827,16 @@
           '<div class="vy-bar"><div class="vy-fill' + (pctW == null ? ' vy-indet' : '') + '" style="width:' + (pctW == null ? 35 : Math.max(4, pctW)) + '%"></div></div>' +
           '<span class="text-xs text-slate-400">' + (jobs.length > 1 ? (jobs.length - 1) + ' más en la fila de tu PC' : 'Nada más en la fila') + '</span>';
         work.classList.add('flow');
+        // Clic → te lleva a ese trabajo (el episodio en "Revisar y publicar", donde se ve el avance toma por toma).
+        if (epJ) { work.style.cursor = 'pointer'; work.title = 'Ver este trabajo'; work.onclick = function () { irATrabajo(epJ.id); }; }
+        else { work.style.cursor = ''; work.title = ''; work.onclick = null; }
       } else {
         work.innerHTML =
           '<span class="vy-lab">Trabajando ahora</span>' +
           '<strong class="text-[15px] font-semibold text-slate-300">Nada en proceso</strong>' +
           '<span class="text-xs text-slate-400">Tu PC está libre. Produce el siguiente episodio cuando quieras.</span>';
         work.classList.remove('flow');
+        work.style.cursor = ''; work.onclick = null;
       }
     }
 
@@ -848,7 +861,7 @@
         var epQ = epDeComando(j.command, eps);
         var t = j.created_at ? new Date(j.created_at) : null;
         var hora = t ? t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
-        return '<div class="flex gap-3 text-sm"><span class="font-mono text-[11px] w-11 flex-none pt-0.5 ' + (j.status === 'running' ? 'text-cyber-cyan' : 'text-slate-400') + '">' + esc(hora) + '</span>' +
+        return '<div class="flex gap-3 text-sm' + (epQ ? ' cursor-pointer hover:bg-white/5 rounded -mx-1 px-1' : '') + '"' + (epQ ? ' role="link" tabindex="0" title="Ver este trabajo" onclick="vyPanel.irATrabajo(\'' + esc(epQ.id) + '\')"' : '') + '><span class="font-mono text-[11px] w-11 flex-none pt-0.5 ' + (j.status === 'running' ? 'text-cyber-cyan' : 'text-slate-400') + '">' + esc(hora) + '</span>' +
           '<span>' + esc(trabajo(j.command)) + (epQ ? ' · Ep. ' + esc(epQ.episode_number) : '') +
           ' <span class="text-[11px] text-slate-500">' + (j.status === 'running' ? '(en curso)' : '(en espera)') + '</span></span></div>';
       }).join('') : '<p class="text-sm text-slate-400">No hay trabajos pendientes en tu PC.</p>';
@@ -867,7 +880,7 @@
     }
   }
 
-  window.vyPanel = { render: render, irARevisar: irARevisar, abrirEpisodio: abrirEpisodio, setView: setView, filtro: setFiltro, apiGuardar: apiGuardar, apiQuitar: apiQuitar, apiProbar: apiProbar,
+  window.vyPanel = { render: render, irARevisar: irARevisar, irATrabajo: irATrabajo, abrirEpisodio: abrirEpisodio, setView: setView, filtro: setFiltro, apiGuardar: apiGuardar, apiQuitar: apiQuitar, apiProbar: apiProbar,
     usersCrear: usersCrear, usersPermiso: usersPermiso, usersCreditos: usersCreditos, usersActiva: usersActiva, usersClave: usersClave, usersBorrar: usersBorrar, usersPrecios: usersPrecios, genPass: genPass, sinNovela: sinNovela };
   document.addEventListener('input', function (ev) { if (ev.target && ev.target.id === 'vyArcSearch') filtrarArco(); });
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initViews);

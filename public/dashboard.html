@@ -23,7 +23,7 @@
     <!-- Rediseño: tema por novela + efectos (fase 1) -->
     <link rel="stylesheet" href="tema.css?v=14">
     <script src="tema.js?v=4" defer></script>
-    <script src="panel.js?v=11" defer></script>
+    <script src="panel.js?v=12" defer></script>
     
     <!-- Font Awesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -130,6 +130,22 @@
             background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0, 240, 255, 0.05) 50%, rgba(0, 240, 255, 0.05));
             background-size: 100% 4px;
         }
+
+        /* Selector de episodio (Franklin oct-12: que tenga el estilo de la página) */
+        .vy-select{
+            -webkit-appearance:none; -moz-appearance:none; appearance:none;
+            background:#0a0f1e url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2300f0ff' d='M6 8.5L1.5 4h9z'/%3E%3C/svg%3E") no-repeat right 11px center;
+            background-size:11px;
+            border:1px solid rgba(0,240,255,.35); border-radius:9px;
+            color:#cfe9ff; font-family:'Space Grotesk',ui-monospace,monospace;
+            font-size:12px; font-weight:600; letter-spacing:.2px;
+            padding:6px 30px 6px 12px; cursor:pointer;
+            max-width:min(88vw,440px); text-overflow:ellipsis;
+            transition:border-color .15s ease, box-shadow .15s ease;
+        }
+        .vy-select:hover{ border-color:rgba(0,240,255,.7); }
+        .vy-select:focus{ outline:none; border-color:#00f0ff; box-shadow:0 0 0 3px rgba(0,240,255,.18); }
+        .vy-select option{ background:#0a0f1e; color:#e9eefb; font-weight:600; }
     </style>
 </head>
 
@@ -3836,7 +3852,7 @@
               : 'Revisando EP ' + inReview.episode_number + ' de "' + esc(data.series.title) + '".';
             // Selector: cualquier episodio con video (también los viejos o ya publicados) para verlo y publicarlo.
             const withVideo = episodes.filter(e => (e.assets || []).some(a => a.kind === 'video_clip' || a.kind === 'final_render')).sort((a, b) => (b.episode_number || 0) - (a.episode_number || 0));
-            if (withVideo.length > 1) banner.innerHTML += ' <select onchange="vyReviewEp(this.value)" class="ml-2 bg-cyber-darker border border-slate-600 rounded px-2 py-0.5 text-xs text-slate-200">' +
+            if (withVideo.length > 1) banner.innerHTML += ' <select onchange="vyReviewEp(this.value)" class="vy-select ml-2">' +
               withVideo.map(e => '<option value="' + esc(e.id) + '"' + (e.id === inReview.id ? ' selected' : '') + '>EP ' + e.episode_number + ' · ' + esc(String(e.title || '').slice(0, 50)) + (e.status === 'en_revision' ? ' (por revisar)' : e.status === 'publicado' ? ' (publicado)' : '') + '</option>').join('') + '</select>';
           } else {
             shotBox.classList.add('hidden');
@@ -3844,6 +3860,8 @@
           }
           lastLoadedData = data;
           try { if (window.vyPanel) window.vyPanel.render(data); } catch (e) { console.warn('vyPanel', e); } // INICIO nuevo (rediseño)
+          // El título de arriba sigue al episodio elegido en el selector (Franklin oct-12).
+          try { const rtEl = document.getElementById('vyRevTitle'); if (rtEl && inReview) rtEl.textContent = 'Episodio ' + inReview.episode_number + (inReview.title ? ' \u00b7 ' + inReview.title : ''); } catch (_) {}
         } catch (err) {
           banner.textContent = 'No se pudo cargar la información (' + err.message + ').';
           banner.classList.remove('text-cyber-gold');
@@ -4222,7 +4240,10 @@
         // Abre ese video en "Revisar y publicar" (si es de otra serie, cambia de serie y lo deja elegido).
         window.vyVideoAbrir = function (id, slug) {
           try { localStorage.setItem('vyrales_review_ep_' + slug, id); } catch (_) {}
-          let same = false; try { same = !!(lastLoadedData && lastLoadedData.series && lastLoadedData.series.slug === slug); } catch (_) {}
+          // Serie que está abierta ahora (la de la URL o la última elegida). Antes siempre se recargaba con el mismo
+          // ?series=…#revisar: si la serie era la misma, el navegador solo cambiaba el #, NO recargaba y quedaba otro episodio.
+          let cur = null; try { cur = new URLSearchParams(location.search).get('series') || localStorage.getItem('vyrales_series'); } catch (_) {}
+          const same = cur === slug;
           if (same && window.vyReviewEp) { window.vyReviewEp(id); if (window.vyPanel) vyPanel.setView('revisar'); }
           else { try { localStorage.setItem('vyrales_series', slug); } catch (_) {} location.href = location.pathname + '?series=' + encodeURIComponent(slug) + '#revisar'; }
         };
