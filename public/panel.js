@@ -51,6 +51,22 @@
     return null;
   }
 
+  // Tarea que la PC esta haciendo AHORA (dinamica, sea cual sea): nombre + toma + episodio.
+  function tareaActual(jobs, eps) {
+    var r = null;
+    for (var i = 0; i < jobs.length; i++) { if (jobs[i].status === 'running') { r = jobs[i]; break; } }
+    if (!r) return null;
+    var txt = trabajo(r.command);
+    var ep = epDeComando(r.command, eps);
+    var toma = '';
+    var qw = ep && ep.validator_report && ep.validator_report.qa_working;
+    if (qw && qw.n) toma = String(qw.n);
+    else { var m = String(r.command).match(/:(\d+)(?::\d+)?$/); if (m) toma = m[1]; }
+    if (toma) { txt = /toma/i.test(txt) ? txt.replace(/una toma/i, 'toma ' + toma) : (txt + ' (toma ' + toma + ')'); }
+    if (ep) txt += ' \u00b7 Ep. ' + ep.episode_number;
+    return txt;
+  }
+
   function aspectoDe(e, serie) {
     var c = e.continuity || {};
     var sb = (serie && serie.story_bible) || {};
@@ -875,8 +891,11 @@
       dot.style.background = on ? 'rgb(var(--vy-emerald))' : 'rgb(var(--vy-gold))';
       lab.textContent = on ? 'PC EN LÍNEA' : 'PC SIN CONEXIÓN';
       lab.style.color = on ? 'rgb(var(--vy-emerald))' : 'rgb(var(--vy-gold))';
-      sub.textContent = on ? (jobs.length ? jobs.length + ' tarea' + (jobs.length === 1 ? '' : 's') + ' en la fila' : 'Agente local listo')
-                           : 'Abre el agente en tu PC para producir';
+      var __act = on ? tareaActual(jobs, eps) : null;
+      var __pend = 0; for (var __i = 0; __i < jobs.length; __i++) if (jobs[__i].status !== 'running') __pend++;
+      sub.textContent = !on ? 'Abre el agente en tu PC para producir'
+                        : __act ? ('\u25b6 ' + __act + (__pend ? '  \u00b7  +' + __pend + ' en la fila' : ''))
+                        : (jobs.length ? jobs.length + ' tarea' + (jobs.length === 1 ? '' : 's') + ' en la fila' : 'Agente local listo');
     }
   }
 
