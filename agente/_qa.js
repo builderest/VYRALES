@@ -62,7 +62,7 @@ function sceneCut(url) {
 // 👁️ Parte del cuadro se deforma (oct-14, toma 2 de El Chapo, la vio Franklin): en un plano SIN personas, la franja del
 // medio (edificio/terreno) se mueve mucho más que el primer plano. Una cámara real da paralaje al revés (lo cercano se mueve
 // MÁS), así que eso es LTX "deslizando" una parte del suelo mientras el resto queda quieto.
-// Calibrado en 11 clips sin personas de EP25: T2 = 2.3 (deformado); los sanos 0.3–1.4.
+// Calibrado en 70 clips sin personas de EP25: T2 = 2.3 (deformado); sanos ≤2.1 (T137 avioneta 2.1) → umbral 2.2.
 function bandMotion(url) {
   const ffmpeg = require(path.join(ROOT, 'node_modules', 'ffmpeg-static'));
   return new Promise((res) => execFile(ffmpeg, ['-v', 'error', '-i', url, '-vf', 'fps=8,scale=128:72,format=gray', '-f', 'rawvideo', '-'], { encoding: 'buffer', timeout: 90000, maxBuffer: 1 << 26 }, (e, raw) => {
@@ -75,7 +75,8 @@ function bandMotion(url) {
     res({ rows: rows.map((r) => Math.round(r * 10) / 10), mid, bot, ratio: Math.round(mid / Math.max(bot, 0.5) * 10) / 10 });
   }));
 }
-const sinPersonas = (sh) => { try { return require(path.join(ROOT, 'netlify', 'functions', '_cerebro')).featuresOf(sh).personas === 'p0' && !(sh.characters || []).length; } catch (_) { return false; } };
+// sinPersonas: sin gente ni vehículo que avance (un vehículo mueve el medio a propósito, T136).
+const sinPersonas = (sh) => { try { const f = require(path.join(ROOT, 'netlify', 'functions', '_cerebro')).featuresOf(sh); return f.personas === 'p0' && !f.vehiculo && !(sh.characters || []).length; } catch (_) { return false; } };
 const lineOf = (sh) => String(sh.voice_part || (Array.isArray(sh.dialogue) ? sh.dialogue : sh.dialogue ? [sh.dialogue] : []).map((d) => d && d.line).filter(Boolean).join(' ')).trim();
 
 // Revisa tomas de a 4 con Claude (lee las imágenes). Devuelve { n: { image_ok, action_ok, haze, broken, reason } }.
@@ -210,7 +211,7 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
       const fz = await frozenSeconds(clip.storage_path);
       if (d && fz > d * 0.4) why = `está quieto ${fz.toFixed(1)} de ${d.toFixed(1)} s`;
       else { const sc = await sceneCut(clip.storage_path); if (sc && sc.cut) why = `cambia de escena a los ${sc.at.toFixed(1)} s (salto ${sc.ratio}× lo normal)`; }
-      if (!why && sinPersonas(sh)) { const bm = await bandMotion(clip.storage_path); if (bm && bm.ratio >= 2 && bm.mid >= 4) why = `una parte del cuadro se deforma (el medio se mueve ${bm.ratio}× más que el primer plano)`; }
+      if (!why && sinPersonas(sh)) { const bm = await bandMotion(clip.storage_path); if (bm && bm.ratio >= 2.2 && bm.mid >= 4) why = `una parte del cuadro se deforma (el medio se mueve ${bm.ratio}× más que el primer plano)`; }
     }
     // Ya corregida a mano por el supervisor o Franklin (clip_stale): se rehace con SU prompt, sin reescribir.
     if (!why && sh.clip_stale) why = 'marcada para rehacer (prompt corregido)';

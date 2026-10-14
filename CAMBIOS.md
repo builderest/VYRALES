@@ -341,3 +341,16 @@ experimento (`doc.forzados`: ¿quién tenía razón?).
 - **Arreglo:** se relee `validator_report` antes de guardar y se limpia `qa_working`; el QA marca "revisar"/"rehacer" en cada
   toma también en la fase automática. Corregido a mano en EP25 (ahora muestra la toma real del QA).
 - Las marcas de "revisada por QA" (shot.qa) las pone la fase VISUAL; aparecen cuando esa fase revise cada toma.
+
+## 2026-10-14 11:50 — 📊 PRIMER INTENTO de El Chapo EP25 (146 tomas), medido + revisado a ojo
+- **Malas a la primera (vistas a ojo, todas confirmadas):** 13 de 146 → **133 pasan (91 %)**:
+  T2 (deforma/luces), T8, T12 (pozo→túnel), T18, T21, T28, T56, T65, T78, T84, T128 (pared se vuelve textura),
+  T142 (celda salta a otra), T146 (túnel con saltos).
+- **Falsos positivos del medidor:** T132 (hombre en la ventana, corte 9.6 pero el clip es continuo), T136 (humvees que
+  avanzan) y T137 (avioneta, franjas 2.1). Arreglado: el detector de deformación ya no aplica con vehículos y sube a 2.2.
+  T132 queda como falso positivo conocido del detector de cortes (con persona en primer plano).
+- **Aparte (no es calidad):** tomas cuyo clip quedó más corto que su voz (T12, T24, T31…): el QA las alarga.
+- **Falta** el juicio visual (caras, manos, imagen = narración): ese número puede bajar el 91 %.
+- **Cláusula estricta (sin personas):** cortes antes 4/18 (22 %) → después 6/42 (14 %). Mejora, pero aún sin
+  significancia estadística; se sigue midiendo.
+- Las 13 malas son TODAS sin personas excepto T65 → el problema de LTX está en planos de solo lugar.
