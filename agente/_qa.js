@@ -58,6 +58,23 @@ function sceneCut(url) {
     res({ cut: ratio >= 3.5 && max >= 8, ratio: Math.round(ratio * 10) / 10, max: Math.round(max * 10) / 10, at });
   }));
 }
+// 👁️ Parte del cuadro se deforma (oct-14, toma 2 de El Chapo, la vio Franklin): en un plano SIN personas, la franja del
+// medio (edificio/terreno) se mueve mucho más que el primer plano. Una cámara real da paralaje al revés (lo cercano se mueve
+// MÁS), así que eso es LTX "deslizando" una parte del suelo mientras el resto queda quieto.
+// Calibrado en 11 clips sin personas de EP25: T2 = 2.3 (deformado); los sanos 0.3–1.4.
+function bandMotion(url) {
+  const ffmpeg = require(path.join(ROOT, 'node_modules', 'ffmpeg-static'));
+  return new Promise((res) => execFile(ffmpeg, ['-v', 'error', '-i', url, '-vf', 'fps=8,scale=128:72,format=gray', '-f', 'rawvideo', '-'], { encoding: 'buffer', timeout: 90000, maxBuffer: 1 << 26 }, (e, raw) => {
+    if (e || !raw) return res(null);
+    const W = 128, H = 72, N = W * H, n = Math.floor(raw.length / N); if (n < 4) return res(null);
+    const rows = new Array(6).fill(0);
+    for (let k = 1; k < n; k++) for (let y = 0; y < H; y++) { const b = Math.floor(y / 12); for (let x = 0; x < W; x++) { const i = y * W + x; rows[b] += Math.abs(raw[k * N + i] - raw[(k - 1) * N + i]); } }
+    for (let b = 0; b < 6; b++) rows[b] /= (n - 1) * 12 * W;
+    const mid = (rows[2] + rows[3]) / 2, bot = (rows[4] + rows[5]) / 2;
+    res({ rows: rows.map((r) => Math.round(r * 10) / 10), mid, bot, ratio: Math.round(mid / Math.max(bot, 0.5) * 10) / 10 });
+  }));
+}
+const sinPersonas = (sh) => { try { return require(path.join(ROOT, 'netlify', 'functions', '_cerebro')).featuresOf(sh).personas === 'p0' && !(sh.characters || []).length; } catch (_) { return false; } };
 const lineOf = (sh) => String(sh.voice_part || (Array.isArray(sh.dialogue) ? sh.dialogue : sh.dialogue ? [sh.dialogue] : []).map((d) => d && d.line).filter(Boolean).join(' ')).trim();
 
 // Revisa tomas de a 4 con Claude (lee las imágenes). Devuelve { n: { image_ok, action_ok, haze, broken, reason } }.
@@ -190,14 +207,15 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
       const fz = await frozenSeconds(clip.storage_path);
       if (d && fz > d * 0.4) why = `está quieto ${fz.toFixed(1)} de ${d.toFixed(1)} s`;
       else { const sc = await sceneCut(clip.storage_path); if (sc && sc.cut) why = `cambia de escena a los ${sc.at.toFixed(1)} s (salto ${sc.ratio}× lo normal)`; }
+      if (!why && sinPersonas(sh)) { const bm = await bandMotion(clip.storage_path); if (bm && bm.ratio >= 2 && bm.mid >= 4) why = `una parte del cuadro se deforma (el medio se mueve ${bm.ratio}× más que el primer plano)`; }
     }
     // Ya corregida a mano por el supervisor o Franklin (clip_stale): se rehace con SU prompt, sin reescribir.
     if (!why && sh.clip_stale) why = 'marcada para rehacer (prompt corregido)';
     if (!why) continue;
     log(`QA toma ${sh.n}: ${why} → la rehago con prompt nuevo`);
-    if (/quieto|escena/.test(why) && !sh.clip_stale) {
+    if (/quieto|escena|deforma/.test(why) && !sh.clip_stale) {
       try {
-        const fix = await rewriteShot(sh, /escena/.test(why) ? 'LTX cortó a OTRA escena a mitad del clip (' + why + '): perdió el lugar y los objetos del cuadro inicial. Pide UN movimiento corto y sencillo que se pueda hacer dentro de ese mismo encuadre (en sitios cerrados o clips de 3 s o menos, cámara casi fija y el movimiento en el sujeto o la luz).' : 'El video salió casi congelado: ' + why + '. Necesita un movimiento claro y visible del sujeto principal.', log);
+        const fix = await rewriteShot(sh, /deforma/.test(why) ? 'LTX deformó una parte del lugar (' + why + '): el terreno o el edificio se "desliza" mientras el primer plano queda quieto. Usa una cámara que se desplace de lado de verdad (slow lateral drift) con un primer plano con textura que pase por delante, y el movimiento en algo natural (luces, hierba, viento); nada de paneos en planos abiertos.' : /escena/.test(why) ? 'LTX cortó a OTRA escena a mitad del clip (' + why + '): perdió el lugar y los objetos del cuadro inicial. Pide UN movimiento corto y sencillo que se pueda hacer dentro de ese mismo encuadre (en sitios cerrados o clips de 3 s o menos, cámara casi fija y el movimiento en el sujeto o la luz).' : 'El video salió casi congelado: ' + why + '. Necesita un movimiento claro y visible del sujeto principal.', log);
         if (fix) {
           const { data: fr } = await supabase.from('episodes').select('shots').eq('id', epId).single();
           await supabase.from('episodes').update({ shots: (fr.shots || []).map((x) => x.n === sh.n ? Object.assign({}, x, fix, fix.start_en ? { end_en: '', end_frame_url: null, end_frame_skip: false } : {}, { prompt_override: null, ltx_en: null, keyframe_prompt_override: fix.start_en ? null : x.keyframe_prompt_override, qa_rewrite_from: { camera: x.camera, action_en: x.action_en, reaction_en: x.reaction_en, start_en: x.start_en } }) : x) }).eq('id', epId);
@@ -389,4 +407,4 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
   return redone;
 }
 
-module.exports = { qaShots, durationOf, frozenSeconds, sceneCut, visionReview, grab };
+module.exports = { qaShots, durationOf, frozenSeconds, sceneCut, bandMotion, visionReview, grab };

@@ -77,12 +77,15 @@ function featuresOf(sh) {
     solo_camara: !!sh.camera_only,
     // Clip corto (≤3 s) con cámara que se desplaza: hipótesis del vigía (oct-14, T8/T18 de EP25 cortaron a otra escena).
     // El cerebro la mide con evidencia; no es regla hasta que los números lo digan.
+    // Paneo (gira sobre su eje) separado del desplazamiento lateral: en EP25 T2 y T8 fallaron con paneo (hipótesis, se mide).
+    cam_paneo: /\bpan(?:s|ning)?\b/.test(cam),
     corto_con_camara: (Number(sh.seconds) || 0) > 0 && Number(sh.seconds) <= 3 && /drift|\bpan\b|truck|dolly|push|track|orbit|crane|tilt/.test(cam)
   };
 }
 
 // Qué significa cada patrón y qué hacer (para el guionista, el reparador y el panel).
 const INFO = {
+  'cam_paneo=true': { label: 'Paneo (la cámara gira sobre su eje)', regla: 'Prefiere el desplazamiento lateral (drift) al paneo; el paneo en planos abiertos o cerrados hace que LTX deforme el lugar.', arreglo: 'Cambia "pan" por "slow lateral drift" con un primer plano que pase por delante.', en_imagen: false },
   'corto_con_camara=true': { label: 'Clip de 3 s o menos con cámara en movimiento', regla: 'En clips de 3 s o menos, cámara casi fija; el movimiento va en el sujeto o la luz.', arreglo: 'Cámara fija o empuje casi imperceptible; mueve el sujeto, la luz o el ambiente dentro del mismo encuadre.', en_imagen: false },
   'cam_acerca=true': { label: 'Cámara que se acerca o se aleja (push-in, zoom, grúa)', regla: 'No uses cámaras que se acerquen o se alejen (push-in, dolly, zoom, crane, pull-back).', arreglo: 'Cambia la cámara por "slow lateral drift to the left/right" y pon el movimiento en el sujeto.', en_imagen: false },
   'cam_sigue=true': { label: 'Cámara que sigue o rodea al sujeto (tracking, órbita, dron)', regla: 'No uses cámaras de seguimiento, órbita, dron o FPV.', arreglo: 'Cámara "slow lateral drift" corta; el sujeto se mueve poco y queda dentro del cuadro.', en_imagen: false },

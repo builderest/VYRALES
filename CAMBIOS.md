@@ -276,3 +276,14 @@ experimento (`doc.forzados`: ¿quién tenía razón?).
 - **`_cerebro.js`:** patrón nuevo `corto_con_camara` (clip ≤3 s con cámara que se desplaza). Es HIPÓTESIS: el cerebro lo mide
   con evidencia y solo será regla si los números lo confirman (independencia: 2 casos no bastan).
 - Entra en acción al final de este mismo gen_local (el QA se carga al terminar), así que T8 y T18 deberían salir solas.
+
+## 2026-10-14 07:45 — 👁️ Toma 2 (la vio Franklin): una parte del suelo se mueve y la otra no
+- **Medición** (movimiento por franjas, 8 fps): en T2 la franja del medio (penal + terreno) se mueve 9.9 y el pasto del primer
+  plano 2.7 → 2.3× al revés de lo que hace una cámara real (lo cercano se mueve MÁS). En los otros 10 clips sin personas:
+  0.3–1.4. T7 da 6.3 pero es legítimo (el preso se agacha) → por eso el detector SOLO aplica a planos sin personas.
+- **`_qa.js` → `bandMotion()` + `sinPersonas()`:** plano sin personas con el medio ≥2× el primer plano → se reescribe la toma
+  ("drift lateral con primer plano que pase por delante, nada de paneos en planos abiertos") y se rehace.
+- **`_cerebro.js`:** patrón `cam_paneo` separado de `cam_lateral`. HIPÓTESIS: en EP25 fallaron 2 de 6 paneos (T2, T8) y 0 de
+  los drifts revisados. Lo decidirá la evidencia.
+- **T2 corregida a mano:** cámara "slow lateral drift" a ras del pasto, el pasto pasa por delante y se mece, las luces del penal
+  parpadean. clip_stale → el QA la rehace con este prompt al terminar gen_local (va por la 37/146, 0 fallos).
