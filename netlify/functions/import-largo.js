@@ -11,12 +11,12 @@ const fixShots = (shots) => (shots || []).map((s, i) => {
   // dos guiones largos completos no se importaron por 4 tomas sin action_en). El QA corrige esas tomas al producir.
   const clean = (t) => String(t || '').replace(/"/g, "'").trim();
   const start = clean(s.start_en || s.visual_en || s.visual_es || s.scene_es || line);
-  return Object.assign({ location: 'escena', characters: [], sfx: '' }, s, { n: i + 1, scene_es: s.scene_es || s.visual_es || line, location: s.location || 'escena', characters: [],
+  return Object.assign({ location: 'escena', characters: [], sfx: '' }, s, { n: i + 1, scene_es: s.scene_es || s.visual_es || line, location: s.location || 'escena', characters: Array.isArray(s.characters) ? s.characters : [],
     camera: clean(s.camera) || 'slow smooth push-in',
     start_en: start,
     action_en: clean(s.action_en) || ('The main subject of the scene moves naturally and continuously, matching the narration: ' + start.slice(0, 160)) });
 });
-function seriesJson({ slug, title, synopsis, tipo, sbExtra, narration, ep, aspect }) {
+function seriesJson({ slug, title, synopsis, tipo, sbExtra, narration, ep, aspect, characters, locations }) {
   ep = Object.assign({}, ep, { shots: fixShots(ep.shots) });
   const p = TIPOS[tipo] || TIPOS.historia;
   const words = ep.shots.map((s) => (s.dialogue || []).map((d) => d.line).join(' ')).join(' ').split(/\s+/).filter(Boolean).length;
@@ -28,10 +28,10 @@ function seriesJson({ slug, title, synopsis, tipo, sbExtra, narration, ep, aspec
       narration: narration || { engine: 'gemini_tts', voice: p.voz, model: 'gemini-3.8-flash-tts', video_audio: 'none', style: p.vozEstilo, mode: 'continuous' },
       subtitle_style: 'palabra', image_engine: 'flow',
       extras: { Narrador: { who: 'an off-screen narrator who is never visible on camera', voice: 'a deep, resonant adult male documentary narrator voice in neutral Latin American Spanish', voiceover: true } },
-      rules: { keyframes: true, shot_seconds: 8, shots_per_episode: ep.shots.length, max_dialogue_words_per_shot: Math.max(28, maxLine), max_characters_per_shot: 2, max_words_per_episode: Math.max(600, words + 50), shot_model: 'veo_lite', cliffhanger_model: 'veo_lite', reference_images: false },
-      locations: { escena: { visual: p.visual, ambient: 'quiet natural ambience' } }
+      rules: { keyframes: true, shot_seconds: 8, shots_per_episode: ep.shots.length, max_dialogue_words_per_shot: Math.max(28, maxLine), max_characters_per_shot: 2, max_words_per_episode: Math.max(600, words + 50), shot_model: 'veo_lite', cliffhanger_model: 'veo_lite', reference_images: !!(characters && characters.length) },
+      locations: Object.assign({ escena: { visual: p.visual, ambient: 'quiet natural ambience' } }, locations || {})
     }, sbExtra || {}),
-    characters: [],
+    characters: Array.isArray(characters) ? characters : [],
     episodes: [Object.assign({ episode_number: 1 }, ep)]
   };
 }
@@ -56,7 +56,7 @@ exports.handler = async (event) => {
     const L = g.long;
     const longSlug = p.slug + '_completa';
     const longEp = { title: L.title, continuity: { summary: L.description || '', hook_text: L.hook_text || '', sources: L.sources || [], chapters: L.chapters || [], youtube_description: L.description || '', visual_checked: new Date().toISOString(), from_job: job, kind: 'largo' }, shots: L.shots };
-    await doImport(seriesJson({ slug: longSlug, title: p.title + ' · Historias completas', synopsis: 'Historias completas (8–15 min) para YouTube: ' + p.nombre + '.', tipo, narration, ep: longEp, aspect: '16:9',
+    await doImport(seriesJson({ slug: longSlug, title: p.title + ' · Historias completas', synopsis: 'Historias completas (8–15 min) para YouTube: ' + p.nombre + '.', tipo, narration, ep: longEp, aspect: '16:9', characters: L.characters, locations: L.locations,
       sbExtra: { max_seconds: 1100, end_card: { enabled: true, mode: 'tail', text: 'SUSCRÍBETE', subtext: 'Una historia completa cada semana', voice: '', seconds: 3 } } }));
     const { data: ls } = await sb.from('series').select('id').eq('slug', longSlug).single();
     const { data: le } = await sb.from('episodes').select('id, episode_number').eq('series_id', ls.id).order('episode_number', { ascending: false }).limit(1).single();
@@ -64,7 +64,7 @@ exports.handler = async (event) => {
     for (const s of g.shorts || []) {
       const ep = { title: s.title, continuity: { summary: 'Short que lleva al video completo: ' + L.title, hook_text: s.hook_text || '', pinned_comment: s.pinned_comment || '', cta_to_long: { series: longSlug, episode_id: le.id, title: L.title }, parent_episode_id: le.id, aspect: '9:16', visual_checked: new Date().toISOString(), from_job: job, kind: 'short_cta' }, shots: s.shots };
       // Los Shorts viven DENTRO de la serie del largo (submenú bajo su video largo), en vertical por episodio (continuity.aspect).
-      await doImport(seriesJson({ slug: longSlug, title: p.title + ' · Historias completas', synopsis: 'Historias completas (8–15 min) para YouTube: ' + p.nombre + '.', tipo, narration, ep, aspect: '16:9',
+      await doImport(seriesJson({ slug: longSlug, title: p.title + ' · Historias completas', synopsis: 'Historias completas (8–15 min) para YouTube: ' + p.nombre + '.', tipo, narration, ep, aspect: '16:9', characters: L.characters, locations: L.locations,
         sbExtra: { max_seconds: 1100, end_card: { enabled: true, mode: 'tail', text: 'SUSCRÍBETE', subtext: 'Una historia completa cada semana', voice: '', seconds: 3 } } }));
       shorts++;
     }

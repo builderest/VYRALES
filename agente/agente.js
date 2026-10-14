@@ -34,14 +34,15 @@ setInterval(() => { PANEL_KEYS.applyKeys(sb, true).catch(() => {}); }, 60000);
 // diste permiso de usar tu PC (página Usuarios). Los guiones con Claude y "push" son solo tuyos.
 // Los trabajos de otra cuenta corren con SUS claves (o las que les prestaste) y su VYRALES_WS.
 const TEN = require(path.join(ROOT, 'netlify', 'functions', '_tenant.js'));
-let wsAllowed = null, wsAllowedAt = 0;
+let wsAllowed = null, wsAllowedAt = 0, adminChannels = new Set();
 async function allowedWs() {
   if (Date.now() - wsAllowedAt < 60000) return wsAllowed;
   wsAllowedAt = Date.now();
   try {
     if (!(await TEN.tenancyOn(sb))) { wsAllowed = null; return null; } // sin la migración: todo como antes
-    const { data, error } = await sb.from('workspaces').select('id, perms, active');
+    const { data, error } = await sb.from('workspaces').select('id, perms, active, owner_ws');
     if (!error) wsAllowed = [TEN.ADMIN_WS].concat((data || []).filter((w) => w.id !== TEN.ADMIN_WS && w.active && w.perms && w.perms.pc).map((w) => w.id));
+    if (!error) adminChannels = new Set((data || []).filter((w) => w.id !== TEN.ADMIN_WS && w.owner_ws === TEN.ADMIN_WS).map((w) => w.id)); // canales del admin: usan SU Claude/PC (oct-13)
   } catch (_) {}
   return wsAllowed;
 }
@@ -86,7 +87,8 @@ async function runJob(job) {
   // Trabajo de OTRA cuenta: sus claves y su espacio (nunca las tuyas sin permiso). Defensa extra: solo comandos de producción.
   let jobEnv = {};
   if (job.workspace_id && job.workspace_id !== TEN.ADMIN_WS) {
-    if (!USER_OK.test(String(job.command))) {
+    await allowedWs(); // refresca la lista de canales del admin
+    if (!adminChannels.has(job.workspace_id) && !USER_OK.test(String(job.command))) {
       await sb.from('agent_jobs').update({ status: 'error', exit_code: 1, output: 'Comando no permitido para esta cuenta.', finished_at: new Date().toISOString() }).eq('id', job.id);
       return;
     }
@@ -356,6 +358,16 @@ async function queueFullRenders() {
     (eps || []).forEach((e) => { epWs[e.id] = e.series && e.series.workspace_id; });
     finsOk = finsOk.filter((a) => wsl.includes(epWs[a.episode_id] || TEN.ADMIN_WS));
   }
+  // Quita episodios SIN tomas de video: su final_render es huérfano y render_full siempre falla
+  // ("nada que unir"), reintentando en bucle cada minuto (el tope failedRenders se resetea al reiniciar). oct-13.
+  if (finsOk.length) {
+    try {
+      const ids = [...new Set(finsOk.map((a) => a.episode_id))];
+      const { data: clips } = await sb.from('assets').select('episode_id').eq('kind', 'video_clip').in('episode_id', ids);
+      const withClips = new Set((clips || []).map((c) => c.episode_id));
+      finsOk = finsOk.filter((a) => withClips.has(a.episode_id));
+    } catch (_) {}
+  }
   const todo = finsOk.find((a) => !(have[a.episode_id] || []).includes(a.storage_path) && (failedRenders[a.storage_path] || 0) < 2);
   if (!todo) return;
   // No armar la calidad completa (726 MB) mientras el QA, un regen o la generación del MISMO episodio siguen
@@ -459,10 +471,13 @@ let busy = false;
 let pushBusy = false;
 let claudeRunning = 0; // cuántos guiones/ideas de Claude corren ahora (varios a la vez)
 let generalRunning = 0; // cuántos trabajos generales corren ahora (varios a la vez)
+let flowBusy = false; // Flow (Chrome de imágenes): de a uno (una sola ventana), pero en PARALELO con la GPU. oct-13.
 const CLAUDE_MAX = +(process.env.VYRALES_CLAUDE_MAX || 3); // Claude en paralelo (Franklin oct-12: que no esperen de a uno)
 const GENERAL_MAX = +(process.env.VYRALES_GENERAL_MAX || 3); // voces/portadas/subtítulos/publicar en paralelo
 // Lo que usa king (GPU) o el Chrome de Flow: de a uno. yt_relacionado usa su propio perfil de Chrome.
-const KING_RE = /^(gen_local|regen_local|toma_local|prueba_ltx|prueba_flux|qa_tomas|flow_)/;
+const KING_RE = /^(gen_local|regen_local|toma_local|prueba_ltx|prueba_flux|qa_tomas|flow_)/; // unión: para excluirlos de la fila general
+const GPU_RE = /^(gen_local|regen_local|toma_local|prueba_ltx|prueba_flux|qa_tomas)/; // usan la GPU de king: de a uno
+const FLOW_RE = /^flow_/; // usan el Chrome de Flow: de a uno, pero en paralelo con la GPU
 async function tick() {
   let mine = false;
   try {
@@ -500,8 +515,18 @@ async function tick() {
       }
     }
     await queueFullRenders().catch((e) => log('calidad completa: ' + String(e.message).slice(0, 100)));
+    // FILA DE FLOW (Chrome de imágenes): independiente de la GPU, corre EN PARALELO; de a uno (una sola ventana). oct-13.
+    if (!flowBusy) {
+      const { data: fpend } = await onlyAllowed(sb.from('agent_jobs').select('*').eq('status', 'pending'), wsl).order('created_at').limit(50);
+      const fq = (fpend || []).filter((x) => FLOW_RE.test(x.command));
+      const fjob = fq.find((x) => !x.workspace_id || x.workspace_id === TEN.ADMIN_WS) || fq[0];
+      if (fjob) {
+        const { data: fc } = await sb.from('agent_jobs').update({ status: 'running' }).eq('id', fjob.id).eq('status', 'pending').select();
+        if (fc && fc.length) { flowBusy = true; runJob(fjob).catch((e) => log('flow:', e.message)).finally(() => { flowBusy = false; }); }
+      }
+    }
     if (busy) return;
-    if (codeChanged() && !pushBusy && claudeRunning === 0 && generalRunning === 0) { log('el código del agente cambió: reiniciando para cargarlo...'); devStop(); process.exit(0); }
+    if (codeChanged() && !pushBusy && !flowBusy && claudeRunning === 0 && generalRunning === 0) { log('el código del agente cambió: reiniciando para cargarlo...'); devStop(); process.exit(0); }
     migrateLocalFinales();
     organizeBySeries();
     // Cada 10 min: videos que Franklin hizo PÚBLICOS en YouTube Studio → se marcan publicados (vyrales.app/ver, enlaces de los Shorts).
@@ -519,7 +544,7 @@ async function tick() {
     // FILA DE KING (la GPU): solo lo que genera video con LTX o usa el Chrome de Flow. Lo demás va en la fila general.
     const { data: pend } = await onlyAllowed(sb.from('agent_jobs').select('*').eq('status', 'pending'), wsl).order('created_at').limit(50);
     // Tus trabajos primero; después los de las cuentas a las que les prestas la PC.
-    const kingQ = (pend || []).filter((x) => KING_RE.test(x.command));
+    const kingQ = (pend || []).filter((x) => GPU_RE.test(x.command));
     const data = [kingQ.find((x) => !x.workspace_id || x.workspace_id === TEN.ADMIN_WS) || kingQ[0]].filter(Boolean);
     const job = data && data[0];
     if (!job) return;
