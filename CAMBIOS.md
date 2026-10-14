@@ -333,3 +333,11 @@ experimento (`doc.forzados`: ¿quién tenía razón?).
   evidencia medida y la de Franklin en vivo. Se recalcula al terminar El Chapo (cerebro_cargar).
 - Resultado provisional de la cláusula estricta (tomas 48–66 sin personas: T52, T55, T56, T59, T63): 1 corte (T56) de 5
   (20 %) vs 4 de 18 (22 %) antes. Muestra muy chica: todavía no dice nada; se juzga al final con ~45 tomas.
+
+## 2026-10-14 11:40 — Panel: "toma 48 generando" se quedaba pegado durante el QA (lo vio Franklin)
+- **CAUSA:** al terminar, `generate-media-background.js` guardaba `validator_report` desde la copia en memoria de ANTES de
+  producir → devolvía un `qa_working` viejo (toma 48, "generar"). Y la fase automática del QA (cortes/duración) no avisaba
+  en qué toma iba; solo la fase visual lo hacía.
+- **Arreglo:** se relee `validator_report` antes de guardar y se limpia `qa_working`; el QA marca "revisar"/"rehacer" en cada
+  toma también en la fase automática. Corregido a mano en EP25 (ahora muestra la toma real del QA).
+- Las marcas de "revisada por QA" (shot.qa) las pone la fase VISUAL; aparecen cuando esa fase revise cada toma.

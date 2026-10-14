@@ -202,6 +202,7 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
   for (const sh of ep.shots || []) {
     const clip = (ep.assets || []).filter((a) => a.kind === 'video_clip' && a.shot_number === sh.n).sort((a, b) => String(b.updated_at || b.created_at).localeCompare(String(a.updated_at || a.created_at)))[0];
     if (!clip || clip.approved) continue; // aprobada por Franklin: no se toca
+    await setWorking(sh.n, 'revisar');
     const d = await durationOf(clip.storage_path);
     let why = '';
     if (exact[sh.n] && d && d < exact[sh.n] * 0.8) why = `dura ${d.toFixed(1)} s y su voz ${exact[sh.n].toFixed(1)} s`;
@@ -217,6 +218,7 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
     // 🧠 Evidencia OBJETIVA para el cerebro: los defectos medidos (corte, deformación) son hechos, no opinión del juez.
     if (/escena|deforma/.test(why)) { try { await require(path.join(ROOT, 'netlify', 'functions', '_cerebro')).recordMany(supabase, [{ ep: epId, n: sh.n, clip: clip.id, try: (sh.qa && Number(sh.qa.tries)) || 0, src: 'medido', ok: false, fl: { b: true }, reason: 'medido: ' + why, shot: sh, tag: 'medido' }]); } catch (_) {} }
     log(`QA toma ${sh.n}: ${why} → la rehago con prompt nuevo`);
+    await setWorking(sh.n, 'rehacer'); // el panel muestra qué toma está rehaciendo el QA (también en la fase automática)
     if (/quieto|escena|deforma/.test(why) && !sh.clip_stale) {
       try {
         const fix = await rewriteShot(sh, /deforma/.test(why) ? 'LTX deformó una parte del lugar (' + why + '): el terreno o el edificio se "desliza" mientras el primer plano queda quieto. Usa una cámara que se desplace de lado de verdad (slow lateral drift) con un primer plano con textura que pase por delante, y el movimiento en algo natural (luces, hierba, viento); nada de paneos en planos abiertos.' : /escena/.test(why) ? 'LTX cortó a OTRA escena a mitad del clip (' + why + '): perdió el lugar y los objetos del cuadro inicial. Pide UN movimiento corto y sencillo que se pueda hacer dentro de ese mismo encuadre (en sitios cerrados o clips de 3 s o menos, cámara casi fija y el movimiento en el sujeto o la luz).' : 'El video salió casi congelado: ' + why + '. Necesita un movimiento claro y visible del sujeto principal.', log);

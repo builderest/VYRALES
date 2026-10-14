@@ -420,9 +420,12 @@ exports.handler = async (event) => {
       quota_stop: quotaStop,
       stopped_by_user: stoppedByUser
     };
+    // Se relee validator_report: la copia en memoria era de ANTES de producir y devolvía un "qa_working" viejo
+    // (el panel quedaba diciendo "generando toma 48" durante todo el QA; Franklin, oct-14). Al terminar: nadie trabaja.
+    const { data: vrNow } = await supabase.from('episodes').select('validator_report').eq('id', episode.id).single();
     await supabase
       .from('episodes')
-      .update({ status: allDone ? 'en_revision' : 'guion_generado', validator_report: Object.assign({}, episode.validator_report || {}, { last_video_run: lastRun }) })
+      .update({ status: allDone ? 'en_revision' : 'guion_generado', validator_report: Object.assign({}, (vrNow && vrNow.validator_report) || episode.validator_report || {}, { last_video_run: lastRun, qa_working: null }) })
       .eq('id', episode.id);
 
     console.log(
