@@ -12,11 +12,15 @@ const json = (s, b) => ({ statusCode: s, headers: { 'Content-Type': 'application
 let cache = {}; // { [ws]: { at, data } } — 3 min POR CANAL (antes era global: en un canal salía la data de otro)
 async function getData(sb, fresh) {
   const ws = (() => { try { return require('./_tenant').currentWs(); } catch (_) { return 'x'; } })();
+  // Firma de las cuentas conectadas del canal: si reconectas una red (ej. Facebook pasó de MindFuel a VYRALES), la caché vieja
+  // ya no vale aunque no hayan pasado los 3 min (oct-14: la analítica seguía mostrando la Página del otro canal).
+  let sig = '';
+  try { let q = sb.from('social_accounts').select('platform, account_id, updated_at'); const T = require('./_tenant'); if (await T.tenancyOn(sb)) q = q.eq('workspace_id', ws); const { data: rows } = await q; sig = (rows || []).map((r) => r.platform + ':' + r.account_id + ':' + r.updated_at).sort().join('|'); } catch (_) {}
   const c = cache[ws];
-  if (!fresh && c && Date.now() - c.at < 180000) return c.data;
+  if (!fresh && c && c.sig === sig && Date.now() - c.at < 180000) return c.data;
   const data = await collect(sb);
   // Si YouTube Analytics falló por un error temporal, no se guarda en caché (el siguiente Actualizar reintenta).
-  if (!(data.youtube && data.youtube.analytics && data.youtube.analytics.reason === 'temporal')) cache[ws] = { at: Date.now(), data };
+  if (!(data.youtube && data.youtube.analytics && data.youtube.analytics.reason === 'temporal')) cache[ws] = { at: Date.now(), data, sig };
   return data;
 }
 

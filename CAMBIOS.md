@@ -435,3 +435,11 @@ experimento (`doc.forzados`: ¿quién tenía razón?).
   del episodio, no en el canal que esté abierto en el panel.
 - **Franklin:** cuando Netlify publique esto, abre el canal VYRALES → "Conectar Facebook + Instagram" (con las dos Páginas
   marcadas) para que VYRALES quede con SU Página. MindFuel ya está bien.
+
+## 2026-10-14 17:00 — Analítica DENTRO del panel + datos del canal correcto (Franklin)
+- **Dentro del panel:** "Analítica" ya no abre otra página: es una pantalla más del panel (`#analitica`), como Producción o
+  Guiones. Muestra la misma analítica en un recuadro integrado (`analitica.html?embed=1`, sin su barra lateral ni botón
+  "Panel"); los enlaces de conectar redes/ir al panel abren en la ventana completa. Se recarga al entrar → siempre del canal activo.
+- **Datos del otro canal:** (1) la caché de 3 min ahora se invalida en cuanto cambia una cuenta conectada del canal (antes,
+  tras reconectar Facebook de MindFuel→VYRALES, seguía mostrando lo viejo hasta 3 min); (2) el índice de episodios que
+  etiqueta los videos por serie/tema solo usa episodios del canal (antes mezclaba todos: MindFuel ahora 0, VYRALES 67).

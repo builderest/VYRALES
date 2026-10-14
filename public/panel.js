@@ -122,7 +122,7 @@
   // ---------- Páginas (cada opción del menú muestra solo su pantalla) ----------
   var VIEWS = {
     inicio: 'Inicio', produccion: 'Producción', revisar: 'Revisar y publicar', guiones: 'Guiones',
-    videos: 'Videos', personajes: 'Personajes', lugares: 'Lugares', reglas: 'Reglas de la novela', gastos: 'Gastos', api: 'API', usuarios: 'Usuarios', creditos: 'Créditos'
+    videos: 'Videos', personajes: 'Personajes', lugares: 'Lugares', reglas: 'Reglas de la novela', gastos: 'Gastos', analitica: 'Analítica', api: 'API', usuarios: 'Usuarios', creditos: 'Créditos'
   };
   var current = 'inicio';
 
@@ -144,6 +144,11 @@
     try { history.replaceState(null, '', location.pathname + location.search + '#' + v); } catch (_) {}
     if (!keepScroll) window.scrollTo({ top: 0, behavior: 'auto' });
     if (v === 'videos' && window.vyVideosCargar) window.vyVideosCargar();
+    if (v === 'analitica') {
+      var fr = $('vyAnaliticaFrame');
+      // Se recarga al entrar: así siempre muestra el canal ACTIVO (cookie vyrales_ws), nunca uno anterior.
+      if (fr) fr.src = '/analitica.html?embed=1&t=' + Date.now();
+    }
     if (v === 'api') apiCargar();
     if (v === 'usuarios') usersCargar();
     if (v === 'creditos') credCargar();

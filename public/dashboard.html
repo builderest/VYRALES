@@ -175,7 +175,7 @@
         <a class="vy-nav" href="#revisar" data-vy-go="revisar"><i class="fa-regular fa-eye"></i>Revisar y publicar<span id="vyNavReview" class="vy-badge hidden">0</span></a>
         <a class="vy-nav" href="#videos" data-vy-go="videos"><i class="fa-solid fa-clapperboard"></i>Videos</a>
         <a class="vy-nav" href="#guiones" data-vy-go="guiones"><i class="fa-solid fa-scroll"></i>Guiones</a>
-        <a class="vy-nav" href="/analitica.html"><i class="fa-solid fa-chart-line"></i>Analítica</a>
+        <a class="vy-nav" href="#analitica" data-vy-go="analitica"><i class="fa-solid fa-chart-line"></i>Analítica</a>
 
         <div class="vy-lab vy-side-sec">Novela</div>
         <a class="vy-nav" href="#personajes" data-vy-go="personajes"><i class="fa-solid fa-users"></i>Personajes</a>
@@ -610,6 +610,10 @@
         </section>
 
         <!-- CUENTA · API: claves de todos los servicios (panel.js + /.netlify/functions/api-keys) -->
+        <!-- Analítica DENTRO del panel (Franklin oct-14): misma sesión y mismo canal activo; se carga al entrar. -->
+        <section id="vyAnalitica" data-vy-view="analitica" aria-label="Analítica">
+            <iframe id="vyAnaliticaFrame" title="Analítica" style="width:100%;height:calc(100vh - 120px);min-height:640px;border:0;border-radius:16px;background:transparent" loading="lazy"></iframe>
+        </section>
         <section id="vyApi" class="flex flex-col gap-5" data-vy-view="api" aria-labelledby="vyApiTitle">
             <div class="flex flex-col gap-1">
                 <span class="vy-lab text-cyber-cyan">// Cuenta · API</span>

@@ -149,7 +149,10 @@ const firstLine = (s) => String(s || '').split('\n')[0];
 const norm = (s) => String(s || '').toLowerCase().replace(/#\S+|\|.*$/g, '').replace(/[^a-z0-9áéíóúñü ]/g, ' ').replace(/\s+/g, ' ').trim();
 
 async function episodeIndex(sb) {
-  const { data } = await sb.from('episodes').select('id, title, episode_number, series_id, validator_report, series(id, slug, title, synopsis)').not('validator_report', 'is', null).limit(500);
+  // Solo los episodios de ESTE canal (antes mezclaba los de todos los canales al etiquetar videos por serie/tema).
+  let q = sb.from('episodes').select('id, title, episode_number, series_id, validator_report, series!inner(id, slug, title, synopsis, workspace_id)').not('validator_report', 'is', null).limit(500);
+  try { const T = require('./_tenant'); if (await T.tenancyOn(sb)) q = q.eq('series.workspace_id', T.currentWs()); } catch (_) {}
+  const { data } = await q;
   const byYt = {}, byTitle = [];
   (data || []).forEach((e) => {
     const vr = e.validator_report || {};

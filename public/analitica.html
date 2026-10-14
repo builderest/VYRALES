@@ -1,6 +1,9 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
+<script>if(/[?&]embed=1/.test(location.search)){document.documentElement.classList.add('embed');
+// Enlaces internos (conectar redes, ir al panel) se abren en la ventana completa, no dentro del recuadro.
+document.addEventListener('click',function(e){var a=e.target.closest&&e.target.closest('a[href^="/"]');if(a&&!a.target){a.target='_top';}},true);}</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>VYRALES // Analítica</title>
@@ -16,6 +19,9 @@
     --text:#eaf1ff; --text-dim:#8fa0c7; --text-dim-2:#60729c;
     --grid-line:rgba(124,156,255,.08); --glow-cyan:0 0 20px rgba(73,216,255,.35);
   }
+  /* Dentro del panel (iframe, ?embed=1): sin barra lateral ni botón de volver (Franklin oct-14) */
+  html.embed .sidebar, html.embed .back-btn{display:none!important}
+  html.embed body{background:transparent}
   *{box-sizing:border-box;margin:0;padding:0}
   html{background:#070b16}
   body{font-family:'Inter',sans-serif;color:var(--text);-webkit-font-smoothing:antialiased;min-height:100vh;
@@ -558,7 +564,7 @@
         const j = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error((j.error || ('HTTP ' + r.status)) + (j.errors ? ' — ' + j.errors.join(' · ') : ''));
         try { localStorage.setItem('vyrales_series', out.series.slug); } catch (_) {}
-        location.href = '/?series=' + encodeURIComponent(out.series.slug);
+        (window.top || window).location.href = '/?series=' + encodeURIComponent(out.series.slug);
       } catch (err) { b.disabled = false; b.textContent = 'Crear el video en el panel'; alert('No se pudo crear: ' + err.message); }
     };
   }
@@ -605,7 +611,7 @@
         const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status);
         store.set(lgKey(), (store.get(lgKey()) || []).filter((y) => y.job !== x.job));
         alert('✔ Listo: el video largo está en "Historias completas" (EP ' + j.long_episode + ') y los ' + j.shorts + ' Shorts en el canal vertical.');
-        location.href = '/?series=' + encodeURIComponent(j.long_slug);
+        (window.top || window).location.href = '/?series=' + encodeURIComponent(j.long_slug);
       } catch (err) { b.disabled = false; b.textContent = 'Crear largo + Shorts en el panel'; alert('No se pudo crear: ' + err.message); }
     };
   }
