@@ -74,12 +74,16 @@ function featuresOf(sh) {
     explosion_fx: /explo|blast|fireball|mushroom cloud|detonat|shockwave/.test(all),
     // Vehículo que SE DESPLAZA en la toma (un bote como escenario no cuenta): sustantivo + verbo de desplazamiento.
     vehiculo: /\b(plane|planes|bomber|bombers|aircraft|jet|jets|car|cars|truck|trucks|sedan|train|ship|ships|boat|boats|tank|tanks|helicopter|rocket|missile|vehicle|convoy)\b[^.;,]{0,60}\b(drives?|driving|rolls?|rolling|flies|flying|fly|soars?|takes? off|lands?|speeds?|races?|sails?|sailing|moves? (?:forward|along|across|toward|away)|glides?|gliding|taxis?|cruises?|climbs?|dives?|launch(?:es)?|streaks?|advances?|pulls? (?:away|out|in))\b/.test(act),
-    solo_camara: !!sh.camera_only
+    solo_camara: !!sh.camera_only,
+    // Clip corto (≤3 s) con cámara que se desplaza: hipótesis del vigía (oct-14, T8/T18 de EP25 cortaron a otra escena).
+    // El cerebro la mide con evidencia; no es regla hasta que los números lo digan.
+    corto_con_camara: (Number(sh.seconds) || 0) > 0 && Number(sh.seconds) <= 3 && /drift|\bpan\b|truck|dolly|push|track|orbit|crane|tilt/.test(cam)
   };
 }
 
 // Qué significa cada patrón y qué hacer (para el guionista, el reparador y el panel).
 const INFO = {
+  'corto_con_camara=true': { label: 'Clip de 3 s o menos con cámara en movimiento', regla: 'En clips de 3 s o menos, cámara casi fija; el movimiento va en el sujeto o la luz.', arreglo: 'Cámara fija o empuje casi imperceptible; mueve el sujeto, la luz o el ambiente dentro del mismo encuadre.', en_imagen: false },
   'cam_acerca=true': { label: 'Cámara que se acerca o se aleja (push-in, zoom, grúa)', regla: 'No uses cámaras que se acerquen o se alejen (push-in, dolly, zoom, crane, pull-back).', arreglo: 'Cambia la cámara por "slow lateral drift to the left/right" y pon el movimiento en el sujeto.', en_imagen: false },
   'cam_sigue=true': { label: 'Cámara que sigue o rodea al sujeto (tracking, órbita, dron)', regla: 'No uses cámaras de seguimiento, órbita, dron o FPV.', arreglo: 'Cámara "slow lateral drift" corta; el sujeto se mueve poco y queda dentro del cuadro.', en_imagen: false },
   'multi_accion=true': { label: 'Varias acciones distintas en una toma ("while…", "the other…")', regla: 'Una toma = un sujeto con UNA acción; nunca dos personas o grupos haciendo cosas distintas.', arreglo: 'Deja UN solo sujeto con UNA acción; lo demás queda de fondo sin acción propia, o parte la toma.', en_imagen: false },

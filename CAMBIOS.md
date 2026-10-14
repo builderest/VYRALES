@@ -253,3 +253,26 @@ experimento (`doc.forzados`: ¿quién tenía razón?).
   locales (videos, imágenes, respaldos, 706 MB) en el commit e47e373. Deshecho con `git reset --mixed origin/main` — ningún
   archivo borrado, siguen en la carpeta. `.gitignore` ahora excluye medios (*.mp4, *.mp3, *.wav, *.tgz…) y carpetas de trabajo,
   así que `git add -A` ya es seguro.
+
+## 2026-10-14 07:15 — Revisión toma 8 de El Chapo (pedida por Franklin)
+- **Problema (visto en 9 cuadros del clip):** 3 s, "paneo lento a la izquierda". En el segundo 0.7 LTX hace una disolvencia a
+  OTRA celda: desaparecen el muro de la ducha y la puerta, que son justo lo que dice la narración ("el único punto que la cámara
+  no ve"). Fallo de continuidad, no de calidad de imagen (el cuadro inicial de Flow está bien).
+- **CAUSA PROBABLE:** paneo en un espacio cerrado con lente 24 mm y solo 3 s: LTX no tiene "a dónde" mover la cámara y cambia de
+  escena. **Corrección:** toma de cámara de seguridad fija (empuje casi imperceptible), parpadeo del fluorescente, sombra en la
+  esquina; el muro queda en cuadro todo el tiempo. Marcada clip_stale.
+- No se rehace todavía: `regen_local` corre el QA de todo el episodio y une el video, y gen_local va por la mitad. Se rehace al
+  terminar gen_local.
+
+## 2026-10-14 07:30 — 👁️ "Ojos" nuevos del QA: detector de corte de escena (por la toma 8)
+- **Franklin:** "es para que mejores todo, para que seas los ojos y la próxima ya esté más pulido".
+- **Medición (20 clips de EP25, diferencia entre cuadros a 8 fps):** T8 salto 29× lo normal (disolvencia a otra celda),
+  T18 3.9× (la muralla salta a otro encuadre con torre). Los otros 18 clips ≤2.4×. Revisado a ojo: T8 y T18 son cortes reales;
+  T10 (2.4×) no es corte.
+- **`agente/_qa.js` → `sceneCut()`:** corte = salto ≥3.5× la mediana del clip y ≥8. Tres usos:
+  1. Revisión mecánica (antes del QA visual, $0): si hay corte, Claude reescribe la toma con la causa exacta y se rehace.
+  2. El QA visual recibe el aviso "CORTE MEDIDO a los X s" para comparar el lugar antes y después.
+  3. Tomas con `clip_stale` (corregidas a mano por el supervisor o Franklin) se rehacen con SU prompt, sin reescribirlas.
+- **`_cerebro.js`:** patrón nuevo `corto_con_camara` (clip ≤3 s con cámara que se desplaza). Es HIPÓTESIS: el cerebro lo mide
+  con evidencia y solo será regla si los números lo confirman (independencia: 2 casos no bastan).
+- Entra en acción al final de este mismo gen_local (el QA se carga al terminar), así que T8 y T18 deberían salir solas.

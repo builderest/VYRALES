@@ -44,6 +44,20 @@ function motionStep(url, center = false) {
     res(Math.round(tot / (n - 1) * 10) / 10);
   }));
 }
+// 👁️ Corte de escena (oct-14, toma 8 de El Chapo): LTX a veces "disuelve" a OTRA escena a mitad del clip.
+// Diferencia entre cuadros (gris 64x36, 8 fps): un corte es UN salto enorme frente a lo normal del clip.
+// Calibrado en 20 clips de EP25: T8 (disolvencia a otra celda) ratio 29, T18 (salto de encuadre) 3.9; clips sanos ≤2.4.
+function sceneCut(url) {
+  const ffmpeg = require(path.join(ROOT, 'node_modules', 'ffmpeg-static'));
+  return new Promise((res) => execFile(ffmpeg, ['-v', 'error', '-i', url, '-vf', 'fps=8,scale=64:36,format=gray', '-f', 'rawvideo', '-'], { encoding: 'buffer', timeout: 90000, maxBuffer: 1 << 26 }, (e, raw) => {
+    if (e || !raw) return res(null);
+    const N = 64 * 36, n = Math.floor(raw.length / N); if (n < 4) return res(null);
+    const d = []; for (let k = 1; k < n; k++) { let x = 0; for (let i = 0; i < N; i++) x += Math.abs(raw[k * N + i] - raw[(k - 1) * N + i]); d.push(x / N); }
+    const sorted = d.slice().sort((a, b) => a - b), med = sorted[Math.floor(sorted.length / 2)], max = sorted[sorted.length - 1];
+    const ratio = max / Math.max(med, 0.5), at = (d.indexOf(max) + 1) / 8;
+    res({ cut: ratio >= 3.5 && max >= 8, ratio: Math.round(ratio * 10) / 10, max: Math.round(max * 10) / 10, at });
+  }));
+}
 const lineOf = (sh) => String(sh.voice_part || (Array.isArray(sh.dialogue) ? sh.dialogue : sh.dialogue ? [sh.dialogue] : []).map((d) => d && d.line).filter(Boolean).join(' ')).trim();
 
 // Revisa tomas de a 4 con Claude (lee las imágenes). Devuelve { n: { image_ok, action_ok, haze, broken, reason } }.
@@ -67,8 +81,9 @@ async function visionReview(items, log, onBatch) {
       fr.forEach((b, k) => files.push({ name: `t${it.sh.n}_${k + 1}.jpg`, buffer: b }));
       const mv = await motionStep(it.url);
       const mvc = await motionStep(it.url, true);
+      const cutM = await sceneCut(it.url);
       const camOnly = it.sh.camera_only ? '\n  TOMA DE SOLO CÁMARA (pedido de Franklin): el objeto/maqueta NO debe moverse ni cambiar de forma; action_ok = true si la cámara hace su paneo; si el objeto cambia de forma, de estructura o se convierte en otra cosa → broken = true.' : '';
-      desc.push(`TOMA ${it.sh.n}${camOnly}: ${nF} imágenes t${it.sh.n}_1.jpg … t${it.sh.n}_${nF}.jpg (de inicio a final, en orden).\n  Narración: "${lineOf(it.sh)}"\n  Debe mostrar: ${it.sh.start_en || it.sh.visual_es || ''}\n  Acción pedida: ${it.sh.action_en || ''}\n  Movimiento medido en píxeles: todo el cuadro ${mv == null ? '?' : mv}, solo el centro ${mvc == null ? '?' : mvc} (≈1 congelado, 3–6 poco o solo cámara, 8+ claro)`);
+      desc.push(`TOMA ${it.sh.n}${camOnly}: ${nF} imágenes t${it.sh.n}_1.jpg … t${it.sh.n}_${nF}.jpg (de inicio a final, en orden).\n  Narración: "${lineOf(it.sh)}"\n  Debe mostrar: ${it.sh.start_en || it.sh.visual_es || ''}\n  Acción pedida: ${it.sh.action_en || ''}\n  Movimiento medido en píxeles: todo el cuadro ${mv == null ? '?' : mv}, solo el centro ${mvc == null ? '?' : mvc} (≈1 congelado, 3–6 poco o solo cámara, 8+ claro)${cutM && cutM.cut ? `\n  ⚠️ CORTE DE ESCENA MEDIDO a los ${cutM.at.toFixed(1)} s (salto ${cutM.ratio}× lo normal): compara el lugar y los objetos antes y después; si cambió de lugar o desapareció lo que nombra la narración, image_ok=false y broken=true.` : ''}`);
     }
     if (!desc.length) continue;
     const prompt = `Eres el control de calidad de un documental. Usa la herramienta Read para mirar TODAS las imágenes que se nombran abajo (están en la carpeta actual). Para cada toma compara el inicio, los puntos intermedios y el final (todas las imágenes de la toma) con la narración.
@@ -174,12 +189,15 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
     else {
       const fz = await frozenSeconds(clip.storage_path);
       if (d && fz > d * 0.4) why = `está quieto ${fz.toFixed(1)} de ${d.toFixed(1)} s`;
+      else { const sc = await sceneCut(clip.storage_path); if (sc && sc.cut) why = `cambia de escena a los ${sc.at.toFixed(1)} s (salto ${sc.ratio}× lo normal)`; }
     }
+    // Ya corregida a mano por el supervisor o Franklin (clip_stale): se rehace con SU prompt, sin reescribir.
+    if (!why && sh.clip_stale) why = 'marcada para rehacer (prompt corregido)';
     if (!why) continue;
     log(`QA toma ${sh.n}: ${why} → la rehago con prompt nuevo`);
-    if (/quieto/.test(why)) {
+    if (/quieto|escena/.test(why) && !sh.clip_stale) {
       try {
-        const fix = await rewriteShot(sh, 'El video salió casi congelado: ' + why + '. Necesita un movimiento claro y visible del sujeto principal.', log);
+        const fix = await rewriteShot(sh, /escena/.test(why) ? 'LTX cortó a OTRA escena a mitad del clip (' + why + '): perdió el lugar y los objetos del cuadro inicial. Pide UN movimiento corto y sencillo que se pueda hacer dentro de ese mismo encuadre (en sitios cerrados o clips de 3 s o menos, cámara casi fija y el movimiento en el sujeto o la luz).' : 'El video salió casi congelado: ' + why + '. Necesita un movimiento claro y visible del sujeto principal.', log);
         if (fix) {
           const { data: fr } = await supabase.from('episodes').select('shots').eq('id', epId).single();
           await supabase.from('episodes').update({ shots: (fr.shots || []).map((x) => x.n === sh.n ? Object.assign({}, x, fix, fix.start_en ? { end_en: '', end_frame_url: null, end_frame_skip: false } : {}, { prompt_override: null, ltx_en: null, keyframe_prompt_override: fix.start_en ? null : x.keyframe_prompt_override, qa_rewrite_from: { camera: x.camera, action_en: x.action_en, reaction_en: x.reaction_en, start_en: x.start_en } }) : x) }).eq('id', epId);
@@ -371,4 +389,4 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
   return redone;
 }
 
-module.exports = { qaShots, durationOf, frozenSeconds, visionReview, grab };
+module.exports = { qaShots, durationOf, frozenSeconds, sceneCut, visionReview, grab };
