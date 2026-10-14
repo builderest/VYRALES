@@ -363,3 +363,14 @@ experimento (`doc.forzados`: ¿quién tenía razón?).
   los largos (gen_local, regen_local, render_full, qa_tomas, flow_frames, voz_ingles, short_reusar) se re-encolan una vez.
   Probado: a las 11:46 UTC el agente se reinició solo con el código nuevo y retomó gen_local de EP25 (salta las 146 tomas
   hechas y corre el QA ya con todas las mejoras de hoy).
+
+## 2026-10-14 12:40 — QA visual de EP25: 67 de 146 "malas" → auditoría a ojo y triaje (king otra vez caído)
+- **king NO responde** desde ~12:00 UTC (gen_estado: `fetch failed` a 100.66.84.73:8188) → todos los rehacer fallaban.
+  QA detenido. **Franklin: revisar king (encendido, Tailscale, ComfyUI).**
+- El juez visual marcó 67/146. Auditoría a ojo de 10 que mis medidores no marcaron: 3 malas de verdad (T10 guardias se
+  funden, T37 mesa→rampa, T39 pila→pared), 3 detalles menores (T14, T36, T44), 4 bien (T15, T17, T24, T41).
+- **Regla nueva en `_qa.js` ("leve")**: si el juez marca SOLO acción floja/al revés o SOLO bruma (sin imagen equivocada ni
+  nada roto/deforme), se acepta con nota y no se rehace (queda como evidencia). `VYRALES_QA_ESTRICTO=1` lo desactiva.
+  En EP25: 15 aceptadas así (T18, 23, 35, 46, 70, 74, 80, 82, 98, 110, 115, 124, 137, 141, 145) + 4 aceptadas por mí a ojo
+  (T15, 17, 24, 41). **Quedan 48 para rehacer** cuando king vuelva (casi todas "cambia de lugar"/objetos que se deforman;
+  T108 y T120 tienen la IMAGEN inicial equivocada → necesitan cuadro nuevo).

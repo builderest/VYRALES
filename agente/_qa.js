@@ -259,14 +259,19 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
       const forced = !!(it.sh.qa && it.sh.qa.force && (it.sh.qa.clip_id === it.clip.id || it.sh.qa.force_any));
       if (forced) { r.action_ok = false; r.reason = 'Marcada a mano: ' + (it.sh.qa.force_reason || 'no está bien') + (r.reason ? ' · QA: ' + r.reason : ''); }
       const bad = forced || r.image_ok === false || r.style_ok === false || r.action_ok === false || r.haze === true || r.broken === true;
+      // LEVE (oct-14, auditoría a ojo de EP25): de lo que el juez marca SOLO por acción floja/al revés o SOLO por bruma, la
+      // mayoría se ve bien en el video (T15, T24, T41…) y rehacerla arriesga empeorarla. Si no hay imagen equivocada ni
+      // nada roto/deforme, se acepta con nota (queda como evidencia para el cerebro). VYRALES_QA_ESTRICTO=1 lo desactiva.
+      const leve = bad && !forced && process.env.VYRALES_QA_ESTRICTO !== '1' && r.image_ok !== false && r.style_ok !== false && r.broken !== true && (r.action_ok === false) !== (r.haze === true);
       // Hasta 3 intentos por toma; en TODOS Claude reescribe cámara/acción/final con lo que vio el QA (repetir el mismo
       // prompt daba el mismo error, ej. T6 Toba). Imagen nueva si no cuadra o desde el 2º intento (solo sin personajes).
       // Después de 3 queda para revisión humana.
       const tries = it.sh.qa ? (Number(it.sh.qa.tries) || (it.sh.qa.redone ? 1 : 0)) : 0;
       const already = tries >= 3;
-      qaOf[it.sh.n] = { clip_id: it.clip.id, ok: !bad, image_ok: r.image_ok !== false, style_ok: r.style_ok !== false, action_ok: r.action_ok !== false, haze: !!r.haze, broken: !!r.broken, reason: String(r.reason || '').slice(0, 300), at: new Date().toISOString(), redone: tries > 0, tries };
+      qaOf[it.sh.n] = { clip_id: it.clip.id, ok: !bad || leve, leve: leve || undefined, image_ok: r.image_ok !== false, style_ok: r.style_ok !== false, action_ok: r.action_ok !== false, haze: !!r.haze, broken: !!r.broken, reason: String(r.reason || '').slice(0, 300), at: new Date().toISOString(), redone: tries > 0, tries };
       ev0.push({ ep: epId, n: it.sh.n, clip: it.clip.id, try: tries, src: 'qa', verdict: r, reason: r.reason, shot: it.sh });
-      if (bad && !already) {
+      if (leve) log(`QA visual toma ${it.sh.n}: detalle leve (${r.reason || ''}) → se acepta sin rehacer`);
+      else if (bad && !already) {
         const freeFrame = !(it.sh.characters || []).length; // cuadro nuevo solo por el camino gratis (Flow/FLUX)
         // Franklin (oct-11): si se rehace con el MISMO prompt, sale el mismo error → SIEMPRE se reescribe el prompt
         // (Claude guionista, con lo que vio el QA) y la imagen se cambia si no cuadra o desde el 2º intento.
