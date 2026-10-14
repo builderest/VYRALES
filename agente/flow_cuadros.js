@@ -33,12 +33,13 @@ for (const line of fs.readFileSync(path.join(ROOT, '.env'), 'utf8').split(/\r?\n
   const all = (ep.shots || []).filter((s) => want.includes(s.n) && (s.start_en || s.action_en));
   // Tomas con personajes: una por una con sus fotos de cara como referencia (createKeyframe → Flow con ingredientes).
   const conPersonajes = all.filter((s) => (s.characters || []).length);
+  const conDone = []; // también limpian frame_stale (antes solo lo hacían las tomas sin personajes)
   if (conPersonajes.length) {
     const { createKeyframe } = require(path.join(ROOT, 'netlify', 'functions', '_keyframe'));
     const { data: fullSeries } = await supabase.from('series').select('id, slug, story_bible, visual_memory').eq('id', ep.series_id).single();
     const { data: characters } = await supabase.from('characters').select('name, fixed_prompt_tag, profile, reference_image_url').eq('series_id', ep.series_id);
     for (const sh of conPersonajes) {
-      try { await createKeyframe(supabase, { series: fullSeries, episode: ep, shot: sh, characters, log: (...x) => console.log(...x) }); console.log(`toma ${sh.n}: cuadro con personajes listo`); }
+      try { await createKeyframe(supabase, { series: fullSeries, episode: ep, shot: sh, characters, log: (...x) => console.log(...x) }); conDone.push(sh.n); console.log(`toma ${sh.n}: cuadro con personajes listo`); }
       catch (e) { console.log(`toma ${sh.n}: FALLÓ ${String(e.message).slice(0, 200)}`); }
     }
   }
@@ -53,7 +54,7 @@ for (const line of fs.readFileSync(path.join(ROOT, '.env'), 'utf8').split(/\r?\n
   }, { aspect });
   // El cuadro final viejo ya no corresponde: se rehace desde el nuevo inicial.
   const { data: fr } = await supabase.from('episodes').select('shots').eq('id', epId).single();
-  await supabase.from('episodes').update({ shots: fr.shots.map((x) => (done.includes(x.n) ? Object.assign({}, x, { end_frame_url: null, end_frame_skip: false, frame_stale: false, clip_stale: solo ? (ep.assets || []).some((a) => a.kind === 'video_clip' && a.shot_number === x.n) : false }) : x)) }).eq('id', epId);
+  await supabase.from('episodes').update({ shots: fr.shots.map((x) => (done.includes(x.n) || conDone.includes(x.n) ? Object.assign({}, x, { end_frame_url: null, end_frame_skip: false, frame_stale: false, clip_stale: solo ? (ep.assets || []).some((a) => a.kind === 'video_clip' && a.shot_number === x.n) : false }) : x)) }).eq('id', epId);
   console.log('Cuadros de Flow guardados:', done.join(',') || 'ninguno');
   if (!done.length && !conPersonajes.length) process.exit(1);
   if (solo) {

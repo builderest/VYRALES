@@ -229,3 +229,10 @@ experimento (`doc.forzados`: ¿quién tenía razón?).
 - **⚠️ PARA FRANKLIN: Netlify NO desplegó el push d75a1fd.** En producción `mover-produccion`, `objeciones` y `cerebro` dan 404
   (siguen las funciones viejas). Las 59 funciones empaquetan bien con esbuild → no es el código. INFERENCIA: Netlify no está
   construyendo (¿créditos/minutos de build agotados o despliegues pausados?). Revisar en app.netlify.com → Deploys.
+
+## 2026-10-14 06:55 — Vigía El Chapo: cuadros completos, arranca la producción
+- Netlify ya despliega: `objeciones` responde 401 (antes 404) → el código nuevo está en producción.
+- Cuadros 146/146. Las 4 tomas marcadas viejas (T4, T6, T57, T103) se rehicieron con Flow ($0).
+- **Bug arreglado** (`agente/flow_cuadros.js`): las tomas CON personajes no quitaban la marca `frame_stale` al rehacerse
+  (solo lo hacían las sin personajes) → el panel las seguía mostrando como viejas. Marca limpiada a mano en EP25.
+- Lanzado `gen_local:3b110a58…` (king, $0) — job e97a7193.
