@@ -513,3 +513,6 @@ experimento (`doc.forzados`: ¿quién tenía razón?).
   sale "Hacer los N Shorts que faltan ($0)" cuando el largo ya tiene tomas: manda `short_reusar` por cada uno (usa
   las tomas del largo y su propia narración). `agent.js`: `short_reusar` entra a la fila (antes se rechazaba si la
   PC estaba ocupada).
+- **Short EP14 fallaba al unir 2 tomas del largo** (`short_reusar.js`: "Failed to configure output pad on
+  Parsed_concat"): `setsar=1` iba ANTES del scale/crop → las piezas llegaban con SAR distinto al concat. Ahora
+  `scale,crop,setsar=1,format=yuv420p`. Re-lanzado: EP14 listo (69 s, revisado a ojo). Shorts EP05/08/09/10/14 hechos.

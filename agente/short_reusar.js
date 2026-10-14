@@ -115,7 +115,7 @@ for(const s of sShots){
   for(const [k,ln] of map[s.n].entries()){const src='S'+s.n+'_'+k+'.mp4';fs.writeFileSync(path.join(cwd,src),Buffer.from(await (await fetch(lClips[ln].storage_path)).arrayBuffer()));parts.push(src);}
   const out='V'+s.n+'.mp4';
   const inArgs=parts.flatMap((p)=>['-i',p]);
-  const pre=parts.length>1?parts.map((_,i)=>`[${i}:v]setsar=1,fps=24,scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720[c${i}]`).join(';')+';'+parts.map((_,i)=>`[c${i}]`).join('')+`concat=n=${parts.length}:v=1:a=0[cat];`+vertFor(side[s.n]).replace('[0:v]','[cat]'):vertFor(side[s.n]);
+  const pre=parts.length>1?parts.map((_,i)=>`[${i}:v]fps=24,scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720,setsar=1,format=yuv420p[c${i}]`).join(';')+';'+parts.map((_,i)=>`[c${i}]`).join('')+`concat=n=${parts.length}:v=1:a=0[cat];`+vertFor(side[s.n]).replace('[0:v]','[cat]'):vertFor(side[s.n]);
   await ff(inArgs.concat(['-f','lavfi','-i','anullsrc=channel_layout=stereo:sample_rate=48000','-filter_complex',pre,'-map','[v]','-map',parts.length+':a','-shortest','-c:v','libx264','-preset','veryfast','-crf','18','-pix_fmt','yuv420p','-c:a','aac',out]),cwd);
   await ff(['-i',out,'-frames:v','1','-q:v','2','F'+s.n+'.jpg'],cwd);
   const key=`${series.slug}/ep${ep.episode_number}/shot-${String(s.n).padStart(2,'0')}-largo-v${Date.now()}`;
