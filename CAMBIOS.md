@@ -460,3 +460,6 @@ experimento (`doc.forzados`: ¿quién tenía razón?).
   Video unido final-v1791998684432 (9:41, 581 s) revisado: 24 cuadros repartidos coherentes, audio −17 dB medio sin silencios
   >1.5 s, sin congelados >2 s. Lanzado `render_full` (calidad completa, 770b1484) y los 3 Shorts con `short_reusar`
   (EP26 9cc4b11a, EP27 64444d09, EP28 3443c79a).
+- **12:48 Texas —** `render_full` EP25 listo: 1920x1080, 581 s, 548 MB. Shorts listos (720x1280, revisados a ojo con 12 cuadros
+  c/u, sin silencios ni congelados, −17 dB): EP26 61.9 s, EP27 58.5 s, EP28 53.3 s, todos cierran con "historia completa 👇".
+  **Producción El Chapo terminada.**
