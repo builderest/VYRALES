@@ -335,8 +335,11 @@ async function agentJobFields(sb, command) {
 // Fila lista para insertar en agent_jobs (con su espacio, permisos y cobro). Lanza error si no se permite.
 async function jobRow(sb, command) { return Object.assign({ command }, await agentJobFields(sb, command)); }
 
+// Ejecuta fn con el espacio (canal) indicado como actual (oct-14: publicar en las redes DEL CANAL del episodio,
+// no en las del canal que esté abierto en el panel).
+function runInWs(wsId, fn) { return als.run(Object.assign({}, current() || {}, { wsId }), fn); }
 module.exports = {
-  jobRow, wsOfJob,
+  jobRow, wsOfJob, runInWs,
   ADMIN_WS, current, currentWs, wsFields, withTenant, tenancyOn, tenancyKnownOn,
   hashPassword, verifyPassword, userCookieValue, parseSession, parseActiveWs,
   loadWs, loadUser, forget, wsOfSeriesSlug, wsOfEpisode, readBody,

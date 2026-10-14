@@ -26,7 +26,19 @@ async function pcFullQuality(supabase, epId, final) {
 
 // Núcleo: lo usa esta función (Netlify) y agente/publish_local.js (PC).
 //   loadVideo(final) → Buffer del video a subir (Supabase en Netlify, archivo local en la PC).
-async function runPublish({ supabase, epId, platform, privacy, loadVideo, quality, log = (...a) => console.log(LOG, ...a) }) {
+// Cada canal publica en SUS redes (Franklin, oct-14): las cuentas se buscan en el canal DUEÑO del episodio, no en el canal
+// que esté abierto en el panel (antes, publicar un episodio de otro canal salía en la Página/IG del canal abierto).
+async function runPublish(args) {
+  const T = require('./_tenant');
+  try {
+    if (await T.tenancyOn(args.supabase)) {
+      const wsEp = await T.wsOfEpisode(args.supabase, args.epId);
+      if (wsEp && wsEp !== T.currentWs()) { (args.log || console.log)('publico con las redes del canal dueño del episodio'); return T.runInWs(wsEp, () => runPublishIn(args)); }
+    }
+  } catch (_) {}
+  return runPublishIn(args);
+}
+async function runPublishIn({ supabase, epId, platform, privacy, loadVideo, quality, log = (...a) => console.log(LOG, ...a) }) {
   const save = async (patch, published) => {
     const { data } = await supabase.from('episodes').select('validator_report, published_at').eq('id', epId).single();
     const vr = Object.assign({}, (data && data.validator_report) || {});

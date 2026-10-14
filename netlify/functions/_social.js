@@ -276,7 +276,20 @@ async function metaConnect(supabase, code) {
     }
     if (!list.length) throw new Error('Meta no devolvió ninguna Página. Permisos concedidos: ' + scopes.map((g) => g.scope + (g.target_ids ? '[' + g.target_ids.length + ']' : '')).join(', ') + '. Revisa que marcaste tu Página de VYRALES y que tu perfil es administrador de esa Página.');
   }
-  const page = (process.env.META_PAGE_ID && list.find((p) => p.id === process.env.META_PAGE_ID)) || list.find((p) => p.instagram_business_account) || list[0];
+  // Cada canal con SU Página (Franklin, oct-14): con varias Páginas autorizadas (VYRALES y MindFuel en el mismo Facebook)
+  // antes se tomaba "la primera con Instagram" → el canal VYRALES quedó con la Página de MindFuel. Ahora se elige la Página
+  // cuyo nombre coincide con el canal (nombre de su YouTube conectado o del espacio). Si hay varias y ninguna coincide,
+  // se pide elegir (no se adivina).
+  const norm = (x) => String(x || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  let page = null;
+  if (list.length > 1) {
+    const T = require('./_tenant');
+    const names = [];
+    try { const yt = await getAccount(supabase, 'youtube'); if (yt && yt.account_name) names.push(yt.account_name); } catch (_) {}
+    try { const w = await T.loadWs(supabase, T.currentWs()); if (w && w.name && !/^admin$/i.test(w.name)) names.push(w.name); } catch (_) {}
+    for (const n of names.map(norm).filter(Boolean)) { page = list.find((p) => norm(p.name) === n) || list.find((p) => norm(p.name).includes(n) || n.includes(norm(p.name))); if (page) break; }
+    if (!page) throw new Error('Autorizaste varias Páginas (' + list.map((p) => p.name).join(', ') + ') y no sé cuál es la de este canal (' + (names.join(' / ') || 'sin nombre') + '). Ponle a la Página el mismo nombre que el canal o conecta desde el canal correcto.');
+  } else page = (process.env.META_PAGE_ID && list.find((p) => p.id === process.env.META_PAGE_ID)) || list[0];
   await saveAccount(supabase, { platform: 'facebook', account_id: page.id, account_name: page.name, access_token: page.access_token, expires_at: null, scopes: 'meta' });
   const ig = page.instagram_business_account;
   if (ig) await saveAccount(supabase, { platform: 'instagram', account_id: ig.id, account_name: ig.username, access_token: page.access_token, expires_at: null, scopes: 'meta' });

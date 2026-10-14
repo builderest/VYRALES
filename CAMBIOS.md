@@ -418,3 +418,20 @@ experimento (`doc.forzados`: ¿quién tenía razón?).
 - **HALLAZGO / PENDIENTE (guionista):** en EP25, 109 de 146 tomas tienen `location: "escena"` (genérico); solo 37 están
   ligadas a uno de los 8 lugares fijos. Ej.: tomas del exterior del penal o del túnel que no dicen su lugar → no recibirían la
   referencia. Para los próximos: que el detallador asigne el lugar fijo a CADA toma que ocurra en él.
+
+## 📌 PENDIENTE (Franklin aprobó, oct-14) — Meta: elegir la Página por canal
+- Problema: dos canales con FB/IG ligados al mismo Facebook personal → al conectar el segundo, Meta reemplaza el permiso y
+  la Página del primero deja de funcionar. Además `metaConnect` elige sola la Página (`META_PAGE_ID` o la primera con IG).
+- Hacer: al conectar Meta, mostrar la lista de Páginas/IG autorizadas y que Franklin elija cuál va en ESE espacio de trabajo;
+  no usar `META_PAGE_ID` como valor fijo global; en el panel, avisar "marca TODAS tus Páginas en Meta (Editar configuración)".
+
+## 2026-10-14 16:40 — Cada canal publica en SUS redes (Franklin)
+- **HALLAZGO (tabla social_accounts):** el canal principal VYRALES tiene guardados Facebook = "MindFuel Rise" e Instagram =
+  "@maindful_rise" — o sea, la Página de MindFuel. CAUSA: `metaConnect` tomaba "la primera Página con Instagram" de todas las
+  autorizadas en tu Facebook. Si se publicaba un video de VYRALES en FB/IG, salía en MindFuel.
+- **Arreglo 1 (`_social.js` → metaConnect):** con varias Páginas autorizadas elige la que se llama como el canal (nombre de su
+  YouTube conectado o del espacio). Si ninguna coincide, NO adivina: avisa qué Páginas hay y pide conectar desde el canal correcto.
+- **Arreglo 2 (`social-publish-background.js` + `_tenant.runInWs`):** al publicar, las cuentas se buscan en el canal DUEÑO
+  del episodio, no en el canal que esté abierto en el panel.
+- **Franklin:** cuando Netlify publique esto, abre el canal VYRALES → "Conectar Facebook + Instagram" (con las dos Páginas
+  marcadas) para que VYRALES quede con SU Página. MindFuel ya está bien.
