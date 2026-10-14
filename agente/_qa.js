@@ -57,27 +57,32 @@ async function visionReview(items, log, onBatch) {
     const files = []; const desc = [];
     for (const it of group) {
       const d = it.dur || 6;
-      const fr = await Promise.all([0.15, d * 0.25, d * 0.5, d * 0.75, Math.max(0.2, d - 0.3)].map((t) => grab(it.url, t)));
+      // 6 a 9 fotos por toma, ~1 por segundo según la duración, repartidas a lo largo del clip (Franklin oct-14:
+      // más muestras = mejor verificación de movimiento/estilo, con Claude $0 en vez de pagar Gemini).
+      const nF = Math.max(6, Math.min(9, Math.round(d)));
+      const end = Math.max(0.2, d - 0.3);
+      const times = Array.from({ length: nF }, (_, k) => 0.15 + (k / (nF - 1)) * (end - 0.15));
+      const fr = await Promise.all(times.map((t) => grab(it.url, t)));
       if (fr.some((b) => !b)) continue;
       fr.forEach((b, k) => files.push({ name: `t${it.sh.n}_${k + 1}.jpg`, buffer: b }));
       const mv = await motionStep(it.url);
       const mvc = await motionStep(it.url, true);
       const camOnly = it.sh.camera_only ? '\n  TOMA DE SOLO CÁMARA (pedido de Franklin): el objeto/maqueta NO debe moverse ni cambiar de forma; action_ok = true si la cámara hace su paneo; si el objeto cambia de forma, de estructura o se convierte en otra cosa → broken = true.' : '';
-      desc.push(`TOMA ${it.sh.n}${camOnly}: imágenes t${it.sh.n}_1.jpg … t${it.sh.n}_5.jpg (de inicio a final, en orden).\n  Narración: "${lineOf(it.sh)}"\n  Debe mostrar: ${it.sh.start_en || it.sh.visual_es || ''}\n  Acción pedida: ${it.sh.action_en || ''}\n  Movimiento medido en píxeles: todo el cuadro ${mv == null ? '?' : mv}, solo el centro ${mvc == null ? '?' : mvc} (≈1 congelado, 3–6 poco o solo cámara, 8+ claro)`);
+      desc.push(`TOMA ${it.sh.n}${camOnly}: ${nF} imágenes t${it.sh.n}_1.jpg … t${it.sh.n}_${nF}.jpg (de inicio a final, en orden).\n  Narración: "${lineOf(it.sh)}"\n  Debe mostrar: ${it.sh.start_en || it.sh.visual_es || ''}\n  Acción pedida: ${it.sh.action_en || ''}\n  Movimiento medido en píxeles: todo el cuadro ${mv == null ? '?' : mv}, solo el centro ${mvc == null ? '?' : mvc} (≈1 congelado, 3–6 poco o solo cámara, 8+ claro)`);
     }
     if (!desc.length) continue;
-    const prompt = `Eres el control de calidad de un documental. Usa la herramienta Read para mirar TODAS las imágenes que se nombran abajo (están en la carpeta actual). Para cada toma compara inicio, mitad y final con la narración.
+    const prompt = `Eres el control de calidad de un documental. Usa la herramienta Read para mirar TODAS las imágenes que se nombran abajo (están en la carpeta actual). Para cada toma compara el inicio, los puntos intermedios y el final (todas las imágenes de la toma) con la narración.
 
 ${desc.join('\n\n')}
 
 Para cada toma decide (sé justo: marca false solo si el problema se ve claro):
 - image_ok: la imagen muestra el sujeto principal que dice la narración (no otra cosa distinta).
 - style_ok: la imagen parece una FOTO REAL (cámara, luz y texturas reales). Es false si parece 3D, render CGI, videojuego, dibujo animado, caricatura, ilustración o pintura, o si el sujeto se ve liso/plástico/brillante tipo juguete (false = problema; hay que rehacer la imagen).
-- action_ok: SE VE la acción pedida en el sujeto principal. Sé ESTRICTO: compara la posición de 2 objetos concretos del sujeto (ej. "roca grande arriba a la izquierda") entre la imagen 1 y la 5 RESPECTO a lo que los rodea. Si solo cambia el encuadre (zoom, giro o inclinación de cámara) y los objetos siguen igual entre sí, es false. Si la imagen muestra algo que debería estar en movimiento (derrumbe, caída, explosión, corriente) y entre 1 y 5 no avanza, es false. Si el movimiento medido es menor que 6, desconfía y mira con más cuidado. Solo para acciones sutiles por naturaleza (una luz que brilla, alguien leyendo) basta con que se note algo.
+- action_ok: SE VE la acción pedida en el sujeto principal. Sé ESTRICTO: compara la posición de 2 objetos concretos del sujeto (ej. "roca grande arriba a la izquierda") entre la PRIMERA y la ÚLTIMA imagen RESPECTO a lo que los rodea. Si solo cambia el encuadre (zoom, giro o inclinación de cámara) y los objetos siguen igual entre sí, es false. Si la imagen muestra algo que debería estar en movimiento (derrumbe, caída, explosión, corriente) y entre la primera y la última no avanza, es false. Si el movimiento medido es menor que 6, desconfía y mira con más cuidado. Solo para acciones sutiles por naturaleza (una luz que brilla, alguien leyendo) basta con que se note algo.
   Personas PEQUEÑAS en planos abiertos (arqueólogos al fondo, un grupo lejano): mira de cerca, las imágenes son grandes. Si hacen la acción aunque se vea pequeña (raspan, caminan, levantan algo), action_ok es true. Marca false solo cuando estés SEGURO de que la acción no ocurre; si dudas en personas pequeñas, true.
   El SUJETO PRINCIPAL es lo que nombra la narración (la columna de humo, las rocas, el grupo, la ola). Si lo que se mueve es el fondo, las nubes de alrededor o los bordes, pero el sujeto principal queda igual (misma forma, mismo tamaño, mismos bultos en el mismo sitio), action_ok es false.
   Ejemplos reales que pasaron mal y NO deben aprobarse: una columna de erupción vista desde el espacio cuya forma no cambia mientras las nubes alrededor se mueven; rocas de un derrumbe que no caen mientras la cámara se inclina; una cámara de magma donde solo avanza la cámara.
-- evidence: en una frase, qué parte del SUJETO PRINCIPAL comparaste y cómo estaba en la imagen 1 y en la 5.
+- evidence: en una frase, qué parte del SUJETO PRINCIPAL comparaste y cómo estaba en la primera y en la última imagen.
 - haze: aparece humo, neblina o bruma blanca que NO tiene que ver con la narración (true = problema).
 - broken: algo deforme, caras o manos rotas, letras/texto inventado, cosas que aparecen o desaparecen (true = problema).
 - reason: una frase corta en español con lo que viste (vacío si todo bien).
@@ -94,11 +99,11 @@ Responde SOLO este JSON: {"tomas":[{"n":1,"image_ok":true,"style_ok":true,"actio
 // Claude ($0) reescribe la toma usando lo que vio el control de calidad. NUNCA toca la narración (la voz es fija):
 // solo cámara/acción/final, la imagen (start_en) si no cuadra con la narración, o propone PARTIR la toma cuando la
 // frase nombra 2+ cosas distintas (los pedazos son la MISMA frase cortada, palabra por palabra).
-async function rewriteShot(sh, reason, log, { allowImage = false, allowSplit = true, context = '' } = {}) {
+async function rewriteShot(sh, reason, log, { allowImage = false, allowSplit = true, context = '', extra = '' } = {}) {
   const { runClaude, parseJson } = require('./_claude');
   const prompt = `Eres el director de fotografía de un documental hecho con LTX (modelo de video que parte de una imagen fija y HACE todo lo que lee).
 Una toma salió mal${sh.camera_only ? ' (es una toma de SOLO CÁMARA: el objeto no se mueve ni cambia de forma; solo cambia el movimiento de cámara, y la acción describe ese paneo y la luz que lo recorre)' : ''}. Arréglala de verdad.
-SÉ INDEPENDIENTE Y CREATIVO: si esta toma YA falló antes, NO hagas un ajuste tímido ni repitas casi lo mismo — REPIENSA la imagen desde cero (otro ángulo, otra composición, otra forma concreta de mostrar lo que dice la narración). El objetivo es que salga BIEN, no que se parezca al intento anterior. Piensa a dónde va la escena (ver contexto) para que la imagen tenga sentido con lo que viene.
+CORRIGE CON PRECISIÓN, NO REINVENTES (Franklin oct-14: reinventar desde cero hacía que el 2º intento saliera PEOR): identifica la causa exacta del fallo y haz el cambio MÁS PEQUEÑO que la elimine. Casi siempre la causa es EXCESO (varias personas con acciones distintas, objetos pequeños, cámara que se acerca, fondo recargado): la solución es SIMPLIFICAR — quitar elementos, un solo sujeto, un solo movimiento grande, cámara lateral corta. Nunca agregues complejidad. Piensa a dónde va la escena (ver contexto) para que tenga sentido con lo que viene.
 
 Narración (FIJA: NO la cambies, no la reescribas, no la resumas): "${lineOf(sh)}"
 ${context ? 'Contexto (lo que se dice ANTES y DESPUÉS, para que la imagen conecte con el relato): ' + context + '\n' : ''}
@@ -107,7 +112,7 @@ Cámara actual: ${sh.camera || ''}
 Acción actual: ${sh.action_en || ''}
 Final actual: ${sh.reaction_en || ''}
 Lo que salió mal (control de calidad): ${reason}
-
+${extra ? '\n' + extra + '\n' : ''}
 Reglas:
 - La imagen tiene que mostrar EXACTAMENTE lo que dice la narración y ser de la ÉPOCA de la historia: si la historia es de la prehistoria (o de otra época), nada moderno (estadios, ciudades, ropa actual, carros, pantallas) salvo que la NARRACIÓN lo mencione o compare con eso ("cabrían en un estadio"): entonces SÍ se muestra lo moderno (sin inventar acción ajena, nada de gente jugando). Si la narración no lo menciona (solo da la cifra), se muestra con gente de esa época.
 - La cámara hace UN movimiento corto y suave que mantiene TODO lo importante dentro del cuadro hasta el final. En "camera" escribe SOLO el movimiento (ej. "slow lateral drift to the left"); nunca "no zoom", "held", "unchanged", "same framing" (LTX hace lo que lee). Si el problema fue que solo se movía la cámara, que se metió o hizo zoom de más, usa un movimiento mínimo y pon el movimiento en el SUJETO.
@@ -118,6 +123,7 @@ Reglas:
 - El final (12–25 palabras, inglés) es el estado final de ESE mismo movimiento, con el sujeto todavía en cuadro.
 ${allowImage ? '- CAMBIA la imagen (es parte del problema): "start_en" (45–80 palabras, inglés) SÚPER específica para Flow. Di el MATERIAL y la TEXTURA REAL del sujeto (grietas, poros, rugosidad, desgaste, suciedad, barro, óxido, pelo, piel) y colores apagados y realistas, para que NUNCA salga liso, brillante ni apetitoso tipo comida (bola de helado, chocolate, caramelo). Di plano y lente, 2–3 detalles concretos del sujeto, el lugar, la luz. Si el intento anterior salió liso o irreconocible, descríbelo de otra forma más clara y reconocible de lo que ES.' : '- No cambies la imagen (no devuelvas start_en).'}
 ${allowSplit ? '- Si la narración nombra 2 a 4 cosas visualmente distintas que no caben en una sola imagen, PARTE la toma: "split" = lista de pedazos; cada "line" es un trozo EXACTO y seguido de la narración (todas juntas forman la narración palabra por palabra, mínimo 3 palabras cada una) con su propia imagen y movimiento. Si no hace falta, no la partas.' : ''}
+${require(path.join(ROOT, 'netlify', 'functions', '_ltx_safe')).LTX_SAFE}
 Responde SOLO uno de estos JSON:
 {"camera":"...","action_en":"...","reaction_en":"..."${allowImage ? ',"start_en":"...","background_en":"3–4 cosas del lugar de la NUEVA imagen, solo nombradas"' : ''}}
 ${allowSplit ? 'o {"split":[{"line":"...","start_en":"...","camera":"...","action_en":"...","reaction_en":"..."}]}' : ''}`;
@@ -186,6 +192,11 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
   }
   // 3) Revisión visual con Claude ($0). Una sola vuelta por toma (shot.qa.redone) para no entrar en bucles.
   if (process.env.VYRALES_QA_VISUAL !== '0') {
+    // 🧠 Cerebro + 🔧 especialista (Franklin oct-14): cada veredicto es evidencia; las reparaciones las decide el especialista.
+    const C = require(path.join(ROOT, 'netlify', 'functions', '_cerebro'));
+    const E = require('./_especialista');
+    let brain = null; try { brain = await C.loadRules(supabase); } catch (_) {}
+    const ev0 = [];
     const { data: ep2 } = await supabase.from('episodes').select('shots, assets(*)').eq('id', epId).single();
     const items = [];
     for (const sh of ep2.shots || []) {
@@ -211,6 +222,7 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
       const tries = it.sh.qa ? (Number(it.sh.qa.tries) || (it.sh.qa.redone ? 1 : 0)) : 0;
       const already = tries >= 3;
       qaOf[it.sh.n] = { clip_id: it.clip.id, ok: !bad, image_ok: r.image_ok !== false, style_ok: r.style_ok !== false, action_ok: r.action_ok !== false, haze: !!r.haze, broken: !!r.broken, reason: String(r.reason || '').slice(0, 300), at: new Date().toISOString(), redone: tries > 0, tries };
+      ev0.push({ ep: epId, n: it.sh.n, clip: it.clip.id, try: tries, src: 'qa', verdict: r, reason: r.reason, shot: it.sh });
       if (bad && !already) {
         const freeFrame = !(it.sh.characters || []).length; // cuadro nuevo solo por el camino gratis (Flow/FLUX)
         // Franklin (oct-11): si se rehace con el MISMO prompt, sale el mismo error → SIEMPRE se reescribe el prompt
@@ -225,6 +237,7 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
         try { await require(path.join(ROOT, 'netlify', 'functions', '_memoria')).addLesson(supabase, { source: 'qa_falla', ep: epId, toma: it.sh.n, narracion: lineOf(it.sh), problema: r.reason || '', imagen: it.sh.start_en, accion: it.sh.action_en, camara: it.sh.camera }); } catch (_) {}
       }
     }
+    try { const nAdd = await C.recordMany(supabase, ev0); if (nAdd) log(`🧠 ${nAdd} veredicto(s) guardados como evidencia`); } catch (e) { log('🧠 no pude guardar evidencia (' + String(e.message).slice(0, 100) + ')'); }
     const saveQa = async (extra = {}) => {
       const { data: fr } = await supabase.from('episodes').select('shots').eq('id', epId).single();
       await supabase.from('episodes').update({ shots: (fr.shots || []).map((x) => qaOf[x.n] ? Object.assign({}, x, { qa: Object.assign({}, qaOf[x.n], extra[x.n] || {}) }, extra[x.n] && extra[x.n].boost ? { qa_boost: true } : {}) : x) }).eq('id', epId);
@@ -260,59 +273,81 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
       if (await yaAprobada(t.n, t.sh)) { log(`QA toma ${t.n}: la aprobaste a mano → no se rehace`); continue; }
       let tries = prevTries[t.n];
       let reason = t.reason;
-      let newFrame = t.newFrame;
       let clipId = t.clip.id;
       let shNow = t.sh;
+      let curV = res[t.n] || {};
       let done = false;
+      // 🔧 BITÁCORA de la toma: lo que ya se probó y qué pasó (persiste en shots[].qa.attempts entre corridas).
+      const promptOf = (x) => ({ camera: x.camera || '', action_en: x.action_en || '', reaction_en: x.reaction_en || '', start_en: x.start_en || '', background_en: x.background_en || '' });
+      const pickV = (v) => ({ image_ok: v.image_ok !== false, style_ok: v.style_ok !== false, action_ok: v.action_ok !== false, haze: !!v.haze, broken: !!v.broken });
+      const attempts = ((t.sh.qa && t.sh.qa.attempts) || []).slice();
+      if (!attempts.some((a) => a.try === tries && a.clip_path === t.clip.storage_path)) attempts.push({ try: tries, at: new Date().toISOString(), verdict: pickV(curV), reason: curV.reason || reason || '', score: E.score(curV), prompt: promptOf(t.sh), clip_path: t.clip.storage_path });
+      const saveShot = async (patch, qaPatch) => {
+        const { data: frx } = await supabase.from('episodes').select('shots').eq('id', epId).single();
+        await supabase.from('episodes').update({ shots: (frx.shots || []).map((x) => x.n === t.n ? Object.assign({}, x, patch || {}, { qa: Object.assign({}, x.qa || {}, qaPatch || {}, { attempts: attempts.slice(-12) }) }) : x) }).eq('id', epId);
+      };
       while (tries < 3 && !done) {
         if (await yaAprobada(t.n, shNow)) { log(`QA toma ${t.n}: la aprobaste a mano → la dejo`); done = true; break; }
         await setWorking(t.n, 'rehacer');
-        // Contexto: lo que se dice ANTES y DESPUÉS, para que la imagen conecte con el relato (ej. T6 "algo redondo" → T7 "es un cráneo").
+        // El especialista DECIDE con la bitácora + la evidencia del cerebro (no reinventa a ciegas).
+        const dec = E.decide({ sh: shNow, verdict: curV, attempts, doc: brain, freeFrame: !(shNow.characters || []).length, keepImage: !!(shNow.qa && shNow.qa.keep_image) });
+        log(`🔧 especialista toma ${t.n}: ${dec.mode.toUpperCase()} — ${dec.why}`);
+        await C.addDiary(supabase, { ep: epId, n: t.n, try: tries + 1, mode: dec.mode, why: dec.why, fallas: dec.fallas });
+        if (!dec.regen) { await saveShot(null, { needs_human: dec.mode, especialista: dec.why }); log(`QA toma ${t.n}: queda marcada para que la revises (${dec.mode})`); break; }
+        // Contexto: lo que se dice ANTES y DESPUÉS, para que la imagen conecte con el relato.
         const ctxA = (ep2.shots || []).find((x) => x.n === t.n - 1);
         const ctxB = (ep2.shots || []).find((x) => x.n === t.n + 1);
         const context = [ctxA ? 'antes: "' + lineOf(ctxA) + '"' : '', ctxB ? 'después: "' + lineOf(ctxB) + '"' : ''].filter(Boolean).join(' · ');
-        // 1) Reescribir el prompt con lo que vio el QA (repetir el mismo da el mismo error).
-        try {
-          const fix = await rewriteShot(shNow, reason, log, { allowImage: newFrame, allowSplit: true, context });
-          if (fix && fix.split) { splits.push({ n: t.n, parts: fix.split }); log(`QA toma ${t.n}: Claude la parte en ${fix.split.length} tomas (misma narración)`); done = true; break; }
-          if (fix) {
-            const { data: fr } = await supabase.from('episodes').select('shots').eq('id', epId).single();
-            await supabase.from('episodes').update({ shots: (fr.shots || []).map((x) => x.n === t.n ? Object.assign({}, x, fix, { prompt_override: null, ltx_en: null, keyframe_prompt_override: fix.start_en ? null : x.keyframe_prompt_override, qa_rewrite_from: { camera: x.camera, action_en: x.action_en, reaction_en: x.reaction_en, start_en: x.start_en } }) : x) }).eq('id', epId);
-            log(`QA toma ${t.n}: prompt nuevo → cámara "${fix.camera}" · ${fix.action_en}`);
-          }
-        } catch (e) { log(`QA toma ${t.n}: no pude reescribir (${String(e.message).slice(0, 120)}) → reintento igual`); }
-        // 2) Rehacer en king (ESPERA a que termine el render).
-        const rr = await handler({ httpMethod: 'POST', headers: { 'x-vyrales-key': process.env.DASHBOARD_KEY || '' }, body: JSON.stringify({ assetId: clipId, provider: 'king', new_frame: newFrame }) });
+        if (dec.rewrite) {
+          try {
+            const fix = await rewriteShot(shNow, reason, log, { allowImage: dec.newFrame, allowSplit: true, context, extra: E.instructions(dec, attempts, brain) });
+            if (fix && fix.split) { splits.push({ n: t.n, parts: fix.split }); log(`QA toma ${t.n}: se parte en ${fix.split.length} tomas (misma narración)`); await C.addDiary(supabase, { ep: epId, n: t.n, mode: 'partir', why: 'el especialista partió la toma en ' + fix.split.length }); done = true; break; }
+            if (fix) {
+              const { data: fr } = await supabase.from('episodes').select('shots').eq('id', epId).single();
+              await supabase.from('episodes').update({ shots: (fr.shots || []).map((x) => x.n === t.n ? Object.assign({}, x, fix, { prompt_override: null, ltx_en: null, keyframe_prompt_override: fix.start_en ? null : x.keyframe_prompt_override, qa_rewrite_from: { camera: x.camera, action_en: x.action_en, reaction_en: x.reaction_en, start_en: x.start_en } }) : x) }).eq('id', epId);
+              log(`QA toma ${t.n}: prompt nuevo → cámara "${fix.camera}" · ${fix.action_en}`);
+            }
+          } catch (e) { log(`QA toma ${t.n}: no pude reescribir (${String(e.message).slice(0, 120)}) → reintento igual`); }
+        } else log(`QA toma ${t.n}: mismo prompt y misma imagen, otra semilla (azar de LTX)`);
+        // Rehacer en king SIN borrar el clip anterior (keep_old) → al final se queda el MEJOR.
+        const rr = await handler({ httpMethod: 'POST', headers: { 'x-vyrales-key': process.env.DASHBOARD_KEY || '' }, body: JSON.stringify({ assetId: clipId, provider: 'king', new_frame: dec.newFrame, keep_old: true }) });
         tries++;
         if (rr.statusCode >= 400) { log(`QA toma ${t.n}: FALLÓ al rehacer ${String(rr.body).slice(0, 160)}`); await bumpTryTo(t.n, tries, t.boost); break; }
         log(`QA toma ${t.n}: rehecha (intento ${tries}/3) ✅ — verificando solo esta toma...`);
-        // 3) Verificar SOLO esta toma (no las demás).
         const { data: ep3 } = await supabase.from('episodes').select('shots, assets(*)').eq('id', epId).single();
         shNow = (ep3.shots || []).find((x) => x.n === t.n) || shNow;
         const clip = (ep3.assets || []).filter((a) => a.kind === 'video_clip' && a.shot_number === t.n).sort((a, b) => String(b.updated_at || b.created_at).localeCompare(String(a.updated_at || a.created_at)))[0];
         clipId = clip ? clip.id : clipId;
         const res3 = await visionReview([{ sh: shNow, clip, url: clip && clip.storage_path, dur: clip ? await durationOf(clip.storage_path) : 0 }], log);
         const vr = res3[t.n] || {};
-        const ok = !(vr.image_ok === false || vr.action_ok === false || vr.haze === true || vr.broken === true);
+        const ok = !(vr.image_ok === false || vr.style_ok === false || vr.action_ok === false || vr.haze === true || vr.broken === true);
+        attempts.push({ try: tries, at: new Date().toISOString(), mode: dec.mode, newFrame: !!dec.newFrame, verdict: pickV(vr), reason: ok ? '' : String(vr.reason || '').slice(0, 300), score: E.score(vr), prompt: promptOf(shNow), clip_path: clip && clip.storage_path });
+        try { await C.recordVerdict(supabase, { ep: epId, n: t.n, clip: clipId, try: tries, src: 'qa', verdict: vr, reason: vr.reason, shot: shNow, tag: 'att' }); } catch (_) {}
         const prevReason = (shNow.qa && (shNow.qa.reason || shNow.qa.force_reason)) || reason;
-        const qaFinal = { clip_id: clipId, ok, image_ok: vr.image_ok !== false, action_ok: vr.action_ok !== false, haze: !!vr.haze, broken: !!vr.broken, reason: ok ? '' : String(vr.reason || reason).slice(0, 300), fixed_from: ok ? prevReason : (shNow.qa && shNow.qa.fixed_from), redone: true, tries, force: false, force_any: false, at: new Date().toISOString() };
-        const { data: fr2 } = await supabase.from('episodes').select('shots').eq('id', epId).single();
-        await supabase.from('episodes').update({ shots: (fr2.shots || []).map((x) => x.n === t.n ? Object.assign({}, x, { qa: qaFinal }) : x) }).eq('id', epId);
+        await saveShot(null, { clip_id: clipId, ok, image_ok: vr.image_ok !== false, style_ok: vr.style_ok !== false, action_ok: vr.action_ok !== false, haze: !!vr.haze, broken: !!vr.broken, reason: ok ? '' : String(vr.reason || reason).slice(0, 300), fixed_from: ok ? prevReason : (shNow.qa && shNow.qa.fixed_from), redone: true, tries, force: false, force_any: false, at: new Date().toISOString() });
         if (!redone.includes(t.n)) redone.push(t.n);
-        log(`QA toma ${t.n}: ${ok ? 'quedó bien ✓' : 'todavía no (' + (vr.reason || '') + ')'}`);
-        if (ok) {
-          done = true;
-          if (prevReason) { try { await require(path.join(ROOT, 'netlify', 'functions', '_memoria')).addLesson(supabase, { source: 'qa_arreglo', ep: epId, toma: t.n, narracion: lineOf(shNow), problema: prevReason, solucion: { camara: shNow.camera, accion: shNow.action_en, imagen: shNow.start_en, solo_camara: !!shNow.camera_only } }); } catch (_) {} }
-        } else {
-          reason = vr.reason || reason;
-          const freeFrame = !(shNow.characters || []).length;
-          newFrame = freeFrame && !(shNow.qa && shNow.qa.keep_image) && (vr.image_ok === false || tries >= 1);
+        log(`QA toma ${t.n}: ${ok ? 'quedó bien ✓ (' + dec.mode + ')' : 'todavía no (' + (vr.reason || '') + ')'}`);
+        if (ok) done = true; else { reason = vr.reason || reason; curV = vr; }
+      }
+      // 🏆 QUEDARSE CON EL MEJOR: si un intento anterior salió mejor que el último, se restaura ESE clip y SU prompt.
+      try {
+        const alive = attempts.filter((a) => a.clip_path);
+        const last = alive[alive.length - 1];
+        let best = null; for (const a of alive) if (!best || a.score <= best.score) best = a; // menor puntaje; en empate, el más reciente
+        if (best && last && best !== last && best.score < last.score) {
+          await supabase.from('assets').update({ storage_path: best.clip_path }).eq('id', clipId);
+          const v = best.verdict || {};
+          await saveShot(Object.assign({}, best.prompt), { ok: best.score === 0, image_ok: v.image_ok !== false, style_ok: v.style_ok !== false, action_ok: v.action_ok !== false, haze: !!v.haze, broken: !!v.broken, reason: best.reason || '', kept_attempt: best.try });
+          log(`🏆 toma ${t.n}: el intento ${best.try} era MEJOR (puntaje ${best.score} vs ${last.score}) → me quedo con ese, nunca para atrás`);
+          await C.addDiary(supabase, { ep: epId, n: t.n, mode: 'conservar_mejor', why: `intento ${best.try} (puntaje ${best.score}) mejor que el último (${last.score})` });
         }
-      }
-      if (!done && tries >= 3) {
-        log(`QA toma ${t.n}: 3 intentos y sigue con problema → queda para que la revises`);
-        try { await require(path.join(ROOT, 'netlify', 'functions', '_memoria')).addLesson(supabase, { source: 'qa_falla', ep: epId, toma: t.n, narracion: lineOf(shNow), problema: reason, imagen: shNow.start_en, accion: shNow.action_en, camara: shNow.camera }); } catch (_) {}
-      }
+        // Borrar los clips de intentos que no se quedaron (nunca uno aprobado: esos no llegan aquí).
+        const keep = best || last;
+        const { removeByPublicUrl } = require(path.join(ROOT, 'netlify', 'functions', '_storage'));
+        for (const a of alive) if (keep && a.clip_path !== keep.clip_path) { try { await removeByPublicUrl(supabase, a.clip_path, () => {}); } catch (_) {} a.clip_path = null; }
+        await saveShot(null, {});
+      } catch (e) { log(`QA toma ${t.n}: (no pude comparar intentos: ${String(e.message).slice(0, 120)})`); }
+      if (!done && tries >= 3) log(`QA toma ${t.n}: 3 intentos y sigue con problema → queda para que la revises`);
     }
     await setWorking(null);
   }
@@ -326,6 +361,7 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
     await supabase.from('agent_jobs').insert({ command: 'flow_frames:' + epId });
     log(`QA: partí ${splits.length} toma(s); en cola sus imágenes nuevas (Flow) y videos (king)`);
   }
+  try { await require(path.join(ROOT, 'netlify', 'functions', '_cerebro')).think(supabase, { log }); } catch (e) { log('🧠 no pude pensar (' + String(e.message).slice(0, 100) + ')'); }
   try {
     const lessons = await require(path.join(ROOT, 'netlify', 'functions', '_memoria')).readJson(supabase, 'lecciones.json', []);
     if (lessons.some((l) => !l.consolidated)) { const { data: oa } = await supabase.from('agent_jobs').select('id').eq('status', 'pending').eq('command', 'claude_aprender').limit(1); if (!(oa && oa.length)) await supabase.from('agent_jobs').insert({ command: 'claude_aprender' }); }

@@ -15,7 +15,7 @@ const F = (f) => require(path.join(ROOT, 'netlify', 'functions', f));
 
 // Convierte tomas {line, visual_es, camera} en tomas del sistema con prompts detallados (Claude, por grupos).
 async function detail(shots, { aspect, context, title, log }) {
-  const rows = shots.map((s, i) => ({ n: i + 1, chapter: s.chapter, chapter_title: s.chapter_title, camera: s.camera || '', start_en: s.visual_es || '', dialogue: [{ speaker: 'Narrador', line: s.line }] }));
+  const rows = shots.map((s, i) => ({ n: i + 1, chapter: s.chapter, chapter_title: s.chapter_title, camera: s.camera || '', start_en: s.visual_es || '', dialogue: [{ speaker: 'Narrador', line: s.line }], characters: Array.isArray(s.characters) ? s.characters : [], location: s.location || '' })); // Franklin oct-14: antes se perdían personaje y lugar aquí
   const { checkVisuals, applyChanges } = F('_visual_check');
   const out = [];
   for (let i = 0; i < rows.length; i += 16) {
@@ -39,7 +39,7 @@ async function detail(shots, { aspect, context, title, log }) {
       applyChanges(part, vc.changes).forEach((x, k) => { out[miss[k]] = Object.assign({}, out[miss[k]], x); });
     } catch (e) { log('    repaso falló (' + String(e.message).slice(0, 100) + ') → la importación pone valores por defecto'); }
   }
-  return out.map((s, i) => Object.assign({}, s, { n: i + 1, characters: [], location: s.location || 'escena' }));
+  return out.map((s, i) => Object.assign({}, s, { n: i + 1, characters: Array.isArray(s.characters) ? s.characters : [], location: s.location || 'escena' }));
 }
 
 (async () => {
@@ -78,10 +78,10 @@ async function detail(shots, { aspect, context, title, log }) {
     const detailed = await detail(longShots, { aspect: '16:9', context, title: story.title, log: console.log });
     // Los Shorts del largo usan las TOMAS DEL LARGO (short_reusar.js, Franklin oct-11): no se escriben prompts de
     // imagen/video para ellos (ahorra ~5–10 min por guion). Solo su narración.
-    const shorts = (story.shorts || []).map((sh) => Object.assign({}, sh, { reuse_long: true, shots: (sh.shots || []).map((x, i) => ({ n: i + 1, camera: x.camera || '', start_en: x.visual_es || '', scene_es: x.visual_es || x.line, dialogue: [{ speaker: 'Narrador', line: x.line }], characters: [], location: 'escena' })) }));
+    const shorts = (story.shorts || []).map((sh) => Object.assign({}, sh, { reuse_long: true, shots: (sh.shots || []).map((x, i) => ({ n: i + 1, camera: x.camera || '', start_en: x.visual_es || '', scene_es: x.visual_es || x.line, dialogue: [{ speaker: 'Narrador', line: x.line }], characters: Array.isArray(x.characters) ? x.characters : [], location: x.location || 'escena' })) }));
     if (shorts.length) console.log(`${shorts.length} Shorts: usarán las tomas del largo (sin prompts propios).`);
     const result = { ok: true, kind: 'largo', tipo, model: 'Claude (tu plan)', costUsd: 0, words, minutes: +(words / 2.3 / 60).toFixed(1),
-      long: { title: story.title, hook_text: story.hook_text, description: story.description, sources: story.sources || [], chapters: (story.chapters || []).map((c) => c.title), shots: detailed },
+      long: { title: story.title, hook_text: story.hook_text, description: story.description, sources: story.sources || [], characters: story.characters || [], locations: story.locations || {}, chapters: (story.chapters || []).map((c) => c.title), shots: detailed },
       shorts, at: new Date().toISOString() };
     await save(result);
     console.log(`LISTO en ${Math.round((Date.now() - t0) / 60000)} min → media/guiones/${job}.json`);

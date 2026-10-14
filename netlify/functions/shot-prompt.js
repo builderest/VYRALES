@@ -79,6 +79,21 @@ exports.handler = async (event) => {
       const prompt = String(input.prompt || '').trim();
       if (prompt.length < 20) return json(400, { error: 'El prompt está vacío o es demasiado corto.' });
       if (prompt.length > 6000) return json(400, { error: 'El prompt es demasiado largo (máx. 6000 caracteres).' });
+      // 🧠 Puerta del cerebro (Franklin oct-14): tu prompt vs el automático; si agrega algo que la evidencia dice que falla, no se guarda
+      // sin tu confirmación (forzar = experimento medido).
+      if (prompt !== original) {
+        try {
+          const C = require('./_cerebro');
+          const asShot = (t) => (kind === 'keyframe' ? Object.assign({}, shot, { start_en: t }) : Object.assign({}, shot, { action_en: t, camera: t }));
+          const j = C.judgeChange(asShot(original), asShot(prompt), await C.loadRules(supabase));
+          if (j.nivel === 'no' && !input.forzar) {
+            const oid = await C.addObjecion(supabase, { tipo: 'toma', ep: episode.id, ep_num: episode.episode_number, n, pedido: 'Prompt editado a mano (' + kind + ') en la toma ' + n, resumen: j.resumen, propuesta: j.propuesta, motivos: j.motivos.map((m) => m.key), cambio: { endpoint: 'shot-prompt', body: { episode_id: episode.id, shot: n, kind, prompt } } });
+            return json(409, { error: 'objecion', objecion: { id: oid, nivel: j.nivel, resumen: j.resumen, propuesta: j.propuesta } });
+          }
+          if (j.nivel === 'no' && input.forzar && input.objecion_id) await C.setObjecion(supabase, input.objecion_id, { estado: 'forzada' });
+          if (j.nivel === 'no' && input.forzar) shot.franklin_forzado = { at: new Date().toISOString(), motivos: j.motivos.map((m) => m.key) };
+        } catch (_) {}
+      }
       next[idx] = Object.assign({}, shot, { [FIELD[kind]]: prompt === original ? undefined : prompt }, kind === 'ltx' ? { prompt_override: null, clip_stale: true } : {});
       if (prompt === original) delete next[idx][FIELD[kind]];
     }

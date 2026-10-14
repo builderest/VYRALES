@@ -43,7 +43,7 @@ exports.handler = async (event) => {
       const buffer = Buffer.from(input.data_base64, 'base64');
       if (buffer.length > 4 * 1024 * 1024) return json(413, { error: 'La imagen pesa más de 4 MB.' });
       await ensureMediaBucket(supabase);
-      const url = await uploadFile(supabase, { path: `${series.slug}/locations/${key}-v${Date.now()}.${ext}`, buffer, contentType: input.content_type });
+      const url = await uploadFile(supabase, { path: `${series.slug}/locations/${String(key).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z0-9_-]+/g, '_')}-v${Date.now()}.${ext}` /* sin tildes ni espacios */, buffer, contentType: input.content_type });
       if (cur.url && cur.url !== url) await removeByPublicUrl(supabase, cur.url);
       next = Object.assign(next, { url, source: 'uploaded', cost_usd: 0, updated_at: new Date().toISOString() });
     }

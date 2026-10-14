@@ -76,7 +76,12 @@ function ltxPromptFor(shot, storyBible) {
   // Narrados: NUNCA cámara fija ("static" dejaba la toma como una foto quieta: EP2 depredadores T7/T11/T16).
   // Cámaras que Claude escribe con "framing kept unchanged", "held", "no zoom": con cfg = 1 eso frena o PROVOCA el zoom.
   const cam0 = clean(shot.camera).replace(/,?\s*(?:with\s+)?(?:the\s+)?(?:same\s+)?(?:extreme\s+)?(?:wide\s+)?(?:framing|angle|height)\s+(?:kept|held)(?:\s+unchanged)?/gi, '').replace(/,?\s*\b(?:no zoom|without zoom(?:ing)?|kept unchanged|unchanged|held)\b/gi, '').replace(/,?\s*(?:the\s+)?same\s+(?:\w+\s+){0,2}(?:framing|angle|distance)\b/gi, '').replace(/,\s*(?:high|low|wide)\s*(?=,|$)/gi, '').replace(/\s+,/g, ',').replace(/[,\s]+$/, '');
-  const cam = dynamic && !MOVE_RE.test(cam0) ? [cam0.replace(/\bstatic\b/ig, '').replace(/^[,\s]+|[,\s]+$/g, '').replace(/,\s*,/g, ','), 'slow push-in'].filter(Boolean).join(', ') : cam0;
+  // LTX-SAFE (Franklin oct-14, EP 11 con 60 % de tomas rotas): push-in, grúa, seguimiento, órbita o dron hacen que solo
+  // se mueva la cámara, cortan al sujeto o lo cambian por otro → en narrados se cambian por un desplazamiento lateral
+  // corto. También arregla guiones YA escritos. El relleno automático ya no es "slow push-in" (dejaba todo quieto).
+  const { safeCamera } = require('./_ltx_safe');
+  const camSafe = dynamic ? safeCamera(cam0, shot) : cam0;
+  const cam = dynamic && !MOVE_RE.test(camSafe) ? [camSafe.replace(/\bstatic\b/ig, '').replace(/^[,\s]+|[,\s]+$/g, '').replace(/,\s*,/g, ','), 'slow lateral drift to the ' + ((Number(shot.n) || 0) % 2 ? 'right' : 'left')].filter(Boolean).join(', ') : camSafe;
   const moving = MOVE_RE.test(cam);
   // Primeros planos (ojo, dientes, ventosas): movimiento suave. Con "energía" LTX los hacía explotar (EP2 T10/T11).
   // Solo planos cerrados: "slow push-in" en planos abiertos dejaba casi todo quieto (Toba largo, oct-2026).

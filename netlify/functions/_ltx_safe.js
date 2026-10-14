@@ -1,0 +1,35 @@
+// REGLAS LTX-SAFE — UNA sola fuente de verdad (Franklin oct-14). Las usan el guionista (_guionista.js), el detallador de
+// prompts (_visual_check.js) y el reparador del QA (agente/_qa.js). Salen de las 73 tomas rotas del EP 11 (Tsar Bomba,
+// 60 % mal): multi-actor → LTX deforma y cambia el número de personas; push-in/seguimiento → solo se mueve la cámara o
+// pierde al sujeto; papeles/sellos/cuerdas/mapas/pantallas → aparecen, desaparecen o inventan letras; humo de relleno.
+// Meta: que cada toma salga bien A LA PRIMERA. Cuando aprendamos algo nuevo, se agrega AQUÍ (llega a las 3 capas).
+
+const SAFE_CAMERAS = ['slow lateral drift to the left', 'slow lateral drift to the right', 'short slow pan to the right', 'short slow pan to the left', 'gentle slight handheld sway'];
+
+const LTX_SAFE = `=== REGLAS LTX-SAFE (MANDAN SOBRE CUALQUIER OTRA REGLA DE IMAGEN, CÁMARA O MOVIMIENTO) ===
+El video lo hace LTX a partir de la imagen inicial. Lo que LTX no puede sostener 6 segundos lo DEFORMA: cambia caras, ropa y colores, cambia el número de personas, inventa edificios, hace aparecer o desaparecer cosas. Cada toma tiene que ser algo que LTX anime BIEN A LA PRIMERA:
+1. UN SUJETO, UN MOVIMIENTO. Cada toma tiene UN sujeto principal (una persona, un objeto grande, o un grupo pequeño que hace exactamente lo mismo) y UNA sola acción continua. PROHIBIDO dos personas o grupos con acciones distintas en la misma toma ("el piloto de la izquierda se inclina mientras el de la derecha…"). Si la línea necesita dos sujetos o dos acciones distintas, PARTE la toma.
+2. POCA GENTE Y SIN CONTAR. Máximo 3 personas visibles con detalle. En action_en nunca des números exactos de gente ("five scientists"): usa "the small group" y que todos hagan el MISMO movimiento a la vez. Multitudes (delegados, público, ejércitos, filas de soldados): lejanas y pequeñas en un plano general, y lo que se mueve es una bandera, el humo que la narración nombre o la cámara lateral (los cambios de luz casi no se ven); nunca filas de gente que se levanta, aplaude o camina.
+3. CÁMARA SEGURA. En "camera" escribe UN movimiento corto y suave que NO se acerque ni se aleje del sujeto: ${SAFE_CAMERAS.map((c) => '"' + c + '"').join(', ')}. PROHIBIDO: push-in, dolly, zoom, pull-back, crane, rise up, boom, orbit, tracking o following shot, travels alongside, FPV, drone, fly-over, whip pan. (Con esos, LTX mueve solo la cámara, corta al sujeto o lo cambia por otro.) EXCEPCIÓN (regla de Franklin): para REVELAR algo enorme en tierra abierta SIN personas (caldera, cráter, paisaje), la cámara sí puede alejarse y subir despacio, con el primer plano despejado.
+4. EL SUJETO SE QUEDA DENTRO. El sujeto se desplaza poco (2–3 pasos, se inclina, gira, levanta algo grande) y queda ENTERO dentro del cuadro de principio a fin, con margen alrededor. Nada ni nadie entra ni sale de cuadro.
+5. MOVIMIENTO GRANDE Y CLARO. Acciones de cuerpo entero o de un objeto grande (camina, se inclina, gira, empuja, cae, sube, ondea, se rompe, avanza). Nada de gestos finos: dedos, firmar, escribir, pasar o deslizar papeles, mover interruptores o perillas pequeñas.
+6. NADA FRÁGIL NI CON LETRAS. Prohibido en la imagen y en la acción: papeles, cartas, documentos, mapas, globos terráqueos, sellos, cuerdas, alambres, cables, libros abiertos, pantallas o televisores con imágenes, relojes, carteles, letreros, banderas con texto, tableros con números o letras. LTX los deforma o inventa letras. Si la narración trata de uno de esos objetos, que sea GRANDE, CENTRAL y RÍGIDO, y lo que se mueve es la cámara lateral (toma de solo cámara); los cambios de luz casi no se ven y LTX compensa acercándose.
+7. FONDO SIMPLE. 2–3 elementos de fondo grandes y simples (pared de concreto, pinos, cielo gris, mar). Nada de arquitectura recargada (cúpulas, torres, palcos, columnas o ventanas repetidas) ni muchos objetos pequeños alrededor.
+8. NADA CAMBIA. Nada aparece, desaparece, se duplica ni se transforma; ropa, colores y cantidad de cosas iguales del primer al último cuadro. Aire limpio: sin humo, niebla, bruma ni polvo flotando, salvo que la narración hable de humo, fuego, explosión, polvo o tormenta.
+9. DETALLADO SOBRE UN SOLO SUJETO. action_en de 25 a 45 palabras, concreta y detallada (qué parte se mueve, hacia dónde, a qué ritmo), pero TODO sobre el mismo sujeto y la misma acción. (Evidencia del cerebro, oct-14: las acciones detalladas fallan la MITAD que el promedio; lo que rompe no es el largo sino meter varios sujetos o cosas.)
+REVISIÓN OBLIGATORIA antes de responder, toma por toma: ¿un solo sujeto con una sola acción descrita con detalle? ¿máximo 3 personas, sin contar? ¿cámara que no se acerca ni se aleja? ¿sujeto entero dentro del cuadro? ¿sin papeles, mapas, pantallas, letras ni objetos frágiles? ¿fondo simple? ¿aire limpio? Si una toma no cumple, corrígela o pártela.`;
+
+// Red de seguridad para guiones YA escritos (el guion puede traer "slow push-in toward…"): se cambia por un
+// desplazamiento lateral corto antes de mandarlo a LTX. No toca las tomas de SOLO CÁMARA (maqueta/objeto rígido).
+const RISKY_CAM_RE = /push[- ]?in|dolly|zoom|pull[- ]?(?:back|out)|crane|\brises?\b|rising|\bboom\b|orbit|arc(?:s|ing)?\s+around|tracking|\btrack(?:s|ing)?\s+(?:alongside|with|behind)|travels?\s+alongside|follow|\bfpv\b|drone|fly[- ]?(?:over|through|by)|\bflies\b|rush|whip/i;
+const PEOPLE_RE = /\b(person|people|man|men|woman|women|child|children|boy|girl|soldier|soldiers|guard|guards|crowd|figure|figures|worker|workers|scientist|scientists|engineer|engineers|pilot|pilots|officer|officers|leader|delegates|hunter|hunters|hominin|hominins|family|group|crew|prisoner|inmate)\b/i;
+const REVEAL_RE = /pull[- ]?(?:back|out)|crane up|\brises?\b|rising|boom up|ascend/i;
+function safeCamera(cam, shot = {}) {
+  if (!cam || shot.camera_only || !RISKY_CAM_RE.test(cam)) return cam;
+  // Regla #14 de Franklin: revelar algo enorme SIN personas → la cámara sí se aleja y sube.
+  if (REVEAL_RE.test(cam) && !/push[- ]?in|zoom in|dolly in|track|follow|orbit/i.test(cam) && !PEOPLE_RE.test([shot.start_en, shot.action_en].join(' '))) return cam;
+  const dir = /\bleft\b/i.test(cam) ? 'left' : /\bright\b/i.test(cam) ? 'right' : (Number(shot.n) || 0) % 2 ? 'right' : 'left';
+  return 'slow lateral drift to the ' + dir;
+}
+
+module.exports = { LTX_SAFE, SAFE_CAMERAS, RISKY_CAM_RE, safeCamera };

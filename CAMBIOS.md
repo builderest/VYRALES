@@ -44,5 +44,140 @@
 
 **Fase 2 en marcha:** regenerando el guion largo de El Chapo *"El hombre que desapareció frente a las cámaras"* (job `largo-mv7eby1m11at`) con el sistema nuevo. Verificar que defina a El Chapo como personaje fijo ANTES de importar; luego borrar los #15-19 viejos.
 
+
+### 2026-10-13/14 (cont.) — Flujo de 3 salas (Guiones → Produciendo → Editar y publicar)
+Visión de Franklin: un guion NO se produce directo desde Guiones; primero se MUEVE a producción; "Produciendo" es la sala de trabajo (solo UNO a la vez); al terminar pasa a "Editar y publicar". TODO LOCAL, SIN PUSH (probado en localhost:8888).
+- **FASE 1** `public/panel.js`: la "Fila de producción" (#vyFilaRows) ya no incluye `en_revision` (esos van a Revisar y publicar). Verificado: 24→15 por terminar.
+- **FASE 2a (compuerta)** — verificado:
+  - `netlify/functions/mover-produccion.js` (NUEVO, local): POST {episode_id,on} marca `episodes.continuity.en_produccion`. Regla SOLO UNO A LA VEZ por serie (409 si ya hay otro). Auth por cookie admin (checkDashboardKey).
+  - `public/panel.js`: la Fila ahora muestra SOLO los que tienen `continuity.en_produccion`.
+  - `public/dashboard.html` (renderOne de Guiones): sin producir directo. Si NO está en producción → muestra el guion de solo lectura (scriptPreview) + botón "Mover a producir". Si SÍ → workspace completo + "Sacar de producción". Botón "Mover a producir / Quitar de producción" también en la CABECERA (summary) con stopPropagation.
+- **FASE 2a** ajuste: `mover-produccion.js` mueve el GRUPO completo (largo + sus Shorts) como una unidad; el "uno a la vez" trata el grupo como uno. `panel.js`: la Fila muestra solo el largo (Shorts no como filas sueltas). dashboard.html: botón "Mover a producir" NO sale en los Shorts (solo largo/standalone), y también en la cabecera (summary) de cada guion.
+- **FASE 2b (sala Produciendo)** — verificado: `renderOne(e, inRoom)` parametrizado → Guiones SIEMPRE solo lectura (scriptPreview), la sala (#produccionWorkspace, nueva sección en dashboard.html) muestra el workspace completo del largo en producción + sus shorts agrupados + un header con PERSONAJES FIJOS y LUGARES FIJOS arriba. El workspace ya no vive en Guiones.
+- **PENDIENTE**: Fase 2c (pase automático a "Editar y publicar" cuando el de la sala queda listo + toggle ocultar "listo para producir" en Guiones) · arreglar por qué El Chapo salió sin personajes fijos (Fase 1 no tomó en el largo).
+- NOTA: `mover-produccion.js` es función nueva → para producción hay que pushear (hoy solo corre en local). El resto (panel.js/dashboard.html) también local sin push.
+
 ---
 *(Agrega aquí los próximos cambios, lo más nuevo arriba.)*
+
+## 2026-10-14 — Siempre Flow ($0) en fotos de personaje + TOMAS FIJAS
+
+- **Fotos de personaje SIEMPRE con Flow ($0)** cuando la serie tiene `story_bible.image_engine='flow'`:
+  - `agente/flow_cara.js`: nuevo comando PC `node agente/flow_cara.js <slug> [characterId]` → genera fotos de cara con Google Flow (baja ORIGINAL `=s0`, resolución completa). Con `characterId` regenera solo ese.
+  - `agente/comandos.js`: registrado `flow_cara` (arg `slug` o `slug:uuid`, hidden).
+  - `agente/agente.js`: `flow_cara` en USER_OK + dispatch + script map (`flow_cara.js`) + maxMin 20.
+  - `netlify/functions/_character_photo.js`: `createCharacterPhoto` usa Flow si `VYRALES_LOCAL_RUN` + engine flow (costUsd:0), si no Gemini.
+  - `public/dashboard.html` `generateCharacterPhotos()`: rama Flow → encola `flow_cara:<slug>[:id]` por el agente. Botones muestran "(Flow, $0)".
+- **Prompt de la foto de referencia**: confirmado que es CARA/apariencia, ropa neutra (camiseta gris lisa), fondo neutro — la ropa de escena la decide el guion en cada toma (NO se fija aquí). `buildImagePrompt` en `_series.js` ya lo hacía bien.
+- **Strip TOMAS FIJAS** (`#tomasFijasStrip`): corregido para leer la imagen desde `series.visual_memory.locations[k].url` (antes miraba `story_bible`, nunca mostraba la generada). Botón **Generar N imágenes** en `#genFijasBtn` → `generateMissingFixedLocations()` (Flow $0, una por una).
+- **Responsive**: grid personajes `grid-cols-1 sm:grid-cols-2 xl:grid-cols-3` + `max-h-[400px] overflow-y-auto` (no crece de más con 6+). Tira de tomas scroll horizontal.
+- PENDIENTE: regenerar El Chapo con `claude_largo.js` corregido (tagging por toma) + `location` en shot del long en `_guionista.js`. PUSH de todo cuando Franklin apruebe.
+
+## 2026-10-14 — QA visual: 6 a 9 fotos por toma (en vez de 5)
+
+- `agente/_qa.js` `visionReview`: antes sacaba 5 fotos fijas por toma (`t_1..t_5`). Ahora saca **6 a 9** según la duración del clip (~1 por segundo, `nF = clamp(round(dur), 6, 9)`), repartidas de inicio a fin. Decisión Franklin: más muestras = mejor verificación de movimiento/estilo, con **Claude ($0)** en vez de pagar Gemini (que se consideró "mejor" pero de pago).
+- Prompt del revisor: referencias dinámicas ("la primera y la última imagen", "puntos intermedios") en vez de "imagen 1 y la 5" fijo.
+- Aplica solo (cada corrida carga el _qa.js más nuevo); no requiere reinicio.
+
+## 2026-10-14 — PROMPT MAESTRO LTX-SAFE (precisión en la generación: que salga bien a la primera)
+
+Diagnóstico con datos: EP 11 (Tsar Bomba, 121 tomas) → 73 malas (60 %): `broken` 55, `action_ok` 47, `haze` 11, `style_ok` 0.
+Causas: multi-actor en una toma (LTX deforma/cambia nº de personas), push-in/grúa/seguimiento (solo se mueve la cámara
+o pierde al sujeto), objetos frágiles (papel, sellos, cuerdas, mapas, pantallas → aparecen/desaparecen/letras), humo de relleno.
+Las reglas viejas SE CONTRADECÍAN: el guionista ponía como ejemplo "fast push-in, crane up, FPV drone fly-over, slow orbit",
+"atmósfera: humo, niebla" y "grupos de 1 a 6".
+
+- **NUEVO `netlify/functions/_ltx_safe.js`** = UNA sola fuente de verdad: `LTX_SAFE` (9 reglas: un sujeto/un movimiento,
+  máx. 3 personas sin contar, cámara lateral corta sin acercarse/alejarse, sujeto dentro, movimiento grande, nada frágil
+  ni con letras, fondo simple, nada cambia/aire limpio, action_en 20–35 palabras + revisión obligatoria), `SAFE_CAMERAS`,
+  `safeCamera()`. Lecciones nuevas se agregan AQUÍ y llegan a las 3 capas.
+- `_guionista.js`: narrado y largo llevan LTX_SAFE (en el narrado se agrega DESPUÉS de la limpieza de ejemplos para no
+  perderlos); cámara segura; "una toma = un sujeto haciendo una sola cosa"; máx. 3 personas; aire limpio; campo
+  **`location`** por toma en el largo (chapters y shorts) + regla de etiquetar el lugar fijo.
+- `_visual_check.js` RULES: + LTX_SAFE; personas máx. 3; action_en 20–35; aire limpio en start_en.
+- `_king.js` `ltxPromptFor`: red de seguridad `safeCamera` (push-in/grúa/seguimiento/órbita/dron → "slow lateral drift")
+  en narrados, también para guiones ya escritos; el relleno automático pasa de "slow push-in" a desplazamiento lateral.
+- `agente/_qa.js` `rewriteShot`: + LTX_SAFE; se quitó "REPIENSA desde cero" (hacía que el 2º intento saliera PEOR) →
+  "corrige con precisión el fallo concreto SIMPLIFICANDO".
+- **BUG** `agente/claude_largo.js` `detail()`: las filas no llevaban `characters` ni `location` → TODAS las tomas del largo
+  quedaban sin personaje y con lugar "escena" (El Chapo EP15/EP20: 0 tomas con personaje, 0 con lugar fijo). Arreglado.
+- PENDIENTE: regenerar El Chapo con el guionista nuevo (tiene visual_checked=true → no se reescribe solo).
+- SIGUIENTE: "cerebro" del QA (especialista con memoria por toma + aprendizaje con evidencia que retroalimenta al guionista).
+
+### PENDIENTE (texto de Franklin, oct-14) — retomar al terminar y verificar el cerebro
+> "El QA no trabaja con King, ¿verdad? Si es así, cuando un video corto termina, el QA puede revisarlo de una vez; no tiene que
+> esperar a que termine todo. Puede ir haciendo QA e ir marcando los que necesitan rehacerse o no, porque son trabajos
+> diferentes. Si uno necesita rehacerse desde 0, ese lo pone en cola hasta que la producción completa termine.
+> Otra cosa: los Shorts no se deben ejecutar con el maestro; deben ejecutarse independientes, ya que se crean después de
+> que el padre está creado y verificado. Deben crearse solos, no juntos con el padre, sino individual al padre."
+
+## 2026-10-14 — 🧠 CEREBRO (aprende con evidencia) + 🔧 ESPECIALISTA de reparación
+
+Pedido de Franklin: "que aprenda, guarde todo, revise, tenga memoria e independencia; que no se lleve de lo que le digan sino
+de lo que funciona (algo que salió bien muchas veces y mal una vez NO es un consejo); que se comunique con el guionista".
+
+- **F1/F2 `netlify/functions/_cerebro.js`** (Storage, carpeta de memoria del canal):
+  - `featuresOf(shot)`: rasgos deterministas ($0) — cámara (acerca/sigue/lateral), multi-acción, personas (p0/p1/p2_3/p4mas),
+    multitud, objeto frágil, texto, humo de relleno, fondo recargado, acción larga, gesto fino, sujeto sale, movimiento sutil,
+    vehículo QUE SE DESPLAZA, explosión, plano cerrado/abierto, personaje fijo, solo cámara.
+  - Evidencia (`cerebro_evidencia.json`): cada veredicto del QA y de Franklin. `syncFromDb({reset})` reconstruye desde la base.
+    **Aprobaciones masivas ("aprobar todas", EP11 = 121 clips en 3 min) NO cuentan**; solo la aprobación individual (≤2/min)
+    y los ✗ de Franklin. `franklinLive()` registra al instante (approve-shot individual, shot-edit qa_force), peso ×3.
+  - Recupera el PRIMER intento de tomas reintentadas 1 vez (`qa_rewrite_from`).
+  - Reglas (`cerebro_reglas.json`) SOLO con números y SOLO con PRIMEROS intentos (los reintentos tienen sesgo): activa si
+    n≥8, ≥1.5× la base, intervalo de Wilson por encima de la base y **en ≥2 episodios**; degradada bajo 1.2× (histéresis);
+    "funciona" si ≤0.6× la base en ≥2 episodios. Métrica "¿sirve reintentar?" por patrón. Fiabilidad del juez del QA por
+    bandera, usable solo con acuerdos (sesgada si solo hay desacuerdos). Arreglos que funcionaron (rasgo quitado → arreglado).
+  - `cerebroBlock()` → entra en `memoryBlock` (lo recibe Claude en CADA llamada: guionista, detallador, reparador, juez).
+- **F3 `agente/_especialista.js`** + bucle de `agente/_qa.js`: bitácora por toma (`shots[].qa.attempts`), decide
+  azar (solo faltó movimiento, toma limpia) / patrón / estructura (reintentar casi nunca sirve) / mínimo / seguro (tras 2) /
+  humano / no_fiable; el reparador recibe la bitácora ("NO repitas") + la evidencia. `regen-shot-background` acepta
+  `keep_old` → al final **se queda el MEJOR intento** (restaura clip + prompt) y borra los demás. Diario `cerebro_diario.json`.
+  Al terminar cada QA, el cerebro piensa solo. El `ok` del reintento ahora incluye style_ok.
+- **F4**: `_memoria.memoryBlock` sin las anécdotas "ERRORES RECIENTES"; `claude_aprender` solo consolida correcciones de
+  Franklin (las del QA → cerebro). Endpoint `netlify/functions/cerebro.js`; sección 🧠 en el modal "Reglas aprendidas"
+  (botones Pensar ahora / Recargar historial, diario, análisis). Comandos `cerebro_cargar` / `cerebro_pensar`
+  (`agente/cerebro.js`; `pensar` = + análisis de Claude que SOLO OPINA, no cambia reglas).
+- **Primeros resultados reales**: 300 tomas en 1er intento, falla 37 %; de 160 reintentadas siguen mal 38 %. 0 reglas activas
+  (lo que más falla —vehículo que se desplaza 74 %, 4+ personas 63 %, multitudes 55 %— viene casi todo del EP11). FUNCIONA:
+  acción detallada >40 palabras (18 %). Quitar "movimiento sutil" arregló 7/9.
+- **El cerebro corrigió el maestro**: se revirtió "acción de 20–35 palabras" → 25–45 detallada (el detalle ayuda).
+  OJO (sin evidencia todavía): la cámara push-in/seguimiento NO sale peor en 1er intento, y el humo de relleno sale MEJOR;
+  las reglas LTX-SAFE de cámara/humo quedan como hipótesis hasta que el cerebro las confirme o descarte.
+- Fix: `_keyframe.js` / `location-image.js` guardan el archivo sin tildes/espacios ("Túnel del Altiplano" fallaba: Invalid key).
+- PENDIENTE: revisar con Franklin la memoria vieja `reglas.json` (39 reglas, varias de casos sueltos que contradicen lo nuevo,
+  ej. #38 "muchas cosas moviéndose a la vez", #39 "la cámara solo se aleja").
+
+## 2026-10-14 — Limpieza de la memoria vieja + El Chapo regenerándose
+- `media/memoria/reglas.json`: 39 → 31 reglas (respaldo `memoria/reglas_respaldo_2026-10-14.json`). Se quitaron 8 reglas
+  del QA (casos sueltos) que contradecían el maestro/cerebro o estaban repetidas: #19, #27, #29, #30, #31, #37, #38, #39.
+  Las reglas de Franklin quedan TODAS.
+- Choques resueltos a favor de Franklin: regla #14 (revelar paisaje enorme SIN personas → cámara se aleja y sube) ahora es
+  excepción en LTX_SAFE y `safeCamera` ya no la convierte en lateral; regla #20 (los cambios de luz no se ven) → LTX_SAFE
+  y el cerebro ya no proponen "mover la luz", sino cámara lateral.
+- `import-largo.js`: cámara por defecto "slow lateral drift" (antes "slow smooth push-in").
+- El Chapo (grupo EP20–24, el que está en Produciendo) se está REGENERANDO con el guionista nuevo, mismo tema:
+  job `largo-mv7m61qa6ndt` (regenerado de `largo-mv7eby1m11at`). Al terminar: import-largo, mover en_produccion al grupo
+  nuevo. EP15–19 y EP20–24 viejos NO se borran sin permiso de Franklin.
+
+## 2026-10-14 — ⚖️ El cerebro puede decirle que NO a Franklin (objeciones)
+Regla de Franklin: "si intento cambiar algo y él no está de acuerdo porque no funcionaría o contradice lo que ya tenemos,
+tiene toda la libertad de decirme que no y no hacerlo, o avisarme en el Dashboard por qué y cuál sería la mejor solución;
+yo puedo cometer errores que él no". Salvaguarda acordada: Franklin conserva "Hazlo igual" y lo forzado se mide como
+experimento (`doc.forzados`: ¿quién tenía razón?).
+- `_cerebro.js`: `judgeChange(antes, después, doc)` juzga SOLO lo que el cambio agrega/quita: `no` = agrega un patrón con
+  evidencia fuerte (regla activa) → no se aplica; `aviso` = agrega algo sospechoso (observación, n≥8, ≥1.3×) o quita algo que
+  funciona → se aplica y avisa. `cerebro_objeciones.json` (`addObjecion`/`setObjecion`/`listObjeciones`). Evidencia marca
+  `forz` (cambio forzado) y `computeStats` cuenta cómo salieron.
+- Puertas: `shot-edit.js` (editor de toma) y `shot-prompt.js` (prompt a mano) → 409 `{objecion}` salvo `forzar:true`
+  (+`objecion_id`); al forzar, la toma lleva `franklin_forzado`. `memoria.js` → regla nueva queda `estado:'evaluando'`
+  (no se usa) y encola `claude_aprender`, que la ACEPTA u OBJETA con razón + regla mejorada (`en_disputa`). Al consolidar,
+  las correcciones de Franklin que contradicen la evidencia van a objeciones, y las reglas evaluando/en disputa/forzadas
+  no las reescribe Claude. `memoryBlock` no usa reglas con `estado`.
+- `netlify/functions/objeciones.js`: GET pendientes/recientes · POST {id, decision: forzar|propuesta|descartar}.
+- Panel: diálogo "Hazlo igual" / "Tienes razón, no lo hagas" (openDialog acepta okText/cancelText), aviso flotante
+  (`vyToast`), pastilla "🧠 N objeciones" abajo a la derecha (cada 90 s), sección ⚖️ en la vista 🧠 con
+  Tienes razón / Usa tu propuesta / Hazlo igual, insignias ⏳/⚖️/experimento en las reglas.
+- Memoria: regla #2 de Franklin (la libertad de decir que no con datos; él conserva la última palabra).
+- Probado de punta a punta: cambio malo en EP20 T1 → 409 y la toma quedó intacta; regla [PRUEBA] de multitudes con push-in →
+  Claude la objetó con datos y propuso dividir en 2 tomas; ambas se resolvieron con "Tienes razón" (regla borrada).

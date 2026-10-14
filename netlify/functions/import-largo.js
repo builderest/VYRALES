@@ -12,7 +12,7 @@ const fixShots = (shots) => (shots || []).map((s, i) => {
   const clean = (t) => String(t || '').replace(/"/g, "'").trim();
   const start = clean(s.start_en || s.visual_en || s.visual_es || s.scene_es || line);
   return Object.assign({ location: 'escena', characters: [], sfx: '' }, s, { n: i + 1, scene_es: s.scene_es || s.visual_es || line, location: s.location || 'escena', characters: Array.isArray(s.characters) ? s.characters : [],
-    camera: clean(s.camera) || 'slow smooth push-in',
+    camera: clean(s.camera) || ('slow lateral drift to the ' + (i % 2 ? 'right' : 'left')), // LTX-safe (oct-14): antes 'slow smooth push-in'
     start_en: start,
     action_en: clean(s.action_en) || ('The main subject of the scene moves naturally and continuously, matching the narration: ' + start.slice(0, 160)) });
 });

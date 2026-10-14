@@ -29,7 +29,8 @@ exports.handler = async (event) => {
     return { statusCode: 405, body: 'Method not allowed' };
   }
   try {
-    const { assetId, provider: reqProvider, new_frame: newFrame } = JSON.parse(event.body || '{}');
+    // keep_old (especialista del QA, oct-14): NO borrar el clip anterior; se devuelve su ruta para poder quedarse con el MEJOR intento.
+    const { assetId, provider: reqProvider, new_frame: newFrame, keep_old: keepOld } = JSON.parse(event.body || '{}');
     // 'king' = LTX-2.5 en la PC king (solo desde Cronix: agente/regen_local.js).
     const provider = ['google', 'fal', 'king'].includes(reqProvider) ? reqProvider : (process.env.VIDEO_PROVIDER || 'google');
     if (!assetId) {
@@ -116,14 +117,14 @@ exports.handler = async (event) => {
     // Storage, para no acumular clips sin uso. Si algo falló antes, el viejo sigue intacto.
     const oldPath = storagePathFromPublicUrl(asset.storage_path);
     // Un clip que Franklin APROBÓ nunca se borra (oct-11: el QA rehízo aprobadas y sus archivos se perdieron).
-    if (oldPath && oldPath !== storagePath && !asset.approved) {
+    if (oldPath && oldPath !== storagePath && !asset.approved && !keepOld) {
       const { error: removeError } = await supabase.storage.from(BUCKET).remove([oldPath]);
       if (removeError) console.warn(LOG, 'no se pudo borrar el archivo viejo (no es grave):', oldPath, removeError.message);
       else console.log(LOG, 'archivo viejo borrado de Storage:', oldPath);
     }
 
     console.log(LOG, 'listo ✅. Toma', updated.shot_number, 'regenerada:', publicUrl);
-    return { statusCode: 200, body: JSON.stringify({ asset: updated, model }) };
+    return { statusCode: 200, body: JSON.stringify({ asset: updated, model, old_storage_path: keepOld ? asset.storage_path : null }) };
   } catch (err) {
     console.error(LOG, 'ERROR:', err);
     return { statusCode: 500, body: JSON.stringify({ error: err.message }) };

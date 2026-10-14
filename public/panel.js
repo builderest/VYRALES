@@ -803,7 +803,7 @@
 
     var fila = $('vyFilaRows');
     if (fila) {
-      var falta = eps.filter(function (e) { return e.status !== 'publicado'; })
+      var falta = eps.filter(function (e) { return e.status !== 'publicado' && e.status !== 'en_revision' && (e.continuity && e.continuity.en_produccion) && !(e.continuity && e.continuity.parent_episode_id); }) // SOLO movidos a producción, solo el largo (sus Shorts van con él, no como filas sueltas) — Franklin oct-13
         .sort(function (a, b) { return (a.episode_number || 0) - (b.episode_number || 0); });
       if ($('vyFilaCount')) $('vyFilaCount').textContent = falta.length ? falta.length + ' por terminar' : '';
       fila.innerHTML = falta.length ? falta.map(function (e) {

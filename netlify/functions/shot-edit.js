@@ -43,6 +43,8 @@ exports.handler = async (event) => {
       if (!clip) return json(400, { error: 'La toma todavía no tiene video.' });
       const reason = clean(body.reason || 'no está bien').slice(0, 300);
       await saveShot({ qa: Object.assign({}, shot.qa || {}, { force: true, force_reason: reason, clip_id: clip.id, ok: false, tries: Math.min(Number((shot.qa || {}).tries) || 0, 2) }) });
+      // 🧠 Franklin la marcó mal → evidencia de peso ×3 (y si el QA la había aprobado, el cerebro aprende que el QA se equivocó).
+      try { await require('./_cerebro').franklinLive(sb, { episodeId: ep.id, shotNumber: shot.n, clipId: clip.id, ok: false, reason }); } catch (_) {}
       // Memoria: la corrección de Franklin es una lección para Claude (la consolida claude_aprender).
       if (require('./_tenant').currentWs() === require('./_tenant').ADMIN_WS) try { await require('./_memoria').addLesson(sb, { source: 'franklin', serie: series && series.slug, ep: ep.id, toma: n, narracion: lineOf(shot), motivo: reason, imagen: shot.start_en || '', accion: shot.action_en || '', camara: shot.camera || '' }); } catch (_) {}
       if (require('./_tenant').currentWs() === require('./_tenant').ADMIN_WS) try { const { data: oa } = await sb.from('agent_jobs').select('id').eq('status', 'pending').eq('command', 'claude_aprender').limit(1); if (!(oa && oa.length)) await sb.from('agent_jobs').insert(await require('./_tenant').jobRow(sb, 'claude_aprender')); } catch (_) {}
@@ -102,6 +104,24 @@ exports.handler = async (event) => {
     Object.assign(patch, { keyframe_prompt_override: null, prompt_override: null, edited_at: new Date().toISOString() });
     if (imgChanged) Object.assign(patch, { frame_stale: true, end_frame_url: null, end_frame_skip: false, own_image: false });
     if (imgChanged || vidChanged || camChanged) patch.clip_stale = !!last('video_clip');
+    // 🧠 ¿El cerebro está de acuerdo? (regla de Franklin oct-14: si la evidencia dice que no funcionaría, NO se hace y
+    // se explica por qué + la mejor solución; Franklin puede decir "hazlo igual" y queda como experimento).
+    let aviso = null;
+    if (imgChanged || vidChanged || camChanged) {
+      try {
+        const C = require('./_cerebro');
+        const j = C.judgeChange(shot, Object.assign({}, shot, patch), await C.loadRules(sb));
+        if (j.nivel === 'no' && !body.forzar) {
+          const oid = await C.addObjecion(sb, { tipo: 'toma', ep: ep.id, ep_num: ep.episode_number, n, pedido: 'Cambio en la toma ' + n + ' del EP ' + ep.episode_number, resumen: j.resumen, propuesta: j.propuesta, motivos: j.motivos.map((m) => m.key), cambio: { endpoint: 'shot-edit', body: { episode_id: ep.id, shot: n, fields: body.fields } } });
+          return json(409, { error: 'objecion', objecion: { id: oid, nivel: j.nivel, resumen: j.resumen, propuesta: j.propuesta } });
+        }
+        if (j.nivel === 'no' && body.forzar) {
+          patch.franklin_forzado = { at: new Date().toISOString(), motivos: j.motivos.map((m) => m.key) };
+          if (body.objecion_id) await C.setObjecion(sb, body.objecion_id, { estado: 'forzada' });
+        }
+        if (j.nivel === 'aviso') aviso = { resumen: j.resumen, propuesta: j.propuesta };
+      } catch (_) {}
+    }
     await saveShot(patch);
     // Memoria: lo que Franklin cambió a mano (antes → después) enseña a Claude cómo lo quiere.
     if (imgChanged || vidChanged || camChanged) {
@@ -112,7 +132,7 @@ exports.handler = async (event) => {
         if (require('./_tenant').currentWs() === require('./_tenant').ADMIN_WS) await require('./_memoria').addLesson(sb, { source: 'franklin_edicion', serie: series && series.slug, ep: ep.id, toma: n, narracion: lineOf(shot), antes, despues });
       } catch (_) {}
     }
-    return json(200, { ok: true, imgChanged, vidChanged });
+    return json(200, { ok: true, imgChanged, vidChanged, aviso });
   } catch (err) {
     return json(500, { error: err.message });
   }

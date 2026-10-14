@@ -388,6 +388,33 @@
             <input type="file" id="locImageInput" accept="image/jpeg,image/png,image/webp" class="hidden" onchange="handleLocationImage(this.files[0])">
         </section>
 
+        <!-- TIRA de PERSONAJES FIJOS (arriba de todo, Franklin oct-13) -->
+        <section class="glass-panel rounded-2xl p-4" data-vy-view="produccion">
+            <details open>
+                <summary class="cursor-pointer list-none text-[11px] font-mono text-cyber-cyan flex items-center gap-2"><i class="fa-solid fa-users"></i>PERSONAJES FIJOS<span id="genPersonajesBtn" class="ml-auto flex items-center"></span><i class="fa-solid fa-chevron-down text-slate-500 text-[9px]"></i></summary>
+                <div id="personajesFijosStrip" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 mt-2 max-h-[400px] overflow-y-auto pr-1"></div>
+            </details>
+        </section>
+
+        <section class="glass-panel rounded-2xl p-4" data-vy-view="produccion">
+            <details open>
+                <summary class="cursor-pointer list-none text-[11px] font-mono text-cyber-gold flex items-center gap-2"><i class="fa-solid fa-location-dot"></i>TOMAS FIJAS <span class="text-slate-500 normal-case">(lugares/escenas que se reusan)</span><span id="genFijasBtn" class="ml-auto flex items-center"></span><i class="fa-solid fa-chevron-down text-slate-500 text-[9px]"></i></summary>
+                <div id="tomasFijasStrip" class="flex gap-3 overflow-x-auto pb-1 mt-2"></div>
+            </details>
+        </section>
+
+        <!-- SALA PRODUCIENDO: minimizable, arriba del todo (Franklin oct-13) -->
+        <section class="glass-panel rounded-2xl p-5" data-vy-view="produccion">
+            <details id="produciendoBox" open>
+                <summary class="cursor-pointer list-none flex items-center justify-between gap-2">
+                    <div class="flex-1"><h2 class="vy-novela text-lg font-bold text-white">Produciendo</h2><p class="text-xs text-slate-400">El episodio en producción: guion, personajes, lugares y tomas. Genera todo desde aquí.</p></div>
+                    <div id="produciendoActions" class="flex flex-wrap items-center gap-2"></div>
+                    <i class="fa-solid fa-chevron-down text-slate-400 ml-2"></i>
+                </summary>
+                <div id="produccionWorkspace" class="space-y-3 mt-3"></div>
+            </details>
+        </section>
+
         <!-- PRODUCCIÓN · siguiente episodio (antes estaba al final de Revisar) -->
         <section id="vySiguiente" class="glass-panel rounded-2xl p-6" data-vy-view="produccion">
             <span class="vy-lab text-cyber-cyan block mb-4">// Siguiente episodio</span>
@@ -411,7 +438,7 @@
 
         <!-- PROGRESO REAL DE LA SERIE ACTIVA (calculado con los datos de Supabase).
              Reemplaza la maqueta "Orquestación del pipeline", cuyos estados eran fijos. -->
-        <section id="vyProduccion" class="glass-panel rounded-2xl p-6" data-vy-view="produccion">
+        <section id="vyProduccion" class="glass-panel rounded-2xl p-6" data-vy-view="inicio">
             <div class="flex flex-col md:flex-row md:items-center justify-between gap-2 mb-5">
                 <div>
                     <h2 class="font-display font-bold text-lg text-white flex items-center gap-2"><i class="fa-solid fa-route text-cyber-cyan"></i>Cómo va la novela</h2>
@@ -438,6 +465,7 @@
                 </table>
             </div>
         </section>
+
 
         <!-- STORY BIBLE & CHARACTER CONSISTENCY CENTRAL (páginas Guiones y Reglas) -->
         <section class="grid grid-cols-1 lg:grid-cols-3 gap-6 vy-split" data-vy-view="guiones reglas">
@@ -481,7 +509,10 @@
                         <span class="vy-lab text-cyber-cyan">// Guiones</span>
                         <h3 id="arcSection" class="vy-novela text-2xl font-bold text-white">Todos los episodios</h3>
                     </div>
-                    <span id="arcCountLabel" class="text-xs font-mono text-slate-400"></span>
+                    <div class="flex items-center gap-3">
+                        <label class="text-[11px] font-mono text-slate-400 flex items-center gap-1.5 cursor-pointer select-none"><input type="checkbox" id="ocultarListos" onchange="toggleListos()" class="accent-cyber-cyan"> Ocultar listos para producir</label>
+                        <span id="arcCountLabel" class="text-xs font-mono text-slate-400"></span>
+                    </div>
                 </div>
                 <p id="arcSynopsis" class="vy-synopsis"></p>
                 <!-- Filtros y búsqueda (panel.js) -->
@@ -1552,7 +1583,10 @@
       const BUDGET_TARGET_USD = 150;
       let costChartRef = null;
       let lastLoadedData = null;
+      window.toggleListos = function () { if (lastLoadedData) renderArc(lastLoadedData); };
 
+      // ¿La serie cargada genera fotos con Flow ($0)? Para las etiquetas de los botones. Declaración hoisted.
+      function _cardFlow() { return ((lastLoadedData && lastLoadedData.series && lastLoadedData.series.story_bible) || {}).image_engine === 'flow'; }
       function esc(s) {
         return (s || '').toString().replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
       }
@@ -2180,14 +2214,14 @@
         const missingPhotos = chars.filter(c => !c.reference_image_url).length;
         const gmb = document.getElementById('genMissingPhotosBtn');
         gmb.classList.toggle('hidden', !missingPhotos);
-        gmb.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles mr-1"></i>Generar ' + missingPhotos + ' foto' + (missingPhotos === 1 ? '' : 's') + ' que falta' + (missingPhotos === 1 ? '' : 'n') + ' (~$' + (missingPhotos * IMAGE_PRICE_USD).toFixed(2) + ')';
+        gmb.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles mr-1"></i>Generar ' + missingPhotos + ' foto' + (missingPhotos === 1 ? '' : 's') + ' que falta' + (missingPhotos === 1 ? '' : 'n') + (_cardFlow() ? ' (Flow, $0)' : ' (~$' + (missingPhotos * IMAGE_PRICE_USD).toFixed(2) + ')');
         document.getElementById('castSubtitle').innerHTML = chars.length
           ? esc(chars.length + ' personajes de "' + data.series.title + '". ') +
             (rules.reference_images
               ? '<span class="text-cyber-emerald"><i class="fa-solid fa-check mr-1"></i>Las fotos SÍ se envían a Veo en cada toma (modelo ' + esc((rules.shot_model || '').replace('veo_', 'Veo ')) + ').</span>'
               : '<span class="text-cyber-gold"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Las fotos NO se envían a Veo: esta serie usa ' + esc((rules.shot_model || 'veo_lite').replace('veo_', 'Veo ')) + ', que no acepta referencias. La cara se mantiene solo por el texto.</span>')
           : 'Esta serie todavía no tiene personajes guardados.';
-        grid.innerHTML = chars.map(c => {
+        window.castCardHtml = function(c, episodes, openIds) {
           const pr = c.profile || {};
           const appearances = episodes.filter(e => (e.shots || []).some(s => (s.characters || []).includes(c.name))).length;
           const roleCls = ROLE_STYLES[c.role] || 'text-slate-300 bg-slate-800 border-slate-700';
@@ -2210,9 +2244,9 @@
                     (c.reference_image_url ? 'border-slate-700 text-slate-400 hover:text-cyber-cyan hover:border-cyber-cyan/40' : 'border-cyber-cyan/40 text-cyber-cyan bg-cyber-cyan/10 hover:bg-cyber-cyan/20') + '">' +
                     '<i class="fa-solid fa-upload mr-1"></i>' + (c.reference_image_url ? 'Cambiar' : 'Subir foto') +
                   '</button>' +
-                  '<button type="button" onclick="openCharacterPhotoEditor(event, \'' + esc(c.id) + '\')" title="Genera la foto con Gemini en el estilo de la serie (puedes editar el prompt antes)" ' +
+                  '<button type="button" onclick="openCharacterPhotoEditor(event, \'' + esc(c.id) + '\')" title="' + (_cardFlow() ? 'Genera la foto con Google Flow en tu PC ($0, resolución completa)' : 'Genera la foto con Gemini en el estilo de la serie') + ' (puedes editar el prompt antes)" ' +
                     'class="text-[10px] font-mono px-2 py-0.5 rounded border border-cyber-violet/40 text-cyber-violet bg-cyber-violet/10 hover:bg-cyber-violet/20">' +
-                    '<i class="fa-solid fa-wand-magic-sparkles mr-1"></i>' + (c.reference_image_url ? 'Regenerar' : 'Generar') + ' (~$' + IMAGE_PRICE_USD.toFixed(2) + ')</button>' +
+                    '<i class="fa-solid fa-wand-magic-sparkles mr-1"></i>' + (c.reference_image_url ? 'Regenerar' : 'Generar') + (_cardFlow() ? ' (Flow, $0)' : ' (~$' + IMAGE_PRICE_USD.toFixed(2) + ')') + '</button>' +
                   (pr.image_prompt
                     ? '<button type="button" onclick="copyTag(this, event)" data-tag="' + esc(pr.image_prompt) + '" title="Copia el prompt para generar la foto en Gemini" ' +
                         'class="text-[10px] font-mono px-2 py-0.5 rounded border border-cyber-violet/40 text-cyber-violet bg-cyber-violet/10 hover:bg-cyber-violet/20">' +
@@ -2270,7 +2304,8 @@
               '</div>' +
             '</details>'
           );
-        }).join('');
+        };
+        grid.innerHTML = chars.map(function (c) { return castCardHtml(c, episodes, openIds); }).join('');
       }
 
       // ── Foto de referencia por personaje ────────────────────────────────────
@@ -2555,8 +2590,13 @@
           : o.kind === 'location'
           ? (isOriginal ? { series: DEFAULT_SERIES, location_key: o.locationKey, reset_prompt: true } : { series: DEFAULT_SERIES, location_key: o.locationKey, prompt: text })
           : Object.assign(isOriginal ? { episode_id: o.episodeId, shot: o.n, kind: o.kind, reset: true } : { episode_id: o.episodeId, shot: o.n, kind: o.kind, prompt: text }, o.kind === 'video' && o.prov === 'king' ? { prov: 'king' } : {});
-        const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-        const out = await res.json().catch(() => ({}));
+        let res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        let out = await res.json().catch(() => ({}));
+        if (res.status === 409 && out.objecion) { // 🧠 el cerebro objetó tu prompt
+          if (!(await cerebroObjeta(out.objecion))) throw new Error('No se guardó: el cerebro objetó y le diste la razón. ' + (out.objecion.propuesta || ''));
+          res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.assign({}, body, { forzar: true, objecion_id: out.objecion.id })) });
+          out = await res.json().catch(() => ({}));
+        }
         if (!res.ok) throw new Error(out.error || ('HTTP ' + res.status));
         return out;
       }
@@ -2747,9 +2787,14 @@
         const fields = () => Object.assign(Object.fromEntries(['start_en', 'action_en', 'reaction_en', 'background_en', 'camera', 'end_en'].map(k => [k, document.getElementById('se_' + k).value])), { camera_only: !!(document.getElementById('se_camera_only') || {}).checked });
         const check = () => { const w1 = words('start_en'), w2 = words('action_en'); msg('Imagen: ' + w1 + ' palabras' + (w1 < 35 ? ' <span class="text-cyber-gold">(corta: LTX y Flow inventan más)</span>' : '') + ' · Movimiento: ' + w2 + ' palabras' + (w2 < 18 ? ' <span class="text-cyber-gold">(corto)</span>' : '')); };
         ['start_en', 'action_en'].forEach(k => document.getElementById('se_' + k).addEventListener('input', check)); check();
-        const save = async () => { const k = (() => { try { return localStorage.getItem('vyrales_key'); } catch (_) { return null; } })();
-          const r = await fetch('/.netlify/functions/shot-edit', { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, k ? { 'x-vyrales-key': k } : {}), body: JSON.stringify({ episode_id: episodeId, shot: n, fields: fields() }) });
-          const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status); return j; };
+        const save = async (forzarId) => { const k = (() => { try { return localStorage.getItem('vyrales_key'); } catch (_) { return null; } })();
+          const r = await fetch('/.netlify/functions/shot-edit', { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, k ? { 'x-vyrales-key': k } : {}), body: JSON.stringify(Object.assign({ episode_id: episodeId, shot: n, fields: fields() }, forzarId ? { forzar: true, objecion_id: forzarId } : {})) });
+          const j = await r.json();
+          // 🧠 El cerebro objetó (evidencia fuerte): no se guardó; Franklin decide.
+          if (r.status === 409 && j.objecion) { if (!(await cerebroObjeta(j.objecion))) throw new Error('No se guardó: el cerebro objetó y le diste la razón. ' + (j.objecion.propuesta || '')); return save(j.objecion.id); }
+          if (!r.ok) throw new Error(j.error || r.status);
+          if (j.aviso) setTimeout(() => cerebroAviso(j.aviso), 300);
+          return j; };
         document.getElementById('se_ai').onclick = async (ev) => { const b = ev.currentTarget; b.disabled = true; msg('<i class="fa-solid fa-spinner fa-spin mr-1"></i>Claude (en tu PC, $0) está detallando la toma desde la narración... (~1 min)');
           try { const k = (() => { try { return localStorage.getItem('vyrales_key'); } catch (_) { return null; } })();
             const post = (extra) => fetch('/.netlify/functions/shot-edit', { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, k ? { 'x-vyrales-key': k } : {}), body: JSON.stringify(Object.assign({ episode_id: episodeId, shot: n, action: 'detail', fields: fields() }, extra || {})) });
@@ -2905,18 +2950,34 @@
         } catch (err) { return alert('No se pudo guardar: ' + err.message); }
         await loadDashboard();
       };
-      window.generateMissingCharacterPhotos = async function() {
-        const chars = (lastLoadedData && lastLoadedData.characters) || [];
+            window.generateMissingCharacterPhotos = async function() {
+        const d = lastLoadedData;
+        const chars = (d && d.characters) || [];
         const missing = chars.filter(c => !c.reference_image_url);
         if (!missing.length) return;
-        if (!await askConfirm('Generar ' + missing.length + ' foto(s) de personaje con Gemini:\n\n' + missing.map(c => '• ' + c.name).join('\n') +
-          '\n\nCosto: ' + missing.length + ' × $' + IMAGE_PRICE_USD.toFixed(3) + ' = ~$' + (missing.length * IMAGE_PRICE_USD).toFixed(2) + ' USD.\n' +
-          'Se hacen en orden; cada foto nueva sirve de referencia de estilo para la siguiente. Después revisas cada una y regeneras solo la que no te guste. ¿Continuar?')) return;
+        const flow = ((d && d.series && d.series.story_bible) || {}).image_engine === 'flow';
+        const lista = missing.map(c => '\u2022 ' + c.name).join('\n');
+        const msg = flow
+          ? ('Generar ' + missing.length + ' foto(s) de personaje con Google Flow ($0):\n\n' + lista + '\n\nSe hacen una por una en tu PC; cada foto nueva sirve de referencia de estilo para la siguiente. \u00bfContinuar?')
+          : ('Generar ' + missing.length + ' foto(s) de personaje con Gemini:\n\n' + lista + '\n\nCosto: ' + missing.length + ' \u00d7 $' + IMAGE_PRICE_USD.toFixed(3) + ' = ~$' + (missing.length * IMAGE_PRICE_USD).toFixed(2) + ' USD. \u00bfContinuar?');
+        if (!await askConfirm(msg)) return;
         await generateCharacterPhotos({ series: DEFAULT_SERIES, only_missing: true }, missing.map(c => c.id));
       };
       async function generateCharacterPhotos(body, ids) {
+        const d = lastLoadedData;
         const before = {};
-        ((lastLoadedData && lastLoadedData.characters) || []).forEach(c => { before[c.id] = c.reference_image_url || null; });
+        ((d && d.characters) || []).forEach(c => { before[c.id] = c.reference_image_url || null; });
+        // SIEMPRE Flow ($0) cuando la serie usa image_engine 'flow': se manda al agente en tu PC. Franklin oct-14.
+        const sbC = (d && d.series && d.series.story_bible) || {};
+        if (sbC.image_engine === 'flow') {
+          const order = body.character_id ? ('flow_cara:' + DEFAULT_SERIES + ':' + body.character_id) : ('flow_cara:' + DEFAULT_SERIES);
+          try { await agentOrder(order); } catch (err) { return alert('No se pudo mandar a la PC: ' + err.message); }
+          document.getElementById('castSubtitle').innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>Google Flow en tu PC: generando ' + ids.length + ' foto(s) ($0, resolución completa)...';
+          const okF = await pollUntil(d2 => ids.every(id => { const c = (d2.characters || []).find(x => String(x.id) === String(id)); return c && c.reference_image_url && c.reference_image_url !== before[id]; }), Math.max(10, ids.length * 5) * 60 * 1000);
+          await loadDashboard();
+          if (!okF) alert('Alguna foto no apareció a tiempo. Revisa la terminal del agente en tu PC (busca flow_cara / [character-photo]).');
+          return;
+        }
         try {
           const res = await fetch('/.netlify/functions/character-photo-background', {
             method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
@@ -2962,6 +3023,16 @@
         if (!ok) alert('La imagen no apareció después de 4 minutos. Revisa la terminal de netlify dev.');
       }
 
+      // Generar TODAS las tomas fijas que faltan, una por una con Flow ($0). Franklin oct-14.
+      window.generateMissingFixedLocations = async function() {
+        const d = lastLoadedData; if (!d) return;
+        const locs = (d.series.story_bible && d.series.story_bible.locations) || {};
+        const vmL = (d.series.visual_memory && d.series.visual_memory.locations) || {};
+        const faltan = Object.keys(locs).filter(k => k !== 'escena' && !((vmL[k] || {}).url));
+        if (!faltan.length) return alert('Todas las tomas fijas ya tienen imagen.');
+        if (!await askConfirm('Generar ' + faltan.length + ' imagen(es) de lugar con Google Flow ($0)?\n\n' + faltan.map(k => '\u2022 ' + k).join('\n') + '\n\nSe hacen una por una en tu PC.')) return;
+        for (const k of faltan) { await generateLocationImage(k); }
+      };
       window.pickLocationImage = function(btn) {
         pendingLocationKey = btn.dataset.loc;
         const input = document.getElementById('locImageInput');
@@ -3126,7 +3197,9 @@
 
       function renderArc(data) {
         const list = document.getElementById('arcList');
-        const eps = (data.episodes || []).slice().sort((a, b) => a.episode_number - b.episode_number);
+        let eps = (data.episodes || []).slice().sort((a, b) => a.episode_number - b.episode_number);
+        // Toggle: ocultar los 'listo para producir' (guion_generado que NO están en producción) para no llenar la pantalla. Franklin oct-13.
+        if (document.getElementById('ocultarListos') && document.getElementById('ocultarListos').checked) eps = eps.filter(e => !(e.status === 'guion_generado' && !(e.continuity || {}).en_produccion));
         const nextToProduce = eps.find(e => e.status === 'guion_generado');
         document.getElementById('arcCountLabel').textContent = eps.length + ' episodios';
         document.getElementById('arcSynopsis').textContent = data.series.synopsis || '';
@@ -3135,7 +3208,7 @@
           return;
         }
         const openEps = new Set([...list.querySelectorAll('details[data-ep-id][open]')].map(d => d.getAttribute('data-ep-id')));
-        const renderOne = (e) => {
+        const renderOne = (e, inRoom) => {
           const st = STATUS_LABELS[e.status] || [e.status, 'text-slate-400 border-slate-600'];
           const canGenerateShots = e.status === 'guion_generado';
           const m = seriesModels(data.series);
@@ -3143,6 +3216,11 @@
           const clips = (e.assets || []).filter(a => a.kind === 'video_clip').length;
           const words = e.validator_report && e.validator_report.words;
           const cont = e.continuity || {};
+          const enProd = !!cont.en_produccion; // COMPUERTA: en Guiones solo se ve el guion; produciendo = workspace completo
+          const lineaDe = (sh) => (sh.dialogue && sh.dialogue[0] && sh.dialogue[0].line) || sh.voice_part || sh.scene_es || '';
+          const scriptPreview = shots.length
+            ? '<div class="space-y-1 pt-1">' + shots.map(sh => '<p class="text-[12px] text-slate-300 leading-snug"><span class="font-mono text-cyber-cyan mr-1.5">' + String(sh.n).padStart(2, '0') + '</span>' + esc(lineaDe(sh)) + '</p>').join('') + '</div>'
+            : '<p class="text-[11px] text-slate-500">Este guion todavía no tiene tomas.</p>';
           const shotsHtml = shots.length
             ? shots.map(sh =>
                 (() => {
@@ -3253,6 +3331,27 @@
             : (!busyJob && e.status === 'guion_generado')
             ? '<button onclick="produceEpisode(\'' + e.id + '\')" class="px-3 py-1.5 rounded-lg bg-cyber-pink/20 border border-cyber-pink/50 text-cyber-pink text-xs font-mono hover:bg-cyber-pink/30"><i class="fa-solid fa-bolt mr-1"></i>Producir este episodio ' + (videoProvider === 'king' ? 'en tu PC (LTX)' : 'con ' + seriesModels(lastLoadedData.series).shot.replace('veo_', 'Veo ')) + ' (~$' + estimateEpisodeCost(e).toFixed(2) + ')</button>'
             : '';
+          // COMPUERTA (Franklin oct-13): un guion no se produce directo desde Guiones; primero se MUEVE a producción.
+          const moverBtn = (e.status === 'guion_generado' && !cont.parent_episode_id) // los Shorts no se mueven solos: van con su largo
+            ? (enProd
+               ? '<button onclick="moverProduccion(\'' + e.id + '\', false)" class="px-3 py-1.5 rounded-lg border border-slate-600 text-slate-400 text-xs font-mono hover:bg-slate-700/30"><i class="fa-solid fa-arrow-left mr-1"></i>Sacar de producción</button>'
+               : '<button onclick="moverProduccion(\'' + e.id + '\', true)" class="px-3 py-1.5 rounded-lg bg-cyber-violet/20 border border-cyber-violet/50 text-cyber-violet text-xs font-mono hover:bg-cyber-violet/30"><i class="fa-solid fa-clapperboard mr-1"></i>Mover a producir</button>')
+            : '';
+          // Barra COMPACTA de acciones (botones cortos, arriba de la sala; sin bajar hasta el final). Franklin oct-13.
+          let vsecs = 0, vcost = '0.00';
+          if (isContinuous(data.series) && shots.length) {
+            const vtxt = shots.slice().sort((a, b) => a.n - b.n).flatMap(x => (x.dialogue || []).map(d => d && d.line).filter(Boolean)).join(' ').replace(/\s+/g, ' ').trim();
+            const vw = vtxt.split(' ').filter(Boolean).length; vsecs = Math.round(vw / 2.3); const vtk = vw > 420 ? 1 : 2; vcost = Math.max(0.01, vtk * (vw / 2.3) / 80 * 0.03).toFixed(2);
+          }
+          const yaVoz = !!(cont.voice && cont.voice.url);
+          const compactBar =
+            '<div class="flex flex-wrap items-center gap-2 pb-2 mb-1 border-b border-cyber-border">' +
+              (busyJob ? busyBtn :
+                ((e.status === 'guion_generado' && missingFrames) ? '<button onclick="generateAllFrames(this)" data-ep="' + e.id + '" class="px-3 py-1.5 rounded-lg bg-cyber-violet/20 border border-cyber-violet/50 text-cyber-violet text-xs font-mono hover:bg-cyber-violet/30"><i class="fa-solid fa-images mr-1"></i>Generar imágenes</button>' : '') +
+                ((isContinuous(data.series) && shots.length && !yaVoz) ? '<button onclick="genContinuousVoice(this)" data-ep="' + e.id + '" data-cost="' + vcost + '" data-secs="' + vsecs + '" class="px-3 py-1.5 rounded-lg bg-cyber-emerald/20 border border-cyber-emerald/50 text-cyber-emerald text-xs font-mono hover:bg-cyber-emerald/30"><i class="fa-solid fa-microphone mr-1"></i>Generar voz</button>' : '') +
+                ((e.status === 'guion_generado') ? '<button onclick="produceEpisode(\'' + e.id + '\')" class="px-3 py-1.5 rounded-lg bg-cyber-pink/25 border border-cyber-pink/60 text-cyber-pink text-xs font-mono hover:bg-cyber-pink/35"><i class="fa-solid fa-bolt mr-1"></i>Iniciar producción</button>' : '')
+              ) +
+            '</div>';
           return (
             '<details data-ep-id="' + e.id + '"' + (openEps.has(String(e.id)) ? ' open' : '') + ' class="bg-cyber-darker rounded-lg border border-cyber-border open:border-cyber-cyan/50">' +
               '<summary class="cursor-pointer list-none p-3 flex items-center justify-between gap-2">' +
@@ -3260,14 +3359,17 @@
                 '<span class="flex items-center gap-2 flex-shrink-0">' +
                   (clips ? '<span class="text-[10px] font-mono text-slate-400">' + clips + '/' + (shots.length || 8) + ' tomas</span>' : '') +
                   (words ? '<span class="text-[10px] font-mono text-slate-500 hidden sm:inline">' + words + ' palabras</span>' : '') +
+                  (e.status === 'guion_generado' && !cont.parent_episode_id
+                    ? '<button onclick="event.stopPropagation();event.preventDefault();moverProduccion(\'' + e.id + '\',' + (enProd ? 'false' : 'true') + ')" class="text-[10px] font-mono px-2 py-0.5 rounded border ' + (enProd ? 'border-slate-600 text-slate-400 hover:bg-slate-700/30' : 'border-cyber-violet/50 text-cyber-violet bg-cyber-violet/10 hover:bg-cyber-violet/20') + '">' + (enProd ? '\u2190 Quitar de producción' : '\u25B6 Mover a producir') + '</button>'
+                    : '') +
                   '<span class="text-[10px] font-mono px-1.5 py-0.5 rounded border ' + st[1] + '">' + st[0] + '</span>' +
                 '</span>' +
               '</summary>' +
               '<div class="px-3 pb-3 space-y-2">' +
                 (cont.summary ? '<p class="text-[11px] text-slate-400"><strong class="text-slate-300">Resumen:</strong> ' + esc(cont.summary) + '</p>' : '') +
-                shotsHtml +
+                (inRoom ? shotsHtml : scriptPreview) +
                 (cont.last_cliffhanger ? '<p class="text-[11px] text-cyber-pink"><strong>Gancho:</strong> ' + esc(cont.last_cliffhanger) + '</p>' : '') +
-                '<div class="flex flex-wrap items-center gap-2 pt-1">' + framesBtn + narrBtn + produceBtn +
+                '<div class="flex flex-wrap items-center gap-2 pt-1">' + (inRoom ? '' : moverBtn) +
                   ((e.assets || []).some(a => a.kind === 'video_clip') && e.status !== 'generando_media'
                     ? '<button onclick="vyEditor.open(\'' + e.id + '\')" class="px-3 py-1.5 rounded-lg bg-cyber-gold/10 border border-cyber-gold/40 text-cyber-gold text-xs font-mono hover:bg-cyber-gold/20"><i class="fa-solid fa-scissors mr-1"></i>Editar episodio</button>'
                     : '') + '</div>' +
@@ -3290,6 +3392,73 @@
               '<div class="p-1.5 space-y-1.5">' + ks.map(renderOne).join('') + '</div>' +
             '</details></div>';
         }).join('');
+        // SALA PRODUCIENDO: el largo en producción (no short, sin terminar) + sus shorts, con workspace completo.
+        // TIRA de PERSONAJES FIJOS (serie activa): arriba de Produciendo.
+        const stripEl = document.getElementById('personajesFijosStrip');
+        if (stripEl) {
+          const chs = data.characters || [];
+          const faltanFotos = chs.filter(c => !c.reference_image_url).length;
+          stripEl.innerHTML = (chs.length
+            ? chs.map(c => castCardHtml(c, data.episodes || [], new Set())).join('')
+            : '<p class="text-[11px] text-slate-500 italic">Aún no hay personajes fijos. Los guiones con personajes (biografías) los crean solos.</p>');
+          const gpb = document.getElementById('genPersonajesBtn');
+          if (gpb) gpb.innerHTML = faltanFotos ? '<button onclick="event.stopPropagation();event.preventDefault();generateMissingCharacterPhotos()" class="text-[10px] font-mono px-2 py-0.5 rounded bg-gradient-to-r from-cyber-cyan to-cyber-violet text-white font-bold hover:opacity-90" title="Genera las fotos de personaje que faltan"><i class="fa-solid fa-wand-magic-sparkles mr-1"></i>Generar ' + faltanFotos + ' foto' + (faltanFotos === 1 ? '' : 's') + '</button>' : '';
+        }
+        // TIRA de TOMAS FIJAS (lugares/escenas reusables) debajo de personajes. Imagen desde visual_memory.
+        const stripLoc = document.getElementById('tomasFijasStrip');
+        if (stripLoc) {
+          const locs = (data.series.story_bible && data.series.story_bible.locations) || {};
+          const vmL = (data.series.visual_memory && data.series.visual_memory.locations) || {};
+          const fx = Object.keys(locs).filter(k => k !== 'escena');
+          const faltanLoc = fx.filter(k => !((vmL[k] || {}).url)).length;
+          stripLoc.innerHTML = fx.length
+            ? fx.map(k => { const L = typeof locs[k] === 'string' ? { visual: locs[k] } : (locs[k] || {}); const img = (vmL[k] || {}).url; return '<div class="flex flex-col items-center gap-1 flex-shrink-0 w-24">' + (img ? '<button type="button" onclick="openMedia(this)" data-src="' + esc(img) + '" data-kind="image" data-title="Toma: ' + esc(k) + '"><img src="' + esc(img) + '" class="w-20 h-12 rounded-lg object-cover border border-cyber-gold/40"></button>' : '<span class="w-20 h-12 rounded-lg border border-dashed border-slate-600 flex items-center justify-center text-slate-500 text-[9px] text-center leading-tight">sin imagen</span>') + '<span class="text-[10px] text-slate-200 text-center truncate w-full" title="' + esc(L.visual || '') + '">' + esc(k) + '</span></div>'; }).join('')
+            : '<p class="text-[11px] text-slate-500 italic">Aún no hay tomas fijas. Los guiones que repiten un mismo lugar (una cárcel, una celda) las crean solos.</p>';
+          const gfb = document.getElementById('genFijasBtn');
+          if (gfb) gfb.innerHTML = faltanLoc ? '<button onclick="event.stopPropagation();event.preventDefault();generateMissingFixedLocations()" class="text-[10px] font-mono px-2 py-0.5 rounded bg-gradient-to-r from-cyber-gold to-cyber-pink text-white font-bold hover:opacity-90" title="Genera con Flow ($0) las imágenes de lugar que faltan"><i class="fa-solid fa-wand-magic-sparkles mr-1"></i>Generar ' + faltanLoc + ' imagen' + (faltanLoc === 1 ? '' : 'es') + '</button>' : '';
+        }
+        const prodWs = document.getElementById('produccionWorkspace');
+        if (prodWs) {
+          const longProd = eps.find(e => (e.continuity || {}).en_produccion && !(e.continuity || {}).parent_episode_id && e.status !== 'en_revision' && e.status !== 'publicado');
+          // Botones de acción CORTOS en la cabecera de "Produciendo" (Franklin oct-13).
+          const actEl = document.getElementById('produciendoActions');
+          if (actEl) {
+            if (!longProd) { actEl.innerHTML = ''; }
+            else {
+              const lp = longProd, lpShots = lp.shots || [], lpCont = lp.continuity || {};
+              const lpBusy = (data.agent_jobs || []).find(j => String(j.command).includes(lp.id) && /^(flow_frames|flow_cuadros|gen_local|regen_local|toma_local|claude_revisar|claude_detalle|claude_pulir|voz_continua):/.test(j.command));
+              const lpMissing = usesKeyframes(data.series) ? lpShots.filter(sh => sh.frame_stale || (!frameFor(lp, sh.n) && !clipFor(lp, sh.n))).length : 0;
+              const lpVoz = !!(lpCont.voice && lpCont.voice.url);
+              const vt = lpShots.slice().sort((a, b) => a.n - b.n).flatMap(x => (x.dialogue || []).map(d => d && d.line).filter(Boolean)).join(' ').replace(/\s+/g, ' ').trim();
+              const vww = vt.split(' ').filter(Boolean).length, vss = Math.round(vww / 2.3), vcc = Math.max(0.01, (vww > 420 ? 1 : 2) * (vww / 2.3) / 80 * 0.03).toFixed(2);
+              const stop = 'event.stopPropagation();event.preventDefault();';
+              let b = '';
+              if (lpBusy) { b = '<span class="px-3 py-1.5 rounded-lg bg-cyber-gold/10 border border-cyber-gold/50 text-cyber-gold text-xs font-mono"><i class="fa-solid fa-spinner fa-spin mr-1"></i>Trabajando…</span>'; }
+              else if (lp.status === 'guion_generado') {
+                if (lpMissing) b += '<button onclick="' + stop + 'generateAllFrames(this)" data-ep="' + lp.id + '" class="px-3 py-1.5 rounded-lg bg-cyber-violet/20 border border-cyber-violet/50 text-cyber-violet text-xs font-mono hover:bg-cyber-violet/30"><i class="fa-solid fa-images mr-1"></i>Generar imágenes</button>';
+                if (isContinuous(data.series) && lpShots.length && !lpVoz) b += '<button onclick="' + stop + 'genContinuousVoice(this)" data-ep="' + lp.id + '" data-cost="' + vcc + '" data-secs="' + vss + '" class="px-3 py-1.5 rounded-lg bg-cyber-emerald/20 border border-cyber-emerald/50 text-cyber-emerald text-xs font-mono hover:bg-cyber-emerald/30"><i class="fa-solid fa-microphone mr-1"></i>Generar voz</button>';
+                b += '<button onclick="' + stop + 'produceEpisode(\'' + lp.id + '\')" class="px-3 py-1.5 rounded-lg bg-cyber-pink/25 border border-cyber-pink/60 text-cyber-pink text-xs font-mono hover:bg-cyber-pink/35"><i class="fa-solid fa-bolt mr-1"></i>Iniciar producción</button>';
+              }
+              actEl.innerHTML = b;
+            }
+          }
+          if (!longProd) {
+            prodWs.innerHTML = '<p class="text-xs font-mono text-slate-500">Mueve un guion a producción (desde Guiones) para trabajarlo aquí.</p>';
+          } else {
+            const ksP = kids[longProd.id] || [];
+            // Lugares fijos del guion (los personajes fijos van en la TIRA de arriba). Franklin oct-13.
+            const locs = (data.series.story_bible && data.series.story_bible.locations) || {};
+            const fixedLocs = Object.keys(locs).filter(k => k !== 'escena');
+            let header = '';
+            if (fixedLocs.length) {
+              header += '<div class="rounded-lg border border-cyber-gold/30 bg-cyber-gold/5 p-3"><p class="text-[11px] font-mono text-cyber-gold mb-1"><i class="fa-solid fa-location-dot mr-1"></i>LUGARES FIJOS (' + fixedLocs.length + ')</p><p class="text-[11px] text-slate-300">' + fixedLocs.map(esc).join(' \u00b7 ') + '</p></div>';
+            }
+            if (!fixedLocs.length) { header = ''; }
+            prodWs.innerHTML = header + renderOne(longProd, true) +
+              (ksP.length ? '<details class="ml-4 rounded-lg border border-cyber-pink/30 bg-cyber-pink/5" open><summary class="cursor-pointer px-3 py-2 text-xs font-mono text-cyber-pink list-none"><i class="fa-solid fa-mobile-screen mr-1"></i>SHORTS DE ESTE VIDEO (' + ksP.length + ') \u00b7 llevan al video completo</summary><div class="p-1.5 space-y-1.5">' + ksP.map(k => renderOne(k, true)).join('') + '</div></details>' : '');
+            const d0 = prodWs.querySelector('details[data-ep-id]'); if (d0) d0.open = true;
+          }
+        }
       }
 
       // Pasos reales de la serie activa: nada fijo, todo sale de get-episodes.
@@ -3402,7 +3571,8 @@
       function renderNextEpisodeCard(data) {
         scheduleGenerationRefresh(data);
         const eps = (data.episodes || []).slice().sort((a, b) => a.episode_number - b.episode_number);
-        const next = eps.find(e => e.status === 'guion_generado');
+        // Apunta al episodio EN PRODUCCIÓN (el de la sala); si no hay, al siguiente guion_generado. Producir = todo el grupo (largo+shorts). Franklin oct-13.
+        const next = eps.find(e => (e.continuity || {}).en_produccion && !(e.continuity || {}).parent_episode_id && e.status !== 'en_revision' && e.status !== 'publicado') || eps.find(e => e.status === 'guion_generado');
         const generating = eps.find(e => e.status === 'generando_media');
         const btn = document.getElementById('nextEpBtn');
         const title = document.getElementById('nextEpTitle');
@@ -3566,14 +3736,101 @@
             '<div class="flex justify-between items-center"><h3 class="font-display font-bold text-white">🧠 Memoria de Claude</h3><button onclick="document.getElementById(\'memModal\').classList.add(\'hidden\')" class="text-slate-400 hover:text-white">✕</button></div>' +
             '<p class="text-[11px] text-slate-400 mt-1">Lo que Claude aprendió y usa SIEMPRE al escribir guiones, prompts de imagen y movimiento, y al corregir tomas. Aprende solo de tus ✗, de tus ediciones y de los arreglos que funcionan.' + (d.pendientes ? ' <span class="text-cyber-gold">' + d.pendientes + ' lección(es) nuevas por aprender.</span>' : '') + '</p>' +
             (d.history && d.history[0] ? '<p class="text-[11px] text-cyber-emerald mt-2">Último aprendizaje: ' + esc(d.history[0].aprendido || '') + '</p>' : '') +
-            '<ol class="mt-3 space-y-2">' + (d.rules || []).map((r, i) => '<li class="flex gap-2 items-start border-b border-cyber-border pb-2"><span class="text-cyber-violet font-mono text-xs mt-0.5">' + (i + 1) + '</span><div class="flex-1"><p class="text-slate-100 text-[13px]">' + esc(r.regla) + '</p>' + (r.por_que ? '<p class="text-[10px] text-slate-500">' + esc(r.por_que) + '</p>' : '') + '</div><button data-i="' + i + '" class="memDel text-[10px] text-cyber-pink hover:underline" title="Borrar esta regla">borrar</button></li>').join('') + '</ol>' +
+            '<div id="cerebroBox" class="mt-3 rounded-lg border border-cyber-cyan/30 bg-cyber-cyan/5 p-3"><p class="text-[11px] font-mono text-slate-400"><i class="fa-solid fa-spinner fa-spin mr-1"></i>Cargando el cerebro...</p></div>' +
+            '<p class="text-[11px] font-mono text-cyber-violet mt-4">REGLAS DE LA MEMORIA (tus correcciones)</p>' +
+            '<ol class="mt-3 space-y-2">' + (d.rules || []).map((r, i) => '<li class="flex gap-2 items-start border-b border-cyber-border pb-2"><span class="text-cyber-violet font-mono text-xs mt-0.5">' + (i + 1) + '</span><div class="flex-1"><p class="text-slate-100 text-[13px]">' + esc(r.regla) + (r.estado === 'evaluando' ? ' <span class="text-[9px] font-mono text-cyber-gold border border-cyber-gold/40 rounded px-1">⏳ el cerebro la está evaluando</span>' : r.estado === 'en_disputa' ? ' <span class="text-[9px] font-mono text-cyber-pink border border-cyber-pink/40 rounded px-1">⚖️ el cerebro objetó (ver arriba)</span>' : r.forzada ? ' <span class="text-[9px] font-mono text-cyber-violet border border-cyber-violet/40 rounded px-1">experimento: la forzaste</span>' : '') + '</p>' + (r.por_que ? '<p class="text-[10px] text-slate-500">' + esc(r.por_que) + '</p>' : '') + '</div><button data-i="' + i + '" class="memDel text-[10px] text-cyber-pink hover:underline" title="Borrar esta regla">borrar</button></li>').join('') + '</ol>' +
             '<div class="mt-3 flex gap-2"><input id="memAdd" class="flex-1 bg-black border border-cyber-border rounded px-2 py-1 text-[13px] text-slate-100" placeholder="Agregar una regla tuya (ej.: los mapas siempre vistos desde arriba)"><button id="memAddBtn" class="px-3 py-1 rounded border border-cyber-violet/50 text-cyber-violet text-xs font-mono">Agregar</button></div>' +
             '<details class="mt-4"><summary class="text-[11px] text-slate-400 cursor-pointer">De dónde aprendió (últimas lecciones)</summary><ul class="mt-2 space-y-1">' + (d.lecciones || []).map(l => '<li class="text-[11px] text-slate-400">• <b class="text-slate-300">' + esc(srcName[l.source] || l.source) + '</b>' + (l.toma ? ' · toma ' + l.toma : '') + ': ' + esc(l.motivo || l.problema || (l.despues ? JSON.stringify(l.despues).slice(0, 160) : '')) + (l.consolidated ? '' : ' <span class="text-cyber-gold">(nueva)</span>') + '</li>').join('') + '</ul></details></div>';
           m.querySelectorAll('.memDel').forEach(b => b.onclick = async () => { if (!confirm('¿Borrar esta regla de la memoria de Claude?')) return; try { await post({ delete: Number(b.dataset.i) }); openMemoria(); } catch (e) { alert(e.message); } });
           document.getElementById('memAddBtn').onclick = async () => { const v = document.getElementById('memAdd').value.trim(); if (!v) return; try { await post({ add: v }); openMemoria(); } catch (e) { alert(e.message); } };
+          renderCerebro(document.getElementById('cerebroBox'));
         } catch (e) { m.innerHTML = '<div class="bg-cyber-darker rounded-xl p-4 mt-6 text-cyber-pink text-sm">No pude cargar la memoria: ' + esc(e.message) + '</div>'; }
       };
 
+      // 🧠 CEREBRO (oct-14): aprende con EVIDENCIA. Las reglas las deciden los números (casos, ≥2 episodios, tasa vs base);
+      // el análisis de Claude solo opina. También muestra lo que decidió el especialista en cada reparación.
+      async function renderCerebro(box) {
+        if (!box) return;
+        let d;
+        try { d = await (await fetch('/.netlify/functions/cerebro', { cache: 'no-store' })).json(); } catch (e) { box.innerHTML = '<p class="text-[11px] text-cyber-pink">No pude cargar el cerebro: ' + esc(e.message) + '</p>'; return; }
+        const doc = d.doc;
+        let objs = { pendientes: [], recientes: [] };
+        try { objs = await (await fetch('/.netlify/functions/objeciones', { cache: 'no-store' })).json(); } catch (_) {}
+        const TIPO = { toma: 'Cambio en una toma', regla: 'Regla nueva tuya', leccion: 'Corrección tuya' };
+        const objHtml = (objs.pendientes || []).length
+          ? '<div class="mt-2 rounded-lg border border-cyber-pink/50 bg-cyber-pink/5 p-2"><p class="text-[10px] font-mono text-cyber-pink">⚖️ NO ESTOY DE ACUERDO CON ESTO (' + objs.pendientes.length + ') — tú decides</p>' +
+            objs.pendientes.map(o => '<div class="mt-2 border-t border-cyber-border/60 pt-2"><p class="text-[11px] text-slate-400">' + esc(TIPO[o.tipo] || o.tipo) + (o.ep_num ? ' · EP' + o.ep_num + ' T' + o.n : '') + '</p>' +
+              '<p class="text-[12px] text-slate-100">' + esc(o.pedido || '') + '</p>' +
+              '<p class="text-[11px] text-slate-300 mt-1 whitespace-pre-line">' + esc(o.resumen || '') + '</p>' +
+              (o.propuesta ? '<p class="text-[11px] text-cyber-emerald mt-1">💡 ' + esc(o.propuesta) + '</p>' : '') +
+              '<div class="flex flex-wrap gap-2 mt-2">' +
+                '<button class="obBtn text-[10px] font-mono px-2 py-1 rounded border border-cyber-emerald/50 text-cyber-emerald" data-id="' + o.id + '" data-d="descartar">Tienes razón</button>' +
+                (o.propuesta_regla ? '<button class="obBtn text-[10px] font-mono px-2 py-1 rounded border border-cyber-cyan/50 text-cyber-cyan" data-id="' + o.id + '" data-d="propuesta">Usa tu propuesta</button>' : '') +
+                '<button class="obBtn text-[10px] font-mono px-2 py-1 rounded border border-cyber-pink/50 text-cyber-pink" data-id="' + o.id + '" data-d="forzar">Hazlo igual</button>' +
+              '</div></div>').join('') + '</div>'
+          : '';
+        const FZ = (doc && doc.forzados) || { n: 0, bien: 0 };
+        const fzHtml = FZ.n ? '<p class="text-[11px] text-cyber-violet mt-2">⚖️ Tus cambios forzados contra mi objeción: ' + FZ.n + ' · salieron bien ' + FZ.bien + ' (' + Math.round(100 * FZ.bien / FZ.n) + '%). Si salen bien, era yo el que se equivocaba.</p>' : '';
+        const btns = '<div class="flex flex-wrap gap-2 mt-2"><button id="cbPensar" class="text-[10px] font-mono px-2 py-1 rounded border border-cyber-cyan/50 text-cyber-cyan hover:bg-cyber-cyan/10"><i class="fa-solid fa-brain mr-1"></i>Pensar ahora</button><button id="cbCargar" class="text-[10px] font-mono px-2 py-1 rounded border border-slate-600 text-slate-300 hover:text-white"><i class="fa-solid fa-rotate mr-1"></i>Recargar historial</button></div>';
+        const head = '<p class="text-[12px] font-display font-bold text-white">🧠 Cerebro <span class="text-[10px] font-mono font-normal text-slate-400">aprende con evidencia, no con casos sueltos</span></p>';
+        if (!doc || !doc.patterns) { box.innerHTML = head + objHtml + '<p class="text-[11px] text-slate-400 mt-1">Todavía no ha pensado. Dale "Recargar historial" para que lea los veredictos que ya existen.</p>' + btns; wireCb(box); return; }
+        const pc = (x) => Math.round((x || 0) * 100) + '%';
+        const row = (p, color) => '<li class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 py-1 border-b border-cyber-border/60"><span class="text-[12px] text-slate-100 flex-1 min-w-[160px]">' + esc(p.label) + '</span>' +
+          '<span class="text-[10px] font-mono ' + color + '">falla ' + pc(p.rate) + ' · ' + (p.lift || 0).toFixed(1) + '× prom.</span>' +
+          '<span class="text-[10px] font-mono text-slate-500">n=' + p.n + ' · ' + (p.eps_mal || 0) + '↑/' + (p.eps_bien || 0) + '↓ ep.' + (p.reintento && p.reintento.n >= 5 ? ' · reintentar sirve ' + pc(p.reintento.util) : '') + '</span></li>';
+        const act = doc.patterns.filter(p => p.state === 'activa'), good = doc.patterns.filter(p => p.state === 'funciona'), deg = doc.patterns.filter(p => p.state === 'degradada');
+        const obs = doc.patterns.filter(p => p.state === 'observacion' && p.n >= 5 && (p.lift >= 1.2 || p.lift <= 0.8)).slice(0, 10);
+        const J = { i: 'imagen', s: 'realismo', a: 'acción', h: 'humo', b: 'roto' };
+        const judge = Object.entries(doc.judge || {}).filter(([, v]) => v.revisadas).map(([k, v]) => J[k] + ': ' + v.falsos_positivos + '/' + v.revisadas + ' los aprobaste igual' + (v.usable ? ' (fiable ' + pc(v.fiabilidad) + ')' : ' — aún no usable'));
+        const R = doc.reintentos || {};
+        const epNum = (id) => { const e = ((lastLoadedData && lastLoadedData.episodes) || []).find(x => x.id === id); return e ? 'EP' + e.episode_number : 'ep'; };
+        const MODE = { azar: '🎲 azar', patron: '🎯 patrón', estructura: '🏗️ estructura', nuevo: '✏️ mínimo', seguro: '🛟 seguro', humano: '🙋 para ti', no_fiable: '⚖️ QA no fiable', conservar_mejor: '🏆 se quedó el mejor', partir: '✂️ partir' };
+        box.innerHTML = head + objHtml + fzHtml +
+          '<p class="text-[11px] text-slate-400 mt-1">' + doc.casos + ' tomas en primer intento · falla promedio <b class="text-slate-200">' + pc(doc.base) + '</b>' + (R.n ? ' · de ' + R.n + ' reintentadas, siguen mal ' + pc(R.siguen_mal / R.n) : '') + '. Una regla solo se activa con ≥' + ((doc.umbrales || {}).MIN_N || 8) + ' casos, en ≥' + ((doc.umbrales || {}).MIN_EPS || 2) + ' episodios y fallando ≥' + ((doc.umbrales || {}).PROMOTE_LIFT || 1.5) + '× el promedio.</p>' +
+          (act.length ? '<p class="text-[10px] font-mono text-cyber-pink mt-2">REGLAS ACTIVAS (se le dicen al guionista)</p><ul>' + act.map(p => row(p, 'text-cyber-pink')).join('') + '</ul>' : '<p class="text-[11px] text-slate-500 mt-2">Sin reglas activas todavía: nada se repite en suficientes episodios como para ser regla.</p>') +
+          (good.length ? '<p class="text-[10px] font-mono text-cyber-emerald mt-2">LO QUE FUNCIONA</p><ul>' + good.map(p => row(p, 'text-cyber-emerald')).join('') + '</ul>' : '') +
+          (deg.length ? '<p class="text-[10px] font-mono text-slate-500 mt-2">DEGRADADAS (dejaron de fallar más que el promedio)</p><ul>' + deg.map(p => row(p, 'text-slate-400')).join('') + '</ul>' : '') +
+          (obs.length ? '<details class="mt-2"><summary class="text-[10px] font-mono text-slate-400 cursor-pointer">EN OBSERVACIÓN (' + obs.length + ') — pistas, todavía no reglas</summary><ul>' + obs.map(p => row(p, 'text-cyber-gold')).join('') + '</ul></details>' : '') +
+          (judge.length ? '<p class="text-[10px] text-slate-500 mt-2"><b>Juez del QA:</b> ' + esc(judge.join(' · ')) + '</p>' : '') +
+          (doc.analisis && doc.analisis.resumen ? '<details class="mt-2"><summary class="text-[10px] font-mono text-cyber-violet cursor-pointer">ANÁLISIS DE CLAUDE (solo opina, no cambia reglas)</summary><p class="text-[11px] text-slate-300 mt-1">' + esc(doc.analisis.resumen) + '</p><ul class="mt-1">' + (doc.analisis.hipotesis || []).map(h => '<li class="text-[11px] text-slate-400">• ' + esc(h) + '</li>').join('') + (doc.analisis.confusiones || []).map(h => '<li class="text-[11px] text-cyber-gold">• se confunden: ' + esc(h) + '</li>').join('') + (doc.analisis.experimentos || []).map(h => '<li class="text-[11px] text-cyber-cyan">• probar: ' + esc(h) + '</li>').join('') + '</ul></details>' : '') +
+          ((d.diario || []).length ? '<details class="mt-2"><summary class="text-[10px] font-mono text-slate-400 cursor-pointer">DIARIO DEL ESPECIALISTA (últimas decisiones)</summary><ul class="mt-1 space-y-0.5">' + d.diario.slice(0, 15).map(x => '<li class="text-[11px] text-slate-400"><span class="font-mono text-slate-500">' + epNum(x.ep) + ' T' + x.n + '</span> ' + (MODE[x.mode] || x.mode) + ' — ' + esc(x.why || '') + '</li>').join('') + '</ul></details>' : '') +
+          ((doc.history || []).length ? '<p class="text-[10px] text-slate-500 mt-2">Último cambio de opinión: ' + esc(((doc.history[doc.history.length - 1] || {}).cambios || []).slice(0, 4).map(c => c.label + ' ' + c.de + '→' + c.a).join(' · ')) + '</p>' : '') +
+          btns;
+        wireCb(box);
+      }
+      async function decidirObjecion(id, decision, box) {
+        const k = (() => { try { return localStorage.getItem('vyrales_key'); } catch (_) { return null; } })();
+        const H = Object.assign({ 'Content-Type': 'application/json' }, k ? { 'x-vyrales-key': k } : {});
+        try {
+          const d = await (await fetch('/.netlify/functions/objeciones', { cache: 'no-store' })).json();
+          const o = (d.pendientes || []).find(x => x.id === id);
+          if (decision === 'forzar' && o && o.tipo === 'toma' && o.cambio) {
+            // "Hazlo igual" en una toma: se reenvía el cambio por la MISMA puerta con forzar (queda como experimento).
+            const r = await fetch('/.netlify/functions/' + o.cambio.endpoint, { method: 'POST', headers: H, body: JSON.stringify(Object.assign({}, o.cambio.body, { forzar: true, objecion_id: id })) });
+            if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(j.error || r.status); }
+          } else {
+            const r = await fetch('/.netlify/functions/objeciones', { method: 'POST', headers: H, body: JSON.stringify({ id, decision }) });
+            if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(j.error || r.status); }
+          }
+        } catch (e) { return alert('No se pudo: ' + e.message); }
+        refreshObjPill(); renderCerebro(box);
+      }
+      function wireCb(box) {
+        box.querySelectorAll('.obBtn').forEach(b => b.onclick = () => { b.disabled = true; decidirObjecion(b.dataset.id, b.dataset.d, box); });
+        const go = async (cmd, btn) => { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>En tu PC...'; try { await agentOrder(cmd); } catch (e) { alert('No se pudo mandar a la PC: ' + e.message); } setTimeout(() => renderCerebro(box), 25000); };
+        const a = box.querySelector('#cbPensar'), b = box.querySelector('#cbCargar');
+        if (a) a.onclick = () => go('cerebro_pensar', a);
+        if (b) b.onclick = () => go('cerebro_cargar', b);
+      }
+
+      window.moverProduccion = async function(episodeId, on) {
+        try {
+          const r = await fetch('/.netlify/functions/mover-produccion', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ episode_id: episodeId, on: on !== false }) });
+          const j = await r.json();
+          if (!r.ok) return alert(j.error || ('Error ' + r.status));
+        } catch (err) { return alert('No se pudo mover: ' + err.message); }
+        loadDashboard();
+      };
       window.produceEpisode = async function(episodeId) {
         const ep = await freshEpisodeOrBlock(episodeId);
         if (!ep) return;
@@ -3867,7 +4124,9 @@
           input.classList.toggle('hidden', !o.input);
           input.value = '';
           cancel.classList.toggle('hidden', !!o.notice);
-          okBtn.textContent = o.notice ? 'Entendido' : (o.input ? 'Confirmar' : 'Sí, continuar');
+          okBtn.textContent = o.okText || (o.notice ? 'Entendido' : (o.input ? 'Confirmar' : 'Sí, continuar'));
+          if (!cancel.dataset.def) cancel.dataset.def = cancel.textContent;
+          cancel.textContent = o.cancelText || cancel.dataset.def;
           const done = v => { m.classList.add('hidden'); document.removeEventListener('keydown', onKey); resolve(v); };
           const ok = () => done(o.input ? input.value : true);
           const no = () => done(o.input ? null : !!o.notice);
@@ -3887,6 +4146,33 @@
         });
       }
       window.askConfirm = (message) => openDialog(message);
+      // 🧠 OBJECIONES (regla de Franklin oct-14): el cerebro puede decir que NO a un cambio con datos y una mejor solución.
+      // Franklin conserva la última palabra ("Hazlo igual") y eso se mide como experimento (¿quién tenía razón?).
+      window.cerebroObjeta = async function (ob) {
+        const go = await openDialog('🧠 El cerebro NO está de acuerdo con este cambio:\n\n' + (ob.resumen || '') + (ob.propuesta ? '\n\nMejor solución: ' + ob.propuesta : '') + '\n\n¿Lo hago igual? Quedará como experimento y el cerebro medirá quién tenía razón.', { okText: 'Hazlo igual', cancelText: 'Tienes razón, no lo hagas' });
+        if (!go && ob.id) { try { const k = (() => { try { return localStorage.getItem('vyrales_key'); } catch (_) { return null; } })(); await fetch('/.netlify/functions/objeciones', { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, k ? { 'x-vyrales-key': k } : {}), body: JSON.stringify({ id: ob.id, decision: 'descartar' }) }); } catch (_) {} }
+        refreshObjPill();
+        return go;
+      };
+      window.vyToast = function (html, ms) {
+        let t = document.getElementById('vyToast');
+        if (!t) { t = document.createElement('div'); t.id = 'vyToast'; t.className = 'fixed left-1/2 -translate-x-1/2 bottom-20 z-50 max-w-[92vw] sm:max-w-xl rounded-xl border border-cyber-gold/50 bg-cyber-darker/95 px-4 py-3 text-[12px] text-slate-100 shadow-lg'; document.body.appendChild(t); }
+        t.innerHTML = html; t.classList.remove('hidden'); clearTimeout(t._h); t._h = setTimeout(() => t.classList.add('hidden'), ms || 12000);
+        t.onclick = () => t.classList.add('hidden');
+      };
+      window.cerebroAviso = function (av) { if (av && av.resumen) vyToast('🧠 <b>Aviso del cerebro</b> (lo guardé igual):<br>' + esc(av.resumen).replace(/\n/g, '<br>') + (av.propuesta ? '<br><span class="text-cyber-gold">Sugerencia: ' + esc(av.propuesta) + '</span>' : '')); };
+      async function refreshObjPill() {
+        try {
+          const d = await (await fetch('/.netlify/functions/objeciones', { cache: 'no-store' })).json();
+          const n = (d.pendientes || []).length;
+          let p = document.getElementById('cbPill');
+          if (!p) { p = document.createElement('button'); p.id = 'cbPill'; p.type = 'button'; p.className = 'hidden fixed bottom-4 right-4 z-40 rounded-full border border-cyber-pink/60 bg-cyber-darker/95 px-3 py-2 text-[12px] font-mono text-cyber-pink shadow-lg hover:bg-cyber-pink/10'; p.onclick = () => openMemoria(); document.body.appendChild(p); }
+          p.innerHTML = '🧠 ' + n + (n === 1 ? ' objeción' : ' objeciones') + ' del cerebro';
+          p.classList.toggle('hidden', !n);
+        } catch (_) {}
+      }
+      window.refreshObjPill = refreshObjPill;
+      setTimeout(refreshObjPill, 2500); setInterval(refreshObjPill, 90000);
       window.askText = (message) => openDialog(message, { input: true });
       // Los alert() del navegador también se pueden bloquear en silencio: se muestran en el modal.
       window.alert = (message) => { openDialog(String(message), { notice: true }); };

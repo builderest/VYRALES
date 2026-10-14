@@ -38,7 +38,18 @@ async function createCharacterPhoto(supabase, { series, character, allCharacters
     : prompt;
 
   log('generando foto de', character.name, references.length ? `(con ${references.length} referencia(s) de estilo)` : '');
-  const img = await generateImage({ prompt: fullPrompt, references });
+  // SIEMPRE con Flow cuando se corre en la PC con serie Flow (Franklin oct-13): $0 y baja la ORIGINAL (=s0, resolución completa) para que sirva de referencia en los prompts del video. Si no, Gemini.
+  let img = null;
+  if (process.env.VYRALES_LOCAL_RUN && series.story_bible && series.story_bible.image_engine === 'flow') {
+    const path = require('path');
+    let flowImage = null;
+    for (const p of [path.join(__dirname, '..', '..', 'agente', 'flow_imagenes.js'), path.join(process.cwd(), 'agente', 'flow_imagenes.js')]) { try { flowImage = require(p).flowImage; break; } catch (_) {} }
+    if (flowImage) {
+      try { const f = await flowImage({ prompt: fullPrompt, refs: references, aspect: (series.story_bible.aspect === '16:9') ? '16:9' : '9:16' }); img = { buffer: f.buffer, mimeType: f.mimeType || 'image/jpeg', costUsd: 0, model: 'flow' }; log('  foto con Google Flow ($0, resolución completa)'); }
+      catch (e) { log('  Flow falló (' + String(e.message).slice(0, 100) + ') → Gemini'); }
+    }
+  }
+  if (!img) img = await generateImage({ prompt: fullPrompt, references });
   await logSpend(supabase, { seriesId: series.id, kind: 'character', model: img.model, costUsd: img.costUsd, note: character.name });
 
   await ensureMediaBucket(supabase);

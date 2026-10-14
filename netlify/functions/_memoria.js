@@ -63,22 +63,16 @@ async function memoryBlock(sb) {
   const propias = ((await getRules(sb)).rules || []);
   const seen = new Set();
   const all = [];
-  for (const x of generales.concat(propias)) { const t = x && x.regla; if (t && !seen.has(t)) { seen.add(t); all.push(t); } }
+  // Reglas "evaluando" (recién agregadas) o "en_disputa" (el cerebro objetó) todavía NO se usan.
+  for (const x of generales.concat(propias)) { const t = x && !x.estado && x.regla; if (t && !seen.has(t)) { seen.add(t); all.push(t); } }
   let block = ident;
   if (all.length) {
     block += 'MEMORIA PROFESIONAL (lo que aprendiste de producciones anteriores y de las correcciones de Franklin; cúmplelo siempre):\n' +
       all.map((t, i) => `${i + 1}. ${t}`).join('\n') + '\n\n';
   }
-  // Ejemplos CONCRETOS recientes de fallos de LTX y cómo se arreglaron (para no repetir los mismos errores).
-  try {
-    const lec = await readJson(sb, 'lecciones.json', []);
-    const fixes = lec.filter((l) => l && l.source === 'qa_arreglo' && l.problema).slice(-6);
-    const fails = lec.filter((l) => l && l.source === 'qa_falla' && l.problema).slice(-4);
-    const fx = fixes.map((l) => '- Falló: ' + String(l.problema).slice(0, 140) + (l.solucion ? ' → se arregló con: ' + [l.solucion.camara && ('cámara "' + l.solucion.camara + '"'), l.solucion.accion && ('acción "' + String(l.solucion.accion).slice(0, 80) + '"')].filter(Boolean).join(', ') : ''));
-    const ff = fails.map((l) => '- Costó mucho (3 intentos): ' + String(l.problema).slice(0, 140));
-    const ej = fx.concat(ff);
-    if (ej.length) block += 'ERRORES RECIENTES DE LTX QUE NO DEBES REPETIR (escribe la cámara y la acción para evitarlos desde la primera toma):\n' + ej.join('\n') + '\n\n';
-  } catch (_) {}
+  // 🧠 CEREBRO (oct-14): en vez de las últimas fallas sueltas (anécdotas que podían ser casos aislados), van SOLO
+  // las reglas COMPROBADAS con evidencia (casos mínimos, ≥ 2 episodios, tasa de falla vs la base) y lo que funciona.
+  try { block += await require('./_cerebro').cerebroBlock(sb); } catch (_) {}
   return block;
 }
 module.exports = { readJson, writeJson, addLesson, getRules, memoryBlock, identidad };

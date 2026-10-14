@@ -148,7 +148,7 @@ async function createLocationImage(supabase, { seriesId, slug, storyBible, key, 
   await logSpend(supabase, { seriesId, kind: 'location', model: img.model, costUsd: img.costUsd, note: key });
   await ensureMediaBucket(supabase);
   const ext = img.mimeType.includes('jpeg') ? 'jpg' : 'png';
-  const url = await uploadFile(supabase, { path: `${slug}/locations/${key}-v${Date.now()}.${ext}`, buffer: img.buffer, contentType: img.mimeType });
+  const url = await uploadFile(supabase, { path: `${slug}/locations/${String(key).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z0-9_-]+/g, '_')}-v${Date.now()}.${ext}` /* sin tildes ni espacios: Supabase rechaza 'Túnel del Altiplano' (oct-14) */, buffer: img.buffer, contentType: img.mimeType });
   // Se relee justo antes de guardar (por si otro lugar se generó en paralelo).
   const { data: fresh } = await supabase.from('series').select('visual_memory').eq('id', seriesId).single();
   const vm = Object.assign({ locations: {} }, (fresh && fresh.visual_memory) || {});

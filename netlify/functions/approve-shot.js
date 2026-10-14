@@ -31,6 +31,8 @@ exports.handler = async (event) => {
       .single();
 
     if (error) throw error;
+    // 🧠 Aprobación INDIVIDUAL = Franklin revisó ESTA toma → evidencia para el cerebro (no bloquea si falla).
+    try { if (data && data.kind === 'video_clip') await require('./_cerebro').franklinLive(supabase, { episodeId: data.episode_id, shotNumber: data.shot_number, clipId: data.id, ok: true }); } catch (_) {}
     return { statusCode: 200, body: JSON.stringify({ asset: data }) };
   } catch (err) {
     return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
