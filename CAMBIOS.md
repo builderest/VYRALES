@@ -443,3 +443,20 @@ experimento (`doc.forzados`: ¿quién tenía razón?).
 - **Datos del otro canal:** (1) la caché de 3 min ahora se invalida en cuanto cambia una cuenta conectada del canal (antes,
   tras reconectar Facebook de MindFuel→VYRALES, seguía mostrando lo viejo hasta 3 min); (2) el índice de episodios que
   etiqueta los videos por serie/tema solo usa episodios del canal (antes mezclaba todos: MindFuel ahora 0, VYRALES 67).
+
+## 2026-10-14 16:45 — QA de EP25 terminado (11:40 AM Texas)
+- QA terminó y unió el video (578.3 s). Quedaron 9 tomas que el juez marcó mal; revisadas a ojo:
+  - Bien → aprobadas por mí con nota: T8, T93, T95, T102, T107, T112.
+  - Mal de verdad → rehaciendo con `regen_local:…:39,94,116` (job bb6eca9e): T39 (la pila de paquetes se vuelve una pared),
+    T94 (preso mirando a cámara en pasillo que debía estar vacío), T116 (el jet con hélices fantasma gigantes).
+  - T120 ya quedó bien (hombre de traje en la mesa de madera, sala de juicio). T142 bien (sierra al atardecer).
+- render_full (calidad completa) cancelado: se rehace al terminar el regen para incluir las 3 tomas nuevas.
+- **17:20 —** regen de T39/T94/T116 terminado y video unido de nuevo (581.2 s). T39 ✓, T116 ✓ (2º intento). T94 seguía mal.
+  **CAUSA de T94:** la toma tenía `characters: ["El Chapo"]` aunque la imagen pide un pasillo VACÍO → Flow recibía la foto
+  de la cara y metía al preso en primer plano. Quitado el personaje y rehecha con cuadro nuevo (`regen_local:…:94:94`).
+  **PENDIENTE guionista/pre-vuelo:** asignar `characters` SOLO si la persona se ve en la imagen (12 tomas de EP25 tienen
+  personaje + "empty" en el prompt: revisar el patrón en el próximo documental).
+- **17:50 —** T94 rehecha: pasillo vacío con el guardia al fondo ✅ (aprobada). **0 tomas marcadas mal en EP25.**
+  Video unido final-v1791998684432 (9:41, 581 s) revisado: 24 cuadros repartidos coherentes, audio −17 dB medio sin silencios
+  >1.5 s, sin congelados >2 s. Lanzado `render_full` (calidad completa, 770b1484) y los 3 Shorts con `short_reusar`
+  (EP26 9cc4b11a, EP27 64444d09, EP28 3443c79a).
