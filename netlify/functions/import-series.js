@@ -50,6 +50,33 @@ function summarize(data, validation, existingSeries) {
   };
 }
 
+// oct-14 (Franklin: "en el canal 2 le di a crear un guion y no se mostró"): el guionista genera slugs del sistema
+// ("cibertales_*"), que ya son del canal principal → en otro canal la importación chocaba (409) y el guion no
+// aparecía. En un canal, esos slugs pasan a ser del canal ("mindfuel_rise_curiosidades_completa") y, si el canal
+// es en inglés (su identidad lo dice), la serie queda en inglés: idioma, estilo del narrador y tarjeta final.
+const NARRADOR_EN = 'Deep, calm, commanding American English documentary narrator: serious, intense and cinematic, with weight on every sentence and short pauses before each reveal. Never cheesy, never like a commercial. Keep the SAME energy from the start to the end of every sentence: never fade or drop the voice at the end.';
+async function adaptarAlCanal(sb, data, T) {
+  try {
+    const ws = T.currentWs();
+    if (!ws || ws === T.ADMIN_WS || !data || !/^cibertales_/.test(String(data.slug || ''))) return;
+    const { data: w } = await sb.from('workspaces').select('name, settings').eq('id', ws).maybeSingle();
+    if (!w) return;
+    const base = String(w.name || 'canal').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || ('canal_' + ws.slice(0, 8));
+    const completa = /_completa$/.test(data.slug);
+    data.slug = data.slug.replace(/^cibertales/, base);
+    const ident = String((w.settings && (w.settings.idioma || w.settings.identidad)) || '');
+    const en = /\ben\b|english|ingl[eé]s/i.test(ident);
+    data.title = w.name + (en ? (completa ? ' · Full stories' : ' · Shorts') : (completa ? ' · Historias completas' : ' · Shorts'));
+    if (!en) return;
+    data.language = 'en';
+    const sb2 = data.story_bible = data.story_bible || {};
+    sb2.narration = Object.assign({}, sb2.narration || {}, { style: NARRADOR_EN });
+    if (sb2.extras && sb2.extras.Narrador) sb2.extras.Narrador = Object.assign({}, sb2.extras.Narrador, { voice: 'a deep, calm, commanding adult documentary narrator voice in natural American English' });
+    if (sb2.end_card) sb2.end_card = Object.assign({}, sb2.end_card, { text: 'SUBSCRIBE', subtext: completa ? 'A new story every week' : 'Follow for the full story', voice: '' });
+    if (data.synopsis) data.synopsis = (completa ? 'Full-length stories (8–15 min) for YouTube: ' : 'Shorts: ') + w.name + '.';
+  } catch (_) {}
+}
+
 exports.handler = async (event) => {
   try {
     const qs = event.queryStringParameters || {};
@@ -122,9 +149,10 @@ exports.handler = async (event) => {
       return json(400, { error: 'Manda { slug } o { series: {...} }.' });
     }
 
-    const validation = validateSeries(data);
     const T = require('./_tenant');
     const tenancy = await T.tenancyOn(supabase);
+    if (tenancy) await adaptarAlCanal(supabase, data, T); // oct-14: guiones del guionista en un canal → serie PROPIA del canal
+    const validation = validateSeries(data);
     const { data: existingSeries } = await supabase.from('series').select(tenancy ? 'id, title, story_bible, workspace_id' : 'id, title, story_bible').eq('slug', data.slug || '').maybeSingle();
     // MULTIUSUARIO: el "slug" es único en todo el sistema. Si ya lo usa OTRA cuenta, no se toca (ni se dice de quién es).
     if (tenancy && existingSeries && existingSeries.workspace_id !== T.currentWs()) {

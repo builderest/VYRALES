@@ -463,3 +463,17 @@ experimento (`doc.forzados`: ¿quién tenía razón?).
 - **12:48 Texas —** `render_full` EP25 listo: 1920x1080, 581 s, 548 MB. Shorts listos (720x1280, revisados a ojo con 12 cuadros
   c/u, sin silencios ni congelados, −17 dB): EP26 61.9 s, EP27 58.5 s, EP28 53.3 s, todos cierran con "historia completa 👇".
   **Producción El Chapo terminada.**
+
+## 2026-10-14 (tarde) — canales: guion que no aparecía y redes "no conectadas"
+- **Guion de MindFuel no aparecía:** el guionista crea series con slugs del sistema (`cibertales_*`), que ya son del canal
+  principal → en otro canal `import-series` respondía 409 y no se creaba nada. Ahora (`adaptarAlCanal` en
+  `import-series.js`) en un canal esos slugs pasan a ser del canal (`mindfuel_rise_curiosidades_completa`) y, si la
+  identidad del canal es en inglés, la serie queda en inglés (language `en`, narrador en inglés americano, tarjeta final
+  SUBSCRIBE). `import-largo.js` usa el slug real que devuelve la importación (y los Shorts apuntan a él).
+  Probado en local con el guion `largo-mv8b3disj3he` (Tom Daley): serie "MindFuel Rise · Full stories" con el largo (EP1)
+  y 3 Shorts (EP2–4) en MindFuel.
+- **Inicio decía "redes no conectadas" en un canal sin series:** `dashboard.html` salía antes de leer `social-status`
+  y `sinNovela()` pintaba "Conectar tus redes" fijo. Ahora se leen las redes igual y `pintarRedes()` (panel.js) pinta
+  el estado real del canal.
+- Pendiente (no tocado): el 🧠 cerebro (evidencia de fallas de LTX) es por canal → MindFuel empieza en cero; las 32
+  reglas generales sí las comparte.

@@ -568,7 +568,23 @@
     var rows = $('vyEpRows'); if (rows) rows.innerHTML = '<tr><td class="vy-td text-slate-400" colspan="5">Todavía no hay episodios.</td></tr>';
     var w = $('vyWork'); if (w) w.innerHTML = '<span class="vy-lab">Trabajando ahora</span><strong class="text-[15px] font-semibold text-slate-300">Nada en proceso</strong>';
     var q = $('vyQueue'); if (q) q.innerHTML = '<p class="text-sm text-slate-400">No hay trabajos pendientes.</p>';
-    var n = $('vyNets'); if (n) n.innerHTML = '<button type="button" class="vy-link" onclick="openSocialModal()">Conectar tus redes</button>';
+    pintarRedes(); // oct-14: el canal puede tener redes conectadas aunque todavía no tenga series
+  }
+
+  // Redes conectadas (del canal activo)
+  function pintarRedes() {
+    var nets = $('vyNets');
+    if (nets) {
+      var acc = ((window.__social || {}).accounts) || {};
+      nets.innerHTML = NETS.map(function (n) {
+        var a = acc[n[0]];
+        var ok = a && !a.old;
+        return '<div class="vy-net"><span>' + n[1] + '</span>' +
+          (ok ? '<span class="font-mono text-[11px] text-cyber-emerald vy-glow-ok">● CONECTADO</span>'
+              : '<button type="button" class="vy-link text-cyber-pink" onclick="openSocialModal()">' + (a && a.old ? 'Reconectar' : 'Conectar') + '</button>') +
+        '</div>';
+      }).join('');
+    }
   }
 
   // ---------- Pintar ----------
@@ -861,19 +877,7 @@
       }
     }
 
-    // Redes conectadas
-    var nets = $('vyNets');
-    if (nets) {
-      var acc = ((window.__social || {}).accounts) || {};
-      nets.innerHTML = NETS.map(function (n) {
-        var a = acc[n[0]];
-        var ok = a && !a.old;
-        return '<div class="vy-net"><span>' + n[1] + '</span>' +
-          (ok ? '<span class="font-mono text-[11px] text-cyber-emerald vy-glow-ok">● CONECTADO</span>'
-              : '<button type="button" class="vy-link text-cyber-pink" onclick="openSocialModal()">' + (a && a.old ? 'Reconectar' : 'Conectar') + '</button>') +
-        '</div>';
-      }).join('');
-    }
+    pintarRedes();
 
     // Fila de trabajo de la PC (datos reales de agent_jobs: pendientes y en curso)
     var q = $('vyQueue');

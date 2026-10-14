@@ -60,21 +60,23 @@ exports.handler = async (event) => {
     const L = g.long;
     const longSlug = p.slug + '_completa';
     const longEp = { title: L.title, continuity: { summary: L.description || '', hook_text: L.hook_text || '', sources: L.sources || [], chapters: L.chapters || [], youtube_description: L.description || '', visual_checked: new Date().toISOString(), from_job: job, kind: 'largo' }, shots: L.shots };
-    await doImport(seriesJson({ slug: longSlug, title: p.title + ' · Historias completas', synopsis: 'Historias completas (8–15 min) para YouTube: ' + p.nombre + '.', tipo, narration, ep: longEp, aspect: '16:9', characters: L.characters, locations: L.locations,
+    const r1 = await doImport(seriesJson({ slug: longSlug, title: p.title + ' · Historias completas', synopsis: 'Historias completas (8–15 min) para YouTube: ' + p.nombre + '.', tipo, narration, ep: longEp, aspect: '16:9', characters: L.characters, locations: L.locations,
       sbExtra: { max_seconds: 1100, end_card: { enabled: true, mode: 'tail', text: 'SUSCRÍBETE', subtext: 'Una historia completa cada semana', voice: '', seconds: 3 } } }));
-    const { data: ls } = await sb.from('series').select('id').eq('slug', longSlug).single();
+    // En un canal, import-series le pone a la serie el slug del canal (oct-14) → se usa el slug REAL.
+    const realSlug = (r1 && r1.series && r1.series.slug) || longSlug;
+    const { data: ls } = await sb.from('series').select('id').eq('slug', realSlug).single();
     // El largo se busca por su TÍTULO (oct-14: si el guion se reimporta, import-series ACTUALIZA el episodio en vez de crear
     // uno nuevo, y "el último episodio" era un Short → los Shorts quedaban enlazados a sí mismos).
     const { data: le } = await sb.from('episodes').select('id, episode_number').eq('series_id', ls.id).eq('title', L.title).order('episode_number', { ascending: false }).limit(1).single();
     let shorts = 0;
     for (const s of g.shorts || []) {
-      const ep = { title: s.title, continuity: { summary: 'Short que lleva al video completo: ' + L.title, hook_text: s.hook_text || '', pinned_comment: s.pinned_comment || '', cta_to_long: { series: longSlug, episode_id: le.id, title: L.title }, parent_episode_id: le.id, aspect: '9:16', visual_checked: new Date().toISOString(), from_job: job, kind: 'short_cta' }, shots: s.shots };
+      const ep = { title: s.title, continuity: { summary: 'Short que lleva al video completo: ' + L.title, hook_text: s.hook_text || '', pinned_comment: s.pinned_comment || '', cta_to_long: { series: realSlug, episode_id: le.id, title: L.title }, parent_episode_id: le.id, aspect: '9:16', visual_checked: new Date().toISOString(), from_job: job, kind: 'short_cta' }, shots: s.shots };
       // Los Shorts viven DENTRO de la serie del largo (submenú bajo su video largo), en vertical por episodio (continuity.aspect).
       await doImport(seriesJson({ slug: longSlug, title: p.title + ' · Historias completas', synopsis: 'Historias completas (8–15 min) para YouTube: ' + p.nombre + '.', tipo, narration, ep, aspect: '16:9', characters: L.characters, locations: L.locations,
         sbExtra: { max_seconds: 1100, end_card: { enabled: true, mode: 'tail', text: 'SUSCRÍBETE', subtext: 'Una historia completa cada semana', voice: '', seconds: 3 } } }));
       shorts++;
     }
-    return json(200, { ok: true, long_slug: longSlug, long_episode: le.episode_number, shorts, short_slug: longSlug });
+    return json(200, { ok: true, long_slug: realSlug, long_episode: le.episode_number, shorts, short_slug: realSlug });
   } catch (err) {
     return json(500, { error: err.message });
   }

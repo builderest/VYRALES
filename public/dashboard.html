@@ -4189,6 +4189,8 @@
           const res = await fetch('/.netlify/functions/get-episodes?series=' + encodeURIComponent(DEFAULT_SERIES));
           if (res.status === 404) {
             const nf = await res.json().catch(() => ({}));
+            // oct-14: un canal sin series todavía también tiene redes y PC → el Inicio no debe decir "no conectadas".
+            try { window.__social = await socialP; window.__agent = await agentP; } catch (_) {}
             renderSeriesSelector(nf.all_series || [], null);
             const others = (nf.all_series || []).filter(x => x.slug !== DEFAULT_SERIES);
             // Multiusuario: la novela guardada en este navegador puede ser de otra cuenta → abrir la primera de la tuya.
