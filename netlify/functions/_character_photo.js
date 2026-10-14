@@ -46,10 +46,10 @@ async function createCharacterPhoto(supabase, { series, character, allCharacters
     for (const p of [path.join(__dirname, '..', '..', 'agente', 'flow_imagenes.js'), path.join(process.cwd(), 'agente', 'flow_imagenes.js')]) { try { flowImage = require(p).flowImage; break; } catch (_) {} }
     if (flowImage) {
       try { const f = await flowImage({ prompt: fullPrompt, refs: references, aspect: (series.story_bible.aspect === '16:9') ? '16:9' : '9:16' }); img = { buffer: f.buffer, mimeType: f.mimeType || 'image/jpeg', costUsd: 0, model: 'flow' }; log('  foto con Google Flow ($0, resolución completa)'); }
-      catch (e) { log('  Flow falló (' + String(e.message).slice(0, 100) + ') → Gemini'); }
+      catch (e) { log('  Flow falló (' + String(e.message).slice(0, 100) + ') → reintento con Flow'); }
     }
   }
-  if (!img) img = await generateImage({ prompt: fullPrompt, references });
+  if (!img) img = await require('./_image').freeImage({ prompt: fullPrompt, references, aspectRatio: (series.story_bible && series.story_bible.aspect === '16:9') ? '16:9' : '9:16', log, tries: 2 }); // ya hubo 1 intento de Flow arriba → 3 en total
   await logSpend(supabase, { seriesId: series.id, kind: 'character', model: img.model, costUsd: img.costUsd, note: character.name });
 
   await ensureMediaBucket(supabase);

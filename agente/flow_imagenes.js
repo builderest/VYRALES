@@ -151,6 +151,16 @@ async function generate(page, ctx, prompt, name, refs) {
       const c = page.getByRole('button', { name: /^(Generar|Confirmar|Sí|Continuar|Generate|Confirm)$/i }).first();
       if (await c.isVisible().catch(() => false)) { await c.click().catch(() => {}); confirmed = true; console.log('  (confirmé la generación)'); }
     }
+    // Si igual pregunta el formato ("Which aspect ratio…"), se elige el del episodio.
+    try {
+      const opt = page.getByText(ASPECT === '16:9' ? /^Horizontal widescreen \(16:9\)$|16:9\)$/ : /^Vertical \(9:16\)$/).last();
+      if (await page.getByText(/aspect ratio would you like|qué relación de aspecto|which aspect/i).last().isVisible().catch(() => false) && await opt.isVisible().catch(() => false)) {
+        await opt.click().catch(() => {}); console.log('  (Flow preguntó el formato → elegí ' + ASPECT + ')'); await sleep(1500);
+      }
+    } catch (_) {}
+    // oct-14: Flow rechaza por política (p. ej. una persona real y famosa por su nombre) → avisar YA, no esperar 4 min.
+    const pol = await page.getByText(/might violate our policies|infringir nuestras pol[ií]ticas/i).first().isVisible().catch(() => false);
+    if (pol) { await shot(page, name + '_politica'); throw new Error('POLITICA: Flow rechazó la imagen por sus políticas (suele ser una persona real nombrada).'); }
     const now = (await imgSrcs(page)).filter((s) => !before.has(mediaKey(s)));
     if (now.length) {
       await sleep(3000);
@@ -207,7 +217,11 @@ async function flowImage({ prompt, refs = [], aspect = null }) {
     }
     if (!ok) throw new Error('Flow: no hay sesión de Google.');
     await newProject(page);
-    const img = await generate(page, ctx, String(prompt).trim().replace(/\.?$/, '.') + (refs.length ? RULE_BASE : ruleFor(prompt)), 'pipeline', refs);
+    // oct-14: si el prompt nombra el OTRO formato (p. ej. "vertical 9:16" en un largo 16:9), Flow se detiene a preguntar
+    // cuál usar y nunca genera (3 fallas seguidas → antes se pagaba Gemini). Se quitan esas frases: manda ASPECT.
+    const otro = ASPECT === '16:9' ? /[^.]*\b(9\s*:\s*16|vertical (frame|image|format))\b[^.]*\.?/gi : /[^.]*\b(16\s*:\s*9|widescreen|horizontal (frame|image|format))\b[^.]*\.?/gi;
+    const limpio = String(prompt).replace(otro, ' ').replace(/\s{2,}/g, ' ').trim();
+    const img = await generate(page, ctx, limpio.replace(/\.?$/, '.') + (refs.length ? RULE_BASE : ruleFor(limpio)), 'pipeline', refs);
     const jpg = img.buffer[0] === 0xff && img.buffer[1] === 0xd8;
     return { buffer: img.buffer, mimeType: jpg ? 'image/jpeg' : 'image/png', costUsd: 0, model: 'flow' };
   } finally {

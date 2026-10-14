@@ -5,7 +5,7 @@
 //      correctos, aunque Lite no acepte fotos de referencia directamente.
 const { shortName, onScreenExtras } = require('./_series');
 const { loadReferenceImages } = require('./_veo');
-const { MAX_CHARACTER_REFS, generateImage } = require('./_image');
+const { MAX_CHARACTER_REFS, generateImage, freeImage } = require('./_image');
 const { ensureMediaBucket, uploadFile, removeByPublicUrl } = require('./_storage');
 const { logSpend } = require('./_spend');
 
@@ -37,7 +37,7 @@ function buildLocationPrompt(locationKey, storyBible) {
   return [
     `${(sb.visual_style || 'Cinematic style').replace(/\.?$/, '.')}`,
     `Empty establishing view of the set, with nobody in it: ${loc.visual.replace(/\.?$/, '.')}`,
-    'Vertical 9:16 composition, eye-level medium-wide view, soft cinematic lighting, rich detail.',
+    (sb.aspect === '16:9' ? 'Horizontal 16:9 widescreen composition' : 'Vertical 9:16 composition') + ', eye-level medium-wide view, soft cinematic lighting, rich detail.', // oct-14: antes siempre 9:16 → Flow se trababa preguntando el formato
     'This image is a fixed set reference that will be reused in every scene, so keep it simple, coherent and timeless.',
     CLEAN_FRAME
   ].join(' ');
@@ -50,7 +50,7 @@ function buildKeyframePrompt(shot, characterRows, storyBible, hasLocationRef) {
   const loc = locationOf(sb, shot.location);
   const names = shot.characters || [];
   const parts = [
-    `Create the very first frame of a vertical 9:16 video shot. ${(sb.visual_style || '').replace(/\.?$/, '.')}`,
+    `Create the very first frame of a ${sb.aspect === '16:9' ? 'horizontal 16:9' : 'vertical 9:16'} video shot. ${(sb.visual_style || '').replace(/\.?$/, '.')}`,
     shot.camera ? `Framing: ${shot.camera.replace(/\.?$/, '.')}` : ''
   ];
   names.forEach((name, i) => {
@@ -140,11 +140,8 @@ async function createLocationImage(supabase, { seriesId, slug, storyBible, key, 
   log('generando imagen fija del lugar', key, '...');
   // GRATIS PRIMERO: series con Google Flow → el lugar se hace con Flow en la PC ($0); Gemini solo fuera de la PC.
   let img;
-  if (process.env.VYRALES_LOCAL_RUN && storyBible && storyBible.image_engine === 'flow') {
-    const f = await flowMod().flowImage({ prompt: finalPrompt, aspect: storyBible.aspect === '16:9' ? '16:9' : '9:16' });
-    img = { buffer: f.buffer, mimeType: f.mimeType, costUsd: 0, model: 'flow' };
-    log('lugar hecho con Google Flow ($0)');
-  } else img = await generateImage({ prompt: finalPrompt, aspectRatio: storyBible.aspect === '16:9' ? '16:9' : '9:16' });
+  img = await freeImage({ prompt: finalPrompt, aspectRatio: storyBible.aspect === '16:9' ? '16:9' : '9:16', log }); // Flow ×3, Gemini solo si falla
+  if (img.model === 'flow') log('lugar hecho con Google Flow ($0)');
   await logSpend(supabase, { seriesId, kind: 'location', model: img.model, costUsd: img.costUsd, note: key });
   await ensureMediaBucket(supabase);
   const ext = img.mimeType.includes('jpeg') ? 'jpg' : 'png';
@@ -211,15 +208,12 @@ async function createKeyframe(supabase, { series, episode, shot, characters, log
   if (flux && (shot.image_engine || series.story_bible.image_engine) === 'flow') {
     try { img = await flowMod().flowImage({ prompt: fluxText, aspect }); log('cuadro inicial de Google Flow' + (aspect === '16:9' ? ' (16:9)' : '')); }
     catch (e) { log('Flow falló (' + String(e.message).slice(0, 160) + ') → FLUX en king'); img = await fluxImage({ prompt: fluxText, aspect }); }
-  } else if (!flux && (shot.characters || []).length && series.story_bible.flow_characters !== false && process.env.VYRALES_LOCAL_RUN && (shot.image_engine || series.story_bible.image_engine) === 'flow') {
-    // Personajes con Google Flow: se suben sus fotos de cara como "ingredientes" ($0). Si falla → Gemini.
-    // oct-14: Flow con personajes es lo normal (flow_characters solo lo apaga si es false); Flow solo existe en la PC.
-    try {
-      const refPrompt = 'Reference images in order: ' + refs.map((r, i) => `image ${i + 1} = ${r.label}`).join('; ') + '. ' + prompt;
-      img = await flowMod().flowImage({ prompt: refPrompt, refs });
-      log('cuadro inicial de Google Flow (con fotos de los personajes)');
-    } catch (e) { log('Flow con personajes falló (' + String(e.message).slice(0, 160) + ') → Gemini'); img = await generateImage({ prompt, references: refs, aspectRatio: aspect }); }
-  } else img = flux ? await fluxImage({ prompt: fluxText, aspect }) : await generateImage({ prompt, references: refs, aspectRatio: aspect });
+  } else if (flux) img = await fluxImage({ prompt: fluxText, aspect });
+  else {
+    // Con personajes (sus fotos de cara como "ingredientes") o sin FLUX: Google Flow ×3 ($0); Gemini solo si Flow falla 3 veces.
+    img = await freeImage({ prompt, references: refs, aspectRatio: aspect, log, anonimizar: shot.characters || [] });
+    if (img.model === 'flow') log('cuadro inicial de Google Flow' + (refs.length ? ' (con ' + refs.length + ' referencia(s))' : ''));
+  }
   await logSpend(supabase, { seriesId, episodeId: episode.id, shotNumber: shot.n, kind: 'keyframe', model: img.model, costUsd: img.costUsd });
 
   await ensureMediaBucket(supabase);
@@ -305,7 +299,7 @@ async function createEndFrame(supabase, { series, episode, shot, startImage, anc
     const fl = require('./_flux');
     const cand = fl.useFlux(sb, shot)
       ? await fl.fluxImage({ prompt: 'Same scene, same lighting and style, a few seconds later: ' + String(shot.end_en).trim() + (attempt === 0 ? '' : (lastSim != null && lastSim < 0.5 ? ' Keep the same camera angle and framing; only a small step of the action.' : ' The action is clearly advanced and the framing slightly closer.')), reference: startImage , aspect: ((episode && episode.continuity && episode.continuity.aspect) || (sb && sb.aspect) || '9:16') })
-      : await generateImage({ prompt: p, references: ref, aspectRatio: ((episode && episode.continuity && episode.continuity.aspect) || (sb && sb.aspect) || '9:16') });
+      : await freeImage({ log, prompt: p, references: ref, aspectRatio: ((episode && episode.continuity && episode.continuity.aspect) || (sb && sb.aspect) || '9:16') });
     await logSpend(supabase, { seriesId: series.id || episode.series_id, episodeId: episode.id, shotNumber: shot.n, kind: 'keyframe', model: cand.model, costUsd: cand.costUsd, note: 'cuadro final' });
     // Si sale casi igual al inicial (SSIM alto) la toma queda quieta: se reintenta una vez; si no, sin cuadro final.
     const sim = await similarity(startImage, cand);

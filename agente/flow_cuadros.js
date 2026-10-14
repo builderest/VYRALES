@@ -5,6 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
 const ROOT = path.resolve(__dirname, '..');
+process.env.VYRALES_LOCAL_RUN = '1'; // oct-14: sin esto createKeyframe no veía Flow y las tomas con personajes iban a Gemini (pagado)
 for (const line of fs.readFileSync(path.join(ROOT, '.env'), 'utf8').split(/\r?\n/)) {
   const m = /^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/.exec(line);
   if (m && !process.env[m[1]]) process.env[m[1]] = m[2].replace(/^(['"])(.*)\1$/, '$2');

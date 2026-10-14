@@ -69,4 +69,36 @@ async function generateImage({ prompt, references = [], aspectRatio = '9:16' }) 
   };
 }
 
-module.exports = { generateImage, IMAGE_MODEL, IMAGE_PRICE_USD, MAX_CHARACTER_REFS };
+// oct-14 — REGLA DE FRANKLIN: "ninguna imagen tiene que pagar en ningún momento; Gemini es lo mismo que Flow, a menos
+// que Flow falle 2 o 3 veces". freeImage = Google Flow en la PC ($0) con hasta 3 intentos; Gemini (de pago) SOLO si
+// los 3 fallan. Fuera de la PC (Netlify) no hay Flow → error claro en vez de cobrar (el panel manda las imágenes a la PC).
+function flowImagenes() {
+  const path = require('path'); const fs = require('fs');
+  const f = [path.join(__dirname, '..', '..', 'agente', 'flow_imagenes.js'), path.join(process.cwd(), 'agente', 'flow_imagenes.js')].find((x) => { try { return fs.existsSync(x); } catch (_) { return false; } });
+  return f ? eval('require')(f) : null;
+}
+// anonimizar: nombres de personas reales; si Flow rechaza por política, los siguientes intentos los cambian por
+// "the person in image N" / "the person" (Flow no hace personas reales famosas por su nombre).
+const sinNombres = (txt, names) => { let s = String(txt || ''); for (const n of (names || []).filter(Boolean).sort((a, b) => b.length - a.length)) { const base = String(n).replace(/\s*\(.*?\)\s*/g, ' ').trim(); for (const k of [n, base, base.split(/\s+/)[0]].filter((x) => x && x.length > 2)) s = s.split(k).join('the person'); } return s; };
+async function freeImage({ prompt, references = [], aspectRatio = '9:16', log = () => {}, tries = 3, anonimizar = [] }) {
+  const F = process.env.VYRALES_LOCAL_RUN ? flowImagenes() : null;
+  if (!F) {
+    if (process.env.VYRALES_PAID_IMAGES === '1') return generateImage({ prompt, references, aspectRatio });
+    throw new Error('Las imágenes se hacen gratis con Google Flow en la PC; aquí no hay Flow y no se paga Gemini. Mándalo a la PC.');
+  }
+  let refs = references || [];
+  let anon = false;
+  let last = null;
+  for (let i = 1; i <= tries; i++) {
+    try {
+      const R = anon ? refs.map((r) => Object.assign({}, r, { label: sinNombres(r.label, anonimizar) })) : refs;
+      const pr = anon ? sinNombres(prompt, anonimizar) : prompt;
+      const p = R.length ? 'Reference images in order: ' + R.map((r, k) => `image ${k + 1} = ${r.label}`).join('; ') + '. ' + pr : pr;
+      const f = await F.flowImage({ prompt: p, refs: R, aspect: aspectRatio === '16:9' ? '16:9' : '9:16' });
+      return { buffer: f.buffer, mimeType: f.mimeType || 'image/jpeg', costUsd: 0, model: 'flow' };
+    } catch (e) { last = e; if (/POLITICA/.test(e.message) && anonimizar.length && !anon) { anon = true; log('Flow: rechazo por política → reintento sin los nombres de las personas'); } log('Flow falló (intento ' + i + '/' + tries + '): ' + String(e.message).slice(0, 140)); if (i < tries) await new Promise((r) => setTimeout(r, 4000 * i)); }
+  }
+  log('Flow falló ' + tries + ' veces → Gemini (de pago, ~$' + IMAGE_PRICE_USD + ')');
+  return generateImage({ prompt, references, aspectRatio });
+}
+module.exports = { freeImage, generateImage, IMAGE_MODEL, IMAGE_PRICE_USD, MAX_CHARACTER_REFS };

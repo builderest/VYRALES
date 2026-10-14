@@ -490,3 +490,16 @@ experimento (`doc.forzados`: ¿quién tenía razón?).
   toma, "generar todos" y `_keyframe.js` (Flow con fotos de personajes, solo en la PC). Y en series con Flow ya no
   se ofrece "Cuadro + animar" mientras la toma no tiene cuadro (ese camino generaba el cuadro con Gemini).
   Revisado `generation_log` de MindFuel: todo $0 hasta ahora (personajes y lugar con Flow).
+- **Regla de Franklin: ninguna imagen se paga; Gemini solo si Flow falla 2–3 veces.** Hallazgo: en EP25 las 40
+  tomas con personajes se hicieron con Gemini ($2.68) porque `flow_cuadros.js` no marcaba `VYRALES_LOCAL_RUN` y
+  `_keyframe.js` exigía `flow_characters: true`. Cambios:
+  - `_image.js` `freeImage()`: Flow en la PC con 3 intentos; Gemini solo después. Fuera de la PC → error, no cobra
+    (salvo `VYRALES_PAID_IMAGES=1`). Lo usan cuadros (con y sin personajes), cuadro final, lugares y fotos de cara.
+  - `flow_cuadros.js` marca `VYRALES_LOCAL_RUN`.
+  - Flow se trababa preguntando "¿9:16 o 16:9?": `_keyframe.js` escribía "vertical 9:16" fijo aunque la serie sea
+    16:9 → ahora usa el formato real; `flow_imagenes.js` quita del prompt frases del otro formato y, si igual pregunta,
+    elige el del episodio.
+  - `flow_imagenes.js` detecta al instante el rechazo por política ("might violate our policies") en vez de esperar
+    4 min; `freeImage` reintenta sin los nombres de las personas.
+  - **Abierto:** con foto de cara subida como referencia, Flow rechaza por política aun sin nombres (probado tomas
+    81–83 de MindFuel EP1, persona real famosa: Tom Daley). Esas tomas terminan en Gemini tras 3 intentos.
