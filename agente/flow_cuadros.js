@@ -32,18 +32,24 @@ for (const line of fs.readFileSync(path.join(ROOT, '.env'), 'utf8').split(/\r?\n
   const want = list ? list.split(',').map(Number) : (ep.shots || []).map((s) => s.n).filter((n) => !solo || !hasFrame(n) || (ep.shots || []).some((s) => s.n === n && s.frame_stale));
   const all = (ep.shots || []).filter((s) => want.includes(s.n) && (s.start_en || s.action_en));
   // Tomas con personajes: una por una con sus fotos de cara como referencia (createKeyframe → Flow con ingredientes).
-  const conPersonajes = all.filter((s) => (s.characters || []).length);
+  // Lugares fijos (Franklin oct-14): Flow acepta varias fotos de referencia → toda toma cuyo lugar tenga foto fija
+  // (TOMAS FIJAS = series.visual_memory.locations[lugar].url) va por el camino CON referencias, aunque no tenga personajes,
+  // para que la celda, el túnel o el penal se vean IGUALES en todo el documental. Antes solo las tomas con personaje.
+  const { data: vmRow } = await supabase.from('series').select('visual_memory').eq('id', ep.series_id).single();
+  const vmLocs = (vmRow && vmRow.visual_memory && vmRow.visual_memory.locations) || {};
+  const lugarFijo = (s) => !!(s.location && vmLocs[s.location] && vmLocs[s.location].url);
+  const conPersonajes = all.filter((s) => (s.characters || []).length || lugarFijo(s));
   const conDone = []; // también limpian frame_stale (antes solo lo hacían las tomas sin personajes)
   if (conPersonajes.length) {
     const { createKeyframe } = require(path.join(ROOT, 'netlify', 'functions', '_keyframe'));
     const { data: fullSeries } = await supabase.from('series').select('id, slug, story_bible, visual_memory').eq('id', ep.series_id).single();
     const { data: characters } = await supabase.from('characters').select('name, fixed_prompt_tag, profile, reference_image_url').eq('series_id', ep.series_id);
     for (const sh of conPersonajes) {
-      try { await createKeyframe(supabase, { series: fullSeries, episode: ep, shot: sh, characters, log: (...x) => console.log(...x) }); conDone.push(sh.n); console.log(`toma ${sh.n}: cuadro con personajes listo`); }
+      try { await createKeyframe(supabase, { series: fullSeries, episode: ep, shot: sh, characters, log: (...x) => console.log(...x) }); conDone.push(sh.n); console.log(`toma ${sh.n}: cuadro con referencias listo (${(sh.characters || []).length} cara(s)${lugarFijo(sh) ? ' + lugar fijo "' + sh.location + '"' : ''})`); }
       catch (e) { console.log(`toma ${sh.n}: FALLÓ ${String(e.message).slice(0, 200)}`); }
     }
   }
-  const shots = all.filter((s) => !(s.characters || []).length);
+  const shots = all.filter((s) => !(s.characters || []).length && !lugarFijo(s));
   console.log('Flow: generando', shots.length, 'cuadros en una sola sesión → tomas', shots.map((s) => s.n).join(','));
   // Cada cuadro se guarda en cuanto sale (el panel los va mostrando uno por uno).
   const done = [];

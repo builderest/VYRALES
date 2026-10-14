@@ -405,3 +405,16 @@ experimento (`doc.forzados`: ¿quién tenía razón?).
   guardadas. EP25 reparada: T64 26.9→11.1 s, T65 1.0→2.3, T66 1.0→2.8, T67 1.0→2.1, T68 2.0→6.3; 0 invertidas; suma
   578.5 s vs voz 576.5 s ✔.
 - PENDIENTE: al terminar el QA, revisar que los clips de T65–T68 alcancen sus nuevas duraciones (si no, rehacerlos).
+- **14:35 — avance QA:** 19 tomas rehechas en ~45 min. Revisadas a ojo: T2 (ahora estable, las luces no se apagan) ✅,
+  T8 (muro se queda) ✅, T10 (los 2 guardias siguen siendo 2) ✅, T37 (mesa de billar ya no se transforma) ✅, T64 ✅.
+  T12 y T28 agotaron 3 intentos según el juez; a ojo se ven bien (pozo estable; cajas estables) → aprobadas por mí con nota.
+  T142 aún salta de ángulo al final → la verá el QA visual.
+
+## 2026-10-14 16:00 — Lugares fijos como referencia en Flow (idea de Franklin, para los próximos documentales)
+- **Antes:** solo las tomas CON personaje mandaban fotos de referencia a Flow (cara + lugar). Las tomas sin personas (celdas,
+  túneles, penal… justo las que más fallan) iban sin ninguna referencia → el mismo lugar salía distinto en cada toma.
+- **Cambio (`agente/flow_cuadros.js`):** toda toma cuyo lugar tenga foto fija (TOMAS FIJAS, `visual_memory.locations`) va por
+  el camino con referencias aunque no tenga personajes. EP25 se queda como está (Franklin).
+- **HALLAZGO / PENDIENTE (guionista):** en EP25, 109 de 146 tomas tienen `location: "escena"` (genérico); solo 37 están
+  ligadas a uno de los 8 lugares fijos. Ej.: tomas del exterior del penal o del túnel que no dicen su lugar → no recibirían la
+  referencia. Para los próximos: que el detallador asigne el lugar fijo a CADA toma que ocurra en él.
