@@ -46,8 +46,8 @@ exports.handler = async (event) => {
       // 🧠 Franklin la marcó mal → evidencia de peso ×3 (y si el QA la había aprobado, el cerebro aprende que el QA se equivocó).
       try { await require('./_cerebro').franklinLive(sb, { episodeId: ep.id, shotNumber: shot.n, clipId: clip.id, ok: false, reason }); } catch (_) {}
       // Memoria: la corrección de Franklin es una lección para Claude (la consolida claude_aprender).
-      if (require('./_tenant').currentWs() === require('./_tenant').ADMIN_WS) try { await require('./_memoria').addLesson(sb, { source: 'franklin', serie: series && series.slug, ep: ep.id, toma: n, narracion: lineOf(shot), motivo: reason, imagen: shot.start_en || '', accion: shot.action_en || '', camara: shot.camera || '' }); } catch (_) {}
-      if (require('./_tenant').currentWs() === require('./_tenant').ADMIN_WS) try { const { data: oa } = await sb.from('agent_jobs').select('id').eq('status', 'pending').eq('command', 'claude_aprender').limit(1); if (!(oa && oa.length)) await sb.from('agent_jobs').insert(await require('./_tenant').jobRow(sb, 'claude_aprender')); } catch (_) {}
+      if (await require('./_memoria').compartido(sb)) try { await require('./_memoria').addLesson(sb, { source: 'franklin', serie: series && series.slug, ep: ep.id, toma: n, narracion: lineOf(shot), motivo: reason, imagen: shot.start_en || '', accion: shot.action_en || '', camara: shot.camera || '' }); } catch (_) {}
+      if (await require('./_memoria').compartido(sb)) try { const { data: oa } = await sb.from('agent_jobs').select('id').eq('status', 'pending').eq('command', 'claude_aprender').limit(1); if (!(oa && oa.length)) await sb.from('agent_jobs').insert(await require('./_tenant').jobRow(sb, 'claude_aprender')); } catch (_) {}
       const { data: open } = await sb.from('agent_jobs').select('id').in('status', ['pending', 'running']).like('command', 'qa_tomas:' + ep.id + '%').limit(1);
       if (!(open && open.length)) { const { error: qe } = await sb.from('agent_jobs').insert(await require('./_tenant').jobRow(sb, 'qa_tomas:' + ep.id)); if (qe) return json(500, { error: qe.message }); }
       return json(200, { queued: true });
@@ -128,8 +128,8 @@ exports.handler = async (event) => {
       try {
         const antes = {}, despues = {};
         FIELDS.concat(['camera_only']).forEach((k) => { if (patch[k] != null && String(patch[k]) !== String(shot[k] == null ? '' : shot[k])) { antes[k] = shot[k] == null ? '' : shot[k]; despues[k] = patch[k]; } });
-        // La memoria de Claude es del admin: las ediciones de otros usuarios no la cambian.
-        if (require('./_tenant').currentWs() === require('./_tenant').ADMIN_WS) await require('./_memoria').addLesson(sb, { source: 'franklin_edicion', serie: series && series.slug, ep: ep.id, toma: n, narracion: lineOf(shot), antes, despues });
+        // La memoria es del admin y sus canales (oct-14): las ediciones de cuentas de OTROS usuarios no la cambian.
+        if (await require('./_memoria').compartido(sb)) await require('./_memoria').addLesson(sb, { source: 'franklin_edicion', serie: series && series.slug, ep: ep.id, toma: n, narracion: lineOf(shot), antes, despues });
       } catch (_) {}
     }
     return json(200, { ok: true, imgChanged, vidChanged, aviso });

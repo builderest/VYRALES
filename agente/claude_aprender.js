@@ -87,6 +87,7 @@ ${JSON.stringify(fresh.map((l) => { const o = Object.assign({}, l); delete o.con
 
 Devuelve la lista COMPLETA y actualizada de reglas:
 - Cada regla: corta (máx. 2 frases), general (sirve para cualquier video, no solo esa toma), accionable, en español, con el porqué.
+- Estas reglas las COMPARTEN todos los canales (nichos e idiomas distintos: historia en español, motivación en inglés…). Solo reglas de OFICIO (imagen, video, voz, ritmo, edición, QA) que sirvan en cualquier nicho; nada del tema, tono o idioma de un canal (eso lo pone la identidad de cada canal).
 - Lo que dijo Franklin tiene prioridad; si contradice una regla vieja, reemplázala.
 - Une duplicados, quita lo que ya no aplica, máximo 40 reglas, las más importantes primero.
 - No cambies nunca la regla de que la narración no se toca ni la de que cada imagen muestra lo que dice su narración.

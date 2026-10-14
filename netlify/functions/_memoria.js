@@ -20,10 +20,27 @@ async function download(sb, d, name, fallback) {
     return JSON.parse(Buffer.from(await data.arrayBuffer()).toString('utf8'));
   } catch (_) { return fallback; }
 }
-async function readJson(sb, name, fallback) { return download(sb, dir(), name, fallback); }
+// oct-14 (Franklin: "tienen que compartir las mismas reglas de revisión, el cerebro tiene que ser igual"):
+// las reglas, el 🧠 cerebro (evidencia, patrones, diario, objeciones) y las lecciones son UNO SOLO para el canal
+// principal y TODOS sus canales (owner_ws = admin): una falla de LTX es igual en cualquier canal, y cada canal
+// aprende de las ediciones de los otros. Lo que cambia por canal es su IDENTIDAD (nicho, tono, idioma): agentes distintos. Solo las cuentas
+// de OTROS usuarios (no creadas por el admin) siguen con lo suyo aparte.
+const SHARED = new Set(['reglas.json', 'cerebro_evidencia.json', 'cerebro_reglas.json', 'cerebro_diario.json', 'cerebro_objeciones.json', 'lecciones.json']);
+const ownerCache = {};
+async function sharedDir(sb) {
+  const ws = wsNow();
+  const T = (() => { try { return require('./_tenant'); } catch (_) { return null; } })();
+  if (!ws || !T || ws === T.ADMIN_WS) return BASE;
+  if (!(ws in ownerCache)) {
+    try { const { data } = await sb.from('workspaces').select('owner_ws').eq('id', ws).maybeSingle(); ownerCache[ws] = data ? data.owner_ws : null; } catch (_) { return dir(); }
+  }
+  return ownerCache[ws] === T.ADMIN_WS ? BASE : dir();
+}
+async function dirFor(sb, name) { return SHARED.has(name) ? sharedDir(sb) : dir(); }
+async function readJson(sb, name, fallback) { return download(sb, await dirFor(sb, name), name, fallback); }
 async function writeJson(sb, name, obj) {
   const body = Buffer.from(JSON.stringify(obj, null, 1), 'utf8');
-  const { error } = await sb.storage.from(BUCKET).upload(dir() + '/' + name, body, { contentType: 'application/json', upsert: true, cacheControl: '0' });
+  const { error } = await sb.storage.from(BUCKET).upload((await dirFor(sb, name)) + '/' + name, body, { contentType: 'application/json', upsert: true, cacheControl: '0' });
   if (error) throw new Error('memoria: ' + error.message);
 }
 
@@ -33,7 +50,7 @@ async function addLesson(sb, lesson) {
   await writeJson(sb, 'lecciones.json', list.slice(-500));
 }
 async function getRules(sb) {
-  const d = dir();
+  const d = await dirFor(sb, 'reglas.json'); // admin y sus canales: las MISMAS reglas (oct-14)
   const c = cache[d];
   if (c && c.rules && Date.now() - c.at < 120000) return c.rules;
   const r = await download(sb, d, 'reglas.json', { rules: [] });
@@ -75,4 +92,6 @@ async function memoryBlock(sb) {
   try { block += await require('./_cerebro').cerebroBlock(sb); } catch (_) {}
   return block;
 }
-module.exports = { readJson, writeJson, addLesson, getRules, memoryBlock, identidad };
+// ¿Este canal comparte la memoria del principal? (admin o canal creado por el admin)
+async function compartido(sb) { return (await sharedDir(sb)) === BASE; }
+module.exports = { compartido, readJson, writeJson, addLesson, getRules, memoryBlock, identidad };

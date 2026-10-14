@@ -477,3 +477,10 @@ experimento (`doc.forzados`: ¿quién tenía razón?).
   el estado real del canal.
 - Pendiente (no tocado): el 🧠 cerebro (evidencia de fallas de LTX) es por canal → MindFuel empieza en cero; las 32
   reglas generales sí las comparte.
+- **Memoria compartida entre canales (pedido de Franklin):** "nichos diferentes, agentes diferentes, pero las mismas
+  reglas, así aprende más de cada uno". `_memoria.js`: `reglas.json`, `lecciones.json` y todo el 🧠 cerebro
+  (`cerebro_evidencia/reglas/diario/objeciones.json`) son UNO SOLO para el principal y sus canales (`owner_ws` = admin).
+  Lo que cambia por canal es la IDENTIDAD (nicho, tono, idioma). Cuentas de OTROS usuarios siguen aparte.
+  `shot-edit.js`: las correcciones de Franklin en cualquier canal suyo ya son lecciones (antes solo en el principal).
+  `claude_aprender.js`: solo reglas de oficio, nada del tema/tono/idioma de un canal. Verificado: Admin y MindFuel leen
+  las mismas 32 reglas y 754 evidencias del cerebro; Wander (otro usuario) no.
