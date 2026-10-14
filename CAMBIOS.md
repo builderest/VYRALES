@@ -374,3 +374,12 @@ experimento (`doc.forzados`: ¿quién tenía razón?).
   En EP25: 15 aceptadas así (T18, 23, 35, 46, 70, 74, 80, 82, 98, 110, 115, 124, 137, 141, 145) + 4 aceptadas por mí a ojo
   (T15, 17, 24, 41). **Quedan 48 para rehacer** cuando king vuelva (casi todas "cambia de lugar"/objetos que se deforman;
   T108 y T120 tienen la IMAGEN inicial equivocada → necesitan cuadro nuevo).
+
+## 2026-10-14 13:30 — 🔎 Por qué Cronix no llega a king: **ProtonVPN** en Cronix
+- `red_diag` (nuevo): `curl` de Cronix a `100.66.84.73:8188` → `connect failed: Bad access` **en 0 ms** = bloqueo LOCAL en
+  Cronix (no es king ni la red: `tailscale ping` responde en 30 ms).
+- `red_diag2` (nuevo): en Cronix está **conectado ProtonVPN** (adaptador "ProtonVPN", servicio + WireGuard corriendo). Su
+  kill switch / filtros bloquean el tráfico que no va por el túnel, incluido Tailscale → Node y curl no pueden abrir la conexión.
+- INFERENCIA: tras los reinicios de Windows de esta mañana (4:29 y 6:16), ProtonVPN se conectó solo al arrancar.
+- **Arreglo (Franklin):** desconectar ProtonVPN en Cronix, o en ProtonVPN → Split tunneling excluir Tailscale / la red
+  100.64.0.0/10, o desactivar el kill switch / "conectar al iniciar". No lo toco yo: es una configuración de seguridad.

@@ -7,6 +7,17 @@ module.exports = {
     help: 'git status + últimos 5 commits',
     steps: [['git', ['status', '-sb']], ['git', ['log', '--oneline', '-5']]]
   },
+  // Diagnóstico de red de esta PC hacia king (oct-14: tras reiniciarse Cronix, el agente no llegaba a ComfyUI).
+  red_diag: {
+    label: 'Diagnóstico de red (Tailscale)',
+    help: 'tailscale status + ping a king + prueba HTTP a ComfyUI',
+    steps: [['curl.exe', ['-sS', '-v', '-m', '15', 'http://100.66.84.73:8188/system_stats']], ['C:\\Program Files\\Tailscale\\tailscale.exe', ['status']], ['C:\\Program Files\\Tailscale\\tailscale.exe', ['ping', '-c', '3', '100.66.84.73']]] // curl primero: tailscale ping sale con error si no hay conexión directa y corta los pasos
+  },
+  red_diag2: {
+    label: 'Diagnóstico de red 2 (firewall/rutas de esta PC)',
+    help: 'Reglas de salida bloqueadas, perfil de red, ruta hacia king',
+    steps: [['powershell.exe', ['-NoProfile', '-Command', "Get-NetConnectionProfile | Format-Table -Auto Name,InterfaceAlias,NetworkCategory | Out-String -Width 200; Get-NetFirewallProfile | Format-Table -Auto Name,Enabled,DefaultOutboundAction | Out-String -Width 200; Get-NetFirewallRule -Direction Outbound -Action Block -Enabled True | Select-Object -First 30 DisplayName,Profile | Format-Table -Auto | Out-String -Width 200; Find-NetRoute -RemoteIPAddress 100.66.84.73 | Select-Object -Last 1 InterfaceAlias,NextHop | Format-Table -Auto | Out-String; Get-Service | Where-Object { $_.DisplayName -match 'VPN|Firewall|Portmaster|GlassWire|Proton|Nord|Express|Surfshark|Warp|Cloudflare|Netlimiter|Kaspersky|Norton|McAfee|Avast|AVG|Bitdefender|ESET' -and $_.Status -eq 'Running' } | Format-Table -Auto Name,DisplayName | Out-String -Width 200"]]]
+  },
   push: {
     label: 'Subir cambios (git push)',
     help: 'Publica los commits en GitHub → Netlify despliega solo',
