@@ -179,9 +179,11 @@ function validateSeries(data) {
     req(c.key && c.name, `${label}: falta key o name.`);
     req(c.role, `${label}: falta role (protagonista, antagonista o secundario).`);
     req(c.fixed_prompt_tag, `${label}: falta fixed_prompt_tag.`);
-    req(c.profile && c.profile.default_outfit, `${label}: falta profile.default_outfit.`);
-    req(c.profile && c.profile.voice, `${label}: falta profile.voice (voz en inglés, siempre igual).`);
-    if (c.fixed_prompt_tag && c.key && !c.fixed_prompt_tag.startsWith(c.key)) {
+    // Documental NARRADO (oct-14, El Chapo): el personaje no habla en cámara → no necesita voz propia, ropa fija (la decide
+    // cada toma) ni que su tag empiece con la clave (eso es para que Veo sepa quién habla en las novelas).
+    if (!narradoUnico) req(c.profile && c.profile.default_outfit, `${label}: falta profile.default_outfit.`);
+    if (!narradoUnico) req(c.profile && c.profile.voice, `${label}: falta profile.voice (voz en inglés, siempre igual).`);
+    if (!narradoUnico && c.fixed_prompt_tag && c.key && !c.fixed_prompt_tag.startsWith(c.key)) {
       errors.push(`${label}: el fixed_prompt_tag debe empezar con "${c.key}," (así Veo sabe quién habla).`);
     }
     if (c.fixed_prompt_tag && /"/.test(c.fixed_prompt_tag)) errors.push(`${label}: el fixed_prompt_tag tiene comillas dobles.`);
@@ -190,6 +192,7 @@ function validateSeries(data) {
     });
     if (byKey[c.key]) errors.push(`Personaje duplicado: ${c.key}.`);
     byKey[c.key] = c;
+    if (c.name) byKey[c.name] = c; // las tomas pueden nombrarlo por NOMBRE (así lo busca el generador de cuadros, _keyframe.js)
   });
 
   const episodes = data.episodes || [];
@@ -282,21 +285,22 @@ function characterRowsFromData(data) {
 // Cada toma guarda además `prompt_preview`: el prompt exacto que recibirá Veo.
 function toEpisodeRows(data) {
   const byKey = {};
-  (data.characters || []).forEach((c) => (byKey[c.key] = c));
+  (data.characters || []).forEach((c) => { byKey[c.key] = c; if (c.name) byKey[c.name] = c; }); // por clave o por NOMBRE
   const rowsForPreview = characterRowsFromData(data);
 
   return (data.episodes || []).map((ep) => {
     const shots = (ep.shots || []).map((s) => {
       const wardrobe = {};
       s.characters.forEach((k) => {
-        const c = byKey[k];
-        wardrobe[c.name] =
-          (s.wardrobe && s.wardrobe[k]) || (ep.wardrobe && ep.wardrobe[k]) || c.profile.default_outfit;
+        const c = byKey[k]; if (!c) return;
+        // Narrados: sin ropa fija (la ropa la decide cada toma; la foto de referencia es solo la cara).
+        const w = (s.wardrobe && s.wardrobe[k]) || (ep.wardrobe && ep.wardrobe[k]) || (c.profile && c.profile.default_outfit);
+        if (w) wardrobe[c.name] = w;
       });
       const shot = {
         n: s.n,
         location: s.location,
-        characters: s.characters.map((k) => byKey[k].name),
+        characters: s.characters.map((k) => (byKey[k] ? byKey[k].name : k)),
         wardrobe,
         camera: s.camera || '',
         start_en: s.start_en || '',

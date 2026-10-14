@@ -32,7 +32,7 @@ const PEOPLE_PL = 'men|women|people|persons|soldiers|scientists|engineers|pilots
 const PEOPLE_SG = /\b(man|woman|person|soldier|scientist|engineer|pilot|worker|guard|officer|delegate|leader|boy|girl|child|figure|physicist|technician|prisoner|sailor|miner|official|general|agent|policeman|journalist|doctor|nurse|farmer|hunter|survivor|narco|drug lord|inmate)\b/g;
 
 function peopleBucket(all) {
-  if (/\b(crowd|crowds|audience|rows of (?:people|men|soldiers|delegates)|army|spectators|hall full|packed hall|mob|masses)\b/.test(all)) return 'p4mas';
+  if (/\b(crowd|crowds|audience|rows of (?:people|men|soldiers|delegates)|an army of|spectators|hall full|packed hall|mob|masses)\b/.test(all)) return 'p4mas';
   let max = 0;
   const re = new RegExp('\\b(two|three|four|five|six|seven|eight|nine|ten|twelve|several|many|dozens|dozen|hundreds|thousands|\\d+)\\s+(?:[a-z-]+\\s+){0,3}(' + PEOPLE_PL + ')\\b', 'g');
   for (const m of all.matchAll(re)) { const v = NUM[m[1]] || Number(m[1]) || 0; if (v > max) max = v; }
@@ -55,9 +55,10 @@ function featuresOf(sh) {
     cam_acerca: acerca,
     cam_sigue: sigue,
     cam_lateral: !acerca && !sigue && /drift|lateral|\bpan\b|truck|sway/.test(cam),
-    multi_accion: /\bwhile\b|\bmeanwhile\b|\bthe other\b|\bas (?:the|his|her) (?:others?|second|rest)\b|,\s*and the (?!camera)/.test(act),
+    // Varias PERSONAS con acciones distintas (no "camina while su abrigo se mueve" ni "la cámara… while la luz…"; oct-14).
+    multi_accion: /\bthe other\b|\banother (?:man|woman|person|guard|soldier|pilot|officer)\b|\bthe second (?:man|woman|person|guard|soldier|pilot|officer)\b|\b(?:man|woman|person|guard|soldier|pilot|officer|engineer|scientist|leader|boy|girl) (?:on|at) the (?:left|right|far|back|front)\b[^.]{0,120}\bwhile\b|\bwhile (?:the|a|two|three) (?:men|women|people|guards|soldiers|pilots|officers|engineers|scientists|crowd|group|others)\b|\bmeanwhile\b/.test(act),
     personas: peopleBucket(all),
-    multitud: /\b(crowd|crowds|audience|delegates|rows of|dozens|hundreds|thousands|army|spectators|hall full|mob)\b/.test(all),
+    multitud: new RegExp('\\b(crowd|crowds|audience|delegates|spectators|hall full|packed hall|mob|an army of|masses)\\b|\\b(rows|dozens|hundreds|thousands|lines) of (?:[a-z-]+ ){0,2}(' + PEOPLE_PL + ')\\b').test(all),
     objeto_fragil: /\b(paper|papers|letter|letters|document|documents|map|maps|globe|seal|seals|rope|ropes|wire|wires|cable|cables|book|books|screen|screens|television|televisions|tv|monitor|monitors|clock|sign|banner|poster|chart|blueprint|blueprints|drafting|switch|switches|gauge|gauges|dial|dials|newspaper|pen|telephone|phone|folder|envelope|notebook)\b/.test(all),
     texto: /\b(text|lettering|writing|written|label|headline|newspaper|inscription|sign reads|words on)\b/.test(all),
     humo_relleno: !hazeNarr && /\b(haze|hazy|mist|misty|fog|foggy|smoke|smoky|dust|steam)\b/.test(all),
@@ -65,13 +66,14 @@ function featuresOf(sh) {
     accion_larga: words(sh.action_en) > 40,
     gesto_fino: /\b(finger|fingers|signs the|signing|writes|writing|types|typing|flips|presses|turns the dial|hand pushes|slides the|passes the|hands over|taps)\b/.test(act),
     sujeto_sale: /\b(out of (?:the )?frame|exits|leaves the frame|walks away|disappears|enters the frame|into (?:the )?frame|off-screen)\b/.test(act),
-    movimiento_sutil: !fuerte && /\b(slightly|subtle|subtly|gently|breathes|blinks|stares|looks at|gazes|watches|glances)\b/.test(act),
+    // Sutil = una PERSONA que casi no se mueve (en tomas donde la cámara recorre un lugar vacío, lo leve es a propósito).
+    movimiento_sutil: !fuerte && /\b(man|woman|person|guard|guards|inmate|prisoner|soldier|officer|leader|boy|girl|he|she|they|his|her)\b/.test(act) && /\b(slightly|subtle|subtly|breathes|blinks|stares|looks at|gazes|watches|glances|turn their heads|turns his head)\b/.test(act),
     personaje_fijo: Array.isArray(sh.characters) && sh.characters.length > 0,
     plano_cerrado: /close[- ]?up|macro|\b85mm|\b100mm/.test(img + ' ' + cam),
     plano_abierto: /wide shot|extreme wide|aerial|establishing|\b24mm|\b16mm|\b14mm/.test(img),
     explosion_fx: /explo|blast|fireball|mushroom cloud|detonat|shockwave/.test(all),
     // Vehículo que SE DESPLAZA en la toma (un bote como escenario no cuenta): sustantivo + verbo de desplazamiento.
-    vehiculo: /\b(plane|planes|bomber|bombers|aircraft|jet|jets|car|cars|truck|trucks|sedan|train|ship|ships|boat|boats|tank|tanks|helicopter|rocket|missile|vehicle|convoy)\b[^.;]{0,70}\b(drives?|driving|rolls?|rolling|flies|flying|fly|soars?|takes? off|lands?|landing|speeds?|races?|sails?|sailing|moves? (?:forward|along|across|toward|away)|glides?|gliding|taxis?|cruises?|climbs?|dives?|launch(?:es)?|streaks?|advances?|pulls? (?:away|out|in))\b/.test(act),
+    vehiculo: /\b(plane|planes|bomber|bombers|aircraft|jet|jets|car|cars|truck|trucks|sedan|train|ship|ships|boat|boats|tank|tanks|helicopter|rocket|missile|vehicle|convoy)\b[^.;,]{0,60}\b(drives?|driving|rolls?|rolling|flies|flying|fly|soars?|takes? off|lands?|speeds?|races?|sails?|sailing|moves? (?:forward|along|across|toward|away)|glides?|gliding|taxis?|cruises?|climbs?|dives?|launch(?:es)?|streaks?|advances?|pulls? (?:away|out|in))\b/.test(act),
     solo_camara: !!sh.camera_only
   };
 }

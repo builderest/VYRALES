@@ -50,6 +50,7 @@ module.exports = {
   flow_lugar: { label: 'Flow: imagen de un lugar', help: 'Imagen fija de un lugar con Google Flow ($0)', special: 'flow_lugar', arg: /^[a-z0-9_]{3,60}:[^:\n\r]{1,80}$/, hidden: true },
   flow_cara: { label: 'Flow: fotos de personaje', help: 'Fotos de cara de personajes con Google Flow ($0)', special: 'flow_cara', arg: /^[a-z0-9_]{3,60}(:[0-9a-fA-F-]{8,40})?$/, hidden: true },
   voz_ingles: { label: 'Pista de audio en inglés', help: 'Traduce (Claude), voz en inglés en una toma (~$0.35; $0 si ya existe y el guion no cambió; :nueva fuerza), sincroniza con las tomas y saca el audio para YouTube', special: 'voz_ingles', arg: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(:nueva)?$/i, hidden: true },
+  preflight: { label: 'Pre-vuelo del episodio', help: 'Antes de producir: el cerebro marca las tomas con riesgo y Claude las corrige con el cambio mínimo ($0)', special: 'preflight', arg: /^[0-9a-f-]{36}$/i, hidden: true },
   cerebro_cargar: { label: 'Cerebro: cargar historial', help: 'Lee todos los veredictos (QA + tus aprobaciones/rechazos individuales) y recalcula los patrones ($0)', special: 'cerebro_cargar', hidden: true },
   cerebro_pensar: { label: 'Cerebro: pensar', help: 'Recalcula los patrones con evidencia + análisis de Claude que solo opina ($0)', special: 'cerebro_pensar', hidden: true },
   claude_aprender: { label: 'Claude aprende', help: 'Convierte las lecciones nuevas (correcciones y arreglos) en reglas de su memoria profesional ($0)', special: 'claude_aprender', hidden: true },

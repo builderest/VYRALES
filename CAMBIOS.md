@@ -181,3 +181,20 @@ experimento (`doc.forzados`: ¿quién tenía razón?).
 - Memoria: regla #2 de Franklin (la libertad de decir que no con datos; él conserva la última palabra).
 - Probado de punta a punta: cambio malo en EP20 T1 → 409 y la toma quedó intacta; regla [PRUEBA] de multitudes con push-in →
   Claude la objetó con datos y propuso dividir en 2 tomas; ambas se resolvieron con "Tienes razón" (regla borrada).
+
+## 2026-10-14 — Prueba real El Chapo (supervisada) · arreglos que salieron
+- Push `d75a1fd` a producción (cerebro, especialista, objeciones, LTX-safe, Producción 3 salas).
+- Guion regenerado `largo-mv7m61qa6ndt` → EP25 (148 tomas) + Shorts EP26–28; en Produciendo (EP20–24 sacados, no borrados).
+  Viejo EP20 → nuevo: personaje 0→34, lugar fijo 0→34, cámara que se acerca 19→4, frágiles 30→3, 4+ personas 5→2.
+- **Importador con personajes fijos** (1ª vez que llegan de verdad): `import-largo.js` completa `key`/`role` y pone
+  Veo Fast como respaldo cuando hay referencias; `_series.js`: en `narrado_unico` no exige voz/ropa fija/prefijo del tag, y
+  las tomas pueden nombrar al personaje por NOMBRE (así lo busca `_keyframe.js`); `toEpisodeRows` no inventa ropa fija.
+- **Detectores del cerebro afinados** (daban falsos positivos y ensuciaban las estadísticas): multi-acción solo si el
+  "while" mete OTRA persona; multitud solo gente ("rows of soldiers", no "rows of cans"; "army soldiers" no es multitud);
+  movimiento sutil solo personas; vehículo solo si el verbo es del vehículo (sin cruzar comas, sin "landing gear").
+- **NUEVO `agente/preflight.js`** (comando `preflight:<ep>`): ANTES de producir, el cerebro marca las tomas con riesgo y
+  Claude las corrige con el cambio mínimo (misma narración/sujeto/personaje/lugar); guarda `shot.preflight` (antes→después).
+  EP25: 21 tomas corregidas (aviones estacionados con hélices girando, sin papeles, grupos de 3, fondos simples).
+- Serie `cibertales_historia_completa`: `flow_characters=true` (las tomas con El Chapo van por Flow $0 con su foto como
+  ingrediente; antes habrían ido por Gemini ~$2.30).
+- Tomas fijas nuevas con imagen (Flow): "Celda de ADX Florence", "Lavandería de Puente Grande".

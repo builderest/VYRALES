@@ -17,6 +17,10 @@ const fixShots = (shots) => (shots || []).map((s, i) => {
     action_en: clean(s.action_en) || ('The main subject of the scene moves naturally and continuously, matching the narration: ' + start.slice(0, 160)) });
 });
 function seriesJson({ slug, title, synopsis, tipo, sbExtra, narration, ep, aspect, characters, locations }) {
+  // Personajes fijos del guion (oct-14: es la 1ª vez que llegan de verdad): el validador exige key y role.
+  const slugK = (t) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+  const chars = (Array.isArray(characters) ? characters : []).filter((c) => c && c.name).map((c, i) => Object.assign({}, c, { key: c.key || slugK(c.name), role: c.role || (i === 0 ? 'protagonista' : 'secundario') }));
+  const hasRefs = chars.length > 0;
   ep = Object.assign({}, ep, { shots: fixShots(ep.shots) });
   const p = TIPOS[tipo] || TIPOS.historia;
   const words = ep.shots.map((s) => (s.dialogue || []).map((d) => d.line).join(' ')).join(' ').split(/\s+/).filter(Boolean).length;
@@ -28,10 +32,10 @@ function seriesJson({ slug, title, synopsis, tipo, sbExtra, narration, ep, aspec
       narration: narration || { engine: 'gemini_tts', voice: p.voz, model: 'gemini-3.8-flash-tts', video_audio: 'none', style: p.vozEstilo, mode: 'continuous' },
       subtitle_style: 'palabra', image_engine: 'flow',
       extras: { Narrador: { who: 'an off-screen narrator who is never visible on camera', voice: 'a deep, resonant adult male documentary narrator voice in neutral Latin American Spanish', voiceover: true } },
-      rules: { keyframes: true, shot_seconds: 8, shots_per_episode: ep.shots.length, max_dialogue_words_per_shot: Math.max(28, maxLine), max_characters_per_shot: 2, max_words_per_episode: Math.max(600, words + 50), shot_model: 'veo_lite', cliffhanger_model: 'veo_lite', reference_images: !!(characters && characters.length) },
+      rules: { keyframes: true, shot_seconds: 8, shots_per_episode: ep.shots.length, max_dialogue_words_per_shot: Math.max(28, maxLine), max_characters_per_shot: 2, max_words_per_episode: Math.max(600, words + 50), shot_model: hasRefs ? 'veo_fast' : 'veo_lite', cliffhanger_model: hasRefs ? 'veo_fast' : 'veo_lite', reference_images: hasRefs }, // con personajes fijos: Veo Fast solo como respaldo (se produce en king)
       locations: Object.assign({ escena: { visual: p.visual, ambient: 'quiet natural ambience' } }, locations || {})
     }, sbExtra || {}),
-    characters: Array.isArray(characters) ? characters : [],
+    characters: chars,
     episodes: [Object.assign({ episode_number: 1 }, ep)]
   };
 }
