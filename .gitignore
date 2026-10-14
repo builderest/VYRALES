@@ -10,3 +10,24 @@ finales/
 pc_generador/en_KING/comfyui_ruta.txt
 pc_generador/en_KING/comfyui.log
 agente/.whisper/
+
+# Medios y archivos de trabajo locales (no van a GitHub: pesan y GitHub rechaza >100 MB)
+*.mp4
+*.mp3
+*.wav
+*.tgz
+*.zip
+._*.json
+_dump_*.json
+_qa_tmp/
+_to_delete/
+_voces/
+backups/
+publicar/
+Analistic/
+Casada Con Mi enemigo/
+Claude outputs/
+Personages/
+VYRALES - YouTube_files/
+pc_generador/en_CRONIX/PC
+/vyrales_logo.png

@@ -26,7 +26,7 @@
 - `netlify/functions/get-episodes.js` — dropdown `allSeries` filtra ocultas. **Pusheado.**
 - `public/dashboard.html` — si la serie activa está oculta, el panel cambia solo a una visible (ya no reaparece `dulce_engano`). **Pusheado (b46c692).**
 - `netlify/functions/analytics.js` — caché **por workspace** (`cache[ws]`) en vez de global; MindFuel ya no muestra datos de VYRALES. **Pusheado (b46c692).**
-- `.env` en Cronix — `DASHBOARD_KEY='@#$%Rm4766102'` entre comillas (el `#` rompía el parseo local y el login admin fallaba). **Local de la PC.**
+- `.env` en Cronix — `DASHBOARD_KEY='(valor en .env, no se escribe aquí)'` entre comillas (el `#` rompía el parseo local y el login admin fallaba). **Local de la PC.**
 
 **El Chapo movido** de `cibertales_curiosidades_completa` (oculta) a `cibertales_historia_completa` (#15-19: 1 largo + 4 shorts). Decisión: rehacer su guion con el sistema nuevo de personajes fijos; borrar los #15-19 viejos SOLO después de verificar e importar el nuevo.
 
@@ -240,3 +240,16 @@ experimento (`doc.forzados`: ¿quién tenía razón?).
   `UND_ERR_CONNECT_TIMEOUT`) en las tomas 1–9. Lo cancelé para no marcar las 146 como fallidas (no se perdió nada: no había
   clips; esas 9 se rehacen al relanzar). No hay forma de encender king desde aquí. **Franklin: encender king (o revisar que
   ComfyUI y Tailscale estén abiertos) y relanzar "Producir" en EP25** — o yo lo relanzo en cuanto king responda.
+
+## 2026-10-14 07:00 — Netlify no publicaba desde c5d82b4: clave en CAMBIOS.md
+- **ERROR EXACTO (log de Netlify):** `Secret env var "DASHBOARD_KEY"'s value detected: found value at line 29 in CAMBIOS.md`
+  → el escáner de secretos de Netlify tumba el build (exit code 2). Desde el commit c5d82b4 NINGÚN push llegó a producción.
+- **Corrección de lo que dije antes:** que `objeciones` diera 401 NO probaba el despliegue (la edge function `auth` responde 401
+  antes de que se sepa si la función existe). Fue una inferencia mal fundada.
+- **Arreglo:** quitado el valor de la clave de CAMBIOS.md. Regla: nunca escribir valores de `.env` en archivos del repo.
+- **Pendiente Franklin:** la clave sigue en el historial de git (commit c5d82b4) → cambiar DASHBOARD_KEY (Netlify → Environment
+  variables y `.env` de Cronix).
+- **07:05 — Push rechazado por GitHub (videos >100 MB).** Un `git add -A` (mi ejemplo de instrucciones) metió 299 archivos
+  locales (videos, imágenes, respaldos, 706 MB) en el commit e47e373. Deshecho con `git reset --mixed origin/main` — ningún
+  archivo borrado, siguen en la carpeta. `.gitignore` ahora excluye medios (*.mp4, *.mp3, *.wav, *.tgz…) y carpetas de trabajo,
+  así que `git add -A` ya es seguro.
