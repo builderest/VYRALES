@@ -93,6 +93,23 @@ exports.handler = async (event) => {
     // Órdenes de la PC en curso (para que los botones sigan "trabajando" aunque recargues el panel).
     let agentJobs = [];
     try { const { data: aj } = await byWs(supabase.from('agent_jobs').select('command, status, created_at').in('status', ['pending', 'running'])).order('created_at').limit(20); agentJobs = aj || []; } catch (_) {}
+    // oct-14: con 28 episodios largos la respuesta pasó de 6 MB → Netlify devolvía 502 (Function.ResponseSizeTooLarge).
+    // Se recortan SOLO en esta respuesta (la base no se toca) campos pesados que la lista del panel no usa:
+    // prompt_preview (prompt de Veo; en narrados LTX arma el suyo), palabras/segmentos/texto de la voz (el editor los saca de
+    // edit-plan), voz anterior, bitácoras del QA y del pre-vuelo, y el prompt largo de cada asset (solo se mira si es voz en off).
+    const narrado = !!(series && series.story_bible && series.story_bible.format === 'narrado_unico');
+    const slimV = (v) => (v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).filter(([k]) => !['words', 'segments', 'text'].includes(k))) : v);
+    for (const e of episodes || []) {
+      for (const sh of e.shots || []) {
+        if (narrado) delete sh.prompt_preview;
+        delete sh.qa_rewrite_from;
+        if (sh.preflight && sh.preflight.antes) sh.preflight = Object.assign({}, sh.preflight, { antes: undefined });
+        if (sh.qa && Array.isArray(sh.qa.attempts)) sh.qa = Object.assign({}, sh.qa, { attempts: undefined, attempts_n: sh.qa.attempts.length });
+      }
+      const c = e.continuity;
+      if (c) { if (c.voice) c.voice = slimV(c.voice); if (c.english) c.english = slimV(c.english); delete c.voice_prev; }
+      for (const a of e.assets || []) if (a.prompt && a.prompt.length > 200) a.prompt = /Voice-over narration/i.test(a.prompt) ? 'Voice-over narration' : '';
+    }
     return {
       statusCode: 200,
       headers: { 'Content-Type': 'application/json' },

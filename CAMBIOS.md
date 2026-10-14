@@ -216,3 +216,16 @@ experimento (`doc.forzados`: ¿quién tenía razón?).
 - Pre-vuelo EP25: 23 tomas corregidas, 3 falsas alarmas; las 6 que siguen marcadas se revisaron a mano y son aceptables
   (cámara domo, teléfono que la narración pide, radio grande y lisa). Detector: "dome camera"/"guard tower" ya no es fondo recargado.
 - Producción EP25 arrancada: flow_frames `e001ae28…` (Flow $0, El Chapo con su foto como ingrediente) + voz_continua `e72e19c9…`.
+
+## 2026-10-14 06:40 — 🔥 Producción: el panel daba HTTP 502 (Franklin, desde el celular)
+- **ERROR EXACTO:** `get-episodes?series=cibertales_historia_completa` → 502 `Function.ResponseSizeTooLarge` (>6 MB, límite de
+  Netlify). **CAUSA:** 28 episodios largos (4 versiones de El Chapo) y el campo `shot.prompt_preview` (prompt de Veo calculado
+  al importar, 2.2 MB, que en narrados nadie usa) + voz palabra por palabra + prompts de assets.
+- **Arreglo inmediato (datos):** se quitó `prompt_preview` de las tomas de las 7 series narradas (35 episodios, 1126 tomas,
+  2.25 MB; es recalculable). Producción respondió 200 con 3.85 MB SIN necesitar despliegue.
+- **Arreglo definitivo (código):** `get-episodes.js` recorta en la respuesta lo que la lista no usa (prompt_preview en narrados,
+  palabras/segmentos/texto de la voz, voice_prev, bitácoras del QA y del pre-vuelo, prompt largo de assets) → 5.80 → 2.05 MB;
+  `_series.js` ya no calcula prompt_preview en narrados.
+- **⚠️ PARA FRANKLIN: Netlify NO desplegó el push d75a1fd.** En producción `mover-produccion`, `objeciones` y `cerebro` dan 404
+  (siguen las funciones viejas). Las 59 funciones empaquetan bien con esbuild → no es el código. INFERENCIA: Netlify no está
+  construyendo (¿créditos/minutos de build agotados o despliegues pausados?). Revisar en app.netlify.com → Deploys.

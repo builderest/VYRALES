@@ -322,7 +322,8 @@ function toEpisodeRows(data) {
         scene_es: s.scene_es,
         dialogue: dialogueList(s.dialogue)
       };
-      shot.prompt_preview = buildShotPrompt(shot, rowsForPreview, data.story_bible);
+      // Narrados: no se guarda el prompt de Veo (LTX arma el suyo; pesaba 2 MB por serie y tumbó get-episodes, oct-14).
+      if (!(data.story_bible && data.story_bible.format === 'narrado_unico')) shot.prompt_preview = buildShotPrompt(shot, rowsForPreview, data.story_bible);
       return shot;
     });
 
