@@ -503,3 +503,8 @@ experimento (`doc.forzados`: ¿quién tenía razón?).
     4 min; `freeImage` reintenta sin los nombres de las personas.
   - **Abierto:** con foto de cara subida como referencia, Flow rechaza por política aun sin nombres (probado tomas
     81–83 de MindFuel EP1, persona real famosa: Tom Daley). Esas tomas terminan en Gemini tras 3 intentos.
+- **Guiones largos que no aparecían en Guiones (pasó varias veces):** el guion terminado solo vivía en la lista de
+  Analítica de ESE navegador y había que darle "Ver y crear en el panel" a mano (si se pidió desde el teléfono, en la
+  PC no aparecía). Revisado: de 7 guiones largos recientes solo 3 se habían creado. Ahora `claude_largo.js` lo crea
+  solo al terminar (import-largo en el canal que lo pidió) y Analítica muestra "ya está en Guiones". Creado a mano
+  el de hoy: "Desmond Doss: salvó a 75 soldados…" (EP29 + Shorts EP30–33).

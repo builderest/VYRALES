@@ -590,6 +590,7 @@ document.addEventListener('click',function(e){var a=e.target.closest&&e.target.c
         const st = $('lgs_' + x.job), bt = $('lgb_' + x.job); if (!st) continue;
         if (g.pending || g.partial) { st.textContent = g.partial ? 'historia escrita · Claude detalla los prompts…' : 'Claude está escribiendo la historia… (' + Math.round((Date.now() - x.at) / 60000) + ' min)'; continue; }
         if (!g.ok) { st.innerHTML = '<span style="color:var(--red)">falló: ' + esc(g.error || '') + '</span>'; bt.innerHTML = `<button class="btn-sm" data-x="${x.job}">Quitar</button>`; bt.firstChild.onclick = () => { store.set(lgKey(), list.filter((y) => y.job !== x.job)); renderLargos(); }; continue; }
+        if (g.imported) { st.textContent = `✔ ya está en Producción → Guiones (EP ${g.imported.long_episode} + ${g.imported.shorts} Shorts)`; bt.innerHTML = `<button class="btn-sm">Quitar</button>`; bt.firstChild.onclick = () => { store.set(lgKey(), list.filter((y) => y.job !== x.job)); renderLargos(); }; continue; }
         st.textContent = `${g.minutes} min · ${g.long.shots.length} tomas · ${(g.shorts || []).length} Shorts`;
         bt.innerHTML = `<button class="btn-sm" style="border-color:rgba(61,220,151,.5);color:var(--green)">Ver y crear en el panel</button>`;
         bt.firstChild.onclick = () => showLargo(x, g);

@@ -97,6 +97,16 @@ async function detail(shots, { aspect, context, title, log }) {
       long: { title: story.title, hook_text: story.hook_text, description: story.description, sources: story.sources || [], characters: story.characters || [], locations: story.locations || {}, chapters: (story.chapters || []).map((c) => c.title), shots: detailed },
       shorts, at: new Date().toISOString() };
     await save(result);
+    // oct-14 (Franklin: "hice un guion y no se pone en Guiones; ha pasado más de una vez"): antes había que abrir
+    // Analítica y darle "Ver y crear en el panel" en el MISMO navegador donde se pidió (la lista vivía en ese
+    // navegador). Ahora el guion terminado se crea solo en el panel (Producción → Guiones) del canal que lo pidió.
+    try {
+      const T = F('_tenant');
+      const r = await T.runInWs(process.env.VYRALES_WS || T.ADMIN_WS, () => F('import-largo').handler({ httpMethod: 'POST', headers: {}, body: JSON.stringify({ job }) }));
+      const o = JSON.parse(r.body || '{}');
+      if (r.statusCode < 300) { console.log(`En el panel → Guiones: "${story.title}" (EP ${o.long_episode}) + ${o.shorts} Short(s)`); await save(Object.assign({}, result, { imported: { long_slug: o.long_slug, long_episode: o.long_episode, shorts: o.shorts } })); }
+      else console.log('⚠ No pude crearlo en el panel (' + (o.error || r.statusCode) + '): créalo desde Analítica.');
+    } catch (e) { console.log('⚠ No pude crearlo en el panel (' + String(e.message).slice(0, 160) + '): créalo desde Analítica.'); }
     console.log(`LISTO en ${Math.round((Date.now() - t0) / 60000)} min → media/guiones/${job}.json`);
   } catch (e) {
     console.log('ERROR:', e.message);
