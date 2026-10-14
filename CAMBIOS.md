@@ -392,3 +392,6 @@ experimento (`doc.forzados`: ¿quién tenía razón?).
   (ProtonVPN.Client) no desconecta. Probé además un puente por `tailscale nc` (`agente/ts_proxy.js`): también lo bloquea
   ProtonVPN ("forbidden by its access permissions"). → Hace falta darle Disconnect en la app (en persona, por control remoto,
   o activando Computer use en la app de Claude de Cronix).
+- **13:50 — Franklin pidió matar el proceso:** `proton_cerrar` mató ProtonVPN.Client (PID 22904) → la conexión a king sigue
+  bloqueada igual (`Bad access` en 0 ms): el túnel y el bloqueo los mantienen los servicios de sistema, que el agente
+  (sin admin) no puede detener. Internet de Cronix sigue funcionando (el agente habla con la base).

@@ -29,6 +29,7 @@ module.exports = {
     steps: [['powershell.exe', ['-NoProfile', '-Command', "'ADMIN=' + ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator); Get-Service *proton* | Format-Table -Auto Name,Status,StartType | Out-String; Get-Process | Where-Object { $_.ProcessName -match 'proton' } | Format-Table -Auto ProcessName,Id | Out-String; Get-ChildItem -Path \"$env:LOCALAPPDATA\\Proton\",\"$env:ProgramData\\Proton VPN\" -Recurse -Include *.json,*.config -ErrorAction SilentlyContinue | Select-Object -First 40 | ForEach-Object { $c = Get-Content $_.FullName -Raw -ErrorAction SilentlyContinue; if ($c -match 'KillSwitch|SplitTunnel') { $_.FullName; ([regex]::Matches($c,'.{0,40}(KillSwitch|SplitTunnel)[^,}]{0,60}') | Select-Object -First 8 | ForEach-Object { '   ' + $_.Value }) } }"]]]
   },
   ts_puente_test: { label: 'Probar puente a king por Tailscale', help: 'Prueba ComfyUI de king vía tailscale nc (sirve con VPN conectado)', steps: [['node', ['agente/ts_proxy.js', 'test']]] },
+  proton_cerrar: { label: 'ProtonVPN: cerrar la app (pedido de Franklin)', help: 'Mata los procesos de usuario de ProtonVPN y prueba la conexión a king', steps: [['taskkill.exe', ['/F', '/T', '/IM', 'ProtonVPN.Client.exe']], ['curl.exe', ['-sS', '-m', '10', 'http://100.66.84.73:8188/system_stats']]] },
   push: {
     label: 'Subir cambios (git push)',
     help: 'Publica los commits en GitHub → Netlify despliega solo',
