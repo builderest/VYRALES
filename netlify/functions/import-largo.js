@@ -63,7 +63,9 @@ exports.handler = async (event) => {
     await doImport(seriesJson({ slug: longSlug, title: p.title + ' · Historias completas', synopsis: 'Historias completas (8–15 min) para YouTube: ' + p.nombre + '.', tipo, narration, ep: longEp, aspect: '16:9', characters: L.characters, locations: L.locations,
       sbExtra: { max_seconds: 1100, end_card: { enabled: true, mode: 'tail', text: 'SUSCRÍBETE', subtext: 'Una historia completa cada semana', voice: '', seconds: 3 } } }));
     const { data: ls } = await sb.from('series').select('id').eq('slug', longSlug).single();
-    const { data: le } = await sb.from('episodes').select('id, episode_number').eq('series_id', ls.id).order('episode_number', { ascending: false }).limit(1).single();
+    // El largo se busca por su TÍTULO (oct-14: si el guion se reimporta, import-series ACTUALIZA el episodio en vez de crear
+    // uno nuevo, y "el último episodio" era un Short → los Shorts quedaban enlazados a sí mismos).
+    const { data: le } = await sb.from('episodes').select('id, episode_number').eq('series_id', ls.id).eq('title', L.title).order('episode_number', { ascending: false }).limit(1).single();
     let shorts = 0;
     for (const s of g.shorts || []) {
       const ep = { title: s.title, continuity: { summary: 'Short que lleva al video completo: ' + L.title, hook_text: s.hook_text || '', pinned_comment: s.pinned_comment || '', cta_to_long: { series: longSlug, episode_id: le.id, title: L.title }, parent_episode_id: le.id, aspect: '9:16', visual_checked: new Date().toISOString(), from_job: job, kind: 'short_cta' }, shots: s.shots };

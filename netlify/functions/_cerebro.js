@@ -62,7 +62,7 @@ function featuresOf(sh) {
     objeto_fragil: /\b(paper|papers|letter|letters|document|documents|map|maps|globe|seal|seals|rope|ropes|wire|wires|cable|cables|book|books|screen|screens|television|televisions|tv|monitor|monitors|clock|sign|banner|poster|chart|blueprint|blueprints|drafting|switch|switches|gauge|gauges|dial|dials|newspaper|pen|telephone|phone|folder|envelope|notebook)\b/.test(all),
     texto: /\b(text|lettering|writing|written|label|headline|newspaper|inscription|sign reads|words on)\b/.test(all),
     humo_relleno: !hazeNarr && /\b(haze|hazy|mist|misty|fog|foggy|smoke|smoky|dust|steam)\b/.test(all),
-    fondo_recargado: /\b(dome|domes|tower|towers|balcony|balconies|columns|colonnade|skyline|cathedral|palace|rows of windows|chandelier|chandeliers|ornate)\b/.test(img),
+    fondo_recargado: /\b(dome|domes|tower|towers|balcony|balconies|columns|colonnade|skyline|cathedral|palace|rows of windows|chandelier|chandeliers|ornate)\b/.test(img.replace(/\b(?:black |smoked |glass )*dome(?: surveillance| security)? camera\b|\bcamera dome\b|\b(?:guard|watch|surveillance) tower\b/g, '')), // una cámara domo o una torre de vigilancia no son fondo recargado
     accion_larga: words(sh.action_en) > 40,
     gesto_fino: /\b(finger|fingers|signs the|signing|writes|writing|types|typing|flips|presses|turns the dial|hand pushes|slides the|passes the|hands over|taps)\b/.test(act),
     sujeto_sale: /\b(out of (?:the )?frame|exits|leaves the frame|walks away|disappears|enters the frame|into (?:the )?frame|off-screen)\b/.test(act),

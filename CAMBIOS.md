@@ -207,3 +207,12 @@ experimento (`doc.forzados`: ¿quién tenía razón?).
   reusar una historia ya escrita (sin volver a pedirla). Afectados en el pasado: todas las versiones de El Chapo
   (EP15–19, EP20–24) y una de "hobbits" no producida. **Toba, EP6 y EP11 NO pasaron por repaso → sanos.**
   El Chapo se rehace: job `largo-mv7o2ert5zy6` (misma historia de Claude, `_to_delete/elchapo_historia_2026-10-14.txt`).
+- Guion rehecho `largo-mv7o2ert5zy6`: **✅ guardián: narración idéntica palabra por palabra (1606 palabras)**; repaso de 5
+  tomas sin partir. Orden verificado (Kate del Castillo T101 → Sean Penn T102 → juicio T118).
+- 🐞 `import-largo.js`: al REIMPORTAR un guion con el mismo título, import-series ACTUALIZA EP25–28 (no crea nuevos) y el
+  importador tomaba "el último episodio" (un Short) como el largo → los Shorts quedaban enlazados a EP28. Ahora busca el
+  largo por su título. Se corrigieron a mano: EP26–28 → padre/cta = EP25. (Además yo había archivado EP25–28 creyendo que
+  era la versión revuelta: se devolvieron a guion_generado. No se perdió nada.) Las 2 imágenes viejas (T4, T6) → frame_stale.
+- Pre-vuelo EP25: 23 tomas corregidas, 3 falsas alarmas; las 6 que siguen marcadas se revisaron a mano y son aceptables
+  (cámara domo, teléfono que la narración pide, radio grande y lisa). Detector: "dome camera"/"guard tower" ya no es fondo recargado.
+- Producción EP25 arrancada: flow_frames `e001ae28…` (Flow $0, El Chapo con su foto como ingrediente) + voz_continua `e72e19c9…`.
