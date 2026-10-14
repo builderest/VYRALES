@@ -2658,7 +2658,7 @@
         const missing = (ep.shots || []).filter(sh => sh.frame_stale || (!frameFor(ep, sh.n) && !clipFor(ep, sh.n))).length;
         // Series con image_engine 'flow' y tomas sin personajes: Google Flow en la PC (gratis), no Gemini por API.
         const sbF = (lastLoadedData && lastLoadedData.series && lastLoadedData.series.story_bible) || {};
-        const useFlow = sbF.image_engine === 'flow' && (sbF.flow_characters === true || !(ep.shots || []).some(sh => (sh.characters || []).length));
+        const useFlow = sbF.image_engine === 'flow' && sbF.flow_characters !== false;
         if (useFlow) {
           if (!await askConfirm('Generar ' + missing + ' cuadros del EP ' + ep.episode_number + ' con Google Flow en la PC (tu plan, $0).\n\nCorre en segundo plano en Cronix: Flow las hace en lotes de 6 (~1 min por lote). Antes, un revisor corrige las imágenes que no muestran lo que dice el narrador (~$0.04). Si Google pide iniciar sesión, se abre la ventana de Chrome. ¿Continuar?')) return;
           btn.disabled = true;
@@ -2867,7 +2867,7 @@
         // Series con Google Flow: la toma se hace con Flow en la PC ($0), no con Gemini por API.
         const sbK = (lastLoadedData && lastLoadedData.series && lastLoadedData.series.story_bible) || {};
         const shK = (ep.shots || []).find(x => x.n === n) || {};
-        if (sbK.image_engine === 'flow' && (sbK.flow_characters === true || !(shK.characters || []).length)) {
+        if (sbK.image_engine === 'flow' && sbK.flow_characters !== false) {
           if (btn) btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>Flow en la PC...';
           try { await agentOrder('flow_frames:' + episodeId + ':' + n); } catch (err) { alert('No se pudo mandar a la PC: ' + err.message); return loadDashboard(); }
           const okF = await pollUntil(d => { const cur = (d.episodes || []).find(x => x.id === episodeId); const f = cur && frameFor(cur, n); return f && f.updated_at !== prevUpdated; }, 10 * 60 * 1000);
@@ -3275,7 +3275,7 @@
                                 ? '<button type="button" onclick="openMedia(this)" data-src="' + esc(frame.storage_path) + '" data-kind="image" data-title="EP ' + e.episode_number + ' · Toma ' + sh.n + ' · cuadro inicial" class="relative" title="Ver cuadro inicial"><img src="' + esc(frame.storage_path) + '" class="h-16 w-9 object-cover rounded border border-cyber-border hover:border-cyber-cyan"></button>'
                                 : '') +
                               (canGenerateShots && !clip
-                                ? (((data.series.story_bible || {}).image_engine === 'flow' && (((data.series.story_bible || {}).flow_characters === true) || !(sh.characters || []).length))
+                                ? (((data.series.story_bible || {}).image_engine === 'flow' && ((data.series.story_bible || {}).flow_characters !== false))
                                   ? '<button onclick="openShotEditor(\'' + e.id + '\',' + sh.n + ')" class="text-[10px] font-mono px-2 py-0.5 rounded border border-cyber-emerald/40 text-cyber-emerald bg-cyber-emerald/10 hover:bg-cyber-emerald/20" title="Abre la toma: revisa la imagen y su prompt y dale Nueva imagen (Google Flow en tu PC, $0)"><i class="fa-solid fa-image mr-1"></i>' + (frame ? 'Regenerar cuadro' : '1 · Generar cuadro') + ' · TOMA ' + String(sh.n).padStart(2, '0') + ' (Google Flow, $0)</button>'
                                   : '<button onclick="openPromptEditor(this)" data-kind="keyframe" data-ep="' + e.id + '" data-n="' + sh.n + '" data-mode="generate" class="text-[10px] font-mono px-2 py-0.5 rounded border border-cyber-violet/40 text-cyber-violet bg-cyber-violet/10 hover:bg-cyber-violet/20"><i class="fa-solid fa-image mr-1"></i>' + (frame ? 'Regenerar cuadro' : '1 · Generar cuadro') + ' · TOMA ' + String(sh.n).padStart(2, '0') + ' (~$' + (IMAGE_PRICE_USD * (locMissing ? 2 : 1)).toFixed(2) + (locMissing ? ', incluye lugar' : '') + ')</button>')
                                 : '') +
@@ -3289,7 +3289,7 @@
                                 (nar ? ' data-narr="' + esc(nar.url) + '" data-narr-secs="' + (nar.seconds || 6) + '" data-mute="' + (/Voice-over narration/i.test(clip.prompt || '') ? '1' : '0') + '"' : '') +
                                 ' class="text-[10px] font-mono text-cyber-emerald hover:underline"><i class="fa-solid fa-circle-play mr-1"></i>Ver toma generada' + (nar ? ' con narración' : '') + ' (' + (clip.approved ? 'aprobada' : 'pendiente de revisión') + ')</button>';
                             })()
-                          : (canGenerateShots
+                          : (canGenerateShots && !(kf && !frame && (data.series.story_bible || {}).image_engine === 'flow') // oct-14: con Flow, primero el cuadro ($0); nunca "cuadro + animar" pagado
                               ? '<button onclick="openPromptEditor(this)" data-kind="video" data-ep="' + e.id + '" data-n="' + sh.n + '" data-mode="generate" data-cost="' + shotCost + '" class="text-[10px] font-mono px-2 py-0.5 rounded border border-cyber-gold/40 text-cyber-gold bg-cyber-gold/10 hover:bg-cyber-gold/20"><i class="fa-solid fa-flask mr-1"></i>' + (kf ? (frame ? '2 · Animar TOMA ' + String(sh.n).padStart(2, '0') : 'Cuadro + animar TOMA ' + String(sh.n).padStart(2, '0')) : 'Generar solo la TOMA ' + String(sh.n).padStart(2, '0')) + ' (~$' + shotCost + ')</button>'
                               : '')) +
                       '</div>' +
@@ -3304,7 +3304,7 @@
           const busyLabel = busyJob ? (busyJob.status === 'pending' ? 'En la fila de la PC (espera su turno)…' : /^flow_/.test(busyJob.command) ? 'Google Flow en tu PC: haciendo cuadros… (faltan ' + missingFrames + ')' : /^voz_continua/.test(busyJob.command) ? 'Generando la voz continua en tu PC…' : /^claude_pulir/.test(busyJob.command) ? 'Claude en tu PC: puliendo la narración…' : /^claude_/.test(busyJob.command) ? 'Claude en tu PC: escribiendo prompts…' : 'Tu PC está produciendo los videos de este episodio…') : '';
           const busyBtn = busyJob ? '<span class="mr-2 mb-1 inline-block px-3 py-1.5 rounded-lg bg-cyber-gold/10 border border-cyber-gold/50 text-cyber-gold text-xs font-mono"><i class="fa-solid fa-spinner fa-spin mr-1"></i>' + busyLabel + '</span>' : '';
           const framesBtn = busyJob ? busyBtn : (e.status === 'guion_generado' && missingFrames)
-            ? '<button onclick="generateAllFrames(this)" data-ep="' + e.id + '" class="mr-2 mb-1 px-3 py-1.5 rounded-lg bg-cyber-violet/15 border border-cyber-violet/50 text-cyber-violet text-xs font-mono hover:bg-cyber-violet/25"><i class="fa-solid fa-images mr-1"></i>Generar los ' + missingFrames + ' cuadros que faltan' + (missingLocationsFor(e).length ? ' + ' + missingLocationsFor(e).length + ' lugares' : '') + ' (' + ((((lastLoadedData && lastLoadedData.series && lastLoadedData.series.story_bible) || {}).image_engine === 'flow' && ((((lastLoadedData && lastLoadedData.series && lastLoadedData.series.story_bible) || {}).flow_characters === true) || !(e.shots || []).some(sh => (sh.characters || []).length))) ? 'Google Flow, $0' : '~$' + ((missingFrames + missingLocationsFor(e).length) * IMAGE_PRICE_USD).toFixed(2)) + ') para revisarlos</button>'
+            ? '<button onclick="generateAllFrames(this)" data-ep="' + e.id + '" class="mr-2 mb-1 px-3 py-1.5 rounded-lg bg-cyber-violet/15 border border-cyber-violet/50 text-cyber-violet text-xs font-mono hover:bg-cyber-violet/25"><i class="fa-solid fa-images mr-1"></i>Generar los ' + missingFrames + ' cuadros que faltan' + (missingLocationsFor(e).length ? ' + ' + missingLocationsFor(e).length + ' lugares' : '') + ' (' + ((((lastLoadedData && lastLoadedData.series && lastLoadedData.series.story_bible) || {}).image_engine === 'flow' && (((lastLoadedData && lastLoadedData.series && lastLoadedData.series.story_bible) || {}).flow_characters !== false)) ? 'Google Flow, $0' : '~$' + ((missingFrames + missingLocationsFor(e).length) * IMAGE_PRICE_USD).toFixed(2)) + ') para revisarlos</button>'
             : '';
           const narrMissing = narrationCfg(data.series) ? shots.filter(sh => { const ns = narrationState(data.series, sh); return ns && !ns.ok; }).length : 0;
           const narrRun = narrationRunning(e);

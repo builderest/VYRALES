@@ -484,3 +484,9 @@ experimento (`doc.forzados`: ¿quién tenía razón?).
   `shot-edit.js`: las correcciones de Franklin en cualquier canal suyo ya son lecciones (antes solo en el principal).
   `claude_aprender.js`: solo reglas de oficio, nada del tema/tono/idioma de un canal. Verificado: Admin y MindFuel leen
   las mismas 32 reglas y 754 evidencias del cerebro; Wander (otro usuario) no.
+- **Botones de cuadro cobraban en tomas con personajes:** el panel solo usaba Flow si la toma NO tenía personajes
+  (o si la serie tenía `flow_characters: true`, que ninguna tenía) → "Generar cuadro (~$0.13, incluye lugar)" iba a
+  Gemini pagado. Ahora Flow es lo normal también con personajes (solo `flow_characters: false` lo apaga): botón por
+  toma, "generar todos" y `_keyframe.js` (Flow con fotos de personajes, solo en la PC). Y en series con Flow ya no
+  se ofrece "Cuadro + animar" mientras la toma no tiene cuadro (ese camino generaba el cuadro con Gemini).
+  Revisado `generation_log` de MindFuel: todo $0 hasta ahora (personajes y lugar con Flow).

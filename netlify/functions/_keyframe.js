@@ -211,8 +211,9 @@ async function createKeyframe(supabase, { series, episode, shot, characters, log
   if (flux && (shot.image_engine || series.story_bible.image_engine) === 'flow') {
     try { img = await flowMod().flowImage({ prompt: fluxText, aspect }); log('cuadro inicial de Google Flow' + (aspect === '16:9' ? ' (16:9)' : '')); }
     catch (e) { log('Flow falló (' + String(e.message).slice(0, 160) + ') → FLUX en king'); img = await fluxImage({ prompt: fluxText, aspect }); }
-  } else if (!flux && (shot.characters || []).length && series.story_bible.flow_characters === true && (shot.image_engine || series.story_bible.image_engine) === 'flow') {
+  } else if (!flux && (shot.characters || []).length && series.story_bible.flow_characters !== false && process.env.VYRALES_LOCAL_RUN && (shot.image_engine || series.story_bible.image_engine) === 'flow') {
     // Personajes con Google Flow: se suben sus fotos de cara como "ingredientes" ($0). Si falla → Gemini.
+    // oct-14: Flow con personajes es lo normal (flow_characters solo lo apaga si es false); Flow solo existe en la PC.
     try {
       const refPrompt = 'Reference images in order: ' + refs.map((r, i) => `image ${i + 1} = ${r.label}`).join('; ') + '. ' + prompt;
       img = await flowMod().flowImage({ prompt: refPrompt, refs });
