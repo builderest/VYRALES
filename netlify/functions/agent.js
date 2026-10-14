@@ -35,7 +35,7 @@ exports.handler = async (event) => {
       }
       // Producir / rehacer en la PC esperan su turno en la fila (el agente las hace una por una);
       // los comandos de la Terminal no se encolan si hay algo corriendo.
-      const queueable = ['gen_local', 'regen_local', 'qa_tomas', 'voz_continua', 'flow_frames', 'flow_lugar', 'claude_pulir', 'claude_revisar', 'claude_detalle', 'claude_guion', 'claude_largo', 'claude_ideas', 'grabar_demo_tiktok'].includes(name);
+      const queueable = ['gen_local', 'regen_local', 'qa_tomas', 'voz_continua', 'flow_frames', 'flow_lugar', 'claude_pulir', 'claude_revisar', 'claude_detalle', 'claude_guion', 'claude_largo', 'claude_ideas', 'grabar_demo_tiktok', 'short_reusar'].includes(name);
       if (!queueable) {
         if (!isAdmin) return json(403, { error: 'La Terminal es solo del administrador.' });
         const { data: busy } = await sb.from('agent_jobs').select('id').in('status', ['pending', 'running']).limit(1);

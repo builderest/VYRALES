@@ -508,3 +508,8 @@ experimento (`doc.forzados`: ¿quién tenía razón?).
   PC no aparecía). Revisado: de 7 guiones largos recientes solo 3 se habían creado. Ahora `claude_largo.js` lo crea
   solo al terminar (import-largo en el canal que lo pidió) y Analítica muestra "ya está en Guiones". Creado a mano
   el de hoy: "Desmond Doss: salvó a 75 soldados…" (EP29 + Shorts EP30–33).
+- **Shorts que faltan de un largo ya hecho (Franklin):** si el largo estaba "en revisión" no había botón para sus
+  Shorts sin hacer ("Mover a producir" solo salía con el largo en guion). Ahora en Guiones, en "SHORTS DE ESTE VIDEO",
+  sale "Hacer los N Shorts que faltan ($0)" cuando el largo ya tiene tomas: manda `short_reusar` por cada uno (usa
+  las tomas del largo y su propia narración). `agent.js`: `short_reusar` entra a la fila (antes se rechazaba si la
+  PC estaba ocupada).

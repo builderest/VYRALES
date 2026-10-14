@@ -3390,9 +3390,20 @@
           const ks = kids[e.id] || [];
           if (!ks.length) return renderOne(e);
           const ready = ks.filter(k => (k.assets || []).some(a => a.kind === 'final_render')).length;
+          // oct-14 (Franklin): Shorts que faltan de un largo YA hecho → se hacen aquí mismo (reusan las tomas del largo, $0),
+          // sin tener que mover el grupo a producción (el largo ya está en revisión y no se podía).
+          const longHasClips = (e.assets || []).some(a => a.kind === 'video_clip');
+          const jobsTxt = (data.agent_jobs || []).map(j => String(j.command)).join(' ');
+          const faltan = ks.filter(k => k.status === 'guion_generado' && !(k.assets || []).some(a => a.kind === 'final_render'));
+          const enCola = faltan.filter(k => jobsTxt.includes(k.id));
+          const pend = faltan.filter(k => !jobsTxt.includes(k.id));
+          const shortsBtn = !longHasClips || !faltan.length ? ''
+            : pend.length
+              ? ' <button onclick="event.stopPropagation();event.preventDefault();hacerShorts(this,\'' + pend.map(k => k.id).join(',') + '\')" class="ml-2 text-[10px] font-mono px-2 py-0.5 rounded border border-cyber-pink/60 text-cyber-pink bg-cyber-pink/15 hover:bg-cyber-pink/25"><i class="fa-solid fa-bolt mr-1"></i>Hacer ' + (pend.length === 1 ? 'el Short que falta' : 'los ' + pend.length + ' Shorts que faltan') + ' ($0)</button>'
+              : ' <span class="ml-2 text-[10px] font-mono text-cyber-gold"><i class="fa-solid fa-spinner fa-spin mr-1"></i>' + enCola.length + ' Short(s) en tu PC…</span>';
           return '<div class="rounded-xl border border-cyber-pink/30 p-1.5 space-y-1.5">' + renderOne(e) +
             '<details class="ml-4 rounded-lg border border-cyber-pink/30 bg-cyber-pink/5" data-ep-id="shorts-' + e.id + '"' + (openEps.has('shorts-' + e.id) ? ' open' : '') + '>' +
-              '<summary class="cursor-pointer px-3 py-2 text-xs font-mono text-cyber-pink list-none"><i class="fa-solid fa-mobile-screen mr-1"></i>SHORTS DE ESTE VIDEO (' + ks.length + ') · vertical · llevan al video completo · ' + ready + '/' + ks.length + ' listos</summary>' +
+              '<summary class="cursor-pointer px-3 py-2 text-xs font-mono text-cyber-pink list-none"><i class="fa-solid fa-mobile-screen mr-1"></i>SHORTS DE ESTE VIDEO (' + ks.length + ') · vertical · llevan al video completo · ' + ready + '/' + ks.length + ' listos' + shortsBtn + '</summary>' +
               '<div class="p-1.5 space-y-1.5">' + ks.map(renderOne).join('') + '</div>' +
             '</details></div>';
         }).join('');
@@ -3827,6 +3838,15 @@
         if (b) b.onclick = () => go('cerebro_cargar', b);
       }
 
+      // Shorts de un largo ya hecho: cada uno con short_reusar en la PC (usa las tomas del largo, su propia narración, $0).
+      window.hacerShorts = async function(btn, ids) {
+        const list = String(ids || '').split(',').filter(Boolean);
+        if (!list.length) return;
+        btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>Mandando a tu PC…';
+        try { for (const id of list) await agentOrder('short_reusar:' + id); }
+        catch (err) { alert('No se pudo mandar a la PC: ' + err.message); }
+        loadDashboard();
+      };
       window.moverProduccion = async function(episodeId, on) {
         try {
           const r = await fetch('/.netlify/functions/mover-produccion', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ episode_id: episodeId, on: on !== false }) });
