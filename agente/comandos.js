@@ -18,6 +18,11 @@ module.exports = {
     help: 'Reglas de salida bloqueadas, perfil de red, ruta hacia king',
     steps: [['powershell.exe', ['-NoProfile', '-Command', "Get-NetConnectionProfile | Format-Table -Auto Name,InterfaceAlias,NetworkCategory | Out-String -Width 200; Get-NetFirewallProfile | Format-Table -Auto Name,Enabled,DefaultOutboundAction | Out-String -Width 200; Get-NetFirewallRule -Direction Outbound -Action Block -Enabled True | Select-Object -First 30 DisplayName,Profile | Format-Table -Auto | Out-String -Width 200; Find-NetRoute -RemoteIPAddress 100.66.84.73 | Select-Object -Last 1 InterfaceAlias,NextHop | Format-Table -Auto | Out-String; Get-Service | Where-Object { $_.DisplayName -match 'VPN|Firewall|Portmaster|GlassWire|Proton|Nord|Express|Surfshark|Warp|Cloudflare|Netlimiter|Kaspersky|Norton|McAfee|Avast|AVG|Bitdefender|ESET' -and $_.Status -eq 'Running' } | Format-Table -Auto Name,DisplayName | Out-String -Width 200"]]]
   },
+  red_diag3: {
+    label: 'Diagnóstico de red 3 (cuándo se conectó cada red)',
+    help: 'Historial de conexiones de red de hoy (VPN, Tailscale, Ethernet) y reinicios',
+    steps: [['powershell.exe', ['-NoProfile', '-Command', "Get-WinEvent -FilterHashtable @{LogName='Microsoft-Windows-NetworkProfile/Operational'; StartTime=(Get-Date).Date.AddHours(-6)} -ErrorAction SilentlyContinue | Where-Object { $_.Id -in 10000,10001 } | Select-Object -First 40 TimeCreated,Id,@{n='Red';e={($_.Message -split [Environment]::NewLine | Select-String 'Name:|Nombre:' | Select-Object -First 1).ToString().Trim()}} | Format-Table -Auto | Out-String -Width 200; Get-WinEvent -FilterHashtable @{LogName='System'; Id=6005,6006,1074; StartTime=(Get-Date).Date.AddHours(-6)} -ErrorAction SilentlyContinue | Select-Object -First 15 TimeCreated,Id | Format-Table -Auto | Out-String"]]]
+  },
   push: {
     label: 'Subir cambios (git push)',
     help: 'Publica los commits en GitHub → Netlify despliega solo',

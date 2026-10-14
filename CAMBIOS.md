@@ -383,3 +383,7 @@ experimento (`doc.forzados`: ¿quién tenía razón?).
 - INFERENCIA: tras los reinicios de Windows de esta mañana (4:29 y 6:16), ProtonVPN se conectó solo al arrancar.
 - **Arreglo (Franklin):** desconectar ProtonVPN en Cronix, o en ProtonVPN → Split tunneling excluir Tailscale / la red
   100.64.0.0/10, o desactivar el kill switch / "conectar al iniciar". No lo toco yo: es una configuración de seguridad.
+- **Línea de tiempo (registro de Windows de Cronix, `red_diag3`):** 4:29 y 4:33 AM dos reinicios pedidos por un programa
+  (evento 1074, típico de Windows Update) → muere el QA. 6:17:41 AM se conecta **ProtonVPN** (antes no aparece en el día).
+  6:46 AM el agente retoma el QA y desde ahí TODO falla. O sea: el VPN no cortó un trabajo en marcha; se conectó después
+  del reinicio, cuando el QA ya estaba muerto, y bloqueó el reintento.
