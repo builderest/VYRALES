@@ -23,6 +23,12 @@ module.exports = {
     help: 'Historial de conexiones de red de hoy (VPN, Tailscale, Ethernet) y reinicios',
     steps: [['powershell.exe', ['-NoProfile', '-Command', "Get-WinEvent -FilterHashtable @{LogName='Microsoft-Windows-NetworkProfile/Operational'; StartTime=(Get-Date).Date.AddHours(-6)} -ErrorAction SilentlyContinue | Where-Object { $_.Id -in 10000,10001 } | Select-Object -First 40 TimeCreated,Id,@{n='Red';e={($_.Message -split [Environment]::NewLine | Select-String 'Name:|Nombre:' | Select-Object -First 1).ToString().Trim()}} | Format-Table -Auto | Out-String -Width 200; Get-WinEvent -FilterHashtable @{LogName='System'; Id=6005,6006,1074; StartTime=(Get-Date).Date.AddHours(-6)} -ErrorAction SilentlyContinue | Select-Object -First 15 TimeCreated,Id | Format-Table -Auto | Out-String"]]]
   },
+  proton_info: {
+    label: 'ProtonVPN: ver modo (solo lectura)',
+    help: 'Admin del agente, procesos/servicios de ProtonVPN y su ajuste de kill switch',
+    steps: [['powershell.exe', ['-NoProfile', '-Command', "'ADMIN=' + ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator); Get-Service *proton* | Format-Table -Auto Name,Status,StartType | Out-String; Get-Process | Where-Object { $_.ProcessName -match 'proton' } | Format-Table -Auto ProcessName,Id | Out-String; Get-ChildItem -Path \"$env:LOCALAPPDATA\\Proton\",\"$env:ProgramData\\Proton VPN\" -Recurse -Include *.json,*.config -ErrorAction SilentlyContinue | Select-Object -First 40 | ForEach-Object { $c = Get-Content $_.FullName -Raw -ErrorAction SilentlyContinue; if ($c -match 'KillSwitch|SplitTunnel') { $_.FullName; ([regex]::Matches($c,'.{0,40}(KillSwitch|SplitTunnel)[^,}]{0,60}') | Select-Object -First 8 | ForEach-Object { '   ' + $_.Value }) } }"]]]
+  },
+  ts_puente_test: { label: 'Probar puente a king por Tailscale', help: 'Prueba ComfyUI de king vía tailscale nc (sirve con VPN conectado)', steps: [['node', ['agente/ts_proxy.js', 'test']]] },
   push: {
     label: 'Subir cambios (git push)',
     help: 'Publica los commits en GitHub → Netlify despliega solo',

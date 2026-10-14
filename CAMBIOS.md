@@ -387,3 +387,8 @@ experimento (`doc.forzados`: ¿quién tenía razón?).
   (evento 1074, típico de Windows Update) → muere el QA. 6:17:41 AM se conecta **ProtonVPN** (antes no aparece en el día).
   6:46 AM el agente retoma el QA y desde ahí TODO falla. O sea: el VPN no cortó un trabajo en marcha; se conectó después
   del reinicio, cuando el QA ya estaba muerto, y bloqueó el reintento.
+- **Intento de cerrarlo con el agente (13:45):** el agente NO es administrador (`proton_info`: ADMIN=False) y el túnel lo
+  mantienen dos servicios de Windows (ProtonVPN Service + WireGuard) que solo un admin puede detener. Cerrar la ventana
+  (ProtonVPN.Client) no desconecta. Probé además un puente por `tailscale nc` (`agente/ts_proxy.js`): también lo bloquea
+  ProtonVPN ("forbidden by its access permissions"). → Hace falta darle Disconnect en la app (en persona, por control remoto,
+  o activando Computer use en la app de Claude de Cronix).
