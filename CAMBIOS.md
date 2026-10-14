@@ -354,3 +354,12 @@ experimento (`doc.forzados`: ¿quién tenía razón?).
 - **Cláusula estricta (sin personas):** cortes antes 4/18 (22 %) → después 6/42 (14 %). Mejora, pero aún sin
   significancia estadística; se sigue midiendo.
 - Las 13 malas son TODAS sin personas excepto T65 → el problema de LTX está en planos de solo lugar.
+
+## 2026-10-14 11:50 — 🔥 El QA llevaba 2 h 17 min MUERTO (no corriendo)
+- **EVIDENCIA:** el último clip rehecho por el QA fue T31 a las 09:29 UTC; `agente.log` muestra "arrancando agente" a las
+  4:29 AM (= 09:29 UTC) y 6:16 AM: la PC/agente se reinició y mató el proceso. En la base el trabajo seguía "running" y
+  nadie lo retomaba (el panel parecía trabajando).
+- **Arreglo (`agente/agente.js` → `recoverOrphans`)**: al arrancar, todo trabajo "running" es huérfano → se marca cortado y
+  los largos (gen_local, regen_local, render_full, qa_tomas, flow_frames, voz_ingles, short_reusar) se re-encolan una vez.
+  Probado: a las 11:46 UTC el agente se reinició solo con el código nuevo y retomó gen_local de EP25 (salta las 146 tomas
+  hechas y corre el QA ya con todas las mejoras de hoy).

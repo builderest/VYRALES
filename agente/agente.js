@@ -561,6 +561,19 @@ async function tick() {
 }
 log('Agente de VYRALES activo en', ROOT, '— comandos:', Object.keys(COMMANDS).join(', '));
 log('Deja esta ventana abierta. Para apagarlo: Ctrl+C.');
-setInterval(tick, 3000);
-tick();
+// Trabajos HUÉRFANOS (oct-14): si la PC o el agente se reinician a mitad de un trabajo, en la base queda "running" para
+// siempre y nadie lo retoma (el QA de El Chapo quedó 2 h 17 min muerto en la toma 31). Al arrancar, nada puede estar
+// corriendo de verdad: se marcan como cortados y los largos se vuelven a encolar UNA vez (gen_local salta lo ya hecho).
+async function recoverOrphans() {
+  try {
+    const { data: orf } = await sb.from('agent_jobs').select('id, command, output').eq('status', 'running');
+    for (const j of orf || []) {
+      await sb.from('agent_jobs').update({ status: 'error', output: String(j.output || '').slice(-19000) + '\n[agente reiniciado: este trabajo se cortó a la mitad]' }).eq('id', j.id);
+      const retry = /^(gen_local|regen_local|render_full|voz_ingles|qa_tomas|flow_frames|short_reusar):/.test(j.command);
+      if (retry && !/agente reiniciado/.test(String(j.output || ''))) { await sb.from('agent_jobs').insert({ command: j.command }); log('↻ retomo trabajo cortado por reinicio:', j.command); }
+      else log('✖ trabajo cortado por reinicio (no se reintenta):', j.command);
+    }
+  } catch (e) { log('no pude revisar trabajos cortados:', e.message); }
+}
+recoverOrphans().finally(() => { setInterval(tick, 3000); tick(); });
 process.on('SIGINT', () => { devStop(); process.exit(0); });
