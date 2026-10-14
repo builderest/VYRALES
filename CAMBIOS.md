@@ -287,3 +287,11 @@ experimento (`doc.forzados`: ¿quién tenía razón?).
   los drifts revisados. Lo decidirá la evidencia.
 - **T2 corregida a mano:** cámara "slow lateral drift" a ras del pasto, el pasto pasa por delante y se mece, las luces del penal
   parpadean. clip_stale → el QA la rehace con este prompt al terminar gen_local (va por la 37/146, 0 fallos).
+
+## 2026-10-14 07:35 — Vigía: tomas 21–39 medidas y revisadas
+- gen_local va bien (0 fallos de king). Medidas las 19 tomas nuevas con los dos detectores:
+  - **Corte de escena:** T21 (salto a 0.25 s y al final las casas del pueblo se "embarran" al alejarse) y T28 (la pila de
+    sacos del almacén se derrumba/deforma y cambia la luz a 1 s). Ambas confirmadas a ojo → detector 4/4 aciertos, 0 falsos
+    en 39 clips.
+  - **Deformación parcial:** ninguna en planos sin personas (T35 da 2.3 pero tiene personas → no aplica, correcto).
+- Las rehará el QA al final (T2, T8 por clip_stale; T18, T21, T28 por corte).
