@@ -236,3 +236,7 @@ experimento (`doc.forzados`: ¿quién tenía razón?).
 - **Bug arreglado** (`agente/flow_cuadros.js`): las tomas CON personajes no quitaban la marca `frame_stale` al rehacerse
   (solo lo hacían las sin personajes) → el panel las seguía mostrando como viejas. Marca limpiada a mano en EP25.
 - Lanzado `gen_local:3b110a58…` (king, $0) — job e97a7193.
+- **07:00 — PARADO: king no responde.** `gen_local` falló al conectar con ComfyUI en king (100.66.84.73:8188, Tailscale,
+  `UND_ERR_CONNECT_TIMEOUT`) en las tomas 1–9. Lo cancelé para no marcar las 146 como fallidas (no se perdió nada: no había
+  clips; esas 9 se rehacen al relanzar). No hay forma de encender king desde aquí. **Franklin: encender king (o revisar que
+  ComfyUI y Tailscale estén abiertos) y relanzar "Producir" en EP25** — o yo lo relanzo en cuanto king responda.
