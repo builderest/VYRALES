@@ -198,3 +198,12 @@ experimento (`doc.forzados`: ¿quién tenía razón?).
 - Serie `cibertales_historia_completa`: `flow_characters=true` (las tomas con El Chapo van por Flow $0 con su foto como
   ingrediente; antes habrían ido por Gemini ~$2.30).
 - Tomas fijas nuevas con imagen (Flow): "Celda de ADX Florence", "Lavandería de Puente Grande".
+- 🐞 **BUG GRAVE (lo cazó la supervisión): el repaso del detallador REVOLVÍA la narración.** `claude_largo.js` `detail()`:
+  el repaso de tomas sin acción/cámara dejaba que Claude PARTIERA tomas y reacomodaba por POSICIÓN (más tomas que las
+  pedidas → todo se corría: frases encima de otras, tomas perdidas), y los grupos dejaban números de toma repetidos.
+  EP25 salió con 58 líneas fuera de orden y la voz ($0.26) leyó ese texto → se descartó y se paró `flow_frames`.
+  Arreglo: repaso sin partir + n temporal único + **GUARDIÁN** (si la narración detallada no es idéntica palabra por
+  palabra a la pulida, se deshace el repaso; si sigue sin cuadrar, el guion NO se guarda). Opción `req.raw_file` para
+  reusar una historia ya escrita (sin volver a pedirla). Afectados en el pasado: todas las versiones de El Chapo
+  (EP15–19, EP20–24) y una de "hobbits" no producida. **Toba, EP6 y EP11 NO pasaron por repaso → sanos.**
+  El Chapo se rehace: job `largo-mv7o2ert5zy6` (misma historia de Claude, `_to_delete/elchapo_historia_2026-10-14.txt`).

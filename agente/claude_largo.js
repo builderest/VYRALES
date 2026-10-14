@@ -31,14 +31,27 @@ async function detail(shots, { aspect, context, title, log }) {
   // Repaso: tomas que quedaron sin acción/cámara (Claude a veces se salta alguna; oct-11 la importación fallaba
   // por 4 tomas sin action_en). Se vuelven a pedir solas, una vez.
   const miss = out.map((s, i) => i).filter((i) => !(out[i].action_en && String(out[i].action_en).trim()) || !(out[i].camera && String(out[i].camera).trim()));
+  // 🐞 BUG oct-14 (El Chapo EP25 salió con la narración REVUELTA): el repaso dejaba que Claude PARTIERA tomas y luego
+  // reacomodaba el resultado por POSICIÓN (más tomas que las pedidas → todo se corría), y además los grupos dejan números
+  // de toma repetidos (cada grupo renumera desde 1). Ahora: sin partir, con números temporales únicos, y un GUARDIÁN que
+  // exige que la narración quede IDÉNTICA palabra por palabra.
+  const norm = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+  const narr = (list) => norm(list.map((x) => (x.dialogue || []).map((d) => d && d.line).filter(Boolean).join(' ')).join(' '));
+  const original = norm(shots.map((s) => s.line).join(' '));
+  if (narr(out) !== original) log('    ⚠️ la narración cambió al partir tomas en los grupos (se revisa abajo)');
+  const antesRepaso = out.slice();
   if (miss.length) {
-    log(`    repaso: ${miss.length} toma(s) sin acción/cámara → las pido otra vez`);
+    log(`    repaso: ${miss.length} toma(s) sin acción/cámara → las pido otra vez (sin partir)`);
     try {
-      const part = miss.map((i) => out[i]);
-      const vc = await checkVisuals({ series: { title }, shots: part, rewriteStart: 'all', llm: claudeLlm(() => {}), aspect, context, log: () => {} });
-      applyChanges(part, vc.changes).forEach((x, k) => { out[miss[k]] = Object.assign({}, out[miss[k]], x); });
+      const part = miss.map((i, k) => Object.assign({}, out[i], { n: k + 1 })); // n único y temporal
+      const vc = await checkVisuals({ series: { title }, shots: part, rewriteStart: 'all', llm: claudeLlm(() => {}), aspect, context, allowSplit: false, log: () => {} });
+      const fixed = applyChanges(part, vc.changes, { splits: false });
+      if (fixed.length === part.length) fixed.forEach((x, k) => { const keep = out[miss[k]]; out[miss[k]] = Object.assign({}, keep, x, { n: keep.n, dialogue: keep.dialogue }); });
     } catch (e) { log('    repaso falló (' + String(e.message).slice(0, 100) + ') → la importación pone valores por defecto'); }
   }
+  if (narr(out) !== narr(antesRepaso)) { log('    🛑 el repaso cambió la narración → lo deshago'); out.splice(0, out.length, ...antesRepaso); }
+  if (narr(out) !== original) throw new Error('GUARDIÁN: la narración detallada NO es idéntica a la que escribió Claude (palabras ' + narr(out).split(' ').length + ' vs ' + original.split(' ').length + '). No guardo un guion revuelto.');
+  log('    ✅ guardián: narración idéntica palabra por palabra (' + original.split(' ').length + ' palabras)');
   return out.map((s, i) => Object.assign({}, s, { n: i + 1, characters: Array.isArray(s.characters) ? s.characters : [], location: s.location || 'escena' }));
 }
 
@@ -57,7 +70,7 @@ async function detail(shots, { aspect, context, title, log }) {
     let story = null;
     for (let k = 1; k <= 2 && !story; k++) {
       let raw = '';
-      try { raw = await runClaude(F('_guionista').buildLongPrompt(tipo, { topic: req.topic, canal }), { timeoutMin: 25, log: console.log }); fs.mkdirSync(path.join(ROOT, '_to_delete'), { recursive: true }); fs.writeFileSync(path.join(ROOT, '_to_delete', `claude_raw_${k}.txt`), raw); story = parseJson(raw); }
+      try { raw = (req.raw_file && fs.existsSync(path.join(ROOT, req.raw_file))) ? (console.log('  reuso la historia ya escrita: ' + req.raw_file), fs.readFileSync(path.join(ROOT, req.raw_file), 'utf8')) : await runClaude(F('_guionista').buildLongPrompt(tipo, { topic: req.topic, canal }), { timeoutMin: 25, log: console.log }); fs.mkdirSync(path.join(ROOT, '_to_delete'), { recursive: true }); fs.writeFileSync(path.join(ROOT, '_to_delete', `claude_raw_${k}.txt`), raw); story = parseJson(raw); }
       catch (e) { console.log(`  intento ${k}: ${String(e.message).slice(0, 200)}`); if (k === 2) throw e; }
     }
     // Pulido de la narración (largo y cada Short): sin "Y" muletilla, sin saltos, sin palabras raras. Claude, $0.
