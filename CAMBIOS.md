@@ -309,3 +309,27 @@ experimento (`doc.forzados`: ¿quién tenía razón?).
   **`_qa.js`:** cada corte/deformación medida se guarda como evidencia (src "medido") → el cerebro aprende de hechos.
 - **gen_local reiniciado** (iba por la 48/146; el proceso viejo tenía el prompt anterior en memoria): job 65e95533. Salta los 47
   clips hechos; rehízo primero T2 (y sigue T8) con su prompt corregido; de la 48 en adelante ya usan el prompt estricto.
+
+## 📌 PENDIENTE (Franklin, oct-14) — guionista, para después de verificar El Chapo
+- Primera frase que enganche en 0–2 s a alguien que no conoce el canal.
+- Presentar lugares y personajes para quien no sabe del tema (sin jerga ni nombres sueltos).
+- Llamado a seguir / like / compartir. HECHO: el largo ya cierra con "Si quieres más historias como esta, contadas
+  completas, suscríbete al canal." Falta decidir: un llamado corto a mitad del largo (tras un momento fuerte, nunca al
+  inicio) y en los Shorts un cierre tipo "sígueme para la historia completa".
+- Medirlo con las métricas de YouTube (retención/seguidores por video) antes de dejarlo como regla.
+
+## 2026-10-14 08:20 — Vigía: tomas 40–66 + T2/T8 rehechas → detectores afinados y un bug del cerebro
+- **T8 nueva:** el muro de la ducha ya se queda (✅ lo principal), pero hay un tirón de cámara a los 2.2 s (medido 17×). El QA
+  la volverá a intentar.
+- **T2 nueva:** sigue mal de otra forma: las luces del penal se apagan y la noche se vuelve atardecer. Los detectores
+  numéricos NO lo ven (no hay salto ni deformación por franjas) → **el QA visual ahora compara la PRIMERA y la ÚLTIMA
+  imagen: si el lugar se convirtió en otro (pozo→túnel, noche→atardecer, luces que desaparecen, pila que se derrumba sola)
+  es broken**. Mismo caso en T12 (el pozo con escalera se vuelve un túnel horizontal).
+- **Corte de escena:** umbral 3.5 → 3.0. Con 68 clips: cortes reales T8, T18, T21, T28, T56 (juzgado: corte a otro ángulo a
+  1.9 s, ratio 3.1–4.6 según la medición), T65 (salta a primer plano del carrito); sanos ≤2.7.
+- **BUG del cerebro arreglado:** contaba los AÑOS como personas ("from 1993 … gunmen" → "1993 personas" → 4+). Afectaba
+  la estadística de "4 o más personas" de TODAS las series históricas con años en el prompt. Además faltaban palabras
+  (gunmen, employee, lawyer, judge, actress, driver, brother…). La reconstrucción del cerebro ahora conserva la
+  evidencia medida y la de Franklin en vivo. Se recalcula al terminar El Chapo (cerebro_cargar).
+- Resultado provisional de la cláusula estricta (tomas 48–66 sin personas: T52, T55, T56, T59, T63): 1 corte (T56) de 5
+  (20 %) vs 4 de 18 (22 %) antes. Muestra muy chica: todavía no dice nada; se juzga al final con ~45 tomas.

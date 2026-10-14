@@ -28,13 +28,13 @@ const low = (s) => String(s || '').toLowerCase();
 const words = (s) => String(s || '').trim().split(/\s+/).filter(Boolean).length;
 const lineOf = (sh) => String(sh.voice_part || (Array.isArray(sh.dialogue) ? sh.dialogue : sh.dialogue ? [sh.dialogue] : []).map((d) => d && d.line).filter(Boolean).join(' ')).trim();
 const NUM = { two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, twelve: 12, several: 4, many: 6, dozens: 20, dozen: 12, hundreds: 100, thousands: 1000 };
-const PEOPLE_PL = 'men|women|people|persons|soldiers|scientists|engineers|pilots|workers|guards|officers|delegates|leaders|children|boys|girls|figures|physicists|technicians|villagers|prisoners|sailors|miners|students|officials|generals|agents|police|policemen|journalists|doctors|nurses|farmers|hunters|survivors|refugees|crew members|spectators';
-const PEOPLE_SG = /\b(man|woman|person|soldier|scientist|engineer|pilot|worker|guard|officer|delegate|leader|boy|girl|child|figure|physicist|technician|prisoner|sailor|miner|official|general|agent|policeman|journalist|doctor|nurse|farmer|hunter|survivor|narco|drug lord|inmate)\b/g;
+const PEOPLE_PL = 'men|women|people|persons|soldiers|scientists|engineers|pilots|workers|guards|officers|delegates|leaders|children|boys|girls|figures|physicists|technicians|villagers|prisoners|sailors|miners|students|officials|generals|agents|police|policemen|journalists|doctors|nurses|farmers|hunters|survivors|refugees|crew members|spectators|gunmen|hitmen|employees|lawyers|judges|reporters|bodyguards|smugglers|traffickers|teenagers|passengers|drivers|accomplices|relatives|brothers|sons';
+const PEOPLE_SG = /\b(man|woman|person|soldier|scientist|engineer|pilot|worker|guard|officer|delegate|leader|boy|girl|child|figure|physicist|technician|prisoner|sailor|miner|official|general|agent|policeman|journalist|doctor|nurse|farmer|hunter|survivor|narco|drug lord|inmate|gunman|hitman|employee|lawyer|judge|reporter|bodyguard|smuggler|trafficker|teenager|passenger|driver|accomplice|actress|actor|father|mother|brother|son|wife|husband)\b/g;
 
 function peopleBucket(all) {
   if (/\b(crowd|crowds|audience|rows of (?:people|men|soldiers|delegates)|an army of|spectators|hall full|packed hall|mob|masses)\b/.test(all)) return 'p4mas';
   let max = 0;
-  const re = new RegExp('\\b(two|three|four|five|six|seven|eight|nine|ten|twelve|several|many|dozens|dozen|hundreds|thousands|\\d+)\\s+(?:[a-z-]+\\s+){0,3}(' + PEOPLE_PL + ')\\b', 'g');
+  const re = new RegExp('\\b(two|three|four|five|six|seven|eight|nine|ten|twelve|several|many|dozens|dozen|hundreds|thousands|\\d{1,3})\\s+(?:[a-z-]+\\s+){0,3}(' + PEOPLE_PL + ')\\b', 'g');
   for (const m of all.matchAll(re)) { const v = NUM[m[1]] || Number(m[1]) || 0; if (v > max) max = v; }
   if (max >= 4) return 'p4mas';
   if (max >= 2 || /\b(both|pair of|couple of|two of them)\b/.test(all)) return 'p2_3';
@@ -170,7 +170,8 @@ async function syncFromDb(sb, { log = () => {}, seriesIds = null, reset = false 
     // Reconstruir desde cero (la base es la fuente: el especialista guarda cada intento en shots[].qa.attempts).
     // Se conservan solo los registros en vivo de Franklin (aprobar/rechazar UNA toma desde el panel).
     const ev = await M.readJson(sb, EVID, []);
-    const live = ev.filter((e) => e.src === 'franklin' && /\|live$/.test(e.k));
+    // Se conservan las opiniones en vivo de Franklin y los defectos MEDIDOS (no están en la base); se les recalculan los rasgos.
+    const live = ev.filter((e) => (e.src === 'franklin' && /\|live$/.test(e.k)) || e.src === 'medido');
     await M.writeJson(sb, EVID, live);
   }
   const added = await recordMany(sb, list);

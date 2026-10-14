@@ -46,7 +46,8 @@ function motionStep(url, center = false) {
 }
 // 👁️ Corte de escena (oct-14, toma 8 de El Chapo): LTX a veces "disuelve" a OTRA escena a mitad del clip.
 // Diferencia entre cuadros (gris 64x36, 8 fps): un corte es UN salto enorme frente a lo normal del clip.
-// Calibrado en 20 clips de EP25: T8 (disolvencia a otra celda) ratio 29, T18 (salto de encuadre) 3.9; clips sanos ≤2.4.
+// Calibrado en 68 clips de EP25: cortes reales T8 29, T18 3.9, T21 4.9, T28 5.3, T65 7.3, T56 4.6 (corte a otro ángulo a 1.9 s);
+// sanos ≤2.7 → umbral 3. Un parpadeo de luz con la escena quieta también salta: es un tirón visible, se rehace igual.
 function sceneCut(url) {
   const ffmpeg = require(path.join(ROOT, 'node_modules', 'ffmpeg-static'));
   return new Promise((res) => execFile(ffmpeg, ['-v', 'error', '-i', url, '-vf', 'fps=8,scale=64:36,format=gray', '-f', 'rawvideo', '-'], { encoding: 'buffer', timeout: 90000, maxBuffer: 1 << 26 }, (e, raw) => {
@@ -55,7 +56,7 @@ function sceneCut(url) {
     const d = []; for (let k = 1; k < n; k++) { let x = 0; for (let i = 0; i < N; i++) x += Math.abs(raw[k * N + i] - raw[(k - 1) * N + i]); d.push(x / N); }
     const sorted = d.slice().sort((a, b) => a - b), med = sorted[Math.floor(sorted.length / 2)], max = sorted[sorted.length - 1];
     const ratio = max / Math.max(med, 0.5), at = (d.indexOf(max) + 1) / 8;
-    res({ cut: ratio >= 3.5 && max >= 8, ratio: Math.round(ratio * 10) / 10, max: Math.round(max * 10) / 10, at });
+    res({ cut: ratio >= 3 && max >= 8, ratio: Math.round(ratio * 10) / 10, max: Math.round(max * 10) / 10, at });
   }));
 }
 // 👁️ Parte del cuadro se deforma (oct-14, toma 2 de El Chapo, la vio Franklin): en un plano SIN personas, la franja del
@@ -117,6 +118,7 @@ Para cada toma decide (sé justo: marca false solo si el problema se ve claro):
 - evidence: en una frase, qué parte del SUJETO PRINCIPAL comparaste y cómo estaba en la primera y en la última imagen.
 - haze: aparece humo, neblina o bruma blanca que NO tiene que ver con la narración (true = problema).
 - broken: algo deforme, caras o manos rotas, letras/texto inventado, cosas que aparecen o desaparecen (true = problema).
+- MISMO LUGAR (oct-14): compara la PRIMERA y la ÚLTIMA imagen. Si el lugar se convirtió en otro (un pozo que pasa a ser un túnel, una celda que pasa a ser otra celda, las luces de un edificio que desaparecen, la noche que se vuelve atardecer, una pila de objetos que se derrumba sola), eso es broken = true aunque cada imagen se vea bien por separado. Pon en reason "cambia de lugar".
 - reason: una frase corta en español con lo que viste (vacío si todo bien).
 Responde SOLO este JSON: {"tomas":[{"n":1,"image_ok":true,"style_ok":true,"action_ok":true,"haze":false,"broken":false,"evidence":"","reason":""}]}`;
     try {
