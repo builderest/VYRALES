@@ -203,7 +203,8 @@ function computeStats(ev) {
   for (const e of ev) {
     const key = e.ep + '|' + e.n + '|' + (e.clip || e.k) + '|' + (e.try || 0);
     const cur = last.get(key);
-    if (!cur || (e.src === 'franklin' && cur.src !== 'franklin') || (e.src === cur.src && String(e.at) >= String(cur.at))) last.set(key, e);
+    // Un defecto MEDIDO (corte de escena, deformación: _qa.js, oct-14) manda sobre la opinión del juez visual; Franklin manda sobre todo.
+    if (!cur || (e.src === 'franklin' && cur.src !== 'franklin') || (e.src === 'medido' && cur.src === 'qa') || (e.src === cur.src && String(e.at) >= String(cur.at))) last.set(key, e);
   }
   const all = [...last.values()];
   // Las reglas para el guionista se calculan con PRIMEROS intentos (la meta es salir bien a la primera, y los reintentos

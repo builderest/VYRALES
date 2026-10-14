@@ -212,6 +212,8 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
     // Ya corregida a mano por el supervisor o Franklin (clip_stale): se rehace con SU prompt, sin reescribir.
     if (!why && sh.clip_stale) why = 'marcada para rehacer (prompt corregido)';
     if (!why) continue;
+    // 🧠 Evidencia OBJETIVA para el cerebro: los defectos medidos (corte, deformación) son hechos, no opinión del juez.
+    if (/escena|deforma/.test(why)) { try { await require(path.join(ROOT, 'netlify', 'functions', '_cerebro')).recordMany(supabase, [{ ep: epId, n: sh.n, clip: clip.id, try: (sh.qa && Number(sh.qa.tries)) || 0, src: 'medido', ok: false, fl: { b: true }, reason: 'medido: ' + why, shot: sh, tag: 'medido' }]); } catch (_) {} }
     log(`QA toma ${sh.n}: ${why} → la rehago con prompt nuevo`);
     if (/quieto|escena|deforma/.test(why) && !sh.clip_stale) {
       try {

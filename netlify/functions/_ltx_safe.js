@@ -32,4 +32,4 @@ function safeCamera(cam, shot = {}) {
   return 'slow lateral drift to the ' + dir;
 }
 
-module.exports = { LTX_SAFE, SAFE_CAMERAS, RISKY_CAM_RE, safeCamera };
+module.exports = { LTX_SAFE, SAFE_CAMERAS, RISKY_CAM_RE, PEOPLE_RE, safeCamera };

@@ -295,3 +295,17 @@ experimento (`doc.forzados`: ¿quién tenía razón?).
     en 39 clips.
   - **Deformación parcial:** ninguna en planos sin personas (T35 da 2.3 pero tiene personas → no aplica, correcto).
 - Las rehará el QA al final (T2, T8 por clip_stale; T18, T21, T28 por corte).
+
+## 2026-10-14 07:55 — Más estricto con lo que se le pasa a LTX (pedido de Franklin)
+- **EVIDENCIA (EP25, tomas 1–39, medida objetiva):** los 4 cortes/deformaciones de lugar (T8, T18, T21, T28) son TODOS
+  planos sin personas: 4 de 18 sin personas vs 0 de 21 con personas. El juez visual nunca lo vio (para él "sin personas" falla
+  igual que el promedio) porque juzga la acción, no si el lugar cambió.
+- **INFERENCIA:** cuando solo se mueve la cámara, LTX "inventa" movimiento cambiando el lugar.
+- **`_king.js` (prompt de LTX):** en planos sin personas ni vehículos se agrega, en afirmativo: "una sola toma continua: el lugar
+  sigue siendo el mismo, los edificios, muros y objetos conservan forma, tamaño y posición; solo la cámara se desliza y los
+  elementos naturales (luz, pasto, agua, tela) se mueven un poco". Aplica a 66 de 146 tomas de EP25. No prohíbe nada ni cambia
+  la cámara (la evidencia de paneo vs drift aún no alcanza).
+- **`_cerebro.js`:** un defecto MEDIDO manda sobre la opinión del juez visual (antes ganaba el primero que se registraba).
+  **`_qa.js`:** cada corte/deformación medida se guarda como evidencia (src "medido") → el cerebro aprende de hechos.
+- **gen_local reiniciado** (iba por la 48/146; el proceso viejo tenía el prompt anterior en memoria): job 65e95533. Salta los 47
+  clips hechos; rehízo primero T2 (y sigue T8) con su prompt corregido; de la 48 en adelante ya usan el prompt estricto.
