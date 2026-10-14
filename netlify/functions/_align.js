@@ -93,8 +93,11 @@ function matchWords(scriptWords, heard0) {
   for (let i = 0; i < n;) {
     if (out[i]) { i++; continue; }
     let q = i; while (q < n && !out[q]) q++;
-    const a = i > 0 ? out[i - 1].end : 0;
+    let a = i > 0 ? out[i - 1].end : 0;
     const b = q < n ? out[q].start : a + (q - i) * 0.35;
+    // (oct-14, EP25 T64) Whisper a veces da a una palabra un final MUY tardío (2–3 s): el hueco quedaba "al revés"
+    // (b < a) y las palabras adivinadas salían con tiempos decrecientes → una toma de 27 s y las siguientes de 1 s.
+    if (i > 0 && b < a + (q - i) * 0.12) { const pe = Math.max(out[i - 1].start + 0.05, b - (q - i) * 0.25); out[i - 1].end = Math.round(Math.min(out[i - 1].end, pe) * 100) / 100; a = Math.min(out[i - 1].end, b); }
     const lens = []; for (let k = i; k < q; k++) lens.push(Math.max(2, norm(scriptWords[k]).length));
     const tot = lens.reduce((x, y) => x + y, 0);
     let t = a;
@@ -170,3 +173,27 @@ async function hearText(wavBuffer, log = console.log) {
   } catch (e) { log('hearText: falló (' + String(e.message).slice(0, 120) + ')'); return null; }
 }
 module.exports = { alignWords, matchWords, wavTo16k, hearText };
+
+// Repara tiempos de palabras YA guardados (voice.words) que quedaron al revés por el bug de arriba: cada tramo de
+// palabras adivinadas se reparte de nuevo entre la palabra real anterior y la siguiente, sin tocar las reales.
+function repairWords(words) {
+  const w = (words || []).map((x) => Object.assign({}, x));
+  let fixed = 0;
+  for (let i = 0; i < w.length;) {
+    if (!w[i].guess) { i++; continue; }
+    let q = i; while (q < w.length && w[q].guess) q++;
+    const prev = i > 0 ? w[i - 1] : null, next = q < w.length ? w[q] : null;
+    const bad = w.slice(i, q).some((x, k, arr) => x.end < x.start || (k > 0 && x.start < arr[k - 1].start)) || (prev && next && next.start < prev.end);
+    if (bad) {
+      let a = prev ? prev.end : 0; const b = next ? next.start : a + (q - i) * 0.35;
+      if (prev && b < a + (q - i) * 0.12) { prev.end = Math.round(Math.max(prev.start + 0.05, b - (q - i) * 0.25) * 100) / 100; a = Math.min(prev.end, b); }
+      const lens = w.slice(i, q).map((x) => Math.max(2, String(x.word || '').replace(/[^\p{L}\p{N}]/gu, '').length)); const tot = lens.reduce((x, y) => x + y, 0);
+      let t = a; for (let k = i; k < q; k++) { const d = Math.max(0, b - a) * lens[k - i] / tot; w[k].start = Math.round(t * 100) / 100; w[k].end = Math.round((t + d) * 100) / 100; t += d; }
+      fixed += q - i;
+    }
+    i = q;
+  }
+  return { words: w, fixed };
+}
+if (typeof module.exports === 'object') module.exports.repairWords = repairWords;
+

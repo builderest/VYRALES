@@ -395,3 +395,13 @@ experimento (`doc.forzados`: ¿quién tenía razón?).
 - **13:50 — Franklin pidió matar el proceso:** `proton_cerrar` mató ProtonVPN.Client (PID 22904) → la conexión a king sigue
   bloqueada igual (`Bad access` en 0 ms): el túnel y el bloqueo los mantienen los servicios de sistema, que el agente
   (sin admin) no puede detener. Internet de Cronix sigue funcionando (el agente habla con la base).
+
+## 2026-10-14 13:55 — QA de EP25 corriendo (ProtonVPN apagado por Franklin) + bug de la alineación de voz
+- ProtonVPN apagado en Cronix → king responde; `qa_tomas` 8f385b69 arrancó. Ya rehízo T21 y T56 (cortes).
+- **BUG (`_align.js`)**: el QA quiso estirar T64 a 26.9 s ("dura 15 s y su voz 26.9 s", imposible: LTX da máx. 15 s).
+  CAUSA: Whisper dio a una palabra un final 2–3 s tardío; el hueco de palabras adivinadas quedó "al revés" (fin < inicio,
+  tiempos decrecientes) → T64 se comía 27 s y T65–T67 quedaban de 1 s. 50 palabras invertidas en EP25.
+- **Arreglo:** `matchWords` encoge esa palabra para que el hueco nunca quede al revés; `repairWords()` repara voces ya
+  guardadas. EP25 reparada: T64 26.9→11.1 s, T65 1.0→2.3, T66 1.0→2.8, T67 1.0→2.1, T68 2.0→6.3; 0 invertidas; suma
+  578.5 s vs voz 576.5 s ✔.
+- PENDIENTE: al terminar el QA, revisar que los clips de T65–T68 alcancen sus nuevas duraciones (si no, rehacerlos).
