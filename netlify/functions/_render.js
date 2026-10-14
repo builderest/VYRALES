@@ -310,6 +310,11 @@ async function renderTail({ cwd, from, out, lines, seconds, voice, sub, finger =
   const events = [];
   if (lines[0]) events.push({ start: 0.15, end: dur, style: 'EndBig', text: `{\\pos(${W / 2},${Math.round(H * 0.44)})\\fad(250,0)}` + clean(lines[0]) });
   if (lines[1]) events.push({ start: 0.45, end: dur, style: 'EndSmall', text: `{\\pos(${W / 2},${Math.round(H * 0.44) + 125})\\fad(250,0)}` + clean(lines[1]) });
+  // URL en PANTALLA debajo del dedo (TikTok/IG/Shorts no dejan enlace clickeable: la escriben). Solo en Shorts que llevan al largo.
+  if (finger) {
+    const verUrl = (process.env.PUBLIC_SITE_HOST || 'vyrales.app').replace(/^https?:\/\//, '').replace(/\/$/, '') + '/ver';
+    events.push({ start: 0.6, end: dur, style: 'EndSmall', text: `{\\pos(${W / 2},${Math.round(H * 0.82)})\\fad(250,0)\\b1\\fs52}` + clean(verUrl) });
+  }
   const assName = path.basename(out, '.mp4') + '.ass';
   fs.writeFileSync(path.join(cwd, assName), [...assHeader(sub), ...events.map(dialogueLine), ''].join('\n'));
   const vf = `scale=${W * 2}:${H * 2},zoompan=z='1+0.06*on/${frames}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${frames}:s=${W}x${H}:fps=${FPS},eq=brightness=-0.12,setsar=1,ass=${assName}:fontsdir=fonts`;
