@@ -19,6 +19,11 @@
 
 ## Registro de cambios
 
+### 2026-10-15 (sesión Claude Cowork)
+
+**Variedad de verbos en tomas de "observar/verificar"** — Franklin notó (toma 92, EP34) que las tomas donde alguien revisa/verifica algo siempre terminan con la misma pose agachada.
+- `netlify/functions/_ltx_safe.js` — regla 5 (MOVIMIENTO GRANDE Y CLARO): la lista de movimientos de cuerpo entero permitidos era muy corta (camina, se inclina, gira, empuja, cae, sube, ondea, se rompe, avanza), y "se inclina" era el único que encajaba con "alguien observando/verificando algo" → se repetía en casi todas esas tomas. Se agregaron verbos de cuerpo entero igual de seguros para LTX (se asoma, endereza la espalda, da un paso atrás, ladea la cabeza y el torso) y una línea explícita: VARÍA EL VERBO en tomas de observar/revisar/verificar/analizar, no usar siempre "se inclina". No toca ninguna otra regla de seguridad (sujeto único, cámara, fondo, etc. igual). **Pusheado.**
+
 ### 2026-10-13 / 14  (sesión Claude Cowork)
 
 **Canal VYRALES enfocado solo en Historia (short + completa).** Las otras 7 series ocultas (`is_active=false`), no borradas, hasta tener un canal por nicho.
