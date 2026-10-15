@@ -10,12 +10,15 @@ const page = (ok, msg) => ({ statusCode: ok ? 200 : 400, headers: { 'Content-Typ
 exports.handler = async (event) => {
   const q = event.queryStringParameters || {};
   if (q.error) return page(false, 'Autorización cancelada: ' + String(q.error_description || q.error).replace(/[<>]/g, ''));
+  // El "state" trae el tipo de conexión adelante ("youtube" o "youtube_backup"): así un solo
+  // callback sirve para la conexión normal y para la de respaldo (oct-15).
+  const plat = String(q.state || '').split('.')[0] === 'youtube_backup' ? 'youtube_backup' : 'youtube';
   let problem = null;
-  try { problem = stateProblem('youtube', q.state); } catch (err) { return page(false, String(err.message).replace(/[<>]/g, '')); }
+  try { problem = stateProblem(plat, q.state); } catch (err) { return page(false, String(err.message).replace(/[<>]/g, '')); }
   if (problem) return page(false, problem.replace(/[<>]/g, ''));
   try {
-    const name = await youtubeConnect(getSupabaseClient(), q.code);
-    return page(true, 'YouTube conectado: ' + String(name || '').replace(/[<>]/g, ''));
+    const name = await youtubeConnect(getSupabaseClient(), q.code, plat);
+    return page(true, (plat === 'youtube_backup' ? 'Respaldo de YouTube conectado: ' : 'YouTube conectado: ') + String(name || '').replace(/[<>]/g, ''));
   } catch (err) { return page(false, String(err.message).replace(/[<>]/g, '')); }
 };
 

@@ -105,22 +105,25 @@ async function translateSrt(srt, from, to, log = console.log) {
 }
 // Sube (o reemplaza) una pista de subtítulos en un video de YouTube. Necesita el permiso youtube.force-ssl.
 async function youtubeCaption(supabase, { videoId, language, name, srt, log = console.log }) {
-  const token = await require('./_social').youtubeAccessToken(supabase);
-  const H = { Authorization: `Bearer ${token}` };
-  // Si ya hay una pista nuestra en ese idioma, se reemplaza (no se duplican).
-  const list = await (await fetch(`https://www.googleapis.com/youtube/v3/captions?part=snippet&videoId=${videoId}`, { headers: H })).json();
-  const prev = (list.items || []).find((c) => c.snippet && c.snippet.language === language && c.snippet.trackKind !== 'asr');
-  const meta = prev ? { id: prev.id, snippet: { isDraft: false } } : { snippet: { videoId, language, name, isDraft: false } };
-  const boundary = 'vyrales' + Date.now();
-  const body = Buffer.concat([
-    Buffer.from(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(meta)}\r\n--${boundary}\r\nContent-Type: application/octet-stream\r\n\r\n`),
-    Buffer.from(srt, 'utf8'), Buffer.from(`\r\n--${boundary}--\r\n`)
-  ]);
-  const r = await fetch(`https://www.googleapis.com/upload/youtube/v3/captions?part=snippet&uploadType=multipart`, { method: prev ? 'PUT' : 'POST', headers: Object.assign({ 'Content-Type': `multipart/related; boundary=${boundary}` }, H), body });
-  const t = await r.text();
-  if (!r.ok) throw new Error('subtítulos ' + language + ' HTTP ' + r.status + ': ' + t.slice(0, 200));
-  log(`YouTube: subtítulos ${language} ${prev ? 'reemplazados' : 'subidos'} ✅`);
-  return JSON.parse(t).id;
+  const SOC = require('./_social');
+  return SOC.withYoutubeFallback(supabase, log, async (platform) => {
+    const token = await SOC.youtubeAccessToken(supabase, platform);
+    const H = { Authorization: `Bearer ${token}` };
+    // Si ya hay una pista nuestra en ese idioma, se reemplaza (no se duplican).
+    const list = await (await fetch(`https://www.googleapis.com/youtube/v3/captions?part=snippet&videoId=${videoId}`, { headers: H })).json();
+    const prev = (list.items || []).find((c) => c.snippet && c.snippet.language === language && c.snippet.trackKind !== 'asr');
+    const meta = prev ? { id: prev.id, snippet: { isDraft: false } } : { snippet: { videoId, language, name, isDraft: false } };
+    const boundary = 'vyrales' + Date.now();
+    const body = Buffer.concat([
+      Buffer.from(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(meta)}\r\n--${boundary}\r\nContent-Type: application/octet-stream\r\n\r\n`),
+      Buffer.from(srt, 'utf8'), Buffer.from(`\r\n--${boundary}--\r\n`)
+    ]);
+    const r = await fetch(`https://www.googleapis.com/upload/youtube/v3/captions?part=snippet&uploadType=multipart`, { method: prev ? 'PUT' : 'POST', headers: Object.assign({ 'Content-Type': `multipart/related; boundary=${boundary}` }, H), body });
+    const t = await r.text();
+    if (!r.ok) throw new Error('subtítulos ' + language + ' HTTP ' + r.status + ': ' + t.slice(0, 200));
+    log(`YouTube: subtítulos ${language} ${prev ? 'reemplazados' : 'subidos'} ✅` + (platform === 'youtube_backup' ? ' (respaldo)' : ''));
+    return JSON.parse(t).id;
+  });
 }
 // Arma (y guarda) las pistas ES/EN del episodio. ES: tiempos por palabra de la voz. EN: palabras de la voz inglesa
 // ya colocada sobre el video (english.words; si no hay, se alinea una vez con Whisper local en inglés).

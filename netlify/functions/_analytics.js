@@ -7,7 +7,7 @@
 //   TikTok: estadísticas piden user.info.stats + video.list (añadirlos en el portal de TikTok).
 // Si algo no está disponible se devuelve { ok:false, reason } y la página lo explica: nunca se
 // rellena con números inventados.
-const { getAccount } = require('./_social');
+const { getAccount, ytCreds, withYoutubeFallback } = require('./_social');
 
 const G = 'https://graph.facebook.com/v21.0/';
 const day = (d) => d.toISOString().slice(0, 10);
@@ -19,17 +19,21 @@ async function getJson(url, opts) {
   return { ok: res.ok, status: res.status, body };
 }
 
-async function ytToken(sb) {
-  const acc = await getAccount(sb, 'youtube');
+async function ytTokenOn(sb, platform) {
+  const acc = await getAccount(sb, platform);
   if (!acc) return null;
   if (acc.expires_at && new Date(acc.expires_at).getTime() - Date.now() > 5 * 60000) return { token: acc.access_token, scopes: acc.scopes || '' };
+  const c = ytCreds(platform);
   const r = await getJson('https://oauth2.googleapis.com/token', {
     method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams(Object.assign({ grant_type: 'refresh_token', refresh_token: acc.refresh_token }, (() => { const c = ytCreds(); return { client_id: c.id, client_secret: c.secret }; })()))
+    body: new URLSearchParams({ client_id: c.id, client_secret: c.secret, grant_type: 'refresh_token', refresh_token: acc.refresh_token })
   });
   if (!r.body.access_token) throw new Error('El permiso de YouTube venció: reconecta YouTube.');
-  { const T = require('./_tenant'); let uq = sb.from('social_accounts').update({ access_token: r.body.access_token, expires_at: new Date(Date.now() + (r.body.expires_in || 3600) * 1000).toISOString() }).eq('platform', 'youtube'); if (await T.tenancyOn(sb)) uq = uq.eq('workspace_id', T.currentWs()); await uq; }
+  { const T = require('./_tenant'); let uq = sb.from('social_accounts').update({ access_token: r.body.access_token, expires_at: new Date(Date.now() + (r.body.expires_in || 3600) * 1000).toISOString() }).eq('platform', platform); if (await T.tenancyOn(sb)) uq = uq.eq('workspace_id', T.currentWs()); await uq; }
   return { token: r.body.access_token, scopes: r.body.scope || acc.scopes || '' };
+}
+async function ytToken(sb) {
+  return withYoutubeFallback(sb, console.log, (platform) => ytTokenOn(sb, platform));
 }
 
 const isoDur = (s) => { const m = /PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/.exec(s || ''); return m ? (+m[1] || 0) * 3600 + (+m[2] || 0) * 60 + (+m[3] || 0) : 0; };

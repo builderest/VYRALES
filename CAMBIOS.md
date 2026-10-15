@@ -569,3 +569,15 @@ experimento (`doc.forzados`: ¿quién tenía razón?).
   Falta: agregar `YOUTUBE_CLIENT_ID_2` y `YOUTUBE_CLIENT_SECRET_2` en las variables de entorno de Netlify
   (ya están en el `.env` local) y reconectar YouTube en los canales que no sean el admin para que tomen
   el proyecto nuevo.
+- **Respaldo de YouTube para canal admin (Franklin):** si al canal 1 se le acaba la cuota del
+  proyecto 1, ahora reintenta automáticamente con el proyecto 2 (mismo canal de YouTube,
+  autorizado también con `YOUTUBE_CLIENT_ID_2/SECRET_2`) en vez de fallar. Se agregó
+  `withYoutubeFallback()`/`isQuotaError()` en `_social.js`, usado en `youtubeUpload`,
+  `youtubeAddToPlaylist`, `youtubePlaylists`, la subida de subtítulos (`_captions.js`) y el
+  refresco de token de analítica (`_analytics.js`). Solo aplica al canal admin (los demás canales
+  ya tienen el proyecto 2 como su cuota PROPIA, no como respaldo — si se les permitiera caer ahí
+  también se repetiría el problema de cuota compartida).
+  Para activarlo: entrar a `/.netlify/functions/oauth-youtube-start?backup=1` logueado como admin
+  y autorizar el MISMO canal de YouTube (pero con el proyecto 2) — queda guardado en
+  `social_accounts` como `platform: 'youtube_backup'`. Sin esa conexión, el respaldo simplemente
+  no se usa y todo sigue como antes.

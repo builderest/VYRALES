@@ -22,17 +22,44 @@ function need(name) {
 // (YOUTUBE_CLIENT_ID/SECRET); el resto de canales usa el proyecto 2 (YOUTUBE_CLIENT_ID_2/SECRET_2,
 // oct-15) para no competir por las 10,000 unidades/día del mismo proyecto. Si no hay proyecto 2
 // configurado, cae al proyecto 1 (como antes).
-function ytCreds() {
+function isAdminWs() {
   let isAdmin = true;
   try { const T = require('./_tenant'); const ws = T.currentWs(); isAdmin = !ws || ws === T.ADMIN_WS; } catch (_) {}
-  if (!isAdmin && process.env.YOUTUBE_CLIENT_ID_2 && process.env.YOUTUBE_CLIENT_SECRET_2) {
+  return isAdmin;
+}
+function ytCreds(platform) {
+  // 'youtube_backup': SIEMPRE proyecto 2, sin importar el canal — es el respaldo del canal admin
+  // cuando se le acaba la cuota del proyecto 1 (oct-15).
+  if (platform === 'youtube_backup') {
+    if (!process.env.YOUTUBE_CLIENT_ID_2 || !process.env.YOUTUBE_CLIENT_SECRET_2) throw new Error('Falta YOUTUBE_CLIENT_ID_2 / YOUTUBE_CLIENT_SECRET_2 en Netlify (respaldo de YouTube).');
+    return { id: process.env.YOUTUBE_CLIENT_ID_2, secret: process.env.YOUTUBE_CLIENT_SECRET_2 };
+  }
+  if (!isAdminWs() && process.env.YOUTUBE_CLIENT_ID_2 && process.env.YOUTUBE_CLIENT_SECRET_2) {
     return { id: process.env.YOUTUBE_CLIENT_ID_2, secret: process.env.YOUTUBE_CLIENT_SECRET_2 };
   }
   return { id: need('YOUTUBE_CLIENT_ID'), secret: need('YOUTUBE_CLIENT_SECRET') };
 }
+// Detecta "se acabó la cuota" en el mensaje de error de una llamada a la API de YouTube.
+function isQuotaError(err) {
+  return /quotaExceeded|dailyLimitExceeded|rateLimitExceeded/i.test(String((err && err.message) || err || ''));
+}
+async function hasBackupAccount(supabase) {
+  try { return !!(await getAccount(supabase, 'youtube_backup')); } catch (_) { return false; }
+}
+// Corre run('youtube'); si falla por cuota Y es el canal admin Y hay respaldo conectado, reintenta con run('youtube_backup').
+async function withYoutubeFallback(supabase, log, run) {
+  try { return await run('youtube'); }
+  catch (err) {
+    if (isQuotaError(err) && isAdminWs() && await hasBackupAccount(supabase)) {
+      (log || console.log)('[youtube] se acabó la cuota del proyecto 1, usando el proyecto de respaldo...');
+      return await run('youtube_backup');
+    }
+    throw err;
+  }
+}
 
 // state anti-CSRF firmado (sin guardar nada): plataforma + hora + firma HMAC con el secreto.
-const stateSecret = (platform) => platform === 'tiktok' ? ttSecret() : platform === 'youtube' ? ytCreds().secret : metaSecret();
+const stateSecret = (platform) => platform === 'tiktok' ? ttSecret() : (platform === 'youtube' || platform === 'youtube_backup') ? ytCreds(platform).secret : metaSecret();
 function makeState(platform) {
   const secret = stateSecret(platform);
   const payload = `${platform}.${Date.now()}`;
@@ -386,44 +413,49 @@ async function facebookPublishReel(supabase, { videoUrl, videoBuffer = null, cap
 // YouTube Studio con un toque. Docs: developers.google.com/youtube/v3/docs/videos/insert
 // Llaves: YOUTUBE_CLIENT_ID, YOUTUBE_CLIENT_SECRET.
 const YT_SCOPES = 'https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/yt-analytics.readonly https://www.googleapis.com/auth/youtube.force-ssl'; // force-ssl: agregar a playlists y editar títulos/descripciones (oct-11) // analytics: página /analitica.html
-function youtubeAuthUrl() {
-  const q = new URLSearchParams({ client_id: ytCreds().id, redirect_uri: REDIRECT('youtube'), response_type: 'code', scope: YT_SCOPES, access_type: 'offline', prompt: 'consent', include_granted_scopes: 'true', state: makeState('youtube') });
+function youtubeAuthUrl(platform = 'youtube') {
+  const q = new URLSearchParams({ client_id: ytCreds(platform).id, redirect_uri: REDIRECT('youtube'), response_type: 'code', scope: YT_SCOPES, access_type: 'offline', prompt: 'consent', include_granted_scopes: 'true', state: makeState(platform) });
   return `https://accounts.google.com/o/oauth2/v2/auth?${q}`;
 }
-async function googleToken(params) {
+async function googleToken(params, platform = 'youtube') {
+  const c = ytCreds(platform);
   const { res, body } = await jsonFetch('https://oauth2.googleapis.com/token', {
     method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams(Object.assign({ client_id: ytCreds().id, client_secret: ytCreds().secret }, params))
+    body: new URLSearchParams(Object.assign({ client_id: c.id, client_secret: c.secret }, params))
   });
   if (!res.ok || !body.access_token) throw new Error('Google no dio el token: ' + JSON.stringify(body).slice(0, 300));
   return body;
 }
-async function youtubeConnect(supabase, code) {
-  const t = await googleToken({ code, grant_type: 'authorization_code', redirect_uri: REDIRECT('youtube') });
+async function youtubeConnect(supabase, code, platform = 'youtube') {
+  const t = await googleToken({ code, grant_type: 'authorization_code', redirect_uri: REDIRECT('youtube') }, platform);
   if (!t.refresh_token) throw new Error('Google no dio refresh_token. Quita el acceso de VYRALES en myaccount.google.com/permissions y vuelve a conectar.');
   const ch = await jsonFetch('https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true', { headers: { Authorization: `Bearer ${t.access_token}` } });
   const c = ch.body && ch.body.items && ch.body.items[0];
   if (!c) throw new Error('Esa cuenta de Google no tiene canal de YouTube (o elegiste otra cuenta/marca). Vuelve a conectar y elige el canal de VYRALES.');
   await saveAccount(supabase, {
-    platform: 'youtube', account_id: c.id, account_name: c.snippet.title, access_token: t.access_token, refresh_token: t.refresh_token,
+    platform, account_id: c.id, account_name: c.snippet.title, access_token: t.access_token, refresh_token: t.refresh_token,
     expires_at: new Date(Date.now() + (t.expires_in || 3600) * 1000).toISOString(), scopes: t.scope || YT_SCOPES
   });
   return c.snippet.title;
 }
-async function youtubeAccessToken(supabase) {
-  const acc = await getAccount(supabase, 'youtube');
-  if (!acc) throw new Error('YouTube no está conectado. Dale "Conectar YouTube".');
+async function youtubeAccessToken(supabase, platform = 'youtube') {
+  const acc = await getAccount(supabase, platform);
+  if (!acc) throw new Error(platform === 'youtube_backup' ? 'El respaldo de YouTube no está conectado.' : 'YouTube no está conectado. Dale "Conectar YouTube".');
   if (acc.expires_at && new Date(acc.expires_at).getTime() - Date.now() > 5 * 60000) return acc.access_token;
   let t;
-  try { t = await googleToken({ grant_type: 'refresh_token', refresh_token: acc.refresh_token }); }
+  try { t = await googleToken({ grant_type: 'refresh_token', refresh_token: acc.refresh_token }, platform); }
   catch (err) { throw new Error('El permiso de YouTube venció (' + err.message.slice(0, 120) + '). Si la app de Google está en modo "Testing" caduca a los 7 días: ponla "In production" y vuelve a conectar.'); }
   await saveAccount(supabase, Object.assign({}, acc, { access_token: t.access_token, expires_at: new Date(Date.now() + (t.expires_in || 3600) * 1000).toISOString() }));
   return t.access_token;
 }
 // privacy: 'public' | 'unlisted' | 'private'. YouTube puede forzar 'private' (proyecto sin auditar).
 // en: { title, description } → localización en inglés (YouTube la muestra a quien tiene el teléfono en inglés).
-async function youtubeUpload(supabase, { videoBuffer, title, description, tags = [], privacy = 'public', en = null, log = console.log }) {
-  const token = await youtubeAccessToken(supabase);
+async function youtubeUpload(supabase, opts) {
+  const log = opts.log || console.log;
+  return withYoutubeFallback(supabase, log, (platform) => youtubeUploadOn(supabase, platform, opts));
+}
+async function youtubeUploadOn(supabase, platform, { videoBuffer, title, description, tags = [], privacy = 'public', en = null, log = console.log }) {
+  const token = await youtubeAccessToken(supabase, platform);
   const meta = {
     snippet: { title: String(title || 'VYRALES').slice(0, 100), description: String(description || '').slice(0, 4900), tags: tags.map((t) => String(t).replace(/^#/, '')).slice(0, 15), categoryId: '27', defaultLanguage: 'es', defaultAudioLanguage: 'es' },
     status: { privacyStatus: privacy, selfDeclaredMadeForKids: false, containsSyntheticMedia: true, embeddable: true }
@@ -436,7 +468,7 @@ async function youtubeUpload(supabase, { videoBuffer, title, description, tags =
   });
   if (!init.ok) throw new Error('YouTube rechazó el inicio de la subida (HTTP ' + init.status + '): ' + (await init.text()).slice(0, 300));
   const uploadUrl = init.headers.get('location');
-  log('[youtube] subiendo', (videoBuffer.length / 1048576).toFixed(1), 'MB...');
+  log('[youtube]' + (platform === 'youtube_backup' ? ' (respaldo)' : '') + ' subiendo', (videoBuffer.length / 1048576).toFixed(1), 'MB...');
   const up = await jsonFetch(uploadUrl, { method: 'PUT', headers: { 'Content-Type': 'video/mp4', 'Content-Length': String(videoBuffer.length) }, body: videoBuffer });
   if (!up.res.ok || !up.body.id) throw new Error('YouTube rechazó el archivo (HTTP ' + up.res.status + '): ' + JSON.stringify(up.body.error || up.body).slice(0, 300));
   const got = up.body.status || {};
@@ -445,19 +477,23 @@ async function youtubeUpload(supabase, { videoBuffer, title, description, tags =
 
 // Agrega un video a una playlist del canal (necesita el permiso youtube.force-ssl: reconectar YouTube una vez).
 async function youtubeAddToPlaylist(supabase, { videoId, playlistId }) {
-  const token = await youtubeAccessToken(supabase);
-  const r = await fetch('https://www.googleapis.com/youtube/v3/playlistItems?part=snippet', {
-    method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ snippet: { playlistId, resourceId: { kind: 'youtube#video', videoId } } })
+  return withYoutubeFallback(supabase, console.log, async (platform) => {
+    const token = await youtubeAccessToken(supabase, platform);
+    const r = await fetch('https://www.googleapis.com/youtube/v3/playlistItems?part=snippet', {
+      method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ snippet: { playlistId, resourceId: { kind: 'youtube#video', videoId } } })
+    });
+    if (!r.ok) { const t = await r.text(); throw new Error((r.status === 403 && /insufficient|scope|permission/i.test(t) ? 'Falta el permiso para playlists: reconecta YouTube en el panel. ' : '') + 'HTTP ' + r.status + ': ' + t.slice(0, 200)); }
+    return true;
   });
-  if (!r.ok) { const t = await r.text(); throw new Error((r.status === 403 && /insufficient|scope|permission/i.test(t) ? 'Falta el permiso para playlists: reconecta YouTube en el panel. ' : '') + 'HTTP ' + r.status + ': ' + t.slice(0, 200)); }
-  return true;
 }
 // Playlists del canal (id + título), para asignarlas por serie o por tema.
 async function youtubePlaylists(supabase) {
-  const token = await youtubeAccessToken(supabase);
-  const r = await fetch('https://www.googleapis.com/youtube/v3/playlists?part=snippet&mine=true&maxResults=50', { headers: { Authorization: `Bearer ${token}` } });
-  const j = await r.json(); if (!r.ok) throw new Error('playlists HTTP ' + r.status);
-  return (j.items || []).map((p) => ({ id: p.id, title: p.snippet.title }));
+  return withYoutubeFallback(supabase, console.log, async (platform) => {
+    const token = await youtubeAccessToken(supabase, platform);
+    const r = await fetch('https://www.googleapis.com/youtube/v3/playlists?part=snippet&mine=true&maxResults=50', { headers: { Authorization: `Bearer ${token}` } });
+    const j = await r.json(); if (!r.ok) throw new Error('playlists HTTP ' + r.status);
+    return (j.items || []).map((p) => ({ id: p.id, title: p.snippet.title }));
+  });
 }
-module.exports = { youtubeAccessToken, youtubeAddToPlaylist, youtubePlaylists, tiktokAuthUrl, tiktokConnect, tiktokSendDraft, tiktokCreatorInfo, tiktokDirectPost, ttDirect, metaAuthUrl, metaConnect, instagramPublishReel, facebookPublishReel, youtubeAuthUrl, youtubeConnect, youtubeUpload, checkState, stateProblem, getAccount, REDIRECT, ytCreds };
+module.exports = { youtubeAccessToken, youtubeAddToPlaylist, youtubePlaylists, tiktokAuthUrl, tiktokConnect, tiktokSendDraft, tiktokCreatorInfo, tiktokDirectPost, ttDirect, metaAuthUrl, metaConnect, instagramPublishReel, facebookPublishReel, youtubeAuthUrl, youtubeConnect, youtubeUpload, checkState, stateProblem, getAccount, REDIRECT, ytCreds, withYoutubeFallback, isQuotaError };
