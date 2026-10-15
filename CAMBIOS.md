@@ -648,3 +648,7 @@ experimento (`doc.forzados`: ¿quién tenía razón?).
   reales se llaman `id="videos-list"`/`id="shorts-list"` (con "s"); por ese desajuste nunca se
   enganchaba el clic, entonces tampoco se movía el resaltado (el "efecto" que se veía que faltaba).
   Ya corregido y probado.
+- **`/ver`: reproducción automática en cadena (Franklin):** al terminar un video o un short, pasa
+  solo al siguiente de la lista (en Videos y en Shorts por igual); al llegar al final, vuelve a
+  empezar desde el primero. Para esto el reproductor ahora usa la API real de YouTube (antes era un
+  iframe simple que no avisaba cuándo terminaba el video).

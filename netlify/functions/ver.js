@@ -262,35 +262,65 @@ ${shorts.length ? `<div id="shorts-section" class="section-view${openShortsFirst
 </div>` : ''}
 
 </div>
+<script src="https://www.youtube.com/iframe_api"></script>
 <script>
 var SITE_ORIGIN = ${JSON.stringify(SITE_ORIGIN)};
+var ytApiReady = false, ytPending = [];
+window.onYouTubeIframeAPIReady = function(){ ytApiReady = true; ytPending.forEach(function(fn){ fn(); }); ytPending = []; };
 (function(){
-  function wire(prefix, listId, posterId, playerId){
+  // Reproduce uno y, cuando termina, pasa solo al siguiente de la lista (igual en Videos y en Shorts),
+  // usando el reproductor real de YouTube (única forma de saber cuándo terminó) (Franklin, oct-15).
+  function makeSection(prefix, listId, posterId, playerId){
     var poster = document.getElementById(posterId);
-    var player = document.getElementById(playerId);
-    if (!poster || !player) return;
-    function embed(vid){
-      player.innerHTML = '<iframe src="https://www.youtube.com/embed/'+vid+'?autoplay=1&rel=0&origin='+encodeURIComponent(SITE_ORIGIN)+'" title="VYRALES" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>';
-    }
-    poster.addEventListener('click', function(){ embed(this.getAttribute('data-vid')); });
+    var playerEl = document.getElementById(playerId);
     var list = document.getElementById(listId);
-    if (!list) return;
-    list.querySelectorAll('.list-item').forEach(function(it){
-      it.addEventListener('click', function(){
-        list.querySelectorAll('.list-item').forEach(function(x){ x.classList.remove('active'); });
-        it.classList.add('active');
-        embed(it.getAttribute('data-vid'));
-        document.getElementById(prefix + '-title').textContent = it.getAttribute('data-title');
-        document.getElementById(prefix + '-info').textContent = it.getAttribute('data-info');
-        var yt = document.getElementById(prefix + '-ytlink'); if (yt) yt.href = it.getAttribute('data-url');
-        document.title = it.getAttribute('data-title') + ' · VYRALES';
-        if (prefix === 'video') { try { history.pushState(null, '', '/ver?v=' + it.getAttribute('data-id')); } catch(_){} }
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-      });
+    if (!poster || !playerEl || !list) return;
+    var items = Array.prototype.slice.call(list.querySelectorAll('.list-item'));
+    var player = null;
+
+    function updateInfo(it){
+      document.getElementById(prefix + '-title').textContent = it.getAttribute('data-title');
+      document.getElementById(prefix + '-info').textContent = it.getAttribute('data-info');
+      var yt = document.getElementById(prefix + '-ytlink'); if (yt) yt.href = it.getAttribute('data-url');
+      document.title = it.getAttribute('data-title') + ' · VYRALES';
+      if (prefix === 'video') { try { history.pushState(null, '', '/ver?v=' + it.getAttribute('data-id')); } catch(_){} }
+    }
+
+    function playNext(afterItem){
+      var idx = items.indexOf(afterItem);
+      var next = items[idx + 1] || items[0]; // al llegar al final, vuelve a empezar la lista
+      if (next) playItem(next, true);
+    }
+
+    function playItem(it, auto){
+      items.forEach(function(x){ x.classList.remove('active'); });
+      it.classList.add('active');
+      updateInfo(it);
+      var vid = it.getAttribute('data-vid');
+      var divId = prefix + '-yt-' + Date.now();
+      playerEl.innerHTML = '<div id="' + divId + '"></div>';
+      function create(){
+        if (player) { try { player.destroy(); } catch(_){} }
+        player = new YT.Player(divId, {
+          videoId: vid,
+          playerVars: { autoplay: 1, rel: 0, origin: SITE_ORIGIN },
+          events: { onStateChange: function(e){ if (e.data === YT.PlayerState.ENDED) playNext(it); } }
+        });
+      }
+      if (ytApiReady) create(); else ytPending.push(create);
+      if (!auto) window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    poster.addEventListener('click', function(){
+      var initial = list.querySelector('.list-item.active') || items[0];
+      if (initial) playItem(initial, false);
+    });
+    items.forEach(function(it){
+      it.addEventListener('click', function(){ playItem(it, false); });
     });
   }
-  wire('video', 'videos-list', 'video-poster', 'video-player');
-  wire('short', 'shorts-list', 'short-poster', 'short-player');
+  makeSection('video', 'videos-list', 'video-poster', 'video-player');
+  makeSection('short', 'shorts-list', 'short-poster', 'short-player');
 
   var tabs = document.querySelectorAll('.tab');
   tabs.forEach(function(t){
