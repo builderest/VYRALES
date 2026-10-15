@@ -4,6 +4,15 @@
 // cada toma la genera LTX-2.5 en la PC king por Tailscale (gratis). Solo se paga lo de Google
 // que no es video: cuadros iniciales (~$0.067 c/u) y voces (~$0.004 c/u).
 // Sin el límite de 15 min de Netlify (un episodio de 20 tomas tarda ~30-40 min en king).
+//
+// oct-15 (Franklin): "el verificador no tiene que esperar a que king termine todos los videos
+// para ir revisando, para ganar tiempo". Antes: UNA llamada generaba TODAS las tomas y SOLO
+// DESPUÉS corría el QA completo (de ahí que un episodio largo se viera "atascado" horas después
+// de que king ya había terminado de producir). Ahora: se pide una toma a la vez y, apenas esa
+// toma queda guardada, se ENCADENA una revisión de QA (sin esperarla) mientras se pide la
+// siguiente toma. Las revisiones de QA se encadenan ENTRE SÍ (nunca dos al mismo tiempo) para
+// no pisarse escribiendo episodes.shots; _qa.js ahora se salta lo que ya revisó (sh.qa.mech_ok)
+// así que llamarlo muchas veces no repite el análisis de lo que ya pasó.
 const fs = require('fs');
 const path = require('path');
 
@@ -38,24 +47,81 @@ async function main() {
       }
     }
   }
-  console.log(`Produciendo "${series.title}" EP ${ep.episode_number}${Number(process.argv[3]) ? ' (solo la toma ' + process.argv[3] + ')' : ''} con LTX-2.5 en king...`);
+
+  const onlyShot = Number(process.argv[3]) || null;
   const { handler } = require(path.join(ROOT, 'netlify', 'functions', 'generate-media-background'));
-  const res = await handler({ httpMethod: 'POST', headers: { 'x-vyrales-key': process.env.DASHBOARD_KEY || '' }, /* llamada interna = "sistema" (multiusuario) */ body: JSON.stringify(Object.assign({ series: series.slug, episode_id: episodeId, provider: 'king', force: ep.status === 'generando_media' }, Number(process.argv[3]) ? { shot: Number(process.argv[3]) } : {})), queryStringParameters: {} });
-  console.log('RESULTADO', res.statusCode, String(res.body || '').slice(0, 800));
-  if (res.statusCode >= 400) process.exit(1);
-  // Control de calidad automático: si alguna toma salió corta o congelada, se rehace sola y se vuelve a unir.
-  if (!Number(process.argv[3])) {
+  const callHandler = (extra) => handler({ httpMethod: 'POST', headers: { 'x-vyrales-key': process.env.DASHBOARD_KEY || '' }, /* llamada interna = "sistema" (multiusuario) */ body: JSON.stringify(Object.assign({ series: series.slug, episode_id: episodeId, provider: 'king', force: ep.status === 'generando_media' }, extra || {})), queryStringParameters: {} });
+
+  if (onlyShot) {
+    // Toma de prueba suelta: sin cambios, igual que antes (sin QA progresivo).
+    console.log(`Produciendo "${series.title}" EP ${ep.episode_number} (solo la toma ${onlyShot}) con LTX-2.5 en king...`);
+    const res = await callHandler({ shot: onlyShot });
+    console.log('RESULTADO', res.statusCode, String(res.body || '').slice(0, 800));
+    if (res.statusCode >= 400) process.exit(1);
+    return;
+  }
+
+  const { data: epShots } = await supabase.from('episodes').select('shots').eq('id', episodeId).single();
+  const totalShots = (epShots && epShots.shots || []).length;
+
+  if (!totalShots) {
+    // Episodio sin tomas estructuradas (guion legacy en texto): no se puede pedir toma por toma
+    // por número, así que se mantiene el comportamiento de siempre (todo de una, QA al final).
+    console.log(`Produciendo "${series.title}" EP ${ep.episode_number} con LTX-2.5 en king (guion legacy, sin QA progresivo)...`);
+    const res = await callHandler();
+    console.log('RESULTADO', res.statusCode, String(res.body || '').slice(0, 800));
+    if (res.statusCode >= 400) process.exit(1);
     try {
       const { handler: regen } = require(path.join(ROOT, 'netlify', 'functions', 'regen-shot-background'));
       const redone = await require('./_qa').qaShots({ supabase, epId: episodeId, handler: regen, log: (...x) => console.log(...x) });
-      if (redone.length) {
-        const { mergeEpisodeVideo } = require(path.join(ROOT, 'netlify', 'functions', '_merge'));
-        const { data: fresh } = await supabase.from('episodes').select('*, assets(*)').eq('id', episodeId).single();
-        const { data: sr } = await supabase.from('series').select('id, slug, title, genre, story_bible').eq('id', ep.series_id).single();
-        const m = await mergeEpisodeVideo(supabase, { episode: fresh, series: sr, log: (...x) => console.log(...x) });
-        console.log('QA: video final unido de nuevo:', m.asset && m.asset.storage_path);
-      }
+      if (redone.length) await mergeFinal();
     } catch (e) { console.log('QA: no se pudo (' + String(e.message).slice(0, 200) + ')'); }
+    return;
+  }
+
+  console.log(`Produciendo "${series.title}" EP ${ep.episode_number} (${totalShots} tomas) con LTX-2.5 en king — QA en vivo, toma por toma...`);
+
+  let anyRedone = false;
+  let qaChain = Promise.resolve();
+  const { handler: regen } = require(path.join(ROOT, 'netlify', 'functions', 'regen-shot-background'));
+  // Encadena una revisión de QA DESPUÉS de la anterior (nunca dos a la vez, para no pisarse
+  // escribiendo episodes.shots) pero SIN esperarla aquí: la toma siguiente se pide ya mismo.
+  const scheduleQa = () => {
+    qaChain = qaChain
+      .then(() => require('./_qa').qaShots({ supabase, epId: episodeId, handler: regen, log: (...x) => console.log('[QA en vivo]', ...x) }))
+      .then((redone) => { if (redone && redone.length) anyRedone = true; })
+      .catch((e) => console.log('[QA en vivo] error:', String(e.message || e).slice(0, 200)));
+    return qaChain;
+  };
+
+  for (let n = 1; n <= totalShots; n++) {
+    const res = await callHandler({ shot: n });
+    console.log(`RESULTADO toma ${n}/${totalShots}`, res.statusCode, String(res.body || '').slice(0, 400));
+    if (res.statusCode >= 400) {
+      console.log(`toma ${n}/${totalShots}: no se pudo generar (${res.statusCode}) — sigo con la siguiente.`);
+      continue;
+    }
+    scheduleQa(); // no await: el QA de lo generado hasta ahora corre mientras se pide la toma n+1
+  }
+
+  console.log('Generación de todas las tomas terminada. Esperando a que termine la última revisión de QA en curso...');
+  await qaChain;
+  // Última pasada de seguridad (por si quedó algo sin revisar, p. ej. por un corte a mitad).
+  try {
+    const redoneFinal = await require('./_qa').qaShots({ supabase, epId: episodeId, handler: regen, log: (...x) => console.log('[QA final]', ...x) });
+    if (redoneFinal && redoneFinal.length) anyRedone = true;
+  } catch (e) { console.log('QA final: no se pudo (' + String(e.message).slice(0, 200) + ')'); }
+
+  if (anyRedone) await mergeFinal();
+
+  async function mergeFinal() {
+    try {
+      const { mergeEpisodeVideo } = require(path.join(ROOT, 'netlify', 'functions', '_merge'));
+      const { data: fresh } = await supabase.from('episodes').select('*, assets(*)').eq('id', episodeId).single();
+      const { data: sr } = await supabase.from('series').select('id, slug, title, genre, story_bible').eq('id', ep.series_id).single();
+      const m = await mergeEpisodeVideo(supabase, { episode: fresh, series: sr, log: (...x) => console.log(...x) });
+      console.log('QA: video final unido de nuevo:', m.asset && m.asset.storage_path);
+    } catch (e) { console.log('QA: no se pudo unir el video final (' + String(e.message).slice(0, 200) + ')'); }
   }
 }
 main().catch((err) => { console.error('ERROR:', err.message || err); process.exit(1); });

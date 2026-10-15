@@ -19,6 +19,15 @@
 
 ## Registro de cambios
 
+### 2026-10-15 (sesión Claude Cowork) — QA en vivo mientras king produce
+
+Franklin reportó (EP34, Atapuerca) que un video largo lleva ~10 h: la mayor parte es la generación de 131 tomas una por una en una sola GPU (king) — eso no se puede acelerar sin más hardware — PERO además, el QA (chequeo mecánico + revisión visual de Claude) **solo arrancaba DESPUÉS de que king terminara TODAS las tomas**, agregando horas encima en vez de ir en paralelo. Esto venía de una idea ya aprobada ("QA de cada clip apenas termina mientras king produce") que nunca se había implementado.
+
+- **`agente/_qa.js`** — `qaShots()` ahora se puede llamar MUCHAS veces sin repetir trabajo: cada toma que ya pasó el chequeo mecánico queda marcada (`shot.qa.mech_ok` + `mech_clip_id`), así que una llamada posterior la salta en vez de volver a correr ffmpeg sobre ella. (La revisión visual de Claude ya se saltaba sola con `shot.qa.ok`.)
+- **`agente/gen_local.js`** (reescrito) — antes: UNA llamada generaba las 131 tomas de corrido y DESPUÉS corría `qaShots` una sola vez sobre todo el episodio. Ahora: pide la toma 1, apenas queda guardada ENCADENA (sin esperarla) una revisión de `qaShots`, y ya pide la toma 2 — así la revisión de las tomas ya hechas corre MIENTRAS king genera la siguiente, en vez de después de todas. Las revisiones se encadenan entre sí (nunca dos a la vez, para no pisarse escribiendo `episodes.shots`), y al terminar la toma 131 se espera la última revisión pendiente + una pasada final de seguridad. Episodios con guion legacy (sin `episodes.shots` estructurado) siguen con el comportamiento de antes (todo de una, QA al final) — son muy pocos y no vale el riesgo de tocarlos.
+- No cambia el costo ni el motor (sigue Flow→FLUX→LTX en king, $0). No afecta el episodio que ya está corriendo ahora mismo (ese proceso sigue con el código viejo que tenía cargado en memoria) — el cambio aplica al PRÓXIMO episodio que se produzca. **Pusheado.**
+- Pendiente de ver en la práctica: cuánto tiempo real ahorra en un episodio largo nuevo (la generación de 131 tomas en una sola GPU sigue siendo el costo dominante; esto quita el "QA pegado encima al final", no la generación misma).
+
 ### 2026-10-15 (sesión Claude Cowork)
 
 **Variedad de verbos en tomas de "observar/verificar"** — Franklin notó (toma 92, EP34) que las tomas donde alguien revisa/verifica algo siempre terminan con la misma pose agachada.

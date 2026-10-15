@@ -203,6 +203,10 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
   for (const sh of ep.shots || []) {
     const clip = (ep.assets || []).filter((a) => a.kind === 'video_clip' && a.shot_number === sh.n).sort((a, b) => String(b.updated_at || b.created_at).localeCompare(String(a.updated_at || a.created_at)))[0];
     if (!clip || clip.approved) continue; // aprobada por Franklin: no se toca
+    // oct-15 (Franklin): qaShots se puede llamar varias veces MIENTRAS king sigue produciendo (ver gen_local.js),
+    // no solo una vez al final. Para no repetir el análisis mecánico (ffmpeg) de tomas ya revisadas en una
+    // llamada anterior, se salta si esta MISMA toma con este MISMO clip ya pasó.
+    if (sh.qa && sh.qa.mech_ok && sh.qa.mech_clip_id === clip.id && !sh.clip_stale) continue;
     await setWorking(sh.n, 'revisar');
     const d = await durationOf(clip.storage_path);
     let why = '';
@@ -215,7 +219,11 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
     }
     // Ya corregida a mano por el supervisor o Franklin (clip_stale): se rehace con SU prompt, sin reescribir.
     if (!why && sh.clip_stale) why = 'marcada para rehacer (prompt corregido)';
-    if (!why) continue;
+    if (!why) {
+      // Pasó: se marca para que una llamada futura de qaShots (en vivo, mientras king sigue produciendo) no la vuelva a analizar.
+      try { const { data: fr } = await supabase.from('episodes').select('shots').eq('id', epId).single(); await supabase.from('episodes').update({ shots: (fr.shots || []).map((x) => x.n === sh.n ? Object.assign({}, x, { qa: Object.assign({}, x.qa, { mech_ok: true, mech_clip_id: clip.id }) }) : x) }).eq('id', epId); } catch (_) {}
+      continue;
+    }
     // 🧠 Evidencia OBJETIVA para el cerebro: los defectos medidos (corte, deformación) son hechos, no opinión del juez.
     if (/escena|deforma/.test(why)) { try { await require(path.join(ROOT, 'netlify', 'functions', '_cerebro')).recordMany(supabase, [{ ep: epId, n: sh.n, clip: clip.id, try: (sh.qa && Number(sh.qa.tries)) || 0, src: 'medido', ok: false, fl: { b: true }, reason: 'medido: ' + why, shot: sh, tag: 'medido' }]); } catch (_) {} }
     log(`QA toma ${sh.n}: ${why} → la rehago con prompt nuevo`);
