@@ -560,3 +560,12 @@ experimento (`doc.forzados`: ¿quién tenía razón?).
 - **Cuota de YouTube: las búsquedas se comían 22 %:** la consola de Google mostró 9.995/10.000 usadas y "Search Queries
   per day: 22". Cada búsqueda cuesta 100 unidades; `viralRefs` (_analytics.js) hacía 6 por cada pedido de ideas.
   Ahora se guardan 24 h por canal (`media/cache/virales_<ws>.json`): una vez al día como máximo (600 unidades).
+- **Segundo proyecto de Google Cloud para YouTube (Franklin):** el proyecto de Google Cloud original
+  (10,000 unidades/día) lo comparten todos los canales — un canal activo puede agotar la cuota de todos.
+  Se creó un segundo proyecto ("vyrales-canal2") solo para canal admin vs. el resto: `_social.js` ahora
+  elige las credenciales por workspace (`ytCreds()`): canal admin sigue con `YOUTUBE_CLIENT_ID/SECRET`
+  (proyecto 1); cualquier otro canal usa `YOUTUBE_CLIENT_ID_2/SECRET_2` (proyecto 2) si están puestas en
+  Netlify, si no cae al proyecto 1 como antes. `_analytics.js` usa el mismo criterio al refrescar el token.
+  Falta: agregar `YOUTUBE_CLIENT_ID_2` y `YOUTUBE_CLIENT_SECRET_2` en las variables de entorno de Netlify
+  (ya están en el `.env` local) y reconectar YouTube en los canales que no sean el admin para que tomen
+  el proyecto nuevo.
