@@ -606,3 +606,7 @@ experimento (`doc.forzados`: ¿quién tenía razón?).
   mismo botón de producir (y también "Generar cuadros" y regenerar una toma sola) genera solas las
   fotos que falten primero (Flow gratis primero, igual que siempre) y sigue con la producción sin
   parar. Si alguna foto de verdad no se pudo generar, ahí sí avisa para revisarla a mano.
+- **`/ver` otra vez, formato cuadrícula (Franklin):** pidió que se viera como la página del canal de
+  YouTube pero con el video grande arriba. Cambié la lista lateral angosta por una cuadrícula de
+  miniaturas (como "Videos" en YouTube) debajo del reproductor grande, en vez de una lista al
+  costado.

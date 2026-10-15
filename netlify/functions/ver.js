@@ -41,7 +41,7 @@ exports.handler = async (event) => {
 
   const ytThumb = (vid) => `https://i.ytimg.com/vi/${vid}/hqdefault.jpg`;
   const listItem = (l, i) => `<button class="item${l.id === initial.id ? ' active' : ''}" data-id="${esc(l.id)}" data-vid="${esc(l.vid)}" data-title="${esc(l.title)}" data-url="${esc(l.url)}">
-    <span class="th"><img src="${esc(l.thumb || ytThumb(l.vid))}" alt="" loading="${i < 3 ? 'eager' : 'lazy'}">${i === 0 ? '<i class="new">NUEVO</i>' : ''}</span>
+    <span class="th"><img src="${esc(l.thumb || ytThumb(l.vid))}" alt="" loading="${i < 6 ? 'eager' : 'lazy'}">${i === 0 ? '<i class="new">NUEVO</i>' : ''}</span>
     <span class="meta"><b>${esc(l.title)}</b></span>
   </button>`;
   const list = longs.map(listItem).join('');
@@ -59,8 +59,8 @@ header .logo{display:flex;align-items:center;gap:8px;font-weight:700;font-size:1
 header .logo svg{flex:none}
 header .ch{margin-left:auto;background:transparent;border:1px solid #3f3f3f;color:#f1f1f1;border-radius:18px;padding:8px 14px;font-size:13px;font-weight:600;text-decoration:none;white-space:nowrap}
 header .ch:hover{background:#272727}
-.wrap{max-width:1300px;margin:0 auto;padding:20px 16px 60px;display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:24px}
-@media (max-width:980px){.wrap{grid-template-columns:1fr;padding:0 0 40px}}
+.wrap{max-width:1100px;margin:0 auto;padding:20px 16px 60px}
+@media (max-width:980px){.wrap{padding:0 0 40px}}
 .player{position:relative;width:100%;aspect-ratio:16/9;background:#000;border-radius:12px;overflow:hidden}
 @media (max-width:980px){.player{border-radius:0}}
 .player iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
@@ -74,16 +74,17 @@ header .ch:hover{background:#272727}
 .info .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .yt{display:inline-flex;align-items:center;gap:6px;background:#272727;color:#f1f1f1;border-radius:18px;padding:8px 14px;font-size:13px;font-weight:600;text-decoration:none}
 .yt:hover{background:#3f3f3f}
-.side h2{font-size:14px;color:#aaa;font-weight:600;margin:0 0 10px;padding:0 4px}
-@media (max-width:980px){.side{padding:0 16px}.side h2{padding:4px 0 10px}}
-.item{display:flex;gap:8px;width:100%;text-align:left;background:transparent;border:0;color:inherit;font:inherit;cursor:pointer;padding:6px 4px;border-radius:10px;margin-bottom:4px}
-.item:hover{background:#1f1f1f}
-.item.active{background:#272727}
-.th{position:relative;flex:none;width:168px;aspect-ratio:16/9;border-radius:8px;overflow:hidden;background:#1a1a1a}
-.th img{width:100%;height:100%;object-fit:cover;display:block}
-.new{position:absolute;left:6px;top:6px;background:#ffd400;color:#000;font-size:10px;font-weight:800;border-radius:4px;padding:2px 5px;font-style:normal}
-.meta{min-width:0;display:flex;flex-direction:column;justify-content:center}
-.meta b{font-size:13px;font-weight:600;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.side{margin-top:28px}
+.side h2{font-size:16px;color:#f1f1f1;font-weight:700;margin:0 0 14px;padding:0 4px}
+@media (max-width:980px){.side{padding:0 16px}}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:18px 14px}
+.item{display:block;width:100%;text-align:left;background:transparent;border:0;color:inherit;font:inherit;cursor:pointer;padding:0;border-radius:12px}
+.item .th{position:relative;width:100%;aspect-ratio:16/9;border-radius:12px;overflow:hidden;background:#1a1a1a;margin-bottom:8px}
+.item.active .th{outline:2px solid #3ea6ff}
+.item:hover .th img{transform:scale(1.03)}
+.th img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .2s}
+.new{position:absolute;left:6px;top:6px;background:#ffd400;color:#000;font-size:10px;font-weight:800;border-radius:4px;padding:2px 5px;font-style:normal;z-index:1}
+.meta b{font-size:14px;font-weight:600;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;color:#f1f1f1}
 </style></head>
 <body>
 <header>
@@ -91,21 +92,19 @@ header .ch:hover{background:#272727}
   <a class="ch" href="${esc(CHANNEL)}" rel="noopener">Suscribirme en YouTube</a>
 </header>
 <div class="wrap">
-  <div>
-    <div class="player" id="player">
-      <button class="poster" id="poster" data-vid="${esc(initial.vid)}" aria-label="Reproducir">
-        <img src="${esc(initial.thumb || ytThumb(initial.vid))}" alt="">
-        <span class="play"><svg width="68" height="48" viewBox="0 0 68 48"><path d="M66.5 7.7c-.8-2.9-2.9-5.1-5.8-5.9C55.6 0 34 0 34 0S12.4 0 7.3 1.8C4.4 2.6 2.3 4.8 1.5 7.7 0 13 0 24 0 24s0 11 1.5 16.3c.8 2.9 2.9 5.1 5.8 5.9C12.4 48 34 48 34 48s21.6 0 26.7-1.8c2.9-.8 5-3 5.8-5.9C68 35 68 24 68 24s0-11-1.5-16.3z" fill="#f00" opacity=".92"/><path d="M27 34l18-10-18-10v20z" fill="#fff"/></svg></span>
-      </button>
-    </div>
-    <div class="info">
-      <h1 id="title">${esc(initial.title)}</h1>
-      <div class="row"><a class="yt" id="ytlink" href="${esc(initial.url)}" target="_blank" rel="noopener">▶ Ver en YouTube</a></div>
-    </div>
+  <div class="player" id="player">
+    <button class="poster" id="poster" data-vid="${esc(initial.vid)}" aria-label="Reproducir">
+      <img src="${esc(initial.thumb || ytThumb(initial.vid))}" alt="">
+      <span class="play"><svg width="68" height="48" viewBox="0 0 68 48"><path d="M66.5 7.7c-.8-2.9-2.9-5.1-5.8-5.9C55.6 0 34 0 34 0S12.4 0 7.3 1.8C4.4 2.6 2.3 4.8 1.5 7.7 0 13 0 24 0 24s0 11 1.5 16.3c.8 2.9 2.9 5.1 5.8 5.9C12.4 48 34 48 34 48s21.6 0 26.7-1.8c2.9-.8 5-3 5.8-5.9C68 35 68 24 68 24s0-11-1.5-16.3z" fill="#f00" opacity=".92"/><path d="M27 34l18-10-18-10v20z" fill="#fff"/></svg></span>
+    </button>
+  </div>
+  <div class="info">
+    <h1 id="title">${esc(initial.title)}</h1>
+    <div class="row"><a class="yt" id="ytlink" href="${esc(initial.url)}" target="_blank" rel="noopener">▶ Ver en YouTube</a></div>
   </div>
   <div class="side">
     <h2>Más historias completas</h2>
-    ${list}
+    <div class="grid">${list}</div>
   </div>
 </div>
 <script>
