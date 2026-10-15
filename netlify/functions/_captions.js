@@ -25,8 +25,8 @@ function buildSrt(words, { lead = LEAD, maxChars = 84, maxSec = 6 } = {}) {
 // oct-14 (Franklin: "los subtítulos de YouTube se pueden poner con colores" → sí, para los LARGOS): formato YTT/SRV3
 // de YouTube (colores, contorno, fuente, posición). Mismos bloques y tiempos que el SRT; letra blanca en negrita con
 // contorno negro, sin caja, y en AMARILLO los números y los nombres propios (lo que el ojo busca primero).
-function buildYtt(words, opts = {}) {
-  const srt = buildSrt(words, opts);
+function buildYtt(words, opts = {}) { return yttFromSrt(buildSrt(words, opts)); }
+function yttFromSrt(srt) {
   const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   const toMs = (x) => { const m = /(\d+):(\d+):(\d+),(\d+)/.exec(x); return ((+m[1] * 60 + +m[2]) * 60 + +m[3]) * 1000 + +m[4]; };
   const destaca = (w, i, arr) => /\d/.test(w) || (i > 0 && /^[A-ZÁÉÍÓÚÑ][\wáéíóúñ'’-]{2,}/.test(w) && !/[.!?…]$/.test(arr[i - 1] || ''));
@@ -44,6 +44,27 @@ function buildYtt(words, opts = {}) {
     '<pen id="1" b="1" fc="#FFFFFF" fo="254" bo="0" et="3" ec="#000000" fs="4" sz="150"/>\n' +
     '<pen id="2" b="1" fc="#FFD400" fo="254" bo="0" et="3" ec="#000000" fs="4" sz="150"/>\n' +
     '<wp id="1" ap="7" ah="50" av="88"/>\n<ws id="1" ju="2"/>\n</head>\n<body>\n' + ps.join('\n') + '\n</body>\n</timedtext>\n';
+}
+// oct-14 (Franklin: "los que son en inglés también traen la traducción al español, ¿verdad?" → antes NO): la pista del
+// OTRO idioma se traduce bloque por bloque con los MISMOS tiempos. Si el video tiene voz inglesa alineada, el inglés sale
+// de esa voz (como antes). Claude en la PC ($0); fuera de la PC no se traduce (no se paga).
+async function translateSrt(srt, from, to, log = console.log) {
+  const blocks = srt.trim().split(/\n\n+/).map((b) => b.split('\n'));
+  const texts = blocks.map((L) => L.slice(2).join(' '));
+  let C = null; try { C = require(require('path').join(__dirname, '..', '..', 'agente', '_claude.js')); } catch (_) {}
+  if (!C || !process.env.VYRALES_LOCAL_RUN) { log('subtítulos: la traducción ' + from + '→' + to + ' se hace en la PC (Claude, $0); aquí se omite.'); return null; }
+  const name = { es: 'Spanish (neutral Latin American)', en: 'natural American English' };
+  const out = [];
+  for (let i = 0; i < texts.length; i += 80) {
+    const part = texts.slice(i, i + 80);
+    const prompt = `Translate these ${part.length} documentary subtitle lines from ${name[from] || from} into ${name[to] || to}. They are consecutive pieces of ONE narration: keep the meaning and flow, natural and human (not word for word), each line about as short as the original so it can be read in the same time. Keep numbers and names. Return ONLY JSON: {"lines":["...", ...]} with exactly ${part.length} strings, same order.\n\n` + JSON.stringify(part);
+    const j = C.parseJson(await C.runClaude(prompt, { timeoutMin: 8, memory: false }));
+    if (!j || !Array.isArray(j.lines) || j.lines.length !== part.length) throw new Error('la traducción no devolvió ' + part.length + ' líneas');
+    out.push(...j.lines);
+  }
+  const wrap = (s) => { s = String(s).replace(/\s+/g, ' ').trim(); if (s.length <= 42) return s; const mid = s.length / 2; let best = -1; for (let i = 0; i < s.length; i++) if (s[i] === ' ' && (best < 0 || Math.abs(i - mid) < Math.abs(best - mid))) best = i; return best > 0 ? s.slice(0, best) + '\n' + s.slice(best + 1) : s; };
+  log('subtítulos: traducidos ' + from + '→' + to + ' (' + out.length + ' bloques, Claude $0)');
+  return blocks.map((L, k) => `${L[0]}\n${L[1]}\n${wrap(out[k])}\n`).join('\n');
 }
 // Sube (o reemplaza) una pista de subtítulos en un video de YouTube. Necesita el permiso youtube.force-ssl.
 async function youtubeCaption(supabase, { videoId, language, name, srt, log = console.log }) {
@@ -70,9 +91,12 @@ async function ensureSubtitles(supabase, episode, log = console.log) {
   const cont = episode.continuity || {};
   const voice = cont.voice; const en = cont.english;
   if (!voice || !Array.isArray(voice.words) || !voice.words.length) throw new Error('La voz no tiene tiempos por palabra.');
-  const out = { es: buildSrt(voice.words) };
-  const ytt = { es: buildYtt(voice.words) }; // oct-14: lo que se sube a YouTube va con colores y letra grande
-  if (en && en.voice_url && Array.isArray(en.lines)) {
+  // Idioma de la voz = idioma de la serie (VYRALES 'es', MindFuel 'en').
+  const { data: serL } = await supabase.from('series').select('language').eq('id', episode.series_id).single();
+  const main = (serL && serL.language) === 'en' ? 'en' : 'es', other = main === 'es' ? 'en' : 'es';
+  const out = { [main]: buildSrt(voice.words) };
+  const ytt = { [main]: buildYtt(voice.words) }; // oct-14: lo que se sube a YouTube va con colores y letra grande
+  if (main === 'es' && en && en.voice_url && Array.isArray(en.lines)) {
     let words = Array.isArray(en.words) && en.words.length ? en.words : null;
     if (!words) {
       log('subtítulos: alineando la voz inglesa (Whisper local, ~2 min)...');
@@ -86,6 +110,7 @@ async function ensureSubtitles(supabase, episode, log = console.log) {
     }
     if (words) { out.en = buildSrt(words); ytt.en = buildYtt(words); }
   }
+  if (!out[other]) { try { const tr = await translateSrt(out[main], main, other, log); if (tr) { out[other] = tr; ytt[other] = yttFromSrt(tr); } } catch (e) { log('subtítulos: no pude traducir (' + String(e.message).slice(0, 120) + ')'); } }
   const { uploadFile } = require('./_storage');
   const { data: se } = await supabase.from('series').select('slug').eq('id', episode.series_id).single();
   const base = `${se.slug}/ep${episode.episode_number}/subs-${Date.now()}`;

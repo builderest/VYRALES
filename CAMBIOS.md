@@ -525,3 +525,8 @@ experimento (`doc.forzados`: ¿quién tenía razón?).
   formato YTT/SRV3 de YouTube: letra blanca en negrita (150 %), contorno negro sin caja, números y nombres propios en
   amarillo, abajo al centro. `uploadSubtitles` sube el YTT (el SRT se sigue guardando). Probado en "Humanos de un
   metro" (youtu.be/MeOR19OAlr8): YouTube lo aceptó y lo sirve con estilo (su conversión a VTT trae color y negrita).
+- **Subtítulos en los dos idiomas siempre:** antes la pista inglesa solo existía si el video tenía voz inglesa, y en un
+  canal en inglés (MindFuel) la pista "es" habría salido con el texto en inglés. Ahora `ensureSubtitles` usa el idioma
+  de la serie como pista principal y TRADUCE la otra con Claude en la PC ($0), mismos tiempos y mismo estilo YTT.
+  Aplicado a los 3 largos que están en YouTube: Toba (pUbmcSr8Ikw, ES + EN de su voz inglesa), Humanos de un metro
+  (MeOR19OAlr8) y Bomba del Zar (OAxewumtTKE) con ES + EN traducido. Revisada la pista EN de la Bomba del Zar.
