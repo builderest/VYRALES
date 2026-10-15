@@ -535,3 +535,11 @@ experimento (`doc.forzados`: ¿quién tenía razón?).
   de la voz (una entrada YTT por palabra, texto acumulado); las pistas traducidas van por bloque. Los 3 largos ya tienen
   amarillo/morado por bloque; la versión palabra por palabra NO se pudo subir hoy: **se agotó la cuota diaria de la API
   de YouTube** (cada subida de subtítulos cuesta ~400 unidades de 10.000; se reinicia a medianoche del Pacífico).
+- **MindFuel EP1 "trabado en la toma 24" (oct-15, ~11:30 pm Texas):** no estaba trabado: cada toma con personaje
+  tardaba ~40 min (Flow no subía la foto de cara: "Añadir a petición" no aparecía; 3 intentos → Gemini $0.067).
+  Franklin eligió pararlo y hacerlo gratis: job cancelado en la toma 26; tomas 26–118 sin `characters` (guardados en
+  `characters_orig`) → cuadros con Flow sin foto (probado 26 y 27: lote de 2 en 56 s, $0). Llevaba 14 cuadros
+  pagados ($0.94).
+- **Alineación de la voz en inglés:** `_align.js` usaba Whisper en español siempre → la voz de MindFuel casaba 143 de
+  1247 palabras y las tomas 1–25 salieron con duraciones mal. Ahora el idioma se detecta del texto (`idiomaDe`):
+  1185/1247. El QA está rehaciendo en king ($0) las tomas 1–25 que no calzan con su voz.

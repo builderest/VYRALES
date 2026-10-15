@@ -111,7 +111,15 @@ function matchWords(scriptWords, heard0) {
   return { words: out, matched };
 }
 
-async function alignWords(wavBuffer, text, log = console.log, lang = 'spanish') {
+// oct-14: el idioma de Whisper sale del TEXTO si no se pasa (MindFuel narra en inglés: con 'spanish' casaba 143/1247 palabras).
+function idiomaDe(text) {
+  const w = String(text || '').toLowerCase().split(/[^a-záéíóúñü']+/);
+  const es = w.filter((x) => /^(que|de|la|el|los|las|y|en|un|una|por|con|para|se|del|su|no|es)$/.test(x)).length;
+  const en = w.filter((x) => /^(the|and|of|to|a|in|is|he|his|was|that|it|for|with|on|you)$/.test(x)).length;
+  return en > es ? 'english' : 'spanish';
+}
+async function alignWords(wavBuffer, text, log = console.log, lang) {
+  lang = lang || idiomaDe(text);
   if (!process.env.VYRALES_LOCAL_RUN) return null;
   try {
     const t0 = Date.now();
