@@ -7,6 +7,7 @@
 const { getSupabaseClient } = require('./_supabase');
 const CHANNEL = process.env.YOUTUBE_CHANNEL_URL || 'https://www.youtube.com/channel/UCfBQ7OFSDrImT96FsDZkY_Q';
 const CHANNEL_ID = (CHANNEL.match(/\/channel\/([^/?]+)/) || [])[1] || 'UCfBQ7OFSDrImT96FsDZkY_Q';
+const SITE_ORIGIN = process.env.PUBLIC_BASE_URL || 'https://vyrales.app';
 const esc = (t) => String(t || '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const nf = (n) => new Intl.NumberFormat('es').format(n || 0);
 // Saca el ID de 11 caracteres de un link youtu.be/... o youtube.com/watch?v=...
@@ -36,7 +37,9 @@ async function getChannelInfo(sb) {
         title: c.snippet.title, handle: c.snippet.customUrl, desc: c.snippet.description || '',
         subs: +c.statistics.subscriberCount || 0, videos: +c.statistics.videoCount || 0,
         avatar: (c.snippet.thumbnails.high || c.snippet.thumbnails.default || {}).url || '',
-        banner: ((c.brandingSettings || {}).image || {}).bannerExternalUrl || ''
+        // YouTube devuelve el banner recortado a baja resolución por defecto; pidiendo el ancho
+        // grande (=w2120) sale la imagen de verdad en alta calidad (Franklin, oct-15).
+        banner: (((c.brandingSettings || {}).image || {}).bannerExternalUrl ? ((c.brandingSettings || {}).image || {}).bannerExternalUrl + '=w2120' : '')
       };
     });
   } catch (_) { info = null; }
@@ -183,10 +186,12 @@ body{background:#0f0f0f;color:#f1f1f1;font-family:Roboto,system-ui,-apple-system
 .playlist-title{font-size:1.05rem;font-weight:500;margin-bottom:12px;position:sticky;top:0;background:#0f0f0f;padding:4px 0;z-index:1}
 .list-item{display:flex;gap:12px;padding:8px;border-radius:8px;cursor:pointer;margin-bottom:8px;background:transparent;border:0;width:100%;text-align:left;color:inherit;font:inherit}
 .list-item:hover,.list-item.active{background:#272727}
+.list-item.active .thumb-container{outline:2px solid #3ea6ff}
 .thumb-container{position:relative;border-radius:8px;overflow:hidden;background:#1a1a1a;flex:none}
 .thumb-container.horizontal{width:140px;aspect-ratio:16/9}
 .thumb-container.vertical{width:90px;aspect-ratio:9/16}
-.thumb-container img{width:100%;height:100%;object-fit:cover;display:block}
+.thumb-container img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .2s ease}
+.list-item:hover .thumb-container img{transform:scale(1.07)}
 .duration-badge{position:absolute;bottom:4px;right:4px;background:rgba(0,0,0,.8);font-size:.7rem;padding:2px 4px;border-radius:4px;color:#fff;font-weight:500}
 .item-info{display:flex;flex-direction:column;justify-content:flex-start;min-width:0}
 .item-title{font-size:.88rem;font-weight:500;line-height:1.3;margin-bottom:4px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;color:#f1f1f1}
@@ -258,13 +263,14 @@ ${shorts.length ? `<div id="shorts-section" class="section-view${openShortsFirst
 
 </div>
 <script>
+var SITE_ORIGIN = ${JSON.stringify(SITE_ORIGIN)};
 (function(){
   function wire(prefix, posterId, playerId){
     var poster = document.getElementById(posterId);
     var player = document.getElementById(playerId);
     if (!poster || !player) return;
     function embed(vid){
-      player.innerHTML = '<iframe src="https://www.youtube.com/embed/'+vid+'?autoplay=1&rel=0" title="VYRALES" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>';
+      player.innerHTML = '<iframe src="https://www.youtube.com/embed/'+vid+'?autoplay=1&rel=0&origin='+encodeURIComponent(SITE_ORIGIN)+'" title="VYRALES" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>';
     }
     poster.addEventListener('click', function(){ embed(this.getAttribute('data-vid')); });
     document.querySelectorAll('#' + prefix + '-list .list-item').forEach(function(it){

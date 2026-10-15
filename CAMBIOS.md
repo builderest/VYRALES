@@ -636,3 +636,10 @@ experimento (`doc.forzados`: ¿quién tenía razón?).
 - **Botón de Suscribirme en `/ver` (Franklin: "se ve feo"):** el widget oficial embebido de YouTube
   dejaba un espacio en blanco feo. Se cambió por un botón propio (rojo, estilo YouTube) que lleva
   directo al canal para suscribirse ahí.
+- **Arreglo "Error 153" al reproducir en `/ver` (Franklin):** al reproductor le faltaba decirle a
+  YouTube desde qué dominio se está reproduciendo (`origin`); sin eso YouTube a veces lo bloquea con
+  ese error. Ya se agregó.
+- **Efecto al pasar el mouse en las miniaturas de la lista (Franklin: "se ve feo" sin eso):** ahora
+  las miniaturas hacen un pequeño zoom al pasar el mouse por encima, como en el canal real.
+- **Banner de `/ver` en mejor calidad (Franklin):** la imagen del banner que trae la API de YouTube
+  venía recortada a baja resolución por defecto; ahora se pide el tamaño grande, se ve nítida.
