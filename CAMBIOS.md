@@ -543,3 +543,8 @@ experimento (`doc.forzados`: ¿quién tenía razón?).
 - **Alineación de la voz en inglés:** `_align.js` usaba Whisper en español siempre → la voz de MindFuel casaba 143 de
   1247 palabras y las tomas 1–25 salieron con duraciones mal. Ahora el idioma se detecta del texto (`idiomaDe`):
   1185/1247. El QA está rehaciendo en king ($0) las tomas 1–25 que no calzan con su voz.
+- **MindFuel: producción PARADA y formato nuevo (Franklin, oct-15):** cancelado el gen_local del EP1 (Tom Daley) y su
+  seguimiento. Nueva identidad del canal (`workspaces.settings.identidad`; la anterior queda en `identidad_anterior`):
+  mensajes motivacionales fuertes y ORIGINALES escritos por el guionista, sin historias reales ni personas reales;
+  una imagen simbólica por frase (pueden ser fijas con movimiento suave, no hace falta video completo) y sin mostrar
+  personas (solo anónimas, lejos o de espaldas). Pendiente: el modo de producción "imágenes" (sin LTX) para este canal.
