@@ -2652,9 +2652,11 @@
       // Genera SOLO los cuadros iniciales que faltan del episodio (sin video) para revisarlos.
       window.generateAllFrames = async function(btn) {
         const episodeId = btn.dataset.ep;
-        const ep = await freshEpisodeOrBlock(episodeId);
+        let ep = await freshEpisodeOrBlock(episodeId);
         if (!ep) return;
-        if (blockIfMissingPhotos(ep)) return;
+        if (await autoFillMissingPhotos(ep) === false) return;
+        ep = await freshEpisodeOrBlock(episodeId);
+        if (!ep) return;
         const missing = (ep.shots || []).filter(sh => sh.frame_stale || (!frameFor(ep, sh.n) && !clipFor(ep, sh.n))).length;
         // Series con image_engine 'flow' y tomas sin personajes: Google Flow en la PC (gratis), no Gemini por API.
         const sbF = (lastLoadedData && lastLoadedData.series && lastLoadedData.series.story_bible) || {};
@@ -2744,6 +2746,23 @@
         const miss = missingPhotos(ep, shotNumbers);
         if (!miss.length) return false;
         alert('📷 Faltan las fotos de cara de:\n\n' + miss.map(n => '• ' + n).join('\n') + '\n\nSin la foto no se puede crear el cuadro inicial. Ve al Elenco y dale "Generar fotos que faltan" (~$' + (miss.length * IMAGE_PRICE_USD).toFixed(2) + '). No se mandó nada ni se cobró nada.');
+        return true;
+      }
+      // oct-15 (Franklin): en vez de bloquear pidiendo ir al Elenco a mano, genera las fotos que falten ahí mismo
+      // (Flow primero, $0; Gemini de respaldo solo si Flow falla) y sigue solo. Devuelve false si no se pudo seguir
+      // (alguna foto no se generó: ahí sí hace falta revisarla a mano).
+      async function autoFillMissingPhotos(ep, shotNumbers) {
+        const miss = missingPhotos(ep, shotNumbers);
+        if (!miss.length) return true;
+        const chars = (lastLoadedData.characters || []).filter(c => miss.includes(c.name));
+        const banner0 = document.getElementById('dataStatusBanner');
+        if (banner0) banner0.textContent = 'Faltan ' + miss.length + ' foto(s) de cara (' + miss.join(', ') + '): generándolas antes de seguir...';
+        try { await generateCharacterPhotos({ series: DEFAULT_SERIES, only_missing: true }, chars.map(c => c.id)); }
+        catch (err) { if (banner0) banner0.textContent = ''; alert('No se pudieron generar las fotos que faltan: ' + err.message); return false; }
+        if (banner0) banner0.textContent = '';
+        const ep2 = await freshEpisodeOrBlock(ep.id);
+        if (!ep2) return false;
+        if (blockIfMissingPhotos(ep2, shotNumbers)) return false;
         return true;
       }
 
@@ -2855,9 +2874,11 @@
         loadDashboard();
       };
       async function generateKeyframe(episodeId, n) {
-        const ep = await freshEpisodeOrBlock(episodeId);
+        let ep = await freshEpisodeOrBlock(episodeId);
         if (!ep) return;
-        if (blockIfMissingPhotos(ep, [n])) return;
+        if (await autoFillMissingPhotos(ep, [n]) === false) return;
+        ep = await freshEpisodeOrBlock(episodeId);
+        if (!ep) return;
         const startedAt = Date.now();
         const prev = ep && frameFor(ep, n);
         const prevUpdated = prev ? prev.updated_at : null;
@@ -3870,9 +3891,15 @@
         loadDashboard();
       };
       window.produceEpisode = async function(episodeId) {
-        const ep = await freshEpisodeOrBlock(episodeId);
+        let ep = await freshEpisodeOrBlock(episodeId);
         if (!ep) return;
-        if (usesKeyframes(lastLoadedData.series) && blockIfMissingPhotos(ep)) return;
+        // oct-15 (Franklin): si faltan fotos de cara, ya NO se bloquea pidiendo ir al Elenco a mano —
+        // se generan solas (Flow primero, $0) y recién entonces sigue la producción.
+        if (usesKeyframes(lastLoadedData.series)) {
+          if (await autoFillMissingPhotos(ep) === false) return;
+          ep = await freshEpisodeOrBlock(episodeId);
+          if (!ep) return;
+        }
         const doneClips = (ep.assets || []).filter(a => a.kind === 'video_clip').length;
         const missingClips = ((ep.shots || []).length || 0) - doneClips;
         const q = videoProvider === 'google' ? veoQuotaInfo(lastLoadedData, seriesModels(lastLoadedData.series).shot) : null;

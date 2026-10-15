@@ -601,3 +601,8 @@ experimento (`doc.forzados`: ¿quién tenía razón?).
   video sea el que aparece listo en la pantalla grande al entrar (antes redirigía de una vez a
   YouTube). Carga liviana: se muestra la miniatura con botón de play y el reproductor real solo se
   carga cuando el usuario le da play (o cambia de video en la lista).
+- **"Iniciar producción" ya no bloquea pidiendo ir al Elenco (Franklin):** si al personaje le falta
+  la foto de cara, antes había que ir manualmente a Elenco → "Generar fotos que faltan". Ahora el
+  mismo botón de producir (y también "Generar cuadros" y regenerar una toma sola) genera solas las
+  fotos que falten primero (Flow gratis primero, igual que siempre) y sigue con la producción sin
+  parar. Si alguna foto de verdad no se pudo generar, ahí sí avisa para revisarla a mano.
