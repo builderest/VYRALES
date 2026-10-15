@@ -587,3 +587,17 @@ experimento (`doc.forzados`: ¿quién tenía razón?).
   ahora también reconoce "youtube.quota" / "exceeded your ... quota". Probado en vivo: subió los
   subtítulos nuevos (karaoke por palabra, ES+EN) a los 3 videos largos ya publicados usando el
   respaldo del proyecto 2, mientras el proyecto 1 seguía sin cuota del día.
+- **Analítica de YouTube intermitente, arreglada (Franklin):** la página de analítica hacía varias
+  llamadas directas a la API (canal, lista de videos, 3 reportes de YouTube Analytics) con el
+  token ya obtenido, pero si alguna de esas llamadas (no el refresco del token) chocaba con la
+  cuota agotada del proyecto 1, no había reintento — por eso a veces cargaba bien y a veces salía
+  en blanco/"—", según si justo en ese momento quedaba cuota. Ahora toda esa recolección
+  (`youtube()`/`youtubeOn()` en `_analytics.js`) corre dentro de `withYoutubeFallback`: si CUALQUIERA
+  de esas llamadas devuelve "cuota agotada", se reintenta completa con el respaldo del proyecto 2.
+- **`/ver` (link de Instagram/TikTok), rediseño (Franklin):** antes cada historia llevaba a YouTube
+  afuera de la página. Ahora el video se ve empotrado ahí mismo (reproductor oficial de YouTube —
+  sigue contando como vista real en YouTube), con un diseño parecido a YouTube: reproductor grande
+  + lista de "más historias" al lado (abajo en el teléfono). `?v=<episode_id>` ahora hace que ESE
+  video sea el que aparece listo en la pantalla grande al entrar (antes redirigía de una vez a
+  YouTube). Carga liviana: se muestra la miniatura con botón de play y el reproductor real solo se
+  carga cuando el usuario le da play (o cambia de video en la lista).

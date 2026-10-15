@@ -46,11 +46,22 @@ function analyticsProblem(r) {
   return { reason: 'error', msg };
 }
 
+// Lanza un error "quotaExceeded" si la respuesta es un 403 por cuota agotada, para que withYoutubeFallback
+// (oct-15) detecte el agotamiento DENTRO de cualquiera de estas llamadas y reintente todo con el respaldo.
+function assertNotQuota(r) {
+  if (r && r.status === 403 && /quotaExceeded|dailyLimitExceeded|rateLimitExceeded/i.test(JSON.stringify(r.body || {}))) {
+    throw new Error('quotaExceeded: ' + JSON.stringify(r.body).slice(0, 300));
+  }
+}
 async function youtube(sb) {
-  const t = await ytToken(sb);
+  return withYoutubeFallback(sb, console.log, (platform) => youtubeOn(sb, platform));
+}
+async function youtubeOn(sb, platform) {
+  const t = await ytTokenOn(sb, platform);
   if (!t) return { connected: false };
   const H = { headers: { Authorization: 'Bearer ' + t.token } };
   const ch = await getJson('https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics,contentDetails&mine=true', H);
+  assertNotQuota(ch);
   const c = ch.body.items && ch.body.items[0];
   if (!c) return { connected: true, error: 'YouTube no devolvió el canal (HTTP ' + ch.status + ').' };
   const out = {
@@ -59,9 +70,11 @@ async function youtube(sb) {
     videos: [], analytics: { ok: false }
   };
   const pl = await getJson('https://www.googleapis.com/youtube/v3/playlistItems?part=contentDetails&maxResults=50&playlistId=' + c.contentDetails.relatedPlaylists.uploads, H);
+  assertNotQuota(pl);
   const ids = (pl.body.items || []).map((i) => i.contentDetails.videoId);
   if (ids.length) {
     const v = await getJson('https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics,contentDetails,status&id=' + ids.join(','), H);
+    assertNotQuota(v);
     out.videos = (v.body.items || []).map((x) => ({
       id: x.id, title: x.snippet.title, published: x.snippet.publishedAt, privacy: x.status && x.status.privacyStatus,
       thumb: (x.snippet.thumbnails && (x.snippet.thumbnails.medium || x.snippet.thumbnails.default) || {}).url || '',
@@ -76,6 +89,7 @@ async function youtube(sb) {
   // Google a veces responde 500 "backendError" suelto: se reintenta hasta 3 veces antes de rendirse.
   const A = async (q) => { let r; for (let k = 0; k < 3; k++) { r = await getJson('https://youtubeanalytics.googleapis.com/v2/reports?ids=channel==MINE&' + q, H); if (r.status < 500) return r; await new Promise((ok) => setTimeout(ok, 1500 * (k + 1))); } return r; };
   const daily = await A(`startDate=${start28}&endDate=${end}&metrics=views,estimatedMinutesWatched,subscribersGained,subscribersLost&dimensions=day&sort=day`);
+  assertNotQuota(daily);
   if (!daily.ok) { out.analytics = Object.assign({ ok: false }, analyticsProblem(daily)); return out; }
   const [perVideo, traffic, totals] = await Promise.all([
     A(`startDate=${startAll}&endDate=${end}&metrics=views,averageViewPercentage,averageViewDuration,subscribersGained,estimatedMinutesWatched&dimensions=video&sort=-views&maxResults=200`),
