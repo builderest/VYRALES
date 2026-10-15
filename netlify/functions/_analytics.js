@@ -25,7 +25,7 @@ async function ytToken(sb) {
   if (acc.expires_at && new Date(acc.expires_at).getTime() - Date.now() > 5 * 60000) return { token: acc.access_token, scopes: acc.scopes || '' };
   const r = await getJson('https://oauth2.googleapis.com/token', {
     method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ client_id: process.env.YOUTUBE_CLIENT_ID, client_secret: process.env.YOUTUBE_CLIENT_SECRET, grant_type: 'refresh_token', refresh_token: acc.refresh_token })
+    body: new URLSearchParams(Object.assign({ grant_type: 'refresh_token', refresh_token: acc.refresh_token }, (() => { const c = ytCreds(); return { client_id: c.id, client_secret: c.secret }; })()))
   });
   if (!r.body.access_token) throw new Error('El permiso de YouTube venció: reconecta YouTube.');
   { const T = require('./_tenant'); let uq = sb.from('social_accounts').update({ access_token: r.body.access_token, expires_at: new Date(Date.now() + (r.body.expires_in || 3600) * 1000).toISOString() }).eq('platform', 'youtube'); if (await T.tenancyOn(sb)) uq = uq.eq('workspace_id', T.currentWs()); await uq; }

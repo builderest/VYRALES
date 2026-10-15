@@ -18,8 +18,21 @@ function need(name) {
   return v;
 }
 
+// Cuota de YouTube compartida por proyecto de Google Cloud: el canal admin usa el proyecto 1
+// (YOUTUBE_CLIENT_ID/SECRET); el resto de canales usa el proyecto 2 (YOUTUBE_CLIENT_ID_2/SECRET_2,
+// oct-15) para no competir por las 10,000 unidades/día del mismo proyecto. Si no hay proyecto 2
+// configurado, cae al proyecto 1 (como antes).
+function ytCreds() {
+  let isAdmin = true;
+  try { const T = require('./_tenant'); const ws = T.currentWs(); isAdmin = !ws || ws === T.ADMIN_WS; } catch (_) {}
+  if (!isAdmin && process.env.YOUTUBE_CLIENT_ID_2 && process.env.YOUTUBE_CLIENT_SECRET_2) {
+    return { id: process.env.YOUTUBE_CLIENT_ID_2, secret: process.env.YOUTUBE_CLIENT_SECRET_2 };
+  }
+  return { id: need('YOUTUBE_CLIENT_ID'), secret: need('YOUTUBE_CLIENT_SECRET') };
+}
+
 // state anti-CSRF firmado (sin guardar nada): plataforma + hora + firma HMAC con el secreto.
-const stateSecret = (platform) => platform === 'tiktok' ? ttSecret() : platform === 'youtube' ? need('YOUTUBE_CLIENT_SECRET') : metaSecret();
+const stateSecret = (platform) => platform === 'tiktok' ? ttSecret() : platform === 'youtube' ? ytCreds().secret : metaSecret();
 function makeState(platform) {
   const secret = stateSecret(platform);
   const payload = `${platform}.${Date.now()}`;
@@ -374,13 +387,13 @@ async function facebookPublishReel(supabase, { videoUrl, videoBuffer = null, cap
 // Llaves: YOUTUBE_CLIENT_ID, YOUTUBE_CLIENT_SECRET.
 const YT_SCOPES = 'https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/yt-analytics.readonly https://www.googleapis.com/auth/youtube.force-ssl'; // force-ssl: agregar a playlists y editar títulos/descripciones (oct-11) // analytics: página /analitica.html
 function youtubeAuthUrl() {
-  const q = new URLSearchParams({ client_id: need('YOUTUBE_CLIENT_ID'), redirect_uri: REDIRECT('youtube'), response_type: 'code', scope: YT_SCOPES, access_type: 'offline', prompt: 'consent', include_granted_scopes: 'true', state: makeState('youtube') });
+  const q = new URLSearchParams({ client_id: ytCreds().id, redirect_uri: REDIRECT('youtube'), response_type: 'code', scope: YT_SCOPES, access_type: 'offline', prompt: 'consent', include_granted_scopes: 'true', state: makeState('youtube') });
   return `https://accounts.google.com/o/oauth2/v2/auth?${q}`;
 }
 async function googleToken(params) {
   const { res, body } = await jsonFetch('https://oauth2.googleapis.com/token', {
     method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams(Object.assign({ client_id: need('YOUTUBE_CLIENT_ID'), client_secret: need('YOUTUBE_CLIENT_SECRET') }, params))
+    body: new URLSearchParams(Object.assign({ client_id: ytCreds().id, client_secret: ytCreds().secret }, params))
   });
   if (!res.ok || !body.access_token) throw new Error('Google no dio el token: ' + JSON.stringify(body).slice(0, 300));
   return body;
@@ -447,4 +460,4 @@ async function youtubePlaylists(supabase) {
   const j = await r.json(); if (!r.ok) throw new Error('playlists HTTP ' + r.status);
   return (j.items || []).map((p) => ({ id: p.id, title: p.snippet.title }));
 }
-module.exports = { youtubeAccessToken, youtubeAddToPlaylist, youtubePlaylists, tiktokAuthUrl, tiktokConnect, tiktokSendDraft, tiktokCreatorInfo, tiktokDirectPost, ttDirect, metaAuthUrl, metaConnect, instagramPublishReel, facebookPublishReel, youtubeAuthUrl, youtubeConnect, youtubeUpload, checkState, stateProblem, getAccount, REDIRECT };
+module.exports = { youtubeAccessToken, youtubeAddToPlaylist, youtubePlaylists, tiktokAuthUrl, tiktokConnect, tiktokSendDraft, tiktokCreatorInfo, tiktokDirectPost, ttDirect, metaAuthUrl, metaConnect, instagramPublishReel, facebookPublishReel, youtubeAuthUrl, youtubeConnect, youtubeUpload, checkState, stateProblem, getAccount, REDIRECT, ytCreds };
