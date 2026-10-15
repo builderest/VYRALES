@@ -652,3 +652,13 @@ experimento (`doc.forzados`: ¿quién tenía razón?).
   solo al siguiente de la lista (en Videos y en Shorts por igual); al llegar al final, vuelve a
   empezar desde el primero. Para esto el reproductor ahora usa la API real de YouTube (antes era un
   iframe simple que no avisaba cuándo terminaba el video).
+- **VYRALES ya tiene su "identidad" definida y YA NO hará temas de narcos/crimen activo (Franklin, por
+  lo de El Chapo):** el sistema tenía una función para que cada canal tenga su propio nicho/identidad
+  (de qué trata, qué evitar), pero estaba programada para usarse SOLO en canales secundarios (como
+  MindFuel), nunca en el canal principal (VYRALES). La corregí para que también aplique al principal,
+  y le definí su identidad: "historias y curiosidades reales y asombrosas (ciencia, historia,
+  misterios, naturaleza, desastres, superación)", con una regla explícita de evitar narcotráfico,
+  cárteles y crimen organizado reciente (como El Chapo) — un delito histórico ya resuelto o de hace
+  mucho tiempo sí puede entrar si no glorifica violencia reciente. Esto ahora se le manda SIEMPRE al
+  guionista (import-series) y al generador automático de ideas (analítica), con máxima prioridad
+  ("manda sobre todo").

@@ -62,7 +62,7 @@ async function getRules(sb) {
 async function identidad(sb, ws) {
   try {
     const T = require('./_tenant');
-    if (!ws || ws === T.ADMIN_WS) return '';
+    if (!ws) return ''; // oct-15 (Franklin): ahora SÍ aplica también al canal principal (VYRALES), si tiene identidad guardada.
     const { data } = await sb.from('workspaces').select('settings, name').eq('id', ws).maybeSingle();
     const txt = data && data.settings && data.settings.identidad;
     return txt ? 'IDENTIDAD DEL CANAL "' + (data.name || '') + '" (manda sobre todo: el tema, el tono y los ejemplos de este canal son ESTOS, no los de otros canales):\n' + String(txt).slice(0, 800) + '\n\n' : '';
@@ -74,7 +74,7 @@ async function memoryBlock(sb) {
   const ws = wsNow();
   const T = (() => { try { return require('./_tenant'); } catch (_) { return null; } })();
   const esCanal = !!(ws && T && ws !== T.ADMIN_WS);
-  const ident = esCanal ? await identidad(sb, ws) : '';
+  const ident = ws ? await identidad(sb, ws) : ''; // oct-15: identidad también para el canal principal si la tiene
   // Reglas generales del principal (oficio) — las lee también el canal (opción A).
   const generales = esCanal ? ((await download(sb, BASE, 'reglas.json', { rules: [] })).rules || []) : [];
   const propias = ((await getRules(sb)).rules || []);

@@ -91,7 +91,7 @@ exports.handler = async (event) => {
         try {
           const T = require('./_tenant');
           const ws = T.parseActiveWs(event) || T.ADMIN_WS;
-          if (ws && ws !== T.ADMIN_WS) {
+          if (ws) { // oct-15 (Franklin): también el canal principal, si tiene identidad guardada
             const sb = require('./_supabase').getSupabaseClient();
             canal = await require('./_memoria').identidad(sb, ws);
           }

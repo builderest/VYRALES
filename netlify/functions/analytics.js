@@ -41,7 +41,7 @@ async function ideasPrompt(sb, body, data) {
   let ident = '';
   try {
     const T = require('./_tenant'); const ws = T.currentWs();
-    if (ws && ws !== T.ADMIN_WS) {
+    if (ws) { // oct-15 (Franklin): también el canal principal, si tiene identidad guardada
       const { data: w } = await sb.from('workspaces').select('settings').eq('id', ws).maybeSingle();
       const st = (w && w.settings) || {};
       if (st.identidad) ident = String(st.identidad).slice(0, 800);
