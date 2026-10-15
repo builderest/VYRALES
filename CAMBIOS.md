@@ -610,3 +610,18 @@ experimento (`doc.forzados`: ¿quién tenía razón?).
   YouTube pero con el video grande arriba. Cambié la lista lateral angosta por una cuadrícula de
   miniaturas (como "Videos" en YouTube) debajo del reproductor grande, en vez de una lista al
   costado.
+- **`/ver` con la marca real del canal (Franklin):** el encabezado ahora trae el banner, el avatar,
+  el nombre, el @handle, suscriptores y la descripción REALES del canal de YouTube (misma API que
+  usa Analítica), con caché de 12 h para no gastar cuota en cada visita. Se agregó también el botón
+  oficial de "Suscribirme" de YouTube (el widget real, funciona de verdad), igual que se ve en el
+  canal.
+- **Arreglo: la cuota agotada se escondía en `/ver` (Franklin, mismo bug que el de analítica):** la
+  llamada que trae los datos del canal no revisaba primero si la respuesta era un error 403 de
+  cuota agotada; la convertía en un "sin canal" genérico que `withYoutubeFallback` no reconocía
+  como cuota, así que nunca pasaba al proyecto de respaldo y la página se quedaba sin banner/avatar.
+  Ahora revisa el código de error ANTES, igual que ya se arregló en analítica y en subtítulos.
+- **`/ver`: ahora también se ven los Shorts y las listas de reproducción (Franklin):** se agregaron
+  pestañas "Videos | Shorts | Listas de reproducción" debajo del reproductor grande, igual que las
+  pestañas del canal real. Los Shorts se muestran en tarjetas verticales (formato celular, como se
+  ven en YouTube) en vez del formato ancho de los videos largos. Las listas de reproducción también
+  traen su miniatura real y, al tocarlas, se reproducen completas en el mismo reproductor grande.
