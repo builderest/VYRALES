@@ -620,8 +620,12 @@ experimento (`doc.forzados`: ¿quién tenía razón?).
   cuota agotada; la convertía en un "sin canal" genérico que `withYoutubeFallback` no reconocía
   como cuota, así que nunca pasaba al proyecto de respaldo y la página se quedaba sin banner/avatar.
   Ahora revisa el código de error ANTES, igual que ya se arregló en analítica y en subtítulos.
-- **`/ver`: ahora también se ven los Shorts y las listas de reproducción (Franklin):** se agregaron
-  pestañas "Videos | Shorts | Listas de reproducción" debajo del reproductor grande, igual que las
-  pestañas del canal real. Los Shorts se muestran en tarjetas verticales (formato celular, como se
-  ven en YouTube) en vez del formato ancho de los videos largos. Las listas de reproducción también
-  traen su miniatura real y, al tocarlas, se reproducen completas en el mismo reproductor grande.
+- **`/ver`, rediseño final según ejemplo de Franklin (sin listas de reproducción):** Franklin mandó
+  un ejemplo exacto de cómo lo quería. Se cambió todo el diseño: ahora son dos pestañas arriba
+  ("Videos" / "Shorts", sin Listas de reproducción, no era necesaria), y cada una tiene su propio
+  reproductor grande a la izquierda + una lista lateral (no cuadrícula abajo) a la derecha con scroll
+  propio. Los Shorts tienen su propio reproductor en formato vertical (9:16, como un celular) y su
+  lista lateral con miniaturas verticales, separado del de Videos (16:9, lista con miniaturas
+  horizontales). Cada tarjeta de la lista muestra vistas y fecha REALES (se agregó `getVideoStats()`
+  que trae vistas y duración reales de YouTube, caché 12h) — nunca se inventan datos: si la API no
+  responde, esos datos simplemente no se muestran.
