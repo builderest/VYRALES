@@ -22,6 +22,29 @@ function buildSrt(words, { lead = LEAD, maxChars = 84, maxSec = 6 } = {}) {
     return `${i + 1}\n${ts(st)} --> ${ts(Math.max(st + 0.5, en))}\n${wrap(b.map((x) => x.word).join(' '))}\n`;
   }).join('\n');
 }
+// oct-14 (Franklin: "los subtítulos de YouTube se pueden poner con colores" → sí, para los LARGOS): formato YTT/SRV3
+// de YouTube (colores, contorno, fuente, posición). Mismos bloques y tiempos que el SRT; letra blanca en negrita con
+// contorno negro, sin caja, y en AMARILLO los números y los nombres propios (lo que el ojo busca primero).
+function buildYtt(words, opts = {}) {
+  const srt = buildSrt(words, opts);
+  const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const toMs = (x) => { const m = /(\d+):(\d+):(\d+),(\d+)/.exec(x); return ((+m[1] * 60 + +m[2]) * 60 + +m[3]) * 1000 + +m[4]; };
+  const destaca = (w, i, arr) => /\d/.test(w) || (i > 0 && /^[A-ZÁÉÍÓÚÑ][\wáéíóúñ'’-]{2,}/.test(w) && !/[.!?…]$/.test(arr[i - 1] || ''));
+  const ps = srt.trim().split(/\n\n+/).map((b) => {
+    const L = b.split('\n'); const [a, z] = L[1].split(' --> ');
+    const st = toMs(a), d = Math.max(300, toMs(z) - st);
+    const segs = []; let i = 0;
+    L.slice(2).forEach((line, li) => {
+      const ws = line.split(' ');
+      ws.forEach((w, k) => { const all = L.slice(2).join(' ').split(' '); const pen = destaca(w, i, all) ? 1 : 0; i++; const txt = (li > 0 && k === 0 ? '\n' : (k > 0 ? ' ' : '')) + w; if (segs.length && segs[segs.length - 1].pen === pen) segs[segs.length - 1].txt += txt; else segs.push({ pen, txt }); });
+    });
+    return `<p t="${st}" d="${d}" wp="1" ws="1">` + segs.map((s) => `<s p="${s.pen + 1}">${esc(s.txt)}</s>`).join('') + '</p>';
+  });
+  return '<?xml version="1.0" encoding="utf-8"?>\n<timedtext format="3">\n<head>\n' +
+    '<pen id="1" b="1" fc="#FFFFFF" fo="254" bo="0" et="3" ec="#000000" fs="4" sz="150"/>\n' +
+    '<pen id="2" b="1" fc="#FFD400" fo="254" bo="0" et="3" ec="#000000" fs="4" sz="150"/>\n' +
+    '<wp id="1" ap="7" ah="50" av="88"/>\n<ws id="1" ju="2"/>\n</head>\n<body>\n' + ps.join('\n') + '\n</body>\n</timedtext>\n';
+}
 // Sube (o reemplaza) una pista de subtítulos en un video de YouTube. Necesita el permiso youtube.force-ssl.
 async function youtubeCaption(supabase, { videoId, language, name, srt, log = console.log }) {
   const token = await require('./_social').youtubeAccessToken(supabase);
@@ -48,6 +71,7 @@ async function ensureSubtitles(supabase, episode, log = console.log) {
   const voice = cont.voice; const en = cont.english;
   if (!voice || !Array.isArray(voice.words) || !voice.words.length) throw new Error('La voz no tiene tiempos por palabra.');
   const out = { es: buildSrt(voice.words) };
+  const ytt = { es: buildYtt(voice.words) }; // oct-14: lo que se sube a YouTube va con colores y letra grande
   if (en && en.voice_url && Array.isArray(en.lines)) {
     let words = Array.isArray(en.words) && en.words.length ? en.words : null;
     if (!words) {
@@ -60,21 +84,21 @@ async function ensureSubtitles(supabase, episode, log = console.log) {
         await supabase.from('episodes').update({ continuity: Object.assign({}, c2, { english: Object.assign({}, c2.english, { words }) }) }).eq('id', episode.id);
       }
     }
-    if (words) out.en = buildSrt(words);
+    if (words) { out.en = buildSrt(words); ytt.en = buildYtt(words); }
   }
   const { uploadFile } = require('./_storage');
   const { data: se } = await supabase.from('series').select('slug').eq('id', episode.series_id).single();
   const base = `${se.slug}/ep${episode.episode_number}/subs-${Date.now()}`;
   const subs = { at: new Date().toISOString() };
-  for (const k of Object.keys(out)) subs[k + '_url'] = await uploadFile(supabase, { path: `${base}-${k}.srt`, buffer: Buffer.from(out[k], 'utf8'), contentType: 'text/plain; charset=utf-8' });
+  for (const k of ['es', 'en'].filter((x) => out[x])) subs[k + '_url'] = await uploadFile(supabase, { path: `${base}-${k}.srt`, buffer: Buffer.from(out[k], 'utf8'), contentType: 'text/plain; charset=utf-8' });
   const { data: fr2 } = await supabase.from('episodes').select('continuity').eq('id', episode.id).single();
   await supabase.from('episodes').update({ continuity: Object.assign({}, (fr2 && fr2.continuity) || {}, { subtitles: subs }) }).eq('id', episode.id);
-  log('subtítulos listos:', Object.keys(out).join(' + '), '(' + out.es.split('\n\n').length + ' bloques ES)');
-  return out;
+  log('subtítulos listos:', ['es', 'en'].filter((x) => out[x]).join(' + '), '(' + out.es.split('\n\n').length + ' bloques ES)');
+  return Object.assign(out, { es_ytt: ytt.es, en_ytt: ytt.en });
 }
 // Sube las pistas a un video de YouTube.
 async function uploadSubtitles(supabase, { videoId, subs, log = console.log }) {
-  if (subs.es) await youtubeCaption(supabase, { videoId, language: 'es', name: 'Español', srt: subs.es, log });
-  if (subs.en) await youtubeCaption(supabase, { videoId, language: 'en', name: 'English', srt: subs.en, log });
+  if (subs.es) await youtubeCaption(supabase, { videoId, language: 'es', name: 'Español', srt: subs.es_ytt || subs.es, log });
+  if (subs.en) await youtubeCaption(supabase, { videoId, language: 'en', name: 'English', srt: subs.en_ytt || subs.en, log });
 }
-module.exports = { buildSrt, youtubeCaption, ensureSubtitles, uploadSubtitles };
+module.exports = { buildYtt, buildSrt, youtubeCaption, ensureSubtitles, uploadSubtitles };

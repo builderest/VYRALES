@@ -521,3 +521,7 @@ experimento (`doc.forzados`: ¿quién tenía razón?).
   `freeImage`: tras un rechazo por política se reintenta SIN las fotos de cara (queda la descripción del personaje).
   **Abierto:** en MindFuel EP1 (Tom Daley, clavadistas en traje de baño) Flow sigue rechazando aun sin la foto de cara
   (probado toma 84) → esas tomas terminarían en Gemini (81 tomas con personajes ≈ $5.4). No producir hasta resolverlo.
+- **Subtítulos de YouTube con colores y más grandes (largos, pedido de Franklin):** `_captions.js` `buildYtt()` arma el
+  formato YTT/SRV3 de YouTube: letra blanca en negrita (150 %), contorno negro sin caja, números y nombres propios en
+  amarillo, abajo al centro. `uploadSubtitles` sube el YTT (el SRT se sigue guardando). Probado en "Humanos de un
+  metro" (youtu.be/MeOR19OAlr8): YouTube lo aceptó y lo sirve con estilo (su conversión a VTT trae color y negrita).
