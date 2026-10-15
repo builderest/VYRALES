@@ -79,7 +79,21 @@ async function main() {
     return;
   }
 
-  console.log(`Produciendo "${series.title}" EP ${ep.episode_number} (${totalShots} tomas) con LTX-2.5 en king — QA en vivo, toma por toma...`);
+  // oct-15 (Franklin): "Flow puede generar todas las imagenes en un solo prompt" - ya existia
+  // (flow_cuadros.js, modo "solo"), pero esta corrida nunca lo llamaba, asi que cada toma abria
+  // su PROPIA sesion de Flow nueva (eso explica buena parte de las horas, no la GPU). Antes de
+  // generar video, se piden en UNA sola sesion de Flow los cuadros que todavia falten (las tomas
+  // con personajes o lugar fijo siguen yendo una por una, porque necesitan su propia foto de
+  // referencia - eso no se puede meter en el mismo lote).
+  console.log(`Produciendo "${series.title}" EP ${ep.episode_number} (${totalShots} tomas) con LTX-2.5 en king...`);
+  console.log('Paso 1: cuadros iniciales en Flow (una sola sesion para lo que falte)...');
+  try {
+    const { spawnSync } = require('child_process');
+    const r = spawnSync(process.execPath, [path.join(__dirname, 'flow_cuadros.js'), 'solo', episodeId], { stdio: 'inherit', timeout: 180 * 60000 });
+    if (r.status) console.log('flow_cuadros (solo): termino con codigo', r.status, '- sigo igual (lo que falte se genera suelto como antes).');
+  } catch (e) { console.log('flow_cuadros (solo): no se pudo (' + String(e.message).slice(0, 200) + ') - sigo igual.'); }
+
+  console.log('Paso 2: video de cada toma - QA en vivo, toma por toma...');
 
   let anyRedone = false;
   let qaChain = Promise.resolve();

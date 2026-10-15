@@ -19,6 +19,13 @@
 
 ## Registro de cambios
 
+### 2026-10-15 (sesión Claude Cowork) — Flow en UNA sola sesión por episodio, no una por toma
+
+Franklin: "Flow puede generar todas las imágenes en un solo prompt, ¿por qué no haces eso?" — tenía razón: esa función YA EXISTÍA en el código (`agente/flow_cuadros.js`, modo `solo`: pide varios cuadros en UNA sola sesión de Flow) y es parte del pipeline documentado (`flow_frames → voz_continua → gen_local`), pero **nadie la llamó antes de producir EP34** — por eso el log mostraba una URL de proyecto de Flow DISTINTA por cada toma (92, 103, 23, 27...), cada una abriendo su propia sesión desde cero.
+- **`agente/gen_local.js`** — antes de generar video, ahora llama siempre a `flow_cuadros.js solo <episodio>` (bloqueante, una sola vez) para pedir en UNA sesión de Flow todos los cuadros que todavía falten. Las tomas con personajes o con lugar fijo (necesitan su propia foto de referencia) siguen yendo una por una — eso no se puede meter en el mismo lote de Flow. Si `flow_cuadros` falla por lo que sea, no corta la producción: sigue igual que antes (cada toma pide su cuadro suelto si hace falta).
+- No cambia el costo ($0 con Flow, igual que antes). **Pusheado.**
+- Esto SÍ debería notarse en episodios nuevos: menos sesiones de Flow repetidas = menos minutos de espera acumulados. La tanda de EP34 que está corriendo ahora mismo (solo falta la toma 27) ya había arrancado cuando hice este cambio, así que esa corrida en particular no lo usa — se verá en el próximo episodio largo.
+
 ### 2026-10-15 (sesión Claude Cowork) — QA en vivo mientras king produce
 
 Franklin reportó (EP34, Atapuerca) que un video largo lleva ~10 h: la mayor parte es la generación de 131 tomas una por una en una sola GPU (king) — eso no se puede acelerar sin más hardware — PERO además, el QA (chequeo mecánico + revisión visual de Claude) **solo arrancaba DESPUÉS de que king terminara TODAS las tomas**, agregando horas encima en vez de ir en paralelo. Esto venía de una idea ya aprobada ("QA de cada clip apenas termina mientras king produce") que nunca se había implementado.
