@@ -3137,7 +3137,7 @@
         const narradoC = sbC.format === 'narrado_unico';
         const contC = !!(sbC.narration && sbC.narration.mode === 'continuous');
         // Narrados: no se crean imágenes de lugares; los cuadros con Flow cuestan $0.
-        const imgPrice = sbC.image_engine === 'flow' && !shots.some((sh) => (sh.characters || []).length) ? 0 : IMAGE_PRICE_USD;
+        const imgPrice = sbC.image_engine === 'flow' && sbC.flow_characters !== false ? 0 : IMAGE_PRICE_USD; // oct-14: con Flow los cuadros son $0 también con personajes (Gemini solo si Flow falla 3 veces)
         const p = { video: 0, frames: 0, locations: narradoC ? 0 : missingLocationsFor(ep).length * IMAGE_PRICE_USD, photos: 0, voices: 0, music: 0, texts: 0.001 };
         shots.forEach((sh) => {
           if (!clipFor(ep, sh.n)) p.video += m.secs * VEO_PRICE_PER_SEC[sh.n === total ? m.cliff : m.shot];

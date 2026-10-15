@@ -91,7 +91,10 @@ async function freeImage({ prompt, references = [], aspectRatio = '9:16', log = 
   let last = null;
   for (let i = 1; i <= tries; i++) {
     try {
-      const R = anon ? refs.map((r) => Object.assign({}, r, { label: sinNombres(r.label, anonimizar) })) : refs;
+      // Tras un rechazo por política: SIN las fotos de cara de esas personas (Flow no hace personas reales desde una
+      // foto) y sin sus nombres; el prompt ya trae su descripción (rasgos y ropa). Se conservan las demás referencias (lugar).
+      const esDePersona = (r) => (anonimizar || []).some((n) => { const b = String(n).replace(/\s*\(.*?\)\s*/g, ' ').trim(); return String(r.label || '').includes(n) || (b && String(r.label || '').includes(b)); });
+      const R = anon ? refs.filter((r) => !esDePersona(r)).map((r) => Object.assign({}, r, { label: sinNombres(r.label, anonimizar) })) : refs;
       const pr = anon ? sinNombres(prompt, anonimizar) : prompt;
       const p = R.length ? 'Reference images in order: ' + R.map((r, k) => `image ${k + 1} = ${r.label}`).join('; ') + '. ' + pr : pr;
       const f = await F.flowImage({ prompt: p, refs: R, aspect: aspectRatio === '16:9' ? '16:9' : '9:16' });

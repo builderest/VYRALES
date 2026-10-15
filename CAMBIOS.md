@@ -516,3 +516,8 @@ experimento (`doc.forzados`: ¿quién tenía razón?).
 - **Short EP14 fallaba al unir 2 tomas del largo** (`short_reusar.js`: "Failed to configure output pad on
   Parsed_concat"): `setsar=1` iba ANTES del scale/crop → las piezas llegaban con SAR distinto al concat. Ahora
   `scale,crop,setsar=1,format=yuv420p`. Re-lanzado: EP14 listo (69 s, revisado a ojo). Shorts EP05/08/09/10/14 hechos.
+- **Aviso "Costo estimado ~$7.79 (cuadros iniciales ~$7.71)" al producir MindFuel EP1:** el cálculo cobraba los
+  cuadros de tomas con personajes aunque la serie use Flow. Ahora con Flow los cuadros cuentan $0.
+  `freeImage`: tras un rechazo por política se reintenta SIN las fotos de cara (queda la descripción del personaje).
+  **Abierto:** en MindFuel EP1 (Tom Daley, clavadistas en traje de baño) Flow sigue rechazando aun sin la foto de cara
+  (probado toma 84) → esas tomas terminarían en Gemini (81 tomas con personajes ≈ $5.4). No producir hasta resolverlo.
