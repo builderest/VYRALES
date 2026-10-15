@@ -190,7 +190,7 @@ const VIRAL_QUERIES = [
   ['Dinosaurios y bestias', 'dinosaurios bestias prehistoricas'],
   ['Misterios', 'misterios de la historia']
 ];
-async function viralRefs(sb) {
+async function viralRefsLive(sb) {
   let t;
   try { t = await ytToken(sb); } catch (_) { t = null; }
   if (!t || !t.token) return '';
@@ -223,4 +223,18 @@ async function viralRefs(sb) {
   return refs.join('\n');
 }
 
+// oct-15: cada búsqueda de YouTube cuesta 100 unidades de la cuota diaria (10.000). viralRefs hacía 6 búsquedas cada
+// vez que se pedían ideas (600 unidades) → hoy 22 búsquedas = 2.200 unidades y la cuota se acabó. Ahora se guarda
+// 24 h por canal en Storage (media/cache/virales_<ws>.json).
+async function viralRefs(sb, ...rest) {
+  let ws = 'admin'; try { ws = require('./_tenant').currentWs() || 'admin'; } catch (_) {}
+  const path = 'cache/virales_' + ws + '.json';
+  try {
+    const { data } = await sb.storage.from('media').download(path + '?t=' + Date.now());
+    if (data) { const c = JSON.parse(Buffer.from(await data.arrayBuffer()).toString('utf8')); if (c && c.at && Date.now() - c.at < 24 * 3600000) return c.refs || ''; }
+  } catch (_) {}
+  const refs = await viralRefsLive(sb, ...rest);
+  if (refs) { try { await sb.storage.from('media').upload(path, Buffer.from(JSON.stringify({ at: Date.now(), refs })), { contentType: 'application/json', upsert: true, cacheControl: '0' }); } catch (_) {} }
+  return refs;
+}
 module.exports = { collect, topicOf, TOPICS, viralRefs };

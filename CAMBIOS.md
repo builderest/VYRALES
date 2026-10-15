@@ -557,3 +557,6 @@ experimento (`doc.forzados`: ¿quién tenía razón?).
   formato nuevo (mensajes motivacionales + imágenes simbólicas).
 - **Subtítulos de los largos un poco más chicos y más abajo (Franklin):** tamaño 150 % → 115 %, posición 88 % → 96 %
   de la altura (pegados al borde de abajo).
+- **Cuota de YouTube: las búsquedas se comían 22 %:** la consola de Google mostró 9.995/10.000 usadas y "Search Queries
+  per day: 22". Cada búsqueda cuesta 100 unidades; `viralRefs` (_analytics.js) hacía 6 por cada pedido de ideas.
+  Ahora se guardan 24 h por canal (`media/cache/virales_<ws>.json`): una vez al día como máximo (600 unidades).
