@@ -643,3 +643,8 @@ experimento (`doc.forzados`: ¿quién tenía razón?).
   las miniaturas hacen un pequeño zoom al pasar el mouse por encima, como en el canal real.
 - **Banner de `/ver` en mejor calidad (Franklin):** la imagen del banner que trae la API de YouTube
   venía recortada a baja resolución por defecto; ahora se pide el tamaño grande, se ve nítida.
+- **Arreglo: al tocar otro video de la lista no cambiaba, ni en Videos ni en Shorts (Franklin):** los
+  botones de la lista funcionaban sobre `id="video-list"`/`id="short-list"`, pero los contenedores
+  reales se llaman `id="videos-list"`/`id="shorts-list"` (con "s"); por ese desajuste nunca se
+  enganchaba el clic, entonces tampoco se movía el resaltado (el "efecto" que se veía que faltaba).
+  Ya corregido y probado.

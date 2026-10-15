@@ -265,7 +265,7 @@ ${shorts.length ? `<div id="shorts-section" class="section-view${openShortsFirst
 <script>
 var SITE_ORIGIN = ${JSON.stringify(SITE_ORIGIN)};
 (function(){
-  function wire(prefix, posterId, playerId){
+  function wire(prefix, listId, posterId, playerId){
     var poster = document.getElementById(posterId);
     var player = document.getElementById(playerId);
     if (!poster || !player) return;
@@ -273,9 +273,11 @@ var SITE_ORIGIN = ${JSON.stringify(SITE_ORIGIN)};
       player.innerHTML = '<iframe src="https://www.youtube.com/embed/'+vid+'?autoplay=1&rel=0&origin='+encodeURIComponent(SITE_ORIGIN)+'" title="VYRALES" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>';
     }
     poster.addEventListener('click', function(){ embed(this.getAttribute('data-vid')); });
-    document.querySelectorAll('#' + prefix + '-list .list-item').forEach(function(it){
+    var list = document.getElementById(listId);
+    if (!list) return;
+    list.querySelectorAll('.list-item').forEach(function(it){
       it.addEventListener('click', function(){
-        document.querySelectorAll('#' + prefix + '-list .list-item').forEach(function(x){ x.classList.remove('active'); });
+        list.querySelectorAll('.list-item').forEach(function(x){ x.classList.remove('active'); });
         it.classList.add('active');
         embed(it.getAttribute('data-vid'));
         document.getElementById(prefix + '-title').textContent = it.getAttribute('data-title');
@@ -287,8 +289,8 @@ var SITE_ORIGIN = ${JSON.stringify(SITE_ORIGIN)};
       });
     });
   }
-  wire('video', 'video-poster', 'video-player');
-  wire('short', 'short-poster', 'short-player');
+  wire('video', 'videos-list', 'video-poster', 'video-player');
+  wire('short', 'shorts-list', 'short-poster', 'short-player');
 
   var tabs = document.querySelectorAll('.tab');
   tabs.forEach(function(t){
