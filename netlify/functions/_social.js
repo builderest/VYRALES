@@ -41,7 +41,7 @@ function ytCreds(platform) {
 }
 // Detecta "se acabó la cuota" en el mensaje de error de una llamada a la API de YouTube.
 function isQuotaError(err) {
-  return /quotaExceeded|dailyLimitExceeded|rateLimitExceeded/i.test(String((err && err.message) || err || ''));
+  return /quotaExceeded|dailyLimitExceeded|rateLimitExceeded|youtube\.quota|exceeded your.{0,15}quota/i.test(String((err && err.message) || err || ''));
 }
 async function hasBackupAccount(supabase) {
   try { return !!(await getAccount(supabase, 'youtube_backup')); } catch (_) { return false; }
@@ -466,11 +466,11 @@ async function youtubeUploadOn(supabase, platform, { videoBuffer, title, descrip
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json; charset=UTF-8', 'X-Upload-Content-Type': 'video/mp4', 'X-Upload-Content-Length': String(videoBuffer.length) },
     body: JSON.stringify(meta)
   });
-  if (!init.ok) throw new Error('YouTube rechazó el inicio de la subida (HTTP ' + init.status + '): ' + (await init.text()).slice(0, 300));
+  if (!init.ok) throw new Error('YouTube rechazó el inicio de la subida (HTTP ' + init.status + '): ' + (await init.text()).slice(0, 500));
   const uploadUrl = init.headers.get('location');
   log('[youtube]' + (platform === 'youtube_backup' ? ' (respaldo)' : '') + ' subiendo', (videoBuffer.length / 1048576).toFixed(1), 'MB...');
   const up = await jsonFetch(uploadUrl, { method: 'PUT', headers: { 'Content-Type': 'video/mp4', 'Content-Length': String(videoBuffer.length) }, body: videoBuffer });
-  if (!up.res.ok || !up.body.id) throw new Error('YouTube rechazó el archivo (HTTP ' + up.res.status + '): ' + JSON.stringify(up.body.error || up.body).slice(0, 300));
+  if (!up.res.ok || !up.body.id) throw new Error('YouTube rechazó el archivo (HTTP ' + up.res.status + '): ' + JSON.stringify(up.body.error || up.body).slice(0, 500));
   const got = up.body.status || {};
   return { videoId: up.body.id, url: `https://youtu.be/${up.body.id}`, privacy: got.privacyStatus || privacy, forcedPrivate: privacy !== 'private' && got.privacyStatus === 'private' };
 }
@@ -483,7 +483,7 @@ async function youtubeAddToPlaylist(supabase, { videoId, playlistId }) {
       method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ snippet: { playlistId, resourceId: { kind: 'youtube#video', videoId } } })
     });
-    if (!r.ok) { const t = await r.text(); throw new Error((r.status === 403 && /insufficient|scope|permission/i.test(t) ? 'Falta el permiso para playlists: reconecta YouTube en el panel. ' : '') + 'HTTP ' + r.status + ': ' + t.slice(0, 200)); }
+    if (!r.ok) { const t = await r.text(); throw new Error((r.status === 403 && /insufficient|scope|permission/i.test(t) ? 'Falta el permiso para playlists: reconecta YouTube en el panel. ' : '') + 'HTTP ' + r.status + ': ' + t.slice(0, 500)); }
     return true;
   });
 }

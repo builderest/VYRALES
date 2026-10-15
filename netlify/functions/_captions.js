@@ -120,7 +120,7 @@ async function youtubeCaption(supabase, { videoId, language, name, srt, log = co
     ]);
     const r = await fetch(`https://www.googleapis.com/upload/youtube/v3/captions?part=snippet&uploadType=multipart`, { method: prev ? 'PUT' : 'POST', headers: Object.assign({ 'Content-Type': `multipart/related; boundary=${boundary}` }, H), body });
     const t = await r.text();
-    if (!r.ok) throw new Error('subtítulos ' + language + ' HTTP ' + r.status + ': ' + t.slice(0, 200));
+    if (!r.ok) throw new Error('subtítulos ' + language + ' HTTP ' + r.status + ': ' + t.slice(0, 500));
     log(`YouTube: subtítulos ${language} ${prev ? 'reemplazados' : 'subidos'} ✅` + (platform === 'youtube_backup' ? ' (respaldo)' : ''));
     return JSON.parse(t).id;
   });

@@ -581,3 +581,9 @@ experimento (`doc.forzados`: ¿quién tenía razón?).
   y autorizar el MISMO canal de YouTube (pero con el proyecto 2) — queda guardado en
   `social_accounts` como `platform: 'youtube_backup'`. Sin esa conexión, el respaldo simplemente
   no se usa y todo sigue como antes.
+- **Respaldo probado y arreglo del detector de cuota:** los mensajes de error de YouTube se
+  cortaban a 200 caracteres antes de llegar a `"reason":"quotaExceeded"`, así que el respaldo
+  nunca se activaba aunque estuviera conectado. Se amplió el corte a 500 caracteres y el detector
+  ahora también reconoce "youtube.quota" / "exceeded your ... quota". Probado en vivo: subió los
+  subtítulos nuevos (karaoke por palabra, ES+EN) a los 3 videos largos ya publicados usando el
+  respaldo del proyecto 2, mientras el proyecto 1 seguía sin cuota del día.
