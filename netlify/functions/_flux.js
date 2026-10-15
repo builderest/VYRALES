@@ -68,13 +68,14 @@ async function fluxImage({ prompt, reference = null, aspect = '9:16' }) {
   }
 }
 
-// ¿Esta toma se hace con flux? Serie con story_bible.image_engine = 'king', toma sin personajes y sin
-// shot.image_engine = 'gemini' (escenas con varios sujetos distintos).
+// oct-15 (Franklin): "quitar a FLUX, no genera imagenes realistas". Si Flow falla en darnos UNA
+// imagen (no responde, se cae, etc.) eso es una falla de generacion → recien ahi se llama a Gemini
+// (de pago, pero igual de realista que Flow). Si la imagen SI sale pero el QA la rechaza (no coincide
+// con la narracion, algo deformado), el problema es el PROMPT, no el motor: se reescribe el prompt y
+// se reintenta con Flow de nuevo, nunca se cambia a FLUX. useFlux() queda apagada (siempre false) en
+// vez de borrar fluxImage(), para poder volver a prenderla facil si hace falta.
 function useFlux(storyBible, shot) {
-  const sb = storyBible || {};
-  const eng = (shot && shot.image_engine) || sb.image_engine;
-  if (eng !== 'king' && eng !== 'flow') return false;
-  return !((shot && shot.characters) || []).length;
+  return false;
 }
 
 module.exports = { fluxImage, useFlux };

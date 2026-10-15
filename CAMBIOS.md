@@ -19,6 +19,15 @@
 
 ## Registro de cambios
 
+### 2026-10-15 (sesión Claude Cowork) — quitar FLUX, Flow para todo (Gemini solo si Flow no genera NADA)
+
+Franklin: "FLUX no genera imágenes realistas, hay que quitarlo. Si Flow falla en GENERAR (no responde, se cae), ahí sí Gemini — pero si la imagen SALE y el QA la rechaza, eso es el PROMPT mal, no el motor; Flow es igual de bueno que Gemini, no debería fallar por calidad."
+
+Encontré que FLUX no era solo un respaldo de emergencia: para tomas sin personajes (la mayoría en un documental), el **cuadro FINAL** (`endFrameFor`, el que arma la continuidad del narrado único) iba DIRECTO a FLUX sin intentar Flow nunca — no como respaldo, como motor principal. Eso explica buena parte de la queja de realismo.
+
+- **`netlify/functions/_flux.js`** — `useFlux()` ahora siempre devuelve `false` (se deja `fluxImage()` sin usar, sin borrarla, por si hay que prenderlo de nuevo rápido). Con esto, tanto el cuadro inicial como el final de TODA toma pasan por `freeImage()`: Flow primero, hasta 3 reintentos ($0 cada uno), y **recién si los 3 fallan en darnos una imagen** se llama a Gemini (de pago) — nunca a FLUX. Si Flow SÍ entrega una imagen pero el QA/juez visual la rechaza, el camino sigue siendo el de siempre: se reescribe el prompt (Claude) y se reintenta con Flow, nunca se cambia de motor.
+- No toca los reintentos ni el tiempo de espera (90 s, cambio de hace un rato) — solo saca a FLUX de la lista de motores automáticos. **Pusheado.**
+
 ### 2026-10-15 (sesión Claude Cowork) — bajar la espera a Flow de 4 min a 90 s
 
 Franklin: "la revisión es el tiempo que dura más, hay que optimizar eso". Medido en el log de EP34: cuando Flow no devuelve imagen, el sistema esperaba **4 minutos fijos** antes de darlo por fallado — y en tomas con personajes/referencias se reintenta hasta 3 veces (`freeImage`, `tries=3`), así que una toma difícil podía quedarse **12 minutos solo esperando** antes de cualquier respaldo. El propio código ya tenía la evidencia de cuánto tarda un pedido que SÍ sale bien: el comentario de `flowImages` (lote) dice "3 imágenes en 49 s en vez de ~40 s CADA una" — es decir, un pedido normal sale en ~40 s.
