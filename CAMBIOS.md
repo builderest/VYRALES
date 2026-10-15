@@ -19,6 +19,13 @@
 
 ## Registro de cambios
 
+### 2026-10-15 (sesión Claude Cowork) — bajar la espera a Flow de 4 min a 90 s
+
+Franklin: "la revisión es el tiempo que dura más, hay que optimizar eso". Medido en el log de EP34: cuando Flow no devuelve imagen, el sistema esperaba **4 minutos fijos** antes de darlo por fallado — y en tomas con personajes/referencias se reintenta hasta 3 veces (`freeImage`, `tries=3`), así que una toma difícil podía quedarse **12 minutos solo esperando** antes de cualquier respaldo. El propio código ya tenía la evidencia de cuánto tarda un pedido que SÍ sale bien: el comentario de `flowImages` (lote) dice "3 imágenes en 49 s en vez de ~40 s CADA una" — es decir, un pedido normal sale en ~40 s.
+- **`agente/flow_imagenes.js`** — `generate()` y `flowImage()` ahora aceptan `waitSec` (antes: 4 min fijos sin parámetro); por defecto **90 segundos** (más del doble de los ~40 s que tarda un pedido normal, para no cortar de más, pero muy por debajo de los 4 min viejos). Afecta: el camino simple (tomas sin personaje) y el de `freeImage` (tomas con personaje/referencia, que reintenta hasta 3 veces — la CANTIDAD de intentos no cambió, Franklin ya había pedido "2-3 veces antes de Gemini"; solo se achicó cuánto se espera en CADA intento).
+- No cambia nada de calidad ni de qué motor se usa (Flow sigue siendo el primero siempre, $0); solo corta antes la espera cuando Flow está realmente atascado. **Pusheado.**
+- HIPÓTESIS a vigilar (no medido todavía): si empiezan a verse más tomas cayendo a FLUX/Gemini porque Flow necesitaba un poco más de 90 s, se sube el número — no hay que bajar los reintentos para compensar.
+
 ### 2026-10-15 (sesión Claude Cowork) — Flow en UNA sola sesión por episodio, no una por toma
 
 Franklin: "Flow puede generar todas las imágenes en un solo prompt, ¿por qué no haces eso?" — tenía razón: esa función YA EXISTÍA en el código (`agente/flow_cuadros.js`, modo `solo`: pide varios cuadros en UNA sola sesión de Flow) y es parte del pipeline documentado (`flow_frames → voz_continua → gen_local`), pero **nadie la llamó antes de producir EP34** — por eso el log mostraba una URL de proyecto de Flow DISTINTA por cada toma (92, 103, 23, 27...), cada una abriendo su propia sesión desde cero.

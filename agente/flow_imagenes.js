@@ -133,7 +133,12 @@ async function addRefs(page, refs, name) {
   fs.rmSync(tmp, { recursive: true, force: true });
 }
 
-async function generate(page, ctx, prompt, name, refs) {
+// oct-15 (Franklin, "la revision es lo que mas dura"): antes se esperaban 4 min FIJOS antes de dar
+// por fallado un pedido a Flow, en CADA intento (hasta 3 veces con personajes = 12 min solo esperando).
+// El propio comentario de flowImages (mas abajo) midio que un pedido que SI sale tarda ~40 s. 90 s deja
+// mas del doble de margen y corta mucho antes los que de verdad estan atascados. Si con el tiempo se ve
+// que corta pedidos que habrian salido bien pasados los 90 s, se sube este numero (nunca se baja tries).
+async function generate(page, ctx, prompt, name, refs, waitSec = 90) {
   if (refs && refs.length) { await addRefs(page, refs, name); await sleep(2000); }
   // Lo que ya hay (incluidas las fotos de referencia recién subidas) NO cuenta como resultado.
   const before = new Set((await imgSrcs(page)).map(mediaKey));
@@ -144,7 +149,7 @@ async function generate(page, ctx, prompt, name, refs) {
   await page.keyboard.press('Enter');
   const t0 = Date.now();
   let confirmed = false;
-  while (Date.now() - t0 < 4 * 60000) {
+  while (Date.now() - t0 < waitSec * 1000) {
     await sleep(4000);
     // El agente de Flow puede pedir confirmación antes de generar: se acepta (es lo que pediste).
     if (!confirmed) {
@@ -199,12 +204,12 @@ async function generate(page, ctx, prompt, name, refs) {
   await shot(page, name + '_timeout');
   console.log('imgs:', JSON.stringify(await page.evaluate(() => [...document.querySelectorAll('img')].map((i) => [i.naturalWidth, i.naturalHeight, (i.currentSrc || i.src).slice(0, 140)]))));
   const txt = await page.evaluate(() => document.body.innerText.slice(-1500)).catch(() => '');
-  throw new Error('Flow no devolvió imagen en 4 min. Texto en pantalla: ' + txt.replace(/\s+/g, ' ').slice(-600));
+  throw new Error('Flow no devolvió imagen en ' + Math.round(waitSec / 60 * 10) / 10 + ' min. Texto en pantalla: ' + txt.replace(/\s+/g, ' ').slice(-600));
 }
 
 // Para el pipeline: genera UNA imagen en Flow (segundo plano; muestra Chrome solo si hay que iniciar sesión).
 // Devuelve lo mismo que _image.generateImage: { buffer, mimeType, costUsd, model }.
-async function flowImage({ prompt, refs = [], aspect = null }) {
+async function flowImage({ prompt, refs = [], aspect = null, waitSec = 90 }) {
   if (aspect) { ASPECT = aspect === '16:9' ? '16:9' : '9:16'; RULE_BASE = ruleBaseFor(); }
   let { ctx, page } = await openFlow(process.env.FLOW_VISIBLE === '1');
   try {
@@ -221,7 +226,7 @@ async function flowImage({ prompt, refs = [], aspect = null }) {
     // cuál usar y nunca genera (3 fallas seguidas → antes se pagaba Gemini). Se quitan esas frases: manda ASPECT.
     const otro = ASPECT === '16:9' ? /[^.]*\b(9\s*:\s*16|vertical (frame|image|format))\b[^.]*\.?/gi : /[^.]*\b(16\s*:\s*9|widescreen|horizontal (frame|image|format))\b[^.]*\.?/gi;
     const limpio = String(prompt).replace(otro, ' ').replace(/\s{2,}/g, ' ').trim();
-    const img = await generate(page, ctx, limpio.replace(/\.?$/, '.') + (refs.length ? RULE_BASE : ruleFor(limpio)), 'pipeline', refs);
+    const img = await generate(page, ctx, limpio.replace(/\.?$/, '.') + (refs.length ? RULE_BASE : ruleFor(limpio)), 'pipeline', refs, waitSec);
     const jpg = img.buffer[0] === 0xff && img.buffer[1] === 0xd8;
     return { buffer: img.buffer, mimeType: jpg ? 'image/jpeg' : 'image/png', costUsd: 0, model: 'flow' };
   } finally {
