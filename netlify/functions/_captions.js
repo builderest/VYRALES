@@ -59,9 +59,9 @@ function pYtt(t, d, toks, all) {
 }
 function yttDoc(ps) {
   return '<?xml version="1.0" encoding="utf-8"?>\n<timedtext format="3">\n<head>\n' +
-    '<pen id="1" b="1" fc="#FFE14D" fo="254" bo="0" et="3" ec="#000000" fs="4" sz="150"/>\n' +
-    '<pen id="2" b="1" fc="#E040FB" fo="254" bo="0" et="3" ec="#000000" fs="4" sz="150"/>\n' +
-    '<wp id="1" ap="7" ah="50" av="88"/>\n<ws id="1" ju="2"/>\n</head>\n<body>\n' + ps.join('\n') + '\n</body>\n</timedtext>\n';
+    '<pen id="1" b="1" fc="#FFE14D" fo="254" bo="0" et="3" ec="#000000" fs="4" sz="115"/>\n' +
+    '<pen id="2" b="1" fc="#E040FB" fo="254" bo="0" et="3" ec="#000000" fs="4" sz="115"/>\n' +
+    '<wp id="1" ap="7" ah="50" av="96"/>\n<ws id="1" ju="2"/>\n</head>\n<body>\n' + ps.join('\n') + '\n</body>\n</timedtext>\n';
 }
 function yttFromSrt(srt) {
   const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -78,9 +78,9 @@ function yttFromSrt(srt) {
     return `<p t="${st}" d="${d}" wp="1" ws="1">` + segs.map((s) => `<s p="${s.pen + 1}">${esc(s.txt)}</s>`).join('') + '</p>';
   });
   return '<?xml version="1.0" encoding="utf-8"?>\n<timedtext format="3">\n<head>\n' +
-    '<pen id="1" b="1" fc="#FFE14D" fo="254" bo="0" et="3" ec="#000000" fs="4" sz="150"/>\n' +
-    '<pen id="2" b="1" fc="#E040FB" fo="254" bo="0" et="3" ec="#000000" fs="4" sz="150"/>\n' +
-    '<wp id="1" ap="7" ah="50" av="88"/>\n<ws id="1" ju="2"/>\n</head>\n<body>\n' + ps.join('\n') + '\n</body>\n</timedtext>\n';
+    '<pen id="1" b="1" fc="#FFE14D" fo="254" bo="0" et="3" ec="#000000" fs="4" sz="115"/>\n' +
+    '<pen id="2" b="1" fc="#E040FB" fo="254" bo="0" et="3" ec="#000000" fs="4" sz="115"/>\n' +
+    '<wp id="1" ap="7" ah="50" av="96"/>\n<ws id="1" ju="2"/>\n</head>\n<body>\n' + ps.join('\n') + '\n</body>\n</timedtext>\n';
 }
 // oct-14 (Franklin: "los que son en inglés también traen la traducción al español, ¿verdad?" → antes NO): la pista del
 // OTRO idioma se traduce bloque por bloque con los MISMOS tiempos. Si el video tiene voz inglesa alineada, el inglés sale

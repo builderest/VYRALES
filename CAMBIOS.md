@@ -555,3 +555,5 @@ experimento (`doc.forzados`: ¿quién tenía razón?).
 - **MindFuel: borrado todo lo de Tom Daley (pedido de Franklin, oct-15):** serie "mindfuel_rise_curiosidades_completa"
   (EP1 largo + 3 Shorts), sus 57 archivos en Storage, 4 personajes y la serie. MindFuel queda sin series, esperando el
   formato nuevo (mensajes motivacionales + imágenes simbólicas).
+- **Subtítulos de los largos un poco más chicos y más abajo (Franklin):** tamaño 150 % → 115 %, posición 88 % → 96 %
+  de la altura (pegados al borde de abajo).
