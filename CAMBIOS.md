@@ -662,3 +662,8 @@ experimento (`doc.forzados`: ¿quién tenía razón?).
   mucho tiempo sí puede entrar si no glorifica violencia reciente. Esto ahora se le manda SIEMPRE al
   guionista (import-series) y al generador automático de ideas (analítica), con máxima prioridad
   ("manda sobre todo").
+- **Ajuste a la identidad de VYRALES (Franklin: "para Instagram ese nicho es buenísimo, al final Vyrales
+  es todo"):** la regla de evitar narcos/crimen ahora es solo para las IDEAS AUTOMÁTICAS que propone el
+  sistema por su cuenta. Si Franklin pide explícitamente un tema de ese tipo para un video puntual, se
+  escribe igual de bien — él decide publicarlo solo en Instagram/TikTok/Facebook (cada plataforma ya se
+  publica por separado, así que no hace falta subirlo también a YouTube).
