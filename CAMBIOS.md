@@ -629,3 +629,10 @@ experimento (`doc.forzados`: ¿quién tenía razón?).
   horizontales). Cada tarjeta de la lista muestra vistas y fecha REALES (se agregó `getVideoStats()`
   que trae vistas y duración reales de YouTube, caché 12h) — nunca se inventan datos: si la API no
   responde, esos datos simplemente no se muestran.
+- **Arreglo en `/ver`: Shorts se colaban en la lista de Videos largos (Franklin):** el filtro usaba
+  solo la URL (`/shorts/`), pero muchos Shorts quedaron publicados con un link normal `youtu.be/<id>`
+  (no `/shorts/`), así que se colaban en "Videos". Ahora se usa también `continuity.kind` (el sistema
+  marca los cortos como `short_cta`), que es el dato correcto para distinguirlos.
+- **Botón de Suscribirme en `/ver` (Franklin: "se ve feo"):** el widget oficial embebido de YouTube
+  dejaba un espacio en blanco feo. Se cambió por un botón propio (rojo, estilo YouTube) que lleva
+  directo al canal para suscribirse ahí.

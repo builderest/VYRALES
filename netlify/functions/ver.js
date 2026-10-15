@@ -108,8 +108,12 @@ exports.handler = async (event) => {
     thumb: ((e.continuity || {}).thumbnail || {}).es_url || ((e.validator_report || {}).publish_package || {}).cover_url || '',
     date: e.published_at || null
   });
-  const longs = published.filter((e) => /\/shorts\//.test(e.validator_report.published.youtube.url) === false).map(toItem).filter((l) => l.vid);
-  const shorts = published.filter((e) => /\/shorts\//.test(e.validator_report.published.youtube.url)).map(toItem).filter((l) => l.vid);
+  // "Short" es: la URL es /shorts/ (confirma solo), o el episodio quedó marcado con continuity.kind
+  // distinto de 'largo' (el campo 'short_cta' que usa el sistema para los cortos, o sin kind) — la URL
+  // sola no alcanza porque muchos shorts se publicaron con un link normal youtu.be/<id> (Franklin, oct-15).
+  const isShort = (e) => /\/shorts\//.test(e.validator_report.published.youtube.url) || (e.continuity || {}).kind !== 'largo';
+  const longs = published.filter((e) => !isShort(e)).map(toItem).filter((l) => l.vid);
+  const shorts = published.filter((e) => isShort(e)).map(toItem).filter((l) => l.vid);
   const q = event.queryStringParameters || {};
   const initialLong = (q.v && longs.find((l) => l.id === q.v)) || longs[0] || null;
   const initialShort = (q.v && shorts.find((l) => l.id === q.v)) || shorts[0] || null;
@@ -154,8 +158,8 @@ body{background:#0f0f0f;color:#f1f1f1;font-family:Roboto,system-ui,-apple-system
 .channel-avatar{width:88px;height:88px;border-radius:50%;object-fit:cover;background:#1a1a1a;border:3px solid #3f3f3f;flex:none}
 .channel-details h2{font-size:1.3rem;margin-bottom:4px;color:#fff}
 .channel-meta{font-size:.9rem;color:#aaa;margin-bottom:10px}
-.subscribe-wrap iframe{display:block}
-.fallback-sub{display:inline-flex;align-items:center;background:#f1f1f1;color:#0f0f0f;border:0;border-radius:18px;padding:10px 18px;font-weight:700;font-size:.9rem;text-decoration:none;cursor:pointer}
+.subscribe-btn{display:inline-flex;align-items:center;gap:8px;background:#cc0000;color:#fff;border:0;border-radius:2px;padding:10px 20px;font-weight:700;font-size:.9rem;letter-spacing:.3px;text-decoration:none;cursor:pointer;text-transform:uppercase}
+.subscribe-btn:hover{background:#b00000}
 .tabs{display:flex;border-bottom:1px solid #3f3f3f;margin-bottom:24px;gap:24px;padding:0 4px}
 .tab{padding:12px 4px;font-weight:500;color:#aaa;cursor:pointer;position:relative;background:none;border:none;font:inherit;font-size:1rem}
 .tab.active{color:#f1f1f1}
@@ -199,9 +203,7 @@ ${ch && ch.banner ? `<div class="banner"><img src="${esc(ch.banner)}" alt=""></d
   <div class="channel-details">
     <h2>${esc((ch && ch.title) || 'VYRALES')}</h2>
     <div class="channel-meta">${ch ? esc(ch.handle || '@vyrales') + ' • ' + nf(ch.subs) + ' suscriptores • ' + nf(ch.videos) + ' videos' : '@vyrales'}</div>
-    <div class="subscribe-wrap">
-      <iframe src="https://www.youtube.com/subscribe_embed?channelid=${esc(CHANNEL_ID)}&layout=default&theme=dark" scrolling="no" frameborder="0" width="220" height="56" style="border:0;overflow:hidden"></iframe>
-    </div>
+    <a class="subscribe-btn" href="${esc(CHANNEL)}" target="_blank" rel="noopener">Suscribirme</a>
   </div>
 </div>
 
