@@ -530,3 +530,8 @@ experimento (`doc.forzados`: ¿quién tenía razón?).
   de la serie como pista principal y TRADUCE la otra con Claude en la PC ($0), mismos tiempos y mismo estilo YTT.
   Aplicado a los 3 largos que están en YouTube: Toba (pUbmcSr8Ikw, ES + EN de su voz inglesa), Humanos de un metro
   (MeOR19OAlr8) y Bomba del Zar (OAxewumtTKE) con ES + EN traducido. Revisada la pista EN de la Bomba del Zar.
+- **Subtítulos más llamativos y palabra por palabra (Franklin):** texto AMARILLO (#FFE14D) y números/nombres en
+  MORADO-ROSA (#E040FB), contorno negro, 150 %. `buildYtt` ahora escribe cada bloque palabra por palabra con los tiempos
+  de la voz (una entrada YTT por palabra, texto acumulado); las pistas traducidas van por bloque. Los 3 largos ya tienen
+  amarillo/morado por bloque; la versión palabra por palabra NO se pudo subir hoy: **se agotó la cuota diaria de la API
+  de YouTube** (cada subida de subtítulos cuesta ~400 unidades de 10.000; se reinicia a medianoche del Pacífico).

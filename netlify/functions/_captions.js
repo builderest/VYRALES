@@ -24,8 +24,45 @@ function buildSrt(words, { lead = LEAD, maxChars = 84, maxSec = 6 } = {}) {
 }
 // oct-14 (Franklin: "los subtítulos de YouTube se pueden poner con colores" → sí, para los LARGOS): formato YTT/SRV3
 // de YouTube (colores, contorno, fuente, posición). Mismos bloques y tiempos que el SRT; letra blanca en negrita con
-// contorno negro, sin caja, y en AMARILLO los números y los nombres propios (lo que el ojo busca primero).
-function buildYtt(words, opts = {}) { return yttFromSrt(buildSrt(words, opts)); }
+// contorno negro, sin caja. Franklin (oct-14): "están blancas, ponle colores más llamativos" → texto AMARILLO y
+// números/nombres propios en MORADO-ROSA (como su referencia).
+// oct-14 (Franklin: "¿se puede que vayan apareciendo cuando va hablando, en YouTube?" → sí): con tiempos por palabra,
+// cada bloque se escribe palabra por palabra (una entrada YTT por palabra con el texto acumulado hasta esa palabra).
+// Las pistas traducidas no tienen tiempo por palabra → salen por bloque (yttFromSrt).
+function buildYtt(words, opts = {}) {
+  const lead = opts.lead != null ? opts.lead : LEAD;
+  const srt = buildSrt(words, opts);
+  const ws = (words || []).filter((w) => w && w.word != null && Number.isFinite(Number(w.start)));
+  const toMs = (x) => { const m = /(\d+):(\d+):(\d+),(\d+)/.exec(x); return ((+m[1] * 60 + +m[2]) * 60 + +m[3]) * 1000 + +m[4]; };
+  let wi = 0; const ps = [];
+  for (const b of srt.trim().split(/\n\n+/)) {
+    const L = b.split('\n'); const [a, z] = L[1].split(' --> '); const st = toMs(a), en = toMs(z);
+    const toks = []; L.slice(2).forEach((line, li) => line.split(' ').forEach((w, k) => toks.push({ w, nl: li > 0 && k === 0 })));
+    const all = toks.map((x) => x.w);
+    const starts = toks.map((_, k) => { const w = ws[wi + k]; return w ? Math.round((lead + Number(w.start)) * 1000) : st; });
+    wi += toks.length;
+    for (let k = 0; k < toks.length; k++) {
+      const t0 = Math.max(st, k === 0 ? st : starts[k]);
+      const t1 = k + 1 < toks.length ? Math.max(t0 + 60, Math.min(en, starts[k + 1])) : en;
+      if (t1 <= t0) continue;
+      ps.push(pYtt(t0, t1 - t0, toks.slice(0, k + 1), all));
+    }
+  }
+  return yttDoc(ps);
+}
+const yttEsc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const yttDestaca = (w, i, arr) => /\d/.test(w) || (i > 0 && /^[A-ZÁÉÍÓÚÑ][\wáéíóúñ'’-]{2,}/.test(w) && !/[.!?…]$/.test(arr[i - 1] || ''));
+function pYtt(t, d, toks, all) {
+  const segs = [];
+  toks.forEach((x, i) => { const pen = yttDestaca(x.w, i, all) ? 2 : 1; const txt = (x.nl ? '\n' : (i > 0 ? ' ' : '')) + x.w; if (segs.length && segs[segs.length - 1].pen === pen) segs[segs.length - 1].txt += txt; else segs.push({ pen, txt }); });
+  return `<p t="${t}" d="${d}" wp="1" ws="1">` + segs.map((s) => `<s p="${s.pen}">${yttEsc(s.txt)}</s>`).join('') + '</p>';
+}
+function yttDoc(ps) {
+  return '<?xml version="1.0" encoding="utf-8"?>\n<timedtext format="3">\n<head>\n' +
+    '<pen id="1" b="1" fc="#FFE14D" fo="254" bo="0" et="3" ec="#000000" fs="4" sz="150"/>\n' +
+    '<pen id="2" b="1" fc="#E040FB" fo="254" bo="0" et="3" ec="#000000" fs="4" sz="150"/>\n' +
+    '<wp id="1" ap="7" ah="50" av="88"/>\n<ws id="1" ju="2"/>\n</head>\n<body>\n' + ps.join('\n') + '\n</body>\n</timedtext>\n';
+}
 function yttFromSrt(srt) {
   const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   const toMs = (x) => { const m = /(\d+):(\d+):(\d+),(\d+)/.exec(x); return ((+m[1] * 60 + +m[2]) * 60 + +m[3]) * 1000 + +m[4]; };
@@ -41,8 +78,8 @@ function yttFromSrt(srt) {
     return `<p t="${st}" d="${d}" wp="1" ws="1">` + segs.map((s) => `<s p="${s.pen + 1}">${esc(s.txt)}</s>`).join('') + '</p>';
   });
   return '<?xml version="1.0" encoding="utf-8"?>\n<timedtext format="3">\n<head>\n' +
-    '<pen id="1" b="1" fc="#FFFFFF" fo="254" bo="0" et="3" ec="#000000" fs="4" sz="150"/>\n' +
-    '<pen id="2" b="1" fc="#FFD400" fo="254" bo="0" et="3" ec="#000000" fs="4" sz="150"/>\n' +
+    '<pen id="1" b="1" fc="#FFE14D" fo="254" bo="0" et="3" ec="#000000" fs="4" sz="150"/>\n' +
+    '<pen id="2" b="1" fc="#E040FB" fo="254" bo="0" et="3" ec="#000000" fs="4" sz="150"/>\n' +
     '<wp id="1" ap="7" ah="50" av="88"/>\n<ws id="1" ju="2"/>\n</head>\n<body>\n' + ps.join('\n') + '\n</body>\n</timedtext>\n';
 }
 // oct-14 (Franklin: "los que son en inglés también traen la traducción al español, ¿verdad?" → antes NO): la pista del
