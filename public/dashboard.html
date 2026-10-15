@@ -2957,7 +2957,7 @@
             window.generateMissingCharacterPhotos = async function() {
         const d = lastLoadedData;
         const chars = (d && d.characters) || [];
-        const missing = chars.filter(c => !c.reference_image_url);
+        const missing = chars.filter(c => !c.reference_image_url && (!window.__fijosScope || window.__fijosScope.chars.has(c.name)));
         if (!missing.length) return;
         const flow = ((d && d.series && d.series.story_bible) || {}).image_engine === 'flow';
         const lista = missing.map(c => '\u2022 ' + c.name).join('\n');
@@ -3032,7 +3032,7 @@
         const d = lastLoadedData; if (!d) return;
         const locs = (d.series.story_bible && d.series.story_bible.locations) || {};
         const vmL = (d.series.visual_memory && d.series.visual_memory.locations) || {};
-        const faltan = Object.keys(locs).filter(k => k !== 'escena' && !((vmL[k] || {}).url));
+        const faltan = Object.keys(locs).filter(k => k !== 'escena' && !((vmL[k] || {}).url) && (!window.__fijosScope || window.__fijosScope.locs.has(k)));
         if (!faltan.length) return alert('Todas las tomas fijas ya tienen imagen.');
         if (!await askConfirm('Generar ' + faltan.length + ' imagen(es) de lugar con Google Flow ($0)?\n\n' + faltan.map(k => '\u2022 ' + k).join('\n') + '\n\nSe hacen una por una en tu PC.')) return;
         for (const k of faltan) { await generateLocationImage(k); }
@@ -3409,9 +3409,23 @@
         }).join('');
         // SALA PRODUCIENDO: el largo en producción (no short, sin terminar) + sus shorts, con workspace completo.
         // TIRA de PERSONAJES FIJOS (serie activa): arriba de Produciendo.
+        // oct-15 (Franklin: "¿por qué me pone El Chapo en una serie nueva que no tiene nada que ver?"): las tiras muestran
+        // SOLO los personajes y lugares del grupo EN PRODUCCIÓN (largo + sus Shorts), no los de toda la serie.
+        const fijosScope = (() => {
+          const all = data.episodes || [];
+          // El grupo que se está produciendo AHORA: el movido más recientemente (los terminados en revisión quedan atrás).
+          const cand = all.filter(e => (e.continuity || {}).en_produccion && !(e.continuity || {}).parent_episode_id && e.status !== 'publicado')
+            .sort((a, b) => ((a.status === 'en_revision') - (b.status === 'en_revision')) || String((b.continuity || {}).produccion_at || '').localeCompare(String((a.continuity || {}).produccion_at || '')));
+          const lp = cand[0];
+          if (!lp) return null;
+          const grp = all.filter(e => e.id === lp.id || (e.continuity || {}).parent_episode_id === lp.id);
+          const sh = grp.flatMap(e => e.shots || []);
+          return { chars: new Set(sh.flatMap(s => (s.characters || []).concat(s.characters_orig || []))), locs: new Set(sh.map(s => s.location).filter(Boolean)) };
+        })();
+        window.__fijosScope = fijosScope;
         const stripEl = document.getElementById('personajesFijosStrip');
         if (stripEl) {
-          const chs = data.characters || [];
+          const chs = (data.characters || []).filter(c => !fijosScope || fijosScope.chars.has(c.name));
           const faltanFotos = chs.filter(c => !c.reference_image_url).length;
           stripEl.innerHTML = (chs.length
             ? chs.map(c => castCardHtml(c, data.episodes || [], new Set())).join('')
@@ -3424,7 +3438,7 @@
         if (stripLoc) {
           const locs = (data.series.story_bible && data.series.story_bible.locations) || {};
           const vmL = (data.series.visual_memory && data.series.visual_memory.locations) || {};
-          const fx = Object.keys(locs).filter(k => k !== 'escena');
+          const fx = Object.keys(locs).filter(k => k !== 'escena' && (!fijosScope || fijosScope.locs.has(k)));
           const faltanLoc = fx.filter(k => !((vmL[k] || {}).url)).length;
           stripLoc.innerHTML = fx.length
             ? fx.map(k => { const L = typeof locs[k] === 'string' ? { visual: locs[k] } : (locs[k] || {}); const img = (vmL[k] || {}).url; return '<div class="flex flex-col items-center gap-1 flex-shrink-0 w-24">' + (img ? '<button type="button" onclick="openMedia(this)" data-src="' + esc(img) + '" data-kind="image" data-title="Toma: ' + esc(k) + '"><img src="' + esc(img) + '" class="w-20 h-12 rounded-lg object-cover border border-cyber-gold/40"></button>' : '<span class="w-20 h-12 rounded-lg border border-dashed border-slate-600 flex items-center justify-center text-slate-500 text-[9px] text-center leading-tight">sin imagen</span>') + '<span class="text-[10px] text-slate-200 text-center truncate w-full" title="' + esc(L.visual || '') + '">' + esc(k) + '</span></div>'; }).join('')

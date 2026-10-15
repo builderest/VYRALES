@@ -548,3 +548,7 @@ experimento (`doc.forzados`: ¿quién tenía razón?).
   mensajes motivacionales fuertes y ORIGINALES escritos por el guionista, sin historias reales ni personas reales;
   una imagen simbólica por frase (pueden ser fijas con movimiento suave, no hace falta video completo) y sin mostrar
   personas (solo anónimas, lejos o de espaldas). Pendiente: el modo de producción "imágenes" (sin LTX) para este canal.
+- **Personajes/tomas fijas de OTRO video en Producción (Franklin: "¿por qué me pone El Chapo en una serie nueva?"):**
+  las tiras mostraban todos los personajes y lugares de la serie (El Chapo, Desmond Doss, ADX Florence…). Ahora solo
+  los del grupo que se está produciendo (el movido más recientemente; EP34 Gran Dolina → "Homínido de Gran Dolina" y
+  sus lugares). "Generar N fotos/imágenes" también genera solo esos.
