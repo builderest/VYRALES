@@ -233,19 +233,33 @@ async function generate(page, ctx, prompt, name, refs, waitSec = 90) {
     const now = (await imgSrcs(page)).filter((s) => !before.has(mediaKey(s)));
     if (now.length) {
       await sleep(3000);
+      // oct-16 (Franklin: "la imagen sí se genera y se ve en pantalla, pero se descarga OTRA vieja"): (1) si hay varias
+      // nuevas (2 versiones, o imágenes atrasadas de un pedido anterior que siguen llegando), se elige la que CORRESPONDE
+      // a este prompt mirándolas (Gemini, ~$0.0005); si ninguna corresponde se sigue esperando. (2) Se baja por la URL de
+      // ESA miniatura (la de Flow ya es la original); ya no se toma "la imagen más grande de la pantalla" del visor, que
+      // podía ser otra.
       let src = now[0];
+      const cands = [];
+      for (const s0 of now.slice(0, 6)) { try { cands.push({ src: s0, thumb: await download(ctx, page, s0, false) }); } catch (_) {} }
+      if (cands.length) {
+        const map = await matchScenes([prompt], cands, (x) => console.log(x));
+        const k = map.findIndex((m) => m === 0);
+        if (k >= 0) src = cands[k].src;
+        else if (!map.failed && process.env.GOOGLE_AI_API_KEY) {
+          console.log('  ' + cands.length + ' imagen(es) nueva(s), pero ninguna es de este pedido → espero la correcta');
+          cands.forEach((c) => before.add(mediaKey(c.src)));
+          continue;
+        }
+      }
       console.log('  miniatura:', src.slice(0, 200));
-      // Abrir la imagen en grande (clic en la miniatura) y tomar la versión de mayor resolución.
-      try {
+      // Solo si la URL NO es del CDN de Flow (vieja forma /asb/), se abre el visor; y se usa solo si muestra ESA misma imagen.
+      if (!/flow-content\.google/.test(src)) try {
         await page.locator(`img[src="${src.replace(/"/g, '\\"')}"]`).first().click({ timeout: 8000 });
         await sleep(4000);
-        // oct-16: antes se tomaba la imagen de MÁS PÍXELES de la página; con foto de referencia del mismo tamaño
-        // (768x1376) salía la REFERENCIA en vez de la generada. Ahora: la que se ve MÁS GRANDE en pantalla (el visor),
-        // y solo del CDN de Flow.
-        const big = await page.evaluate(() => [...document.querySelectorAll('img')].filter((i) => /flow-content\.google|\/asb\//.test(i.currentSrc || i.src)).map((i) => { const r = i.getBoundingClientRect(); return { s: i.currentSrc || i.src, w: i.naturalWidth, h: i.naturalHeight, a: r.width * r.height }; }).sort((a, b) => b.a - a.a)[0]);
-        console.log('  grande:', big && big.w + 'x' + big.h, big && big.s.slice(0, 200));
+        const big = await page.evaluate(() => [...document.querySelectorAll('img')].filter((i) => /flow-content\.google|\/asb\//.test(i.currentSrc || i.src)).map((i) => { const r = i.getBoundingClientRect(); return { s: i.currentSrc || i.src, w: Math.round(r.width), h: Math.round(r.height) }; }).sort((a, b) => b.w * b.h - a.w * a.h)[0]);
         await shot(page, name + '_grande');
-        if (big && big.w > 600) src = big.s;
+        if (big && big.w > 600 && mediaKey(big.s) === mediaKey(src)) src = big.s;
+        else if (big) console.log('  (el visor muestra otra imagen → uso la miniatura elegida)');
       } catch (e) { console.log('  (no pude abrir en grande:', String(e.message).split('\n')[0], ')'); }
       let buf = null;
       // Las URLs de Google (…/asb/…) dan la ORIGINAL agregando "=s0" (sin eso llega la miniatura de 286 px).
@@ -375,7 +389,7 @@ async function matchScenes(prompts, imgs, log) {
     const used = new Set(), map = imgs.map(() => -1);
     (out.images || []).forEach((x) => { const i = Number(x.image) - 1, sc = Number(x.scene) - 1; if (i >= 0 && i < imgs.length && sc >= 0 && sc < prompts.length && !used.has(sc) && map[i] === -1) { map[i] = sc; used.add(sc); } });
     return map;
-  } catch (e) { log('  (no pude emparejar las imágenes: ' + String(e.message).slice(0, 160) + ')'); return imgs.map(() => -1); }
+  } catch (e) { log('  (no pude emparejar las imágenes: ' + String(e.message).slice(0, 160) + ')'); const m = imgs.map(() => -1); m.failed = true; return m; }
 }
 
 // Varias imágenes en UNA sola sesión de Flow (un proyecto, sin reabrir Chrome): en lotes de LOTE escenas por
