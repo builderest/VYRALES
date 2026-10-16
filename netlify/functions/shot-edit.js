@@ -89,6 +89,9 @@ exports.handler = async (event) => {
       const { storeKeyframeImage } = require('./_keyframe');
       const url = await storeKeyframeImage(sb, { series, episode: ep, shotN: n, image: { imageBytes: buf.toString('base64'), mimeType: body.mime || 'image/jpeg' }, note: 'imagen subida a mano' });
       await saveShot({ frame_stale: false, clip_stale: !!last('video_clip'), end_frame_url: null, end_frame_skip: false, own_image: true });
+      // oct-16 (Franklin: "cambié muchas imágenes que aún tienen el video viejo"): la aprobación era del video de la imagen
+      // VIEJA. Si se queda aprobado, el QA lo salta y nunca se rehace con tu imagen nueva → se quita la aprobación.
+      if (last('video_clip')) await sb.from('assets').update({ approved: false, approved_at: null }).eq('episode_id', ep.id).eq('kind', 'video_clip').eq('shot_number', n);
       return json(200, { ok: true, frame: url, clip_stale: !!last('video_clip') });
     }
 

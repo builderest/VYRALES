@@ -203,7 +203,7 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
   }
   for (const sh of ep.shots || []) {
     const clip = (ep.assets || []).filter((a) => a.kind === 'video_clip' && a.shot_number === sh.n).sort((a, b) => String(b.updated_at || b.created_at).localeCompare(String(a.updated_at || a.created_at)))[0];
-    if (!clip || clip.approved) continue; // aprobada por Franklin: no se toca
+    if (!clip || (clip.approved && !sh.clip_stale)) continue; // aprobada por Franklin: no se toca (salvo que cambiaste su imagen después: clip_stale)
     // oct-15 (Franklin): qaShots se puede llamar varias veces MIENTRAS king sigue produciendo (ver gen_local.js),
     // no solo una vez al final. Para no repetir el análisis mecánico (ffmpeg) de tomas ya revisadas en una
     // llamada anterior, se salta si esta MISMA toma con este MISMO clip ya pasó.
