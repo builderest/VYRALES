@@ -15,6 +15,7 @@ const { findFont, FONT_FILE, FONT_NAME } = require('./_render');
 const TEXT_MODEL = 'gemini-3.8-flash';
 const TEXT_PRICE = { input: 0.75, output: 3.75 }; // USD por 1M tokens (oct-2026)
 const AI_DISCLOSURE = '🤖 Recreación hecha con IA (imágenes y voz) con fines educativos, basada en evidencia científica.';
+const AI_DISCLOSURE_EN = '🤖 Made with AI (images and voice).';
 
 function narrationOf(shots) {
   return (shots || []).map((s) => (Array.isArray(s.dialogue) ? s.dialogue : (s.dialogue ? [s.dialogue] : [])).map((d) => d.line).join(' ')).filter(Boolean);
@@ -60,7 +61,8 @@ function chapterLines(out, lineShots, starts, lang) {
   }
   return list.length >= 3 ? list.map((x) => mmss(x.t) + ' ' + x.title) : [];
 }
-function longTexts({ episode, cont, out, tags, lineShots, ordered, lockedTitle, hook }) {
+function longTexts({ episode, cont, out, tags, lineShots, ordered, lockedTitle, hook, EN = false }) {
+  const AI = EN ? AI_DISCLOSURE_EN : AI_DISCLOSURE;
   const starts = shotStartTimes(episode, ordered);
   const en = cont.english || {};
   const strip = (t) => String(t || '').split('\n').filter((l) => !/^\s*(Cap[ií]tulos|Chapters)\s*:/i.test(l) && !/comentario fijado|pinned comment/i.test(l)).join('\n').trim();
@@ -75,16 +77,17 @@ function longTexts({ episode, cont, out, tags, lineShots, ordered, lockedTitle, 
     cta_to_long: null,
     cover_text: String(hook || out.cover_text || episode.title || '').toUpperCase().slice(0, 60),
     part: '',
-    tiktok: [String(out.tiktok_caption || '').trim(), AI_DISCLOSURE, tags.slice(0, 5).join(' ')].filter(Boolean).join('\n'),
-    instagram: join([String(out.instagram_caption || '').trim(), '', AI_DISCLOSURE, '', tags.join(' ')]),
+    tiktok: [String(out.tiktok_caption || '').trim(), AI, tags.slice(0, 5).join(' ')].filter(Boolean).join('\n'),
+    instagram: join([String(out.instagram_caption || '').trim(), '', AI, '', tags.join(' ')]),
     youtube_title: longTitle(lockedTitle || out.youtube_title || episode.title),
-    youtube: join([descES, '', chES.length ? 'Capítulos:' : '', ...chES, '', sources.length ? '📚 Todas las fuentes científicas están en el comentario fijado.' : '', '', AI_DISCLOSURE, '', tagLine]),
+    // Canal en inglés: la descripción principal también va en inglés (no hay versión en español).
+    youtube: EN ? join([descEN || descES, '', chEN.length ? 'Chapters:' : '', ...chEN, '', sources.length ? '📚 Sources are in the pinned comment.' : '', '', AI, '', tagLine]) : join([descES, '', chES.length ? 'Capítulos:' : '', ...chES, '', sources.length ? '📚 Todas las fuentes científicas están en el comentario fijado.' : '', '', AI_DISCLOSURE, '', tagLine]),
     youtube_title_en: longTitle(en.title || out.youtube_title_en || out.youtube_title),
     youtube_en: join([descEN, '', chEN.length ? 'Chapters:' : '', ...chEN, '', sources.length ? '📚 All scientific sources are in the pinned comment.' : '', '', '🤖 AI-made recreation (images and voice) for educational purposes, based on scientific evidence.', '', tagLine]),
     chapters_es: chES, chapters_en: chEN,
     hashtags: tags,
     pinned_comment: sources.length ? ['📚 Fuentes científicas / Scientific sources:', ...sources.map((x, i) => (i + 1) + '. ' + x)].join('\n') : String(out.pinned_comment || '').trim(),
-    ai_disclosure: AI_DISCLOSURE,
+    ai_disclosure: AI,
     landscape: true
   };
 }
@@ -104,10 +107,13 @@ async function writeTexts({ series, episode, totalEpisodes }) {
   // Video suelto o Short que lleva al largo: sin "Parte 2/5" ni "próximo episodio" (Franklin, oct-11: el Short del largo salía con "Parte 2/5").
   const single = !(totalEpisodes > 1) || !!(cont.cta_to_long || cont.kind === 'short_cta');
   const lockedTitle = cont.title_locked && episode.title ? String(episode.title).trim() : '';
+  // Canal en INGLÉS (MindFuel, oct-16): todos los textos en inglés, su propia llamada a la acción y aviso de IA en inglés.
+  const CC = require('./_pulir').ctasOf(series && series.story_bible);
+  const EN = CC.lang === 'en';
   const prompt = [
-    'Eres editor de redes sociales de un canal de documentales cortos verticales en español (Latinoamérica).',
+    EN ? 'Eres editor de redes sociales de un canal de YouTube/TikTok en INGLÉS para público de EE. UU. TODOS los textos que devuelvas van en inglés americano natural (los campos "_en" repiten lo mismo).' : 'Eres editor de redes sociales de un canal de documentales cortos verticales en español (Latinoamérica).',
     'Escribe el paquete de publicación de este episodio para TikTok, Instagram/Facebook Reels y YouTube Shorts.',
-    'REGLAS: usa SOLO datos que estén en la narración (no inventes cifras ni hechos); tono intrigante pero científicamente prudente; nada de clickbait falso ni promesas que el video no cumple; español neutro; máximo 2 emojis por texto; no menciones que es IA (eso se agrega aparte).',
+    `REGLAS: usa SOLO datos que estén en la narración (no inventes cifras ni hechos); ${EN ? 'tono fuerte y motivador, directo' : 'tono intrigante pero científicamente prudente'}; nada de clickbait falso ni promesas que el video no cumple; ${EN ? 'inglés americano natural' : 'español neutro'}; máximo 2 emojis por texto; no menciones que es IA (eso se agrega aparte).`,
     '',
     `Serie: ${series.title || series.slug}`,
     series.synopsis ? `Sinopsis: ${series.synopsis}` : '',
@@ -126,7 +132,7 @@ async function writeTexts({ series, episode, totalEpisodes }) {
     '  "tiktok_caption": "máx. 150 caracteres: gancho + pregunta corta (sin hashtags)",',
     '  "instagram_caption": "3 a 5 líneas: gancho, contexto breve, invitación a seguir la serie (sin hashtags)",',
     '  "youtube_title": "título para YouTube Shorts, máx. 70 caracteres, claro e intrigante, sin hashtags ni emojis",',
-    '  "hashtags": ["5 a 8 hashtags relevantes en español e inglés, sin #"],',
+    EN ? '  "hashtags": ["5 a 8 hashtags relevantes en inglés, sin #"],' : '  "hashtags": ["5 a 8 hashtags relevantes en español e inglés, sin #"],',
     '  "youtube_title_en": "el mismo título de YouTube en inglés natural (no literal), máx. 90 caracteres",',
     '  "youtube_description_en": "la misma descripción en inglés natural de documental (2–4 frases), sin hashtags",',
     '  "pinned_comment": "una pregunta para que la gente comente",',
@@ -147,27 +153,29 @@ async function writeTexts({ series, episode, totalEpisodes }) {
   const u = j.usageMetadata || {};
   const costUsd = ((u.promptTokenCount || 1500) * TEXT_PRICE.input + ((u.candidatesTokenCount || 500) + (u.thoughtsTokenCount || 0)) * TEXT_PRICE.output) / 1e6;
   const tags = (Array.isArray(out.hashtags) ? out.hashtags : []).map((t) => '#' + String(t).replace(/^#/, '').replace(/\s+/g, '')).filter((t) => t.length > 1).slice(0, 8);
-  if (isLong) return Object.assign({ costUsd }, longTexts({ episode, cont, out, tags, lineShots, ordered, lockedTitle, hook }));
+  if (isLong) return Object.assign({ costUsd }, longTexts({ episode, cont, out, tags, lineShots, ordered, lockedTitle, hook, EN }));
   const part = single ? '' : `Parte ${episode.episode_number}/${totalEpisodes}`;
   // Shorts que llevan al video largo: la llamada a la acción también en los textos (Franklin: "entra al enlace que te dejo aquí abajo").
   const ctaLong = !!(cont.cta_to_long || cont.kind === 'short_cta');
-  const CTA = '👇 Si quieres ver la historia completa, entra al enlace que te dejo aquí abajo.';
-  return {
+  const CTA = EN ? '👇 ' + ((series.story_bible && series.story_bible.ctas && series.story_bible.ctas.post) || 'The full message is in the link below.') : '👇 Si quieres ver la historia completa, entra al enlace que te dejo aquí abajo.';
+  const AI = EN ? AI_DISCLOSURE_EN : AI_DISCLOSURE;
+  const res0 = {
     costUsd,
     cta_to_long: ctaLong ? CTA : null,
     cover_text: String(hook || out.cover_text || episode.title || '').toUpperCase().slice(0, 60),
     part,
-    tiktok: [String(out.tiktok_caption || '').trim(), ctaLong ? CTA : '', part, AI_DISCLOSURE, tags.slice(0, 5).join(' ')].filter(Boolean).join('\n'),
-    instagram: [String(out.instagram_caption || '').trim(), ctaLong ? '\n' + CTA : '', '', single ? '' : part + (out.next_hook ? ' · ' + String(out.next_hook).trim() : ''), '', AI_DISCLOSURE, '', tags.join(' ')].filter((x, i, a) => x !== '' || a[i - 1] !== '').join('\n'),
+    tiktok: [String(out.tiktok_caption || '').trim(), ctaLong ? CTA : '', part, AI, tags.slice(0, 5).join(' ')].filter(Boolean).join('\n'),
+    instagram: [String(out.instagram_caption || '').trim(), ctaLong ? '\n' + CTA : '', '', single ? '' : part + (out.next_hook ? ' · ' + String(out.next_hook).trim() : ''), '', AI, '', tags.join(' ')].filter((x, i, a) => x !== '' || a[i - 1] !== '').join('\n'),
     youtube_title: youtubeTitle(lockedTitle || out.youtube_title || out.cover_text || episode.title, part),
-    youtube: [String(out.instagram_caption || '').trim(), '', single ? '' : part + (out.next_hook ? ' · ' + String(out.next_hook).trim() : ''), '', AI_DISCLOSURE, '', ['#Shorts'].concat(tags.slice(0, 6)).join(' ')].filter((x, i, a) => x !== '' || a[i - 1] !== '').join('\n'),
+    youtube: [String(out.instagram_caption || '').trim(), '', single ? '' : part + (out.next_hook ? ' · ' + String(out.next_hook).trim() : ''), '', AI, '', ['#Shorts'].concat(tags.slice(0, 6)).join(' ')].filter((x, i, a) => x !== '' || a[i - 1] !== '').join('\n'),
     // Inglés (Franklin, oct-11: títulos y descripciones en los DOS idiomas en YouTube; YouTube muestra el de su idioma).
     youtube_title_en: youtubeTitle(String(out.youtube_title_en || '').trim() || lockedTitle || out.youtube_title || episode.title, single ? '' : `Part ${episode.episode_number}/${totalEpisodes}`),
-    youtube_en: [String(out.youtube_description_en || '').trim(), ctaLong ? '\n👇 Want the full story? The link is right below.' : '', '', 'Made with AI.', '', ['#Shorts'].concat(tags.slice(0, 6)).join(' ')].filter((x, i, a) => x !== '' || (a[i - 1] !== '' && i > 0)).join('\n').trim(),
+    youtube_en: [String(out.youtube_description_en || '').trim(), ctaLong ? '\n' + (EN ? CTA : '👇 Want the full story? The link is right below.') : '', '', (EN ? AI_DISCLOSURE_EN : 'Made with AI.'), '', ['#Shorts'].concat(tags.slice(0, 6)).join(' ')].filter((x, i, a) => x !== '' || (a[i - 1] !== '' && i > 0)).join('\n').trim(),
     hashtags: tags,
-    pinned_comment: ctaLong ? '👇 La historia completa está aquí: (pega aquí el enlace del video largo)' : String(out.pinned_comment || '').trim(),
-    ai_disclosure: AI_DISCLOSURE
+    pinned_comment: ctaLong ? (EN ? '👇 Full video here: (paste the link to the long video)' : '👇 La historia completa está aquí: (pega aquí el enlace del video largo)') : String(out.pinned_comment || '').trim(),
+    ai_disclosure: AI
   };
+  return res0;
 }
 
 function run(args, cwd) {

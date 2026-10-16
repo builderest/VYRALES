@@ -138,6 +138,8 @@ function assHeader(sub) {
     `Style: Num,${FONT_NAME},430,&H00F0F0F0,&H000000FF,&H00FF8A1E,&H96000000,-1,0,0,0,100,100,0,0,1,14,6,5,20,20,0,1`,
     `Style: PosterSm,Cinzel,58,&H00E6E6E6,&H000000FF,&H00101010,&HA0000000,-1,0,0,0,100,100,2,0,1,3,4,8,50,50,190,1`,
     `Style: PosterBig,Cinzel,116,&H00D8D8D8,&H000000FF,&H00101010,&HA0000000,-1,0,0,0,100,100,1,0,1,4,5,8,40,40,190,1`,
+    // Frase que se va armando palabra por palabra en el CENTRO (MindFuel, Franklin oct-16); énfasis = más grande y en oro.
+    `Style: Frase,${FONT_NAME},${H > W ? 120 : 118},&H00FFFFFF,&H000000FF,&H00000000,&HA0000000,-1,0,0,0,100,100,1,0,1,6,3,5,${H > W ? 60 : 140},${H > W ? 60 : 140},0,1`,
     `Style: CardSmall,${FONT_NAME},40,&H00B4B4B4,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,0,0,5,70,70,0,1`,
     '', '[Events]', 'Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text'
   ];
@@ -171,6 +173,53 @@ function posterText(text, big = [], gold = []) {
   });
   flush();
   return '{\\fad(500,250)\\fscx92\\fscy92\\t(0,700,\\fscx100\\fscy100)}' + lines.join('\\N');
+}
+
+// LETRAS QUE SE VAN ARMANDO (subtitle_style "frase", MindFuel — Franklin oct-16): la frase aparece en el centro
+// palabra por palabra justo cuando el narrador la dice; las palabras FUERTES salen más grandes y en otro color.
+// words: [{word,start,end}] de la voz continua (tiempos reales). emphasis: palabras marcadas en el guion
+// (text_big / text_gold de las tomas); si no hay, se usan palabras de fuerza típicas del mensaje.
+const POWER_WORDS = new Set(('never nobody nothing everything everyone always now today tomorrow tonight quit quitting pain fear discipline choose choice ' +
+  'fight win lose losing alone enough stop start decide rise hard harder hardest strong stronger weak comfort prison excuse excuses wait waiting ' +
+  'save yourself life dream dreams purpose truth real must power change move moving up again focus regret proof promise respect earn earned ' +
+  'built build show shows up silence silent dark storm war battle hungry winners legacy die dying alive free freedom').split(' '));
+const EMPH_COLOR = '&H0000C8FF&'; // oro (BGR)
+function kineticEvents(words, { lead = 0, bodyEnd = 1e9, wide = false, emphasis = [] } = {}) {
+  const key = (w) => String(w).toLowerCase().replace(/[^\p{L}\p{N}']/gu, '').replace(/'s$/, '');
+  const shown = (w) => String(w).replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}%]+$/gu, '').toUpperCase();
+  const E = new Set(emphasis.map(key).filter(Boolean));
+  const isEmph = (w) => { const k = key(w); return k && (E.size ? E.has(k) : POWER_WORDS.has(k)); };
+  const maxChars = wide ? 18 : 13, maxWords = wide ? 4 : 3;
+  const W0 = (words || []).filter((w) => w && shown(w.word) && Number.isFinite(Number(w.start)));
+  // 1) frases cortas: se corta en punto/coma, en pausas largas o cuando ya no cabe
+  const chunks = []; let cur = [];
+  W0.forEach((w, i) => {
+    const prev = W0[i - 1];
+    const len = cur.reduce((n, x) => n + shown(x.word).length + 1, 0) + shown(w.word).length;
+    const brk = cur.length && (cur.length >= maxWords || len > maxChars || (prev && Number(w.start) - Number(prev.end || prev.start) > 0.55) || (prev && /[.!?;:]["»”)]*$/.test(prev.word)) || (prev && /,$/.test(prev.word) && cur.length >= 2));
+    if (brk) { chunks.push(cur); cur = []; }
+    cur.push(w);
+  });
+  if (cur.length) chunks.push(cur);
+  // 2) un evento por palabra: muestra la frase hasta esa palabra; la nueva "salta" al aparecer
+  const evs = [];
+  chunks.forEach((c, ci) => {
+    const next = chunks[ci + 1];
+    const chunkEnd = Math.min(bodyEnd - 0.1, next ? lead + Number(next[0].start) - 0.02 : lead + Number(c[c.length - 1].end || c[c.length - 1].start) + 0.8);
+    c.forEach((w, k) => {
+      const st = lead + Number(w.start);
+      const en = k + 1 < c.length ? lead + Number(c[k + 1].start) : chunkEnd;
+      if (!(en > st + 0.03)) return;
+      const txt = c.slice(0, k + 1).map((x, j) => {
+        const em = isEmph(x.word);
+        const base = em ? `{\\1c${EMPH_COLOR}\\fscx135\\fscy135}` : '{\\1c&H00FFFFFF&\\fscx100\\fscy100}';
+        const pop = j === k ? (em ? '{\\fscx95\\fscy95\\t(0,140,\\fscx135\\fscy135)}' : '{\\fscx75\\fscy75\\t(0,120,\\fscx100\\fscy100)}') : '';
+        return base + pop + shown(x.word);
+      }).join(' ');
+      evs.push({ start: st, end: en, style: 'Frase', text: txt });
+    });
+  });
+  return evs;
 }
 
 function subtitleText(text, seconds, sub, color) {
@@ -637,7 +686,8 @@ async function renderEpisode({ episode, series, log = console.log, fetchFile = d
         const word = String(wd.word).replace(/[^\p{L}\p{N}]/gu, '').toUpperCase();
         return word && en > st + 0.05 ? { start: st, end: en, style: 'Word', text: `{\\1c${WORD_COLORS[k % WORD_COLORS.length]}\\fscx118\\fscy118\\t(0,90,\\fscx100\\fscy100)}` + word } : null;
       }).filter(Boolean) : null;
-      const evs = wordEvs ? wordEvs.concat(numEvs) : segs.map((x, k) => {
+      const fraseEvs = sbx.subtitle_style === 'frase' ? kineticEvents(Array.isArray(contVoice.words) && contVoice.words.length ? contVoice.words : VF.wordTimes(segs), { lead: VF.LEAD, bodyEnd, wide: W > H, emphasis: [...big, ...gold] }) : null;
+      const evs = fraseEvs ? fraseEvs : wordEvs ? wordEvs.concat(numEvs) : segs.map((x, k) => {
         const st = VF.LEAD + Number(x.start) - 0.05;
         const en = Math.min(bodyEnd - 0.1, k + 1 < segs.length ? VF.LEAD + Number(segs[k + 1].start) - 0.08 : VF.LEAD + Number(x.end) + 1.6);
         const text = sbx.subtitle_style === 'poster' ? posterText(x.text, big, gold) : subtitleText(x.text, Math.max(0.3, Number(x.end) - Number(x.start)), Object.assign({}, sub, { karaoke: true }), null);
@@ -645,7 +695,8 @@ async function renderEpisode({ episode, series, log = console.log, fetchFile = d
       }).filter(Boolean).concat(numEvs);
       // Documental LARGO (Franklin, oct-11: "solo los Shorts con letras grandes"): sin texto en pantalla; en YouTube
       // van subtítulos ES/EN aparte (pistas CC que cambian según el idioma del teléfono).
-      if ((episode.continuity || {}).kind === 'largo') evs.length = 0;
+      // Excepción: canales con letras que se van armando ("frase", MindFuel): las lleva también el largo (Franklin oct-16).
+      if ((episode.continuity || {}).kind === 'largo' && sbx.subtitle_style !== 'frase') evs.length = 0;
       fs.writeFileSync(path.join(cwd, 'voz.ass'), [...assHeader(sub), ...evs.map(dialogueLine), ''].join('\n'));
       const ms = Math.round(VF.LEAD * 1000);
       // Shorts que llevan al largo: cuando el narrador dice "entra al enlace que te dejo aquí abajo", aparece el dedo 👇
@@ -765,4 +816,4 @@ function tagAiMetadata(file, log = console.log) {
   } catch (err) { log('AVISO: no pude agregar los metadatos de IA:', err.message); }
 }
 
-module.exports = { run, download, detectSpeech, renderEpisode, resolvePlan, defaultPlan, autoTransition, autoEndCard, withTotalEpisodes, dialogueOf, findFont, FONT_FILE, FONT_NAME };
+module.exports = { kineticEvents, run, download, detectSpeech, renderEpisode, resolvePlan, defaultPlan, autoTransition, autoEndCard, withTotalEpisodes, dialogueOf, findFont, FONT_FILE, FONT_NAME };

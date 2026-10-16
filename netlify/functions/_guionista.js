@@ -196,7 +196,10 @@ function buildNarratedPrompt(tipo = 'curiosidades', { topic = '', canal = '' } =
 // "enfocar el canal en la historia completa que mantenga al oyente pegado"; los Shorts/Reels/TikTok son el
 // tráiler con llamada a la acción). Paso 1 = la HISTORIA (narración + qué se ve en cada toma, en español);
 // los prompts detallados en inglés para Flow/LTX los escribe después el revisor (_visual_check), por capítulos.
-function buildLongPrompt(tipo = 'historia', { topic = '', canal = '' } = {}) {
+function buildLongPrompt(tipo = 'historia', { topic = '', canal = '', cierre = null, cta = null } = {}) {
+  // Cierre del largo y del Short POR CANAL (ctasOf en _pulir.js). null = el de VYRALES (español).
+  const CIERRE = cierre === null ? 'Si quieres más historias como esta, contadas completas, suscríbete al canal.' : cierre;
+  const CTA = cta === null ? 'Si quieres ver la historia completa, entra al enlace que te dejo aquí abajo.' : cta;
   const p = TIPOS[tipo] || TIPOS.historia;
   const voz = (buildNarratedPromptRaw(tipo, p).match(/=== VOZ HUMANA[\s\S]*?(?=\n=== REGLAS TÉCNICAS)/) || [''])[0];
   const canalBlock = canal ? `\n=== IDENTIDAD DEL CANAL (MANDA SOBRE TODO) ===\nEscribe para ESTE canal: respeta su nicho, su voz y lo que ya aprendió. Si algo aquí choca con la plantilla de género de abajo, GANA esto.\n${canal}\n` : '';
@@ -216,7 +219,7 @@ ${voz}
   3. 6 a 8 CAPÍTULOS de 60–120 s. Cada capítulo tiene título corto, avanza la historia (causa → efecto) y TERMINA con una pregunta abierta o un giro que obliga a seguir viendo.
   4. EL CLÍMAX al 70–80 % del video.
   5. RESOLUCIÓN Y LEGADO: qué pasó después y por qué te importa hoy.
-  6. CIERRE: vuelve a la imagen de la apertura, una pregunta al espectador para que comente y, como ÚLTIMA frase, EXACTAMENTE: "Si quieres más historias como esta, contadas completas, suscríbete al canal."
+  6. CIERRE: vuelve a la imagen de la apertura, una pregunta al espectador para que comente${CIERRE ? ' y, como ÚLTIMA frase, EXACTAMENTE: "' + CIERRE + '" (solo esa, en ese idioma; nunca la repitas en otro idioma)' : ''}.
 - RETENCIÓN: un re-enganche cada 30–60 s (un dato que sorprende, un giro, una pregunta). Nunca resumas lo que ya se dijo. Nada de relleno ni de listas de datos.
 - CERO DATOS FALSOS: cada dato con su fuente en "sources". Si hay un rango, usa palabras prudentes ("cerca de", "unos"). Si no se puede verificar, no entra.
 
@@ -229,7 +232,7 @@ ${voz}
 
 === SHORTS QUE LLEVAN AL VIDEO LARGO (vertical, para YouTube Shorts, TikTok, Reels y Facebook) ===
 - 3 a 5 Shorts. Cada uno cuenta UN momento poderoso de la historia completo por sí mismo (45–70 s, 110–160 palabras), con un gancho brutal en la primera frase, la MISMA voz del narrador, y deja al espectador queriendo saber el resto.
-- La ÚLTIMA línea de cada Short es SIEMPRE, palabra por palabra: "Si quieres ver la historia completa, entra al enlace que te dejo aquí abajo." (regla fija del canal: así habla una persona; en pantalla sale un dedo señalando hacia abajo). Nada de frases tipo "lo contamos completo en el video largo de nuestro canal", que suenan a robot.
+- La ÚLTIMA línea de cada Short es SIEMPRE, palabra por palabra: "${CTA || '(una invitación corta a ver el video completo con el enlace de abajo, en el idioma del canal)'}" (regla fija del canal: así habla una persona; en pantalla sale un dedo señalando hacia abajo). Nada de frases tipo "lo contamos completo en el video largo de nuestro canal", que suenan a robot.
 - 8 a 14 tomas por Short, mismas reglas de visual_es y camera.
 
 === PERSONAJES Y LUGARES FIJOS (decide según la historia) ===

@@ -70,16 +70,17 @@ async function detail(shots, { aspect, context, title, log }) {
     let story = null;
     for (let k = 1; k <= 2 && !story; k++) {
       let raw = '';
-      try { raw = (req.raw_file && fs.existsSync(path.join(ROOT, req.raw_file))) ? (console.log('  reuso la historia ya escrita: ' + req.raw_file), fs.readFileSync(path.join(ROOT, req.raw_file), 'utf8')) : await runClaude(F('_guionista').buildLongPrompt(tipo, { topic: req.topic, canal }), { timeoutMin: 25, log: console.log }); fs.mkdirSync(path.join(ROOT, '_to_delete'), { recursive: true }); fs.writeFileSync(path.join(ROOT, '_to_delete', `claude_raw_${k}.txt`), raw); story = parseJson(raw); }
+      try { raw = (req.raw_file && fs.existsSync(path.join(ROOT, req.raw_file))) ? (console.log('  reuso la historia ya escrita: ' + req.raw_file), fs.readFileSync(path.join(ROOT, req.raw_file), 'utf8')) : await runClaude(F('_guionista').buildLongPrompt(tipo, Object.assign({ topic: req.topic, canal }, await F('_pulir').channelCtas(supabase))), { timeoutMin: 25, log: console.log }); fs.mkdirSync(path.join(ROOT, '_to_delete'), { recursive: true }); fs.writeFileSync(path.join(ROOT, '_to_delete', `claude_raw_${k}.txt`), raw); story = parseJson(raw); }
       catch (e) { console.log(`  intento ${k}: ${String(e.message).slice(0, 200)}`); if (k === 2) throw e; }
     }
     // Pulido de la narración (largo y cada Short): sin "Y" muletilla, sin saltos, sin palabras raras. Claude, $0.
     try {
-      const { polishLines } = F('_pulir');
+      const { polishLines, channelCtas } = F('_pulir');
+      const cc = await channelCtas(supabase); // cierre/CTA e idioma del canal (MindFuel: inglés, sin "historias")
       const all = (story.chapters || []).flatMap((c) => c.shots || []);
-      const nl = await polishLines(all.map((x) => x.line), claudeLlm(() => {}), { kind: 'largo', title: story.title });
+      const nl = await polishLines(all.map((x) => x.line), claudeLlm(() => {}), Object.assign({ kind: 'largo', title: story.title }, cc));
       all.forEach((x, i) => { x.line = nl[i]; });
-      for (const sh of story.shorts || []) { const n2 = await polishLines((sh.shots || []).map((x) => x.line), claudeLlm(() => {}), { kind: 'short_cta', title: sh.title }); sh.shots.forEach((x, i) => { x.line = n2[i]; }); }
+      for (const sh of story.shorts || []) { const n2 = await polishLines((sh.shots || []).map((x) => x.line), claudeLlm(() => {}), Object.assign({ kind: 'short_cta', title: sh.title }, cc)); sh.shots.forEach((x, i) => { x.line = n2[i]; }); }
       console.log('Narración pulida (largo + Shorts).');
     } catch (e) { console.log('  (pulido: ' + String(e.message).slice(0, 160) + ')'); }
     const longShots = (story.chapters || []).flatMap((c, ci) => (c.shots || []).map((s) => Object.assign({}, s, { chapter: ci + 1, chapter_title: c.title })));

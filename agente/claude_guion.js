@@ -67,7 +67,7 @@ async function job(id) {
       try { data = parseJson(await runClaude(prompt, { log: console.log })); }
       catch (e) { console.log(`  intento ${k}: ${String(e.message).slice(0, 200)}`); if (k === 2 || /instalado|sesión/.test(e.message)) throw e; }
     }
-    try { const { polishLines } = require(path.join(ROOT, 'netlify', 'functions', '_pulir')); const sh = data.episodes[0].shots; const nl = await polishLines(sh.map((x) => (x.dialogue || []).map((d) => d.line).join(' ')), claudeLlm(() => {}), { title: data.episodes[0].title }); sh.forEach((x, i) => { x.dialogue = [{ speaker: 'Narrador', line: nl[i] }]; }); console.log('Narración pulida (sin muletillas ni saltos).'); } catch (e) { console.log('  (pulido: ' + String(e.message).slice(0, 120) + ')'); }
+    try { const { polishLines } = require(path.join(ROOT, 'netlify', 'functions', '_pulir')); const sh = data.episodes[0].shots; const nl = await polishLines(sh.map((x) => (x.dialogue || []).map((d) => d.line).join(' ')), claudeLlm(() => {}), Object.assign({ title: data.episodes[0].title }, await require(path.join(ROOT, 'netlify', 'functions', '_pulir')).channelCtas(supabase))); sh.forEach((x, i) => { x.dialogue = [{ speaker: 'Narrador', line: nl[i] }]; }); console.log('Narración pulida (sin muletillas ni saltos).'); } catch (e) { console.log('  (pulido: ' + String(e.message).slice(0, 120) + ')'); }
     console.log('Guion escrito en', Math.round((Date.now() - t) / 1000), 's. Revisor IMAGEN = NARRACIÓN (prompts detallados) con Claude...');
     const { validation } = await finishScript(data, { idea, tipo, llm: claudeLlm(console.log) });
     const ep = data.episodes[0];
@@ -119,13 +119,13 @@ async function pulir(epId) {
   const { getSupabaseClient } = require(path.join(ROOT, 'netlify', 'functions', '_supabase'));
   const { polishLines } = require(path.join(ROOT, 'netlify', 'functions', '_pulir'));
   const sb = getSupabaseClient();
-  const { data: ep } = await sb.from('episodes').select('title, shots, continuity').eq('id', epId).single();
+  const { data: ep } = await sb.from('episodes').select('title, shots, continuity, series:series_id(story_bible)').eq('id', epId).single();
   const sh = (ep.shots || []).slice().sort((a, b) => a.n - b.n);
   const lineOf = (x) => String(x.voice_part || (x.dialogue || []).map((d) => d.line).join(' ')).trim();
   const lines = sh.map(lineOf);
   const kind = ep.continuity && ep.continuity.kind === 'short_cta' ? 'short_cta' : ep.continuity && ep.continuity.kind === 'largo' ? 'largo' : 'normal';
   console.log('Puliendo la narración de "' + ep.title + '" (' + lines.length + ' líneas, ' + kind + ') con Claude...');
-  const nl = await polishLines(lines, claudeLlm(console.log), { kind, title: ep.title });
+  const nl = await polishLines(lines, claudeLlm(console.log), Object.assign({ kind, title: ep.title }, require(path.join(ROOT, 'netlify', 'functions', '_pulir')).ctasOf(ep.series && ep.series.story_bible)));
   let changed = 0;
   const byN = {}; sh.forEach((x, i) => { if (nl[i] !== lines[i]) { changed++; console.log(`  #${x.n}: ${lines[i]}\n     → ${nl[i]}`); } byN[x.n] = nl[i]; });
   const { data: fr } = await sb.from('episodes').select('shots').eq('id', epId).single();
