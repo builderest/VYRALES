@@ -321,6 +321,15 @@ async function generateBatch(page, ctx, prompts, name, log, refs = null) {
   await sleep(800);
   await shot(page, name + '_1_prompt');
   await page.keyboard.press('Enter');
+  // oct-16: si el mensaje NO se envió (el texto sigue en la caja), se aprieta el botón de enviar.
+  await sleep(2000);
+  const left = await page.locator('.ProseMirror').first().innerText().catch(() => '');
+  if (String(left).trim().length > 40) {
+    log('  (el mensaje no se envió con Enter → aprieto el botón de enviar)');
+    const sendBtn = page.locator('button[aria-label*="nviar" i], button[aria-label*="end" i], button:has(i:text("arrow_forward"))').last();
+    if (await sendBtn.isVisible().catch(() => false)) await sendBtn.click().catch(() => {}); else await page.keyboard.press('Control+Enter').catch(() => {});
+    await sleep(1500); await shot(page, name + '_1b_reenvio');
+  }
   const t0 = Date.now(), maxMs = (3 + prompts.length * 0.75) * 60000;
   if (refs && refs.length) while (Date.now() - t0 < 10000) { await sleep(2000); (await imgSrcs(page)).forEach((x) => before.add(mediaKey(x))); }
   let last = -1, quiet = 0, cur = [];
@@ -333,6 +342,9 @@ async function generateBatch(page, ctx, prompts, name, log, refs = null) {
     if (cur.length !== last) { log(`  Flow lote: ${cur.length}/${prompts.length} imágenes (${Math.round((Date.now() - t0) / 1000)} s)`); last = cur.length; quiet = 0; }
     else if (cur.length >= prompts.length) { if (++quiet >= 2) break; }
     else if (cur.length > 0 && ++quiet >= 12) break; // ~48 s sin novedades: Flow ya terminó lo que iba a hacer
+    // oct-16 (EP39): Flow no hizo NADA en 6 min (lo normal: primeras imágenes en 1–2 min) → no se esperan los 18 min:
+    // el lote falla y se vuelve a pedir en un proyecto nuevo.
+    if (!cur.length && Date.now() - t0 > 6 * 60000) { await shot(page, name + '_nada'); throw new Error('Flow no generó ninguna imagen en 6 min'); }
   }
   await shot(page, name + '_2_listo');
   const out = [];
