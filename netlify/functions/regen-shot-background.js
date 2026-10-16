@@ -127,7 +127,11 @@ exports.handler = async (event) => {
     // aquí y el QA volvía a rehacer la MISMA toma en cada pasada ("marcada para rehacer (prompt corregido)") = bucle.
     try {
       const { data: fr } = await supabase.from('episodes').select('shots').eq('id', episode.id).single();
-      if ((fr.shots || []).some((x) => x.n === asset.shot_number && x.clip_stale)) await supabase.from('episodes').update({ shots: fr.shots.map((x) => (x.n === asset.shot_number ? Object.assign({}, x, { clip_stale: false }) : x)) }).eq('id', episode.id);
+      // El clip es NUEVO pero conserva el mismo id de asset → el veredicto viejo del QA (ok/revisar/mech_ok con ese
+      // clip_id) haría que el QA se saltara el video nuevo sin mirarlo (visto oct-16: "revisando 0 toma(s)"). Se borra
+      // el veredicto y se conservan solo los intentos (para el límite de 3) y la bitácora.
+      const clean = (q) => (q ? { tries: q.tries, redone: q.redone, attempts: q.attempts, keep_image: q.keep_image } : q);
+      await supabase.from('episodes').update({ shots: (fr.shots || []).map((x) => (x.n === asset.shot_number ? Object.assign({}, x, { clip_stale: false, qa: clean(x.qa) }) : x)) }).eq('id', episode.id);
     } catch (e) { console.warn(LOG, 'no pude limpiar clip_stale (no es grave):', e.message); }
     console.log(LOG, 'listo ✅. Toma', updated.shot_number, 'regenerada:', publicUrl);
     return { statusCode: 200, body: JSON.stringify({ asset: updated, model, old_storage_path: keepOld ? asset.storage_path : null }) };
