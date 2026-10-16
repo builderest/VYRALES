@@ -85,6 +85,8 @@ function applyChanges(shots, changes, { frames = false, splits = true } = {}) {
   let out = (shots || []).map((sh) => {
     const c = byN[sh.n];
     if (!c) return sh;
+    // oct-16: imagen subida por Franklin (own_image) → el revisor no cambia el prompt de la imagen ni la marca vieja.
+    if (sh.own_image) return Object.assign({}, sh, { action_en: c.action_en, reaction_en: c.reaction_en, background_en: c.background_en, end_en: c.end_en });
     const upd = { start_en: c.start_en, action_en: c.action_en, reaction_en: c.reaction_en, background_en: c.background_en, end_en: c.end_en };
     if (c.startChanged) Object.assign(upd, { end_frame_url: null, end_frame_skip: false, visual_fix: { at: new Date().toISOString(), problema: c.problema, antes: sh.start_en } }, frames ? { frame_stale: true } : {});
     return Object.assign({}, sh, upd);

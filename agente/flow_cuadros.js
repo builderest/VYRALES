@@ -45,8 +45,26 @@ for (const line of fs.readFileSync(path.join(ROOT, '.env'), 'utf8').split(/\r?\n
     const { createKeyframe } = require(path.join(ROOT, 'netlify', 'functions', '_keyframe'));
     const { data: fullSeries } = await supabase.from('series').select('id, slug, story_bible, visual_memory').eq('id', ep.series_id).single();
     const { data: characters } = await supabase.from('characters').select('name, fixed_prompt_tag, profile, reference_image_url').eq('series_id', ep.series_id);
+    // oct-16 (Franklin): TODAS las tomas con referencias PRIMERO y juntas, en una sola ventana de Flow, agrupadas por
+    // las mismas fotos (misma cara / mismo lugar) y en lotes. Antes: una por una, cada una abriendo su propio Chrome.
+    // Lo que no salga así se rehace por el camino de siempre (createKeyframe: reintentos, anonimizar si hay rechazo por
+    // política, y Gemini solo si Flow no da NINGUNA imagen).
+    const prep = [];
     for (const sh of conPersonajes) {
-      try { await createKeyframe(supabase, { series: fullSeries, episode: ep, shot: sh, characters, log: (...x) => console.log(...x) }); conDone.push(sh.n); console.log(`toma ${sh.n}: cuadro con referencias listo (${(sh.characters || []).length} cara(s)${lugarFijo(sh) ? ' + lugar fijo "' + sh.location + '"' : ''})`); }
+      try { prep.push(Object.assign({ sh }, await require(path.join(ROOT, 'netlify', 'functions', '_keyframe')).prepareKeyframe(supabase, { series: fullSeries, episode: ep, shot: sh, characters, log: (...x) => console.log(...x) }))); }
+      catch (e) { console.log(`toma ${sh.n}: no pude preparar el pedido (${String(e.message).slice(0, 160)}) → va de a una`); }
+    }
+    if (prep.length) {
+      const { flowImagesConRefs } = require('./flow_imagenes');
+      await flowImagesConRefs(prep.map((x) => ({ prompt: x.prompt, refs: x.refs })), console.log, async (i, img) => {
+        await storeKeyframeImage(supabase, { series, episode: ep, shotN: prep[i].sh.n, image: { imageBytes: img.buffer.toString('base64'), mimeType: img.mimeType }, note: 'Google Flow (lote con referencias)' });
+        conDone.push(prep[i].sh.n);
+        console.log(`toma ${prep[i].sh.n}: cuadro con referencias listo (${conDone.length}/${conPersonajes.length})`);
+      }, { aspect });
+    }
+    for (const sh of conPersonajes) {
+      if (conDone.includes(sh.n)) continue;
+      try { await createKeyframe(supabase, { series: fullSeries, episode: ep, shot: sh, characters, log: (...x) => console.log(...x) }); conDone.push(sh.n); console.log(`toma ${sh.n}: cuadro con referencias listo (de a una) (${(sh.characters || []).length} cara(s)${lugarFijo(sh) ? ' + lugar fijo "' + sh.location + '"' : ''})`); }
       catch (e) { console.log(`toma ${sh.n}: FALLÓ ${String(e.message).slice(0, 200)}`); }
     }
   }

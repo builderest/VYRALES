@@ -284,7 +284,9 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
         // Franklin (oct-11): si se rehace con el MISMO prompt, sale el mismo error → SIEMPRE se reescribe el prompt
         // (Claude guionista, con lo que vio el QA) y la imagen se cambia si no cuadra o desde el 2º intento.
         // keep_image: Franklin quiere ESA imagen (ej. el estadio de T35 como comparación); solo se arregla el movimiento.
-        const newFrame = freeFrame && !(it.sh.qa && it.sh.qa.keep_image) && (r.image_ok === false || r.style_ok === false || tries >= 1);
+        // oct-16 (Franklin: "subí imágenes buenas y el QA las borró para crear disparates"): own_image = la subiste TÚ
+        // (shot-edit la marca así) → el QA NUNCA la cambia; solo puede rehacer el movimiento/video.
+        const newFrame = freeFrame && !it.sh.own_image && !(it.sh.qa && it.sh.qa.keep_image) && (r.image_ok === false || r.style_ok === false || tries >= 1);
         const rewrite = true;
         todo.push({ n: it.sh.n, clip: it.clip, newFrame, boost: r.action_ok === false, rewrite, reason: r.reason || '', sh: it.sh });
         log(`QA visual toma ${it.sh.n}: ${r.reason || 'no pasó'} → intento ${tries + 1}/3: Claude reescribe el prompt${newFrame ? ' + imagen nueva' : ''}`);
@@ -346,7 +348,7 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
         if (await yaAprobada(t.n, shNow)) { log(`QA toma ${t.n}: la aprobaste a mano → la dejo`); done = true; break; }
         await setWorking(t.n, 'rehacer');
         // El especialista DECIDE con la bitácora + la evidencia del cerebro (no reinventa a ciegas).
-        const dec = E.decide({ sh: shNow, verdict: curV, attempts, doc: brain, freeFrame: !(shNow.characters || []).length, keepImage: !!(shNow.qa && shNow.qa.keep_image) });
+        const dec = E.decide({ sh: shNow, verdict: curV, attempts, doc: brain, freeFrame: !(shNow.characters || []).length, keepImage: !!(shNow.own_image || (shNow.qa && shNow.qa.keep_image)) });
         log(`🔧 especialista toma ${t.n}: ${dec.mode.toUpperCase()} — ${dec.why}`);
         await C.addDiary(supabase, { ep: epId, n: t.n, try: tries + 1, mode: dec.mode, why: dec.why, fallas: dec.fallas });
         if (!dec.regen) { await saveShot(null, { needs_human: dec.mode, especialista: dec.why }); log(`QA toma ${t.n}: queda marcada para que la revises (${dec.mode})`); break; }
@@ -356,7 +358,7 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
         const context = [ctxA ? 'antes: "' + lineOf(ctxA) + '"' : '', ctxB ? 'después: "' + lineOf(ctxB) + '"' : ''].filter(Boolean).join(' · ');
         if (dec.rewrite) {
           try {
-            const fix = await rewriteShot(shNow, reason, log, { allowImage: dec.newFrame, allowSplit: true, context, extra: E.instructions(dec, attempts, brain) });
+            const fix = await rewriteShot(shNow, reason, log, { allowImage: dec.newFrame && !shNow.own_image, allowSplit: true, context, extra: E.instructions(dec, attempts, brain) });
             if (fix && fix.split) { splits.push({ n: t.n, parts: fix.split }); log(`QA toma ${t.n}: se parte en ${fix.split.length} tomas (misma narración)`); await C.addDiary(supabase, { ep: epId, n: t.n, mode: 'partir', why: 'el especialista partió la toma en ' + fix.split.length }); done = true; break; }
             if (fix) {
               const { data: fr } = await supabase.from('episodes').select('shots').eq('id', epId).single();
@@ -366,7 +368,7 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
           } catch (e) { log(`QA toma ${t.n}: no pude reescribir (${String(e.message).slice(0, 120)}) → reintento igual`); }
         } else log(`QA toma ${t.n}: mismo prompt y misma imagen, otra semilla (azar de LTX)`);
         // Rehacer en king SIN borrar el clip anterior (keep_old) → al final se queda el MEJOR.
-        const rr = await handler({ httpMethod: 'POST', headers: { 'x-vyrales-key': process.env.DASHBOARD_KEY || '' }, body: JSON.stringify({ assetId: clipId, provider: 'king', new_frame: dec.newFrame, keep_old: true }) });
+        const rr = await handler({ httpMethod: 'POST', headers: { 'x-vyrales-key': process.env.DASHBOARD_KEY || '' }, body: JSON.stringify({ assetId: clipId, provider: 'king', new_frame: dec.newFrame && !shNow.own_image, keep_old: true }) });
         tries++;
         if (rr.statusCode >= 400) { log(`QA toma ${t.n}: FALLÓ al rehacer ${String(rr.body).slice(0, 160)}`); await bumpTryTo(t.n, tries, t.boost); break; }
         log(`QA toma ${t.n}: rehecha (intento ${tries}/3) ✅ — verificando solo esta toma...`);

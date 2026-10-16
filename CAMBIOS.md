@@ -19,6 +19,14 @@
 
 ## Registro de cambios
 
+### 2026-10-16 (sesión Claude Cowork, 2) — tomas con referencias en lote; el QA ya no borra las imágenes que subes tú
+
+- **`agente/flow_imagenes.js`** — nuevo `flowImagesConRefs`: las tomas CON fotos de referencia (caras / lugar fijo) van en UNA ventana, agrupadas por las MISMAS referencias (se suben una vez) y en lotes de 20; lo que no salga va de a una en la misma ventana. `generateBatch` acepta referencias. Prueba (`flow_prueba_ref`, reescrito): la misma cara en 5 escenas distintas, 5/5 en un solo mensaje, 68 s, la misma mujer en todas.
+- **`netlify/functions/_keyframe.js`** — `prepareKeyframe` (separado de `createKeyframe`, sin cambiar lo que hace): fotos de cara que falten, imagen fija del lugar, referencias y prompt.
+- **`agente/flow_cuadros.js`** — Paso 1 del pipeline: PRIMERO todas las tomas con referencias juntas (lote), después las demás de 20 en 20. Lo que falle sigue por `createKeyframe` (reintentos, anonimizar por política, Gemini solo si Flow no da NINGUNA imagen).
+- **`agente/_qa.js`** + **`netlify/functions/_visual_check.js`** — BUG reportado por Franklin ("subí imágenes que estaban bien y el QA las borró para crear disparates"): `shot-edit` marcaba la toma con `own_image: true` al subir tu imagen, pero NADIE lo leía. Ahora el QA nunca cambia esa imagen (solo puede rehacer el video/movimiento) y el revisor IMAGEN = NARRACIÓN no le cambia el prompt de imagen ni la marca vieja.
+- Pendiente: los CUADROS FINALES (uno por toma, durante el paso de video) siguen de a uno — es lo que más cuota gasta en un largo.
+
 ### 2026-10-16 (sesión Claude Cowork) — Flow: dejar de colgarse (cuota, referencias, detector, lote de 10) y cortar el bucle de Claude sin cuota
 
 Franklin: "Flow se queda colgado la mayor parte del tiempo". Análisis con los últimos 60 trabajos (`agent_jobs.output`) y las capturas de `_to_delete/flow`: Flow SÍ genera en ~40–60 s; lo que se colgaba era el robot. 27 intentos fallidos y 9 pagos a Gemini innecesarios, por 3 causas + un bucle:

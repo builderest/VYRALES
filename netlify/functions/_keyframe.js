@@ -165,7 +165,9 @@ async function createLocationImage(supabase, { seriesId, slug, storyBible, key, 
   return { url, entry, visualMemory: vm };
 }
 
-async function createKeyframe(supabase, { series, episode, shot, characters, log = console.log }) {
+// oct-16: la parte que prepara el pedido (fotos de cara que falten, imagen fija del lugar, referencias y prompt) se
+// separa para que flow_cuadros pueda pedir VARIAS tomas con referencias en un solo lote de Flow.
+async function prepareKeyframe(supabase, { series, episode, shot, characters, log = console.log }) {
   // Memoria visual automática: si el lugar de esta toma no tiene imagen fija todavía, se crea
   // primero (una sola vez por lugar) para que todas las tomas de ese lugar compartan el set.
   const seriesId = series.id || episode.series_id;
@@ -196,6 +198,11 @@ async function createKeyframe(supabase, { series, episode, shot, characters, log
   }
   const { refs, hasLocationRef } = await keyframeReferences(shot, characters, narradoFmt ? {} : series.visual_memory);
   const prompt = effectiveKeyframePrompt(shot, characters, series.story_bible, hasLocationRef);
+  const aspect = (episode && episode.continuity && episode.continuity.aspect) || (series.story_bible && series.story_bible.aspect) || '9:16';
+  return { refs, prompt, aspect, seriesId };
+}
+async function createKeyframe(supabase, { series, episode, shot, characters, log = console.log }) {
+  const { refs, prompt, seriesId } = await prepareKeyframe(supabase, { series, episode, shot, characters, log });
   const { fluxImage, useFlux } = require('./_flux');
   const fluxText = shot.start_en || shot.action_en || shot.end_en || '';
   const flux = useFlux(series.story_bible, shot) && !!fluxText;
@@ -388,6 +395,7 @@ async function loadExistingKeyframe(supabase, episodeId, shotNumber) {
 }
 
 module.exports = {
+  prepareKeyframe,
   buildLocationPrompt,
   buildKeyframePrompt,
   effectiveKeyframePrompt,

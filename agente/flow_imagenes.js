@@ -288,9 +288,13 @@ async function download(ctx, page, src, full) {
   const b64 = await page.evaluate(async (u) => { const r = await fetch(u); const b = new Uint8Array(await r.arrayBuffer()); let s = ''; for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000)); return btoa(s); }, url).catch(() => null);
   return b64 ? Buffer.from(b64, 'base64') : null;
 }
-async function generateBatch(page, ctx, prompts, name, log) {
+async function generateBatch(page, ctx, prompts, name, log, refs = null) {
+  // oct-16: con referencias (caras de personajes / foto fija del lugar) se suben UNA vez para todo el lote.
+  if (refs && refs.length) { await addRefs(page, refs, name); await sleep(2000); }
   const before = new Set((await imgSrcs(page)).map(mediaKey));
-  const msg = `Create ${prompts.length} separate images, one for EACH scene below. Each scene is its own ${ASPECT === '16:9' ? 'horizontal 16:9 widescreen' : 'vertical 9:16'} photorealistic image; do not combine scenes into one picture and do not skip any scene. Generate all ${prompts.length} now without asking.\n` +
+  for (let k = 0; k < 5; k++) { await sleep(1500); const n0 = before.size; (await imgSrcs(page)).forEach((x) => before.add(mediaKey(x))); if (before.size === n0 && k >= 1) break; }
+  const refTxt = refs && refs.length ? 'Reference images in order: ' + refs.map((r, k) => `image ${k + 1} = ${r.label || 'reference'}`).join('; ') + '. Use them as the exact identity/look of those people and places in every scene where they appear.\n' : '';
+  const msg = refTxt + `Create ${prompts.length} separate images, one for EACH scene below. Each scene is its own ${ASPECT === '16:9' ? 'horizontal 16:9 widescreen' : 'vertical 9:16'} photorealistic image; do not combine scenes into one picture and do not skip any scene. Generate all ${prompts.length} now without asking.\n` +
     prompts.map((p, i) => `Scene ${i + 1}: ${String(p).trim().replace(/\.?$/, '.')}${PEOPLE_RE.test(p) ? '' : ' (no people)'}`).join('\n') + '\nStyle for every image:' + RULE_BASE;
   await page.click('.ProseMirror');
   await page.keyboard.insertText(msg);
@@ -298,6 +302,7 @@ async function generateBatch(page, ctx, prompts, name, log) {
   await shot(page, name + '_1_prompt');
   await page.keyboard.press('Enter');
   const t0 = Date.now(), maxMs = (3 + prompts.length * 0.75) * 60000;
+  if (refs && refs.length) while (Date.now() - t0 < 10000) { await sleep(2000); (await imgSrcs(page)).forEach((x) => before.add(mediaKey(x))); }
   let last = -1, quiet = 0, cur = [];
   while (Date.now() - t0 < maxMs) {
     await sleep(4000);
@@ -394,13 +399,83 @@ async function flowImages(prompts, log = console.log, onEach = null, opts = {}) 
     await ctx.close().catch(() => {});
   }
 }
-module.exports = { flowImage, flowImages };
+// oct-16 (Franklin: "las de personajes también van en el lote, o al menos todas juntas primero"): tomas CON fotos de
+// referencia. Antes cada una abría su propio Chrome (createKeyframe → flowImage) = 1 ventana + 1 mensaje de cuota por toma.
+// Ahora: UNA ventana; se agrupan las tomas que usan las MISMAS referencias (misma cara/lugar), se suben una vez y van en
+// lotes de LOTE; lo que no salga en el lote se pide de a una en la misma ventana. items: [{ prompt, refs }] →
+// [{ buffer, mimeType } | { error }] en el mismo orden.
+async function flowImagesConRefs(items, log = console.log, onEach = null, opts = {}) {
+  ASPECT = opts.aspect === '16:9' ? '16:9' : '9:16'; RULE_BASE = ruleBaseFor();
+  const FLAG = path.join(OUT, 'cuota_agotada.txt');
+  try { if (Date.now() - Number(fs.readFileSync(FLAG, 'utf8')) < 3 * 3600000) { log('Flow: cuota del agente agotada (aviso de hace < 3 h) → no pido nada'); return items.map(() => ({ error: 'CUOTA_FLOW: cuota del agente agotada' })); } } catch (_) {}
+  const crypto = require('crypto');
+  const keyOf = (refs) => (refs || []).map((r) => (r.label || '') + ':' + crypto.createHash('md5').update(String(r.imageBytes || '')).digest('hex')).join('|');
+  const groups = new Map();
+  items.forEach((it, i) => { const k = keyOf(it.refs); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(i); });
+  log(`Flow (con referencias): ${items.length} cuadros en ${groups.size} grupo(s) de referencias, una sola ventana`);
+  let { ctx, page } = await openFlow(process.env.FLOW_VISIBLE === '1');
+  const out = new Array(items.length).fill(null);
+  let cuota = false;
+  const finish = async (i, buf) => { const jpg = buf[0] === 0xff && buf[1] === 0xd8; out[i] = { buffer: buf, mimeType: jpg ? 'image/jpeg' : 'image/png' }; if (onEach) { try { await onEach(i, out[i]); } catch (e) { log('  (no se pudo guardar al momento: ' + String(e.message).slice(0, 120) + ')'); } } };
+  try {
+    let ok = await ensureLogin(page, 0.1);
+    if (!ok) { await ctx.close().catch(() => {}); ({ ctx, page } = await openFlow(true)); ok = await ensureLogin(page, 10); }
+    if (!ok) throw new Error('Flow: no hay sesión de Google.');
+    let g = 0;
+    for (const [, idxAll] of groups) {
+      g++;
+      const refs = items[idxAll[0]].refs || [];
+      for (let s0 = 0; s0 < idxAll.length && !cuota; s0 += LOTE) {
+        const idx = idxAll.slice(s0, s0 + LOTE);
+        if (idx.length < 2) continue; // una sola: va directo al paso de a una
+        try {
+          await newProject(page);
+          const t = Date.now();
+          const prompts = idx.map((k) => items[k].prompt);
+          const imgs = await generateBatch(page, ctx, prompts, 'reflote' + g, log, refs);
+          const map = await matchScenes(prompts, imgs, log);
+          let n = 0;
+          for (let m = 0; m < imgs.length; m++) {
+            if (map[m] < 0 || out[idx[map[m]]]) continue;
+            const buf = await download(ctx, page, imgs[m].src, true);
+            if (esOriginal(buf)) { await finish(idx[map[m]], buf); n++; }
+          }
+          log(`Flow grupo ${g} (${refs.length} ref.): ${n}/${idx.length} en un mensaje, ${Math.round((Date.now() - t) / 1000)} s`);
+        } catch (e) { if (/CUOTA_FLOW/.test(e.message)) { cuota = true; log('Flow: ' + e.message); break; } log('Flow grupo ' + g + ': lote FALLÓ ' + String(e.message).slice(0, 200) + ' → de a una'); }
+        await sleep(2000 + Math.random() * 2000);
+      }
+      for (const i of idxAll) {
+        if (out[i] || cuota) continue;
+        try { await newProject(page); const img = await generate(page, ctx, String(items[i].prompt).trim().replace(/\.?$/, '.') + RULE_BASE, 'ref' + (i + 1), items[i].refs); await finish(i, img.buffer); log(`Flow ${i + 1}/${items.length}: lista de a una (misma ventana)`); }
+        catch (e) { out[i] = { error: e.message }; log(`Flow ${i + 1}/${items.length}: FALLÓ ${String(e.message).slice(0, 200)}`); if (/CUOTA_FLOW/.test(e.message)) cuota = true; }
+        await sleep(2000 + Math.random() * 2000);
+      }
+    }
+    if (cuota) { try { fs.writeFileSync(FLAG, String(Date.now())); } catch (_) {} }
+    return out.map((x) => x || { error: cuota ? 'CUOTA_FLOW' : 'sin imagen' });
+  } finally { await ctx.close().catch(() => {}); }
+}
+module.exports = { flowImage, flowImages, flowImagesConRefs };
 
 if (require.main === module) (async () => {
   const mode = process.argv[2] || 'prueba';
   // oct-16 (Franklin: "en un solo mensaje generar todas, o de 10 en 10, sin cerrar la ventana"): PRUEBA de lote grande.
   // Usa el MISMO flowImages del pipeline (una sola ventana de Chrome, un mensaje por lote) con 10 escenas fáciles de
   // distinguir, y mide cuántas salen en el lote y cuánto tarda. No toca episodios ni la base de datos.
+  // oct-16: prueba del lote CON referencia (la misma cara en 5 escenas distintas, un solo mensaje).
+  if (mode === 'prueba_ref') {
+    const url = process.argv[3] || 'https://pfwdbdkngmdmoolzflhe.supabase.co/storage/v1/object/public/media/characters/job_la_prueba/1721708b-31d5-42d0-b7a2-1fbef60075d9-1791249285259.jpg';
+    const ref = { imageBytes: Buffer.from(await (await fetch(url)).arrayBuffer()).toString('base64'), mimeType: 'image/jpeg', label: 'the woman with the long grey-black braid (face)' };
+    const S = ['The woman with the long braid walks through a sunny old hacienda courtyard in a long rust-red dress.',
+      'The woman with the long braid kneels in a vegetable garden at dawn, holding a basket of tomatoes.',
+      'The woman with the long braid stands on a wooden pier at a calm lake at sunset, looking at the water.',
+      'The woman with the long braid sits at a rustic kitchen table by a window, pouring coffee from a clay pot.',
+      'The woman with the long braid walks down a rainy city street at night holding a black umbrella.'];
+    const t0 = Date.now();
+    const r = await flowImagesConRefs(S.map((p) => ({ prompt: p, refs: [ref] })), console.log, async (i, img) => { fs.writeFileSync(path.join(OUT, 'reflote_escena' + (i + 1) + '.jpg'), img.buffer); }, { aspect: '9:16' });
+    console.log('RESULTADO: ' + r.filter((x) => x && x.buffer).length + '/' + S.length + ' en ' + Math.round((Date.now() - t0) / 1000) + ' s → _to_delete\\flow\\reflote_escena*.jpg');
+    return;
+  }
   if (mode === 'prueba_lote') {
     // Cuántas escenas probar: argumento, o el número en _to_delete/flow/prueba_lote_n.txt (para probar >10 sin tocar el agente).
     let N = Number(process.argv[3]) || 0; try { N = N || Number(fs.readFileSync(path.join(OUT, 'prueba_lote_n.txt'), 'utf8')); } catch (_) {}
