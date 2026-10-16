@@ -20,7 +20,7 @@ let ASPECT = process.env.FLOW_ASPECT === '16:9' ? '16:9' : '9:16';
 const ruleBaseFor = () => (ASPECT === '16:9' ? ' Horizontal 16:9 landscape widescreen image.' : ' Vertical 9:16 portrait image.') + ' Photorealistic, cinematic documentary, dramatic lighting, sharp detail. Real photograph captured with a real camera — NOT a 3D render, NOT CGI, NOT a video game, NOT an illustration, cartoon or painting; real-world textures, not smooth plastic. No text.';
 let RULE_BASE = ruleBaseFor();
 // Sin personas SOLO si la escena no las menciona (el oficial del búnker, siluetas, manos…).
-const PEOPLE_RE = /\b(person|people|persons|man|men|woman|women|officer|soldier|soldiers|silhouette|silhouettes|child|children|boy|girl|hand|hands|crowd|figure|figures|worker|operator|pilot|scientist|human|humans|hunter|hunters|survivor|survivors|clan|tribe|band|members|family|families|warrior|warriors|villagers|pedestrians|sapiens|hominid|hominids)\b/i;
+const PEOPLE_RE = /\b(person|people|persons|man|men|woman|women|officer|soldier|soldiers|silhouette|silhouettes|child|children|boy|girl|hand|hands|crowd|figure|figures|worker|operator|pilot|scientist|human|humans|hunter|hunters|survivor|survivors|clan|tribe|band|members|family|families|warrior|warriors|villagers|pedestrians|sapiens|hominid|hominids|astronauts?|cosmonauts?|divers?|researchers?|workers|crew|knights?|warriors?)\b/i; // oct-16: astronauta/buzo/investigador también son personas (antes se pedía "no people" y se borraban)
 const ruleFor = (prompt) => RULE_BASE + (PEOPLE_RE.test(prompt) ? '' : ' No people, no hands.');
 const RULE = RULE_BASE + ' No people, no hands.';
 
@@ -502,13 +502,16 @@ if (require.main === module) (async () => {
       'A brass antique compass lying open on an old paper-free wooden desk.',
       'A herd of wild horses running across a wide grassy plain under dark clouds.'
     ];
-    const P = P0.slice(0, N);
+    // Escenas propias para una prueba: _to_delete/flow/prueba_lote_prompts.json = { "aspect": "16:9", "prompts": [...] } (si existe, manda).
+    let PF = null; try { PF = JSON.parse(fs.readFileSync(path.join(OUT, 'prueba_lote_prompts.json'), 'utf8')); } catch (_) {}
+    const P = PF && Array.isArray(PF.prompts) && PF.prompts.length ? PF.prompts.slice(0, 30) : P0.slice(0, N);
+    if (PF && PF.prompts) LOTE = Math.min(30, P.length);
     const t0 = Date.now(); const tiempos = [];
     console.log('PRUEBA LOTE: ' + P.length + ' escenas, ' + LOTE + ' por mensaje');
     const r = await flowImages(P, console.log, async (i, img) => {
       tiempos.push(Math.round((Date.now() - t0) / 1000));
       fs.writeFileSync(path.join(OUT, 'lote' + P.length + '_escena' + (i + 1) + (img.mimeType === 'image/png' ? '.png' : '.jpg')), img.buffer);
-    }, { aspect: '9:16' });
+    }, { aspect: PF && PF.aspect === '16:9' ? '16:9' : '9:16' });
     const ok = r.filter((x) => x && x.buffer).length;
     console.log('RESULTADO: ' + ok + '/' + P.length + ' imágenes en ' + Math.round((Date.now() - t0) / 1000) + ' s · cada una lista a los (s): ' + tiempos.join(', '));
     console.log('Guardadas en _to_delete\\flow\\lote' + P.length + '_escena*.jpg');

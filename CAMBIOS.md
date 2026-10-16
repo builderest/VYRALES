@@ -29,6 +29,9 @@
 - **`agente/_qa.js`** — (a) si las casillas dicen "bien" pero la nota describe un defecto ("son cuatro y no tres", "la cámara se aleja") la toma ya NO queda aprobada: queda `revisar` para Franklin (sin rehacerla sola); (b) regla de coherencia en el prompt del juez; (c) las tomas `revisar` y las que agotaron 3 intentos ya no se re-escanean en cada pasada del QA en vivo (era parte del bucle de horas).
 - **EP 34 tomas 19, 36, 79, 89, 107**: action_en/reaction_en/camera reescritos con el contenido B (respaldo de lo anterior en `shot.backup_oct16`), para rehacerlas por el pipeline real y medir el QA.
 
+- **Bucle: el QA rehacía dos veces las tomas "marcadas para rehacer" (`netlify/functions/regen-shot-background.js`).** Al rehacer una toma con éxito nunca se quitaba la marca `clip_stale`, así que el QA la volvía a rehacer en la siguiente pasada (visto esta noche: T19 y T36 se generaron 2 veces). Ahora, al quedar lista, se limpia `clip_stale` de esa toma.
+- **`agente/flow_imagenes.js`** — modo de prueba `prueba_lote` lee los prompts de `_to_delete/flow/prueba_lote_prompts.json` (para probar escenas universales: guerra, explosión, fuego, nave, Luna, Marte, Júpiter, dinosaurio); la detección de "hay personas" ahora incluye astronautas, buzos, investigadores, obreros, tripulación, caballeros y guerreros.
+
 ### 2026-10-16 (sesión Claude Cowork, 2) — tomas con referencias en lote; el QA ya no borra las imágenes que subes tú
 
 - **`agente/flow_imagenes.js`** — nuevo `flowImagesConRefs`: las tomas CON fotos de referencia (caras / lugar fijo) van en UNA ventana, agrupadas por las MISMAS referencias (se suben una vez) y en lotes de 20; lo que no salga va de a una en la misma ventana. `generateBatch` acepta referencias. Prueba (`flow_prueba_ref`, reescrito): la misma cara en 5 escenas distintas, 5/5 en un solo mensaje, 68 s, la misma mujer en todas.
