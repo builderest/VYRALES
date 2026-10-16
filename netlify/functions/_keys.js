@@ -133,6 +133,10 @@ async function resolveFor(sb, ctx, force) {
       continue;
     }
     if (own.vals[n]) { vals[n] = own.vals[n]; src[n] = 'panel'; continue; }
+    // Canal DEL ADMIN (owner_ws = admin, p. ej. MindFuel): usa las claves del admin como su canal principal, sin
+    // préstamo ni créditos (igual que ya usa su Claude y su PC). Antes caía en "falta" → "Falta GOOGLE_AI_API_KEY" al
+    // preparar textos en MindFuel (Franklin, oct-16). Lo propio del canal (página de Facebook, enlace del canal) NO se hereda.
+    if (ws && ws.owner_ws === T.ADMIN_WS && !f.own) { if (adminVal(n)) { vals[n] = adminVal(n); src[n] = 'servidor'; } else src[n] = 'falta'; continue; }
     if (SERVICE[f.service].adminOnly) { if (adminVal(n)) { vals[n] = adminVal(n); src[n] = 'servidor'; } else src[n] = 'falta'; continue; }
     const canBorrow = !f.own && perms[f.service] === true && adminVal(n) && (!SERVICE[f.service].charged || credits > 0);
     if (canBorrow) { vals[n] = adminVal(n); src[n] = 'prestada'; borrowed.add(f.service); }
