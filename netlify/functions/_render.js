@@ -356,7 +356,7 @@ async function renderCard({ cwd, out, lines, seconds, sub }) {
 
 // Cierre sobre la última imagen del episodio: zoom lento, un poco más oscura, texto grande y
 // (si la serie tiene narrador con voz fija) la voz del narrador diciendo el texto.
-async function renderTail({ cwd, from, out, lines, seconds, voice, sub, finger = false }) {
+async function renderTail({ cwd, from, out, lines, seconds, voice, sub, finger = false, verUrl: verUrl0 }) {
   const dur = Math.max(1.5, Math.min(7, voice ? 0.4 + voice.seconds + 0.6 : Number(seconds) || 2.5));
   const png = path.basename(out, '.mp4') + '.png';
   await run(['-y', '-sseof', '-0.15', '-i', from, '-frames:v', '1', '-update', '1', png], cwd);
@@ -366,8 +366,8 @@ async function renderTail({ cwd, from, out, lines, seconds, voice, sub, finger =
   if (lines[1]) events.push({ start: 0.45, end: dur, style: 'EndSmall', text: `{\\pos(${W / 2},${Math.round(H * 0.44) + 125})\\fad(250,0)}` + clean(lines[1]) });
   // URL en PANTALLA debajo del dedo (TikTok/IG/Shorts no dejan enlace clickeable: la escriben). Solo en Shorts que llevan al largo.
   if (finger) {
-    const verUrl = (process.env.PUBLIC_SITE_HOST || 'vyrales.app').replace(/^https?:\/\//, '').replace(/\/$/, '') + '/ver';
-    events.push({ start: 0.6, end: dur, style: 'EndSmall', text: `{\\pos(${W / 2},${Math.round(H * 0.82)})\\fad(250,0)\\b1\\fs52}` + clean(verUrl) });
+    const verUrl = verUrl0 !== undefined ? verUrl0 : (process.env.PUBLIC_SITE_HOST || 'vyrales.app').replace(/^https?:\/\//, '').replace(/\/$/, '') + '/ver';
+    if (verUrl) events.push({ start: 0.6, end: dur, style: 'EndSmall', text: `{\\pos(${W / 2},${Math.round(H * 0.82)})\\fad(250,0)\\b1\\fs52}` + clean(verUrl) });
   }
   const assName = path.basename(out, '.mp4') + '.ass';
   fs.writeFileSync(path.join(cwd, assName), [...assHeader(sub), ...events.map(dialogueLine), ''].join('\n'));
@@ -538,7 +538,12 @@ async function renderEpisode({ episode, series, log = console.log, fetchFile = d
   // Cierre propio de la serie (ej. curiosidades: "Síguenos para más curiosidades"), si el editor no lo cambió.
   const sbEnd = series && series.story_bible && series.story_bible.end_card;
   if (sbEnd && !(episode.edit_plan && episode.edit_plan.end_card)) plan.end_card = Object.assign({}, plan.end_card, sbEnd);
-  if (ctaShort) plan.end_card = { enabled: true, mode: 'tail', text: 'HISTORIA COMPLETA', subtext: 'en el enlace de aquí abajo', voice: '', seconds: 3 };
+  // Cierre del Short POR CANAL (oct-16: MindFuel salía con "HISTORIA COMPLETA · en el enlace de aquí abajo · vyrales.app/ver").
+  // story_bible.short_end_card = { text, subtext, url } (url "" = sin dirección en pantalla). En inglés sin config: FULL VIDEO.
+  const sbAll = (series && series.story_bible) || {};
+  const EN_CH = require('./_pulir').ctasOf(sbAll).lang === 'en';
+  const sec = sbAll.short_end_card || (EN_CH ? { text: 'FULL VIDEO', subtext: 'link below', url: '' } : { text: 'HISTORIA COMPLETA', subtext: 'en el enlace de aquí abajo' });
+  if (ctaShort) plan.end_card = { enabled: true, mode: 'tail', text: sec.text, subtext: sec.subtext, voice: '', seconds: 3 };
   const sub = Object.assign({}, plan.subtitles, { margin_v: Math.min(1150, Math.max(20, Number(plan.subtitles.margin_v) || 180)) });
   // Series con story_bible.subtitle_style = 'poster' (frases motivacionales): texto tipo póster en vez del karaoke.
   if (series && series.story_bible && series.story_bible.subtitle_style === 'poster') { sub.style = 'poster'; sub.karaoke = false; }
@@ -623,7 +628,7 @@ async function renderEpisode({ episode, series, log = console.log, fetchFile = d
       // Voz del cierre: el narrador TTS de la serie (también en modo voz de LTX, que no tiene narrador).
       const cfg = narrationConfig(sbx) || (sbx.narration && sbx.narration.engine === 'ltx' ? Object.assign({}, sbx.narration, { engine: 'gemini_tts' }) : null);
       const voice = cfg && plan.end_card.voice ? await endVoice({ cwd, text: plan.end_card.voice, cfg, log }) : null;
-      const tailArgs = { cwd, from: lastPart.file, out: 'p99-end.mp4', lines: [plan.end_card.text, plan.end_card.subtext], seconds: plan.end_card.seconds, voice, sub, finger: ctaShort };
+      const tailArgs = { cwd, from: lastPart.file, out: 'p99-end.mp4', lines: [plan.end_card.text, plan.end_card.subtext], seconds: plan.end_card.seconds, voice, sub, finger: ctaShort, verUrl: ctaShort ? sec.url : undefined };
       let t;
       try { t = await renderTail(tailArgs); }
       catch (e) { log('cierre con dedo falló (' + String(e.message).slice(0, 100) + ') → sin dedo'); t = await renderTail(Object.assign({}, tailArgs, { finger: false })); }
