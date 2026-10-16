@@ -65,7 +65,8 @@ function longTexts({ episode, cont, out, tags, lineShots, ordered, lockedTitle, 
   const AI = EN ? AI_DISCLOSURE_EN : AI_DISCLOSURE;
   const starts = shotStartTimes(episode, ordered);
   const en = cont.english || {};
-  const strip = (t) => String(t || '').split('\n').filter((l) => !/^\s*(Cap[ií]tulos|Chapters)\s*:/i.test(l) && !/comentario fijado|pinned comment/i.test(l)).join('\n').trim();
+  // También se quitan líneas de capítulos con tiempos escritos a mano en el guion ("01:10 The Waiting Room"): los tiempos REALES se ponen abajo.
+  const strip = (t) => String(t || '').split('\n').filter((l) => !/^\s*(Cap[ií]tulos|Chapters)\s*:/i.test(l) && !/comentario fijado|pinned comment/i.test(l) && !/^\s*\d{1,2}:\d{2}(:\d{2})?\s+\S/.test(l)).join('\n').trim();
   const chES = chapterLines(out, lineShots, starts, 'es');
   const chEN = chapterLines(out, lineShots, starts, 'en');
   const sources = Array.isArray(cont.sources) ? cont.sources.map(String).filter(Boolean) : [];
@@ -79,14 +80,15 @@ function longTexts({ episode, cont, out, tags, lineShots, ordered, lockedTitle, 
     part: '',
     tiktok: [String(out.tiktok_caption || '').trim(), AI, tags.slice(0, 5).join(' ')].filter(Boolean).join('\n'),
     instagram: join([String(out.instagram_caption || '').trim(), '', AI, '', tags.join(' ')]),
-    youtube_title: longTitle(lockedTitle || out.youtube_title || episode.title),
+    youtube_title: longTitle(lockedTitle || (EN ? out.youtube_title_en || out.youtube_title : out.youtube_title) || episode.title),
     // Canal en inglés: la descripción principal también va en inglés (no hay versión en español).
-    youtube: EN ? join([descEN || descES, '', chEN.length ? 'Chapters:' : '', ...chEN, '', sources.length ? '📚 Sources are in the pinned comment.' : '', '', AI, '', tagLine]) : join([descES, '', chES.length ? 'Capítulos:' : '', ...chES, '', sources.length ? '📚 Todas las fuentes científicas están en el comentario fijado.' : '', '', AI_DISCLOSURE, '', tagLine]),
+    youtube: EN ? join([descEN || descES, '', chEN.length ? 'Chapters:' : '', ...chEN, '', AI, '', tagLine]) : join([descES, '', chES.length ? 'Capítulos:' : '', ...chES, '', sources.length ? '📚 Todas las fuentes científicas están en el comentario fijado.' : '', '', AI_DISCLOSURE, '', tagLine]),
     youtube_title_en: longTitle(en.title || out.youtube_title_en || out.youtube_title),
     youtube_en: join([descEN, '', chEN.length ? 'Chapters:' : '', ...chEN, '', sources.length ? '📚 All scientific sources are in the pinned comment.' : '', '', '🤖 AI-made recreation (images and voice) for educational purposes, based on scientific evidence.', '', tagLine]),
     chapters_es: chES, chapters_en: chEN,
     hashtags: tags,
-    pinned_comment: sources.length ? ['📚 Fuentes científicas / Scientific sources:', ...sources.map((x, i) => (i + 1) + '. ' + x)].join('\n') : String(out.pinned_comment || '').trim(),
+    // Canal en inglés (motivación): el comentario fijado es la pregunta para comentar, no una lista de fuentes.
+    pinned_comment: EN ? String(out.pinned_comment || '').trim() : sources.length ? ['📚 Fuentes científicas / Scientific sources:', ...sources.map((x, i) => (i + 1) + '. ' + x)].join('\n') : String(out.pinned_comment || '').trim(),
     ai_disclosure: AI,
     landscape: true
   };
@@ -166,7 +168,7 @@ async function writeTexts({ series, episode, totalEpisodes }) {
     part,
     tiktok: [String(out.tiktok_caption || '').trim(), ctaLong ? CTA : '', part, AI, tags.slice(0, 5).join(' ')].filter(Boolean).join('\n'),
     instagram: [String(out.instagram_caption || '').trim(), ctaLong ? '\n' + CTA : '', '', single ? '' : part + (out.next_hook ? ' · ' + String(out.next_hook).trim() : ''), '', AI, '', tags.join(' ')].filter((x, i, a) => x !== '' || a[i - 1] !== '').join('\n'),
-    youtube_title: youtubeTitle(lockedTitle || out.youtube_title || out.cover_text || episode.title, part),
+    youtube_title: youtubeTitle(lockedTitle || (EN ? out.youtube_title_en : '') || out.youtube_title || out.cover_text || episode.title, part),
     youtube: [String(out.instagram_caption || '').trim(), '', single ? '' : part + (out.next_hook ? ' · ' + String(out.next_hook).trim() : ''), '', AI, '', ['#Shorts'].concat(tags.slice(0, 6)).join(' ')].filter((x, i, a) => x !== '' || a[i - 1] !== '').join('\n'),
     // Inglés (Franklin, oct-11: títulos y descripciones en los DOS idiomas en YouTube; YouTube muestra el de su idioma).
     youtube_title_en: youtubeTitle(String(out.youtube_title_en || '').trim() || lockedTitle || out.youtube_title || episode.title, single ? '' : `Part ${episode.episode_number}/${totalEpisodes}`),

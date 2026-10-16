@@ -39,6 +39,27 @@ function ytCreds(platform) {
   }
   return { id: need('YOUTUBE_CLIENT_ID'), secret: need('YOUTUBE_CLIENT_SECRET') };
 }
+// Renovar el permiso de YouTube probando el proyecto que le toca y, si Google dice "unauthorized_client" (el permiso
+// se dio con el OTRO proyecto de Google Cloud), con el otro. Caso real oct-16: MindFuel se conectó el 13-oct con el
+// proyecto 1; el 15-oct los canales no-admin pasaron al proyecto 2 y desde entonces su permiso no se podía renovar.
+async function refreshYoutube(acc, platform = 'youtube') {
+  const first = ytCreds(platform);
+  const all = [first];
+  const p1 = process.env.YOUTUBE_CLIENT_ID ? { id: process.env.YOUTUBE_CLIENT_ID, secret: process.env.YOUTUBE_CLIENT_SECRET } : null;
+  const p2 = process.env.YOUTUBE_CLIENT_ID_2 ? { id: process.env.YOUTUBE_CLIENT_ID_2, secret: process.env.YOUTUBE_CLIENT_SECRET_2 } : null;
+  for (const c of [p1, p2]) if (c && c.id && c.secret && !all.some((x) => x.id === c.id)) all.push(c);
+  let lastErr = null;
+  for (const c of all) {
+    const { res, body } = await jsonFetch('https://oauth2.googleapis.com/token', {
+      method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ client_id: c.id, client_secret: c.secret, grant_type: 'refresh_token', refresh_token: acc.refresh_token })
+    });
+    if (res.ok && body.access_token) return body;
+    lastErr = new Error('Google no dio el token: ' + JSON.stringify(body).slice(0, 300));
+    if (!/unauthorized_client/.test(JSON.stringify(body))) break; // otro error (permiso revocado/vencido): no sirve probar el otro proyecto
+  }
+  throw lastErr;
+}
 // Detecta "se acabó la cuota" en el mensaje de error de una llamada a la API de YouTube.
 function isQuotaError(err) {
   return /quotaExceeded|dailyLimitExceeded|rateLimitExceeded|youtube\.quota|exceeded your.{0,15}quota/i.test(String((err && err.message) || err || ''));
@@ -443,7 +464,7 @@ async function youtubeAccessToken(supabase, platform = 'youtube') {
   if (!acc) throw new Error(platform === 'youtube_backup' ? 'El respaldo de YouTube no está conectado.' : 'YouTube no está conectado. Dale "Conectar YouTube".');
   if (acc.expires_at && new Date(acc.expires_at).getTime() - Date.now() > 5 * 60000) return acc.access_token;
   let t;
-  try { t = await googleToken({ grant_type: 'refresh_token', refresh_token: acc.refresh_token }, platform); }
+  try { t = await refreshYoutube(acc, platform); }
   catch (err) { throw new Error('El permiso de YouTube venció (' + err.message.slice(0, 120) + '). Si la app de Google está en modo "Testing" caduca a los 7 días: ponla "In production" y vuelve a conectar.'); }
   await saveAccount(supabase, Object.assign({}, acc, { access_token: t.access_token, expires_at: new Date(Date.now() + (t.expires_in || 3600) * 1000).toISOString() }));
   return t.access_token;
@@ -496,4 +517,4 @@ async function youtubePlaylists(supabase) {
     return (j.items || []).map((p) => ({ id: p.id, title: p.snippet.title }));
   });
 }
-module.exports = { youtubeAccessToken, youtubeAddToPlaylist, youtubePlaylists, tiktokAuthUrl, tiktokConnect, tiktokSendDraft, tiktokCreatorInfo, tiktokDirectPost, ttDirect, metaAuthUrl, metaConnect, instagramPublishReel, facebookPublishReel, youtubeAuthUrl, youtubeConnect, youtubeUpload, checkState, stateProblem, getAccount, REDIRECT, ytCreds, withYoutubeFallback, isQuotaError };
+module.exports = { refreshYoutube, youtubeAccessToken, youtubeAddToPlaylist, youtubePlaylists, tiktokAuthUrl, tiktokConnect, tiktokSendDraft, tiktokCreatorInfo, tiktokDirectPost, ttDirect, metaAuthUrl, metaConnect, instagramPublishReel, facebookPublishReel, youtubeAuthUrl, youtubeConnect, youtubeUpload, checkState, stateProblem, getAccount, REDIRECT, ytCreds, withYoutubeFallback, isQuotaError };
