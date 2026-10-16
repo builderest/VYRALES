@@ -31,10 +31,29 @@ function loadPlaywright() {
 }
 
 // visible=false → ventana fuera de pantalla (en segundo plano, sigue siendo Chrome real).
+// CANDADO entre procesos (oct-16): el perfil de Chrome de Flow solo lo puede abrir UN proceso a la vez. La fila de Flow
+// ya va de a uno, pero otros trabajos también usan Flow (rehacer tomas, portadas con IA) y si coincidían el segundo
+// fallaba con "No pude abrir Chrome ni Edge". Ahora el segundo ESPERA (hasta 20 min) a que el primero cierre.
+const LOCK = () => path.join(OUT, 'flow.lock');
+const alive = (pid) => { try { process.kill(pid, 0); return true; } catch (e) { return e.code === 'EPERM'; } };
+async function takeFlowLock(log = console.log) {
+  const t0 = Date.now(); let said = false;
+  for (;;) {
+    try { fs.writeFileSync(LOCK(), JSON.stringify({ pid: process.pid, at: Date.now() }), { flag: 'wx' }); return; } catch (_) {}
+    let cur = null; try { cur = JSON.parse(fs.readFileSync(LOCK(), 'utf8')); } catch (_) {}
+    if (!cur || cur.pid === process.pid || !alive(cur.pid) || Date.now() - cur.at > 60 * 60000) { try { fs.unlinkSync(LOCK()); } catch (_) {} continue; }
+    if (Date.now() - t0 > 20 * 60000) throw new Error('Flow está ocupado por otro trabajo hace más de 20 min (pid ' + cur.pid + ').');
+    if (!said) { log('Flow: otro trabajo está usando Chrome de Flow → espero a que termine...'); said = true; }
+    await new Promise((r) => setTimeout(r, 5000));
+  }
+}
+function dropFlowLock() { try { const cur = JSON.parse(fs.readFileSync(LOCK(), 'utf8')); if (cur.pid === process.pid) fs.unlinkSync(LOCK()); } catch (_) {} }
+process.on('exit', dropFlowLock);
 async function openFlow(visible) {
   const { chromium } = loadPlaywright();
   fs.mkdirSync(PROFILE, { recursive: true });
   fs.mkdirSync(OUT, { recursive: true });
+  await takeFlowLock();
   let ctx = null;
   for (const channel of ['chrome', 'msedge']) {
     try {
@@ -43,7 +62,8 @@ async function openFlow(visible) {
       break;
     } catch (e) { console.log('No pude abrir', channel, '→', String(e.message).split('\n')[0]); }
   }
-  if (!ctx) throw new Error('No pude abrir Chrome ni Edge');
+  if (!ctx) { dropFlowLock(); throw new Error('No pude abrir Chrome ni Edge'); }
+  const close0 = ctx.close.bind(ctx); ctx.close = async (...a) => { try { return await close0(...a); } finally { dropFlowLock(); } };
   const page = ctx.pages()[0] || (await ctx.newPage());
   return { ctx, page };
 }

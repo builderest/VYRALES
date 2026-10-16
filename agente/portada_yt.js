@@ -36,7 +36,8 @@ async function compose(cwd,{img,text,hl,side,W,H,out}){
 (async()=>{const [epId,vid0]=process.argv.slice(2);
 const sb=require(F+'/_supabase').getSupabaseClient();
 const {data:ep}=await sb.from('episodes').select('*, assets(*)').eq('id',epId).single();
-const cont=ep.continuity||{};const land=cont.kind==='largo';const W=land?1280:1080,H=land?720:1920;
+const cont=ep.continuity||{};const land=cont.kind==='largo';
+const {data:serie0}=await sb.from('series').select('story_bible').eq('id',ep.series_id).single();const EN=require(F+'/_pulir').ctasOf(serie0&&serie0.story_bible).lang==='en';const W=land?1280:1080,H=land?720:1920;
 const imgs=require(F+'/_assets').latestPerShot((ep.assets||[]).filter((a)=>a.kind==='image'&&a.storage_path&&a.shot_number!=null),['image']).filter((a)=>a.kind==='image').sort((a,b)=>a.shot_number-b.shot_number);
 if(!imgs.length)throw new Error('El episodio no tiene cuadros.');
 const cwd=fs.mkdtempSync(path.join(os.tmpdir(),'vy-portada-'));fs.mkdirSync(path.join(cwd,'fonts'));fs.copyFileSync(findFont(),path.join(cwd,'fonts',FONT_FILE));
@@ -56,28 +57,41 @@ ${narr.slice(0,9000)}
 Elige las 2 tomas MÁS ÉPICAS para la portada: un solo sujeto claro y grande, drama, escala, contraste, colores fuertes, que se entienda en miniatura chiquita del celular, que muestre de qué trata el video (el tema PRINCIPAL, no una comparación con otro caso ni un detalle cualquiera), sin caras deformes ni texto inventado. DESCARTA cualquier cuadro con algo que no corresponde a la época de la historia (barcos, edificios, ropa o máquinas modernas en una escena prehistórica, etc.), salvo que la narración de esa toma lo mencione.
 Escribe el TEXTO de la portada: 2 a 4 palabras en MAYÚSCULAS que den curiosidad y NO repitan el título palabra por palabra (ej. "CASI NOS BORRA", "¿EL FIN HUMANO?"). Marca 1 palabra para destacar en amarillo. Y la versión en inglés natural (2–4 palabras).
 Para cada toma di en qué lado está el sujeto ("left","right","center") para poner el texto en el lado contrario.
-Responde SOLO JSON: {"tomas":[{"n":12,"subject_side":"right","why":"..."},{"n":40,"subject_side":"left","why":"..."}],"text_es":"...","highlight_es":["..."],"text_en":"...","highlight_en":["..."]}`;
+ADEMÁS (Franklin, oct-16: "una portada que llame MUCHO la atención, hecha con IA, que exagere, que haga que la gente entre"): escribe 2 prompts en inglés para generar con IA una imagen NUEVA de portada, NO un cuadro del video. Estilo miniatura viral de YouTube: UN sujeto enorme y dramático que se entiende en miniatura, emoción extrema o escala exagerada (algo gigantesco, a punto de pasar, en el momento más intenso), contraste fuerte, luz de contraluz/rim light, colores saturados (naranja/azul, rojo/negro), fondo simple y oscuro, profundidad de campo corta, y un lado del cuadro LIBRE (oscuro y vacío) para poner el texto. Exagera lo visual, pero que sea el tema REAL del video (nada que el video no cuente, ni personas reales identificables, ni sangre). Sin letras, logos ni texto dentro de la imagen. ${land?'Formato horizontal 16:9.':'Formato vertical 9:16, sujeto en la mitad de abajo y el espacio libre ARRIBA.'}
+Responde SOLO JSON: {"tomas":[{"n":12,"subject_side":"right","why":"..."},{"n":40,"subject_side":"left","why":"..."}],"text_es":"...","highlight_es":["..."],"text_en":"...","highlight_en":["..."],"ai":[{"prompt":"...","subject_side":"right"},{"prompt":"...","subject_side":"left"}]}`;
 const j=parseJson(await runClaude(p1,{files:sheets.map((x)=>({name:x,buffer:fs.readFileSync(path.join(cwd,x))})),timeoutMin:10,log:console.log}));
 const picks=(j.tomas||[]).filter((t)=>byShot[t.n]).slice(0,2);
 if(!picks.length)throw new Error('Claude no eligió tomas válidas: '+JSON.stringify(j).slice(0,200));
 console.log('Elegidas:',picks.map((t)=>t.n+' ('+t.why+')').join(' | '),'· texto:',j.text_es,'/',j.text_en);
 const sideFor=(t)=>t.subject_side==='left'?'right':'left';
+// Texto principal: el idioma del canal (MindFuel = inglés).
+const T1=EN?(j.text_en||j.text_es):j.text_es, H1=EN?j.highlight_en:j.highlight_es;
 const cands=[];
-for(const t of picks){const out='cand'+t.n+'.jpg';await compose(cwd,{img:byShot[t.n],text:j.text_es,hl:j.highlight_es,side:sideFor(t),W,H,out});cands.push({t,out});}
+for(const t of picks){const out='cand'+t.n+'.jpg';await compose(cwd,{img:byShot[t.n],text:T1,hl:H1,side:sideFor(t),W,H,out});cands.push({img:byShot[t.n],side:sideFor(t),out,shot:t.n,kind:'cuadro'});}
+// Portadas con IA (Flow, $0): imagen nueva exagerada hecha SOLO para la portada. Si Flow falla o no hay cuota, quedan los cuadros.
+if(process.env.VYRALES_PORTADA_IA!=='0'&&Array.isArray(j.ai)&&j.ai.length){
+  try{
+    const {flowImages}=require('./flow_imagenes');
+    const ai=j.ai.filter((x)=>x&&x.prompt).slice(0,2);
+    console.log('Portada con IA: generando',ai.length,'imagen(es) en Flow...');
+    const r=await flowImages(ai.map((x)=>x.prompt),console.log,null,{aspect:land?'16:9':'9:16'});
+    for(const [k,x] of (r||[]).entries()){if(!x||!x.buffer)continue;const img=path.join(cwd,'ai'+k+'.jpg');fs.writeFileSync(img,x.buffer);const out='candIA'+k+'.jpg';await compose(cwd,{img,text:T1,hl:H1,side:sideFor(ai[k]),W,H,out});cands.push({img,side:sideFor(ai[k]),out,shot:null,kind:'ia',prompt:ai[k].prompt});}
+  }catch(e){console.log('Portada con IA: no se pudo ('+String(e.message).slice(0,140)+') → sigo con los cuadros del video');}
+}
 let win=cands[0];
 if(cands.length>1){
-  const p2=`Eres el mejor diseñador de miniaturas de YouTube. Lee ${cands.map((c)=>c.out).join(' y ')}: son 2 portadas candidatas del mismo video ("${ep.title||''}").
-¿Cuál consigue MÁS clics en el celular (se entiende en chiquito, texto legible, sujeto claro, drama)? Si el texto tapa el sujeto o no se lee, esa pierde.
+  const p2=`Eres el mejor diseñador de miniaturas de YouTube. Lee ${cands.map((c)=>c.out).join(', ')}: son ${cands.length} portadas candidatas del mismo video ("${ep.title||''}").
+¿Cuál consigue MÁS clics en el celular (se entiende en chiquito, texto legible, sujeto claro, drama, curiosidad)? Si el texto tapa el sujeto, no se lee, o la imagen tiene letras raras, caras deformes o no tiene que ver con el video, esa pierde.
 Responde SOLO JSON: {"mejor":"${cands[0].out}","por_que":"..."}`;
-  try{const k=parseJson(await runClaude(p2,{files:cands.map((c)=>({name:c.out,buffer:fs.readFileSync(path.join(cwd,c.out))})),timeoutMin:6,log:console.log}));win=cands.find((c)=>c.out===k.mejor)||win;console.log('Ganadora:',win.out,'·',k.por_que);}catch(e){console.log('no pude comparar ('+e.message.slice(0,80)+') → uso la primera');}
+  try{const k=parseJson(await runClaude(p2,{files:cands.map((c)=>({name:c.out,buffer:fs.readFileSync(path.join(cwd,c.out))})),timeoutMin:6,log:console.log}));win=cands.find((c)=>c.out===k.mejor)||win;console.log('Ganadora:',win.out,'('+win.kind+') ·',k.por_que);}catch(e){console.log('no pude comparar ('+e.message.slice(0,80)+') → uso la primera');}
 }
-await compose(cwd,{img:byShot[win.t.n],text:j.text_en||j.text_es,hl:j.highlight_en,side:sideFor(win.t),W,H,out:'portada_en.jpg'});
+await compose(cwd,{img:win.img,text:EN?T1:(j.text_en||j.text_es),hl:EN?H1:j.highlight_en,side:win.side,W,H,out:'portada_en.jpg'});
 const {uploadFile}=require(F+'/_storage');const {data:se}=await sb.from('series').select('slug').eq('id',ep.series_id).single();
 const base=`${se.slug}/ep${ep.episode_number}/portada-yt-${Date.now()}`;
 // YouTube acepta portadas de hasta 2 MB: si pasa, se baja la calidad del jpg.
 for(const f of [win.out,'portada_en.jpg']){for(let q=4;q<=12&&fs.statSync(path.join(cwd,f)).size>1.9e6;q+=2){await ff(['-i',f,'-q:v',String(q),'r_'+f],cwd);fs.renameSync(path.join(cwd,'r_'+f),path.join(cwd,f));}}
 const esBuf=fs.readFileSync(path.join(cwd,win.out)),enBuf=fs.readFileSync(path.join(cwd,'portada_en.jpg'));
-const thumb={shot:win.t.n,text_es:j.text_es,text_en:j.text_en,es_url:await uploadFile(sb,{path:base+'-es.jpg',buffer:esBuf,contentType:'image/jpeg'}),en_url:await uploadFile(sb,{path:base+'-en.jpg',buffer:enBuf,contentType:'image/jpeg'}),at:new Date().toISOString()};
+const thumb={shot:win.shot,kind:win.kind,ai_prompt:win.prompt||null,text_es:j.text_es,text_en:j.text_en,es_url:await uploadFile(sb,{path:base+'-es.jpg',buffer:esBuf,contentType:'image/jpeg'}),en_url:await uploadFile(sb,{path:base+'-en.jpg',buffer:enBuf,contentType:'image/jpeg'}),at:new Date().toISOString()};
 const {data:fr}=await sb.from('episodes').select('continuity').eq('id',epId).single();
 await sb.from('episodes').update({continuity:Object.assign({},fr.continuity||{},{thumbnail:thumb})}).eq('id',epId);
 console.log('Portada ES:',thumb.es_url);console.log('Portada EN:',thumb.en_url);
