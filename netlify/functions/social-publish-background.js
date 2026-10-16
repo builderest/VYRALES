@@ -67,14 +67,18 @@ async function runPublishIn({ supabase, epId, platform, privacy, loadVideo, qual
       const yt = ((pvr.published || {}).youtube) || ((pvr.social_runs || {}).youtube) || {};
       const longUrl = yt.url || (yt.video_id ? 'https://youtu.be/' + yt.video_id : '');
       if (longUrl) {
-        const line = '👉 Historia completa: ' + longUrl;
+        const { data: serX } = await supabase.from('series').select('story_bible').eq('id', ep.series_id).single();
+        const EN = require('./_pulir').ctasOf(serX && serX.story_bible).lang === 'en'; // canal en inglés (MindFuel)
+        const line = (EN ? '👉 Full video: ' : '👉 Historia completa: ') + longUrl;
         // Instagram y TikTok NO convierten en enlace lo que va en el texto (HECHO): ahí se manda al enlace del perfil,
         // que apunta a vyrales.app/ver (siempre muestra los largos públicos). Facebook y YouTube sí llevan el enlace directo.
         const SITE = (process.env.PUBLIC_SITE_HOST || 'vyrales.app') + '/ver';
-        const lineBio = '👉 Historia completa: toca el enlace de mi perfil (' + SITE + ')';
+        const lineBio = EN ? '👉 Full video: tap the link in my profile' : '👉 Historia completa: toca el enlace de mi perfil (' + SITE + ')';
         const add = (t, ln = line) => { t = String(t || ''); if (!t || t.includes(longUrl) || t.includes(SITE)) return t; const i = t.indexOf('👇'); if (i < 0) return ln + '\n' + t; const end = t.indexOf('\n', i); return end < 0 ? t + '\n' + ln : t.slice(0, end) + '\n' + ln + t.slice(end); };
-        pk = Object.assign({}, pk, { tiktok: add(pk.tiktok, lineBio), instagram: add(pk.instagram, lineBio), facebook: add(pk.facebook || pk.instagram), youtube: add(pk.youtube, '▶ Historia completa: toca el video relacionado (arriba del título)'),
-          pinned_comment: String(pk.pinned_comment || '').replace(/\(pega aquí el enlace del video largo\)/, longUrl) || line });
+        pk = Object.assign({}, pk, { tiktok: add(pk.tiktok, lineBio), instagram: add(pk.instagram, lineBio), facebook: add(pk.facebook || pk.instagram), youtube: add(pk.youtube, EN ? '▶ Full video: tap the related video (above the title)' : '▶ Historia completa: toca el video relacionado (arriba del título)'),
+          pinned_comment: require('./_social').withLongLink(pk.pinned_comment, longUrl) || line });
+        // Se GUARDA el comentario ya con el enlace (antes solo se cambiaba en memoria y al hacerse público se publicaba el hueco).
+        try { const { data: fr0 } = await supabase.from('episodes').select('validator_report').eq('id', ep.id).single(); const v0 = Object.assign({}, fr0.validator_report || {}); v0.publish_package = Object.assign({}, v0.publish_package || {}, { pinned_comment: pk.pinned_comment }); await supabase.from('episodes').update({ validator_report: v0 }).eq('id', ep.id); } catch (_) {}
         log('enlace al video largo agregado a los textos:', longUrl);
         if (yt.privacy === 'private' || /uploaded_private/.test(String(yt.status || ''))) log('AVISO: el video largo sigue en PRIVADO en YouTube; el enlace no funcionará para el público hasta que lo hagas público.');
       } else log('AVISO: el video largo todavía no está en YouTube → este Short sale sin enlace (súbelo primero).');
@@ -112,7 +116,10 @@ async function runPublishIn({ supabase, epId, platform, privacy, loadVideo, qual
         } catch (e) { log('YouTube: subtítulos no subidos (' + String(e.message).slice(0, 160) + ') → se pueden subir con "subtitulos:<ep>"'); }
       }
       // Documental largo: las fuentes van como comentario (la API no deja FIJARLO: se fija a mano en Studio con 1 clic).
-      if ((pk.landscape || parentId) && pk.pinned_comment) { // largo: fuentes · Short del largo: enlace a la historia completa
+      // Con el video PRIVADO YouTube rechaza el comentario (403): se publica solo cuando lo hagas público (agente/_yt_sync.js).
+      // Tampoco se publica si todavía tiene el hueco sin enlace.
+      if (r.privacy === 'private') log('YouTube: el comentario fijado se publica solo cuando hagas PÚBLICO el video');
+      else if ((pk.landscape || parentId) && pk.pinned_comment && !require('./_social').LONG_LINK_PH.test(pk.pinned_comment)) { // largo: fuentes · Short del largo: enlace a la historia completa
         try {
           const tk = await require('./_social').youtubeAccessToken(supabase);
           const cr = await fetch('https://www.googleapis.com/youtube/v3/commentThreads?part=snippet', { method: 'POST', headers: { Authorization: `Bearer ${tk}`, 'Content-Type': 'application/json' },

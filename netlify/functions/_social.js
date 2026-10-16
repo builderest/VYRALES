@@ -60,6 +60,18 @@ async function refreshYoutube(acc, platform = 'youtube') {
   }
   throw lastErr;
 }
+// ENLACE AL VIDEO LARGO en el comentario del Short (oct-16, Franklin: "dice que haga click aquí en el link del comentario
+// pero el link no sale"). El paquete guarda un hueco "(pega aquí el enlace del video largo)"; se llena con el enlace REAL
+// del largo en YouTube. Si el largo todavía no está en YouTube, el hueco NO se publica.
+const LONG_LINK_PH = /\((pega aquí el enlace del video largo|paste the link to the long video)\)/i;
+async function longVideoUrl(supabase, parentId) {
+  if (!parentId) return '';
+  const { data: par } = await supabase.from('episodes').select('validator_report').eq('id', parentId).single();
+  const pvr = (par && par.validator_report) || {};
+  const yt = ((pvr.published || {}).youtube) || ((pvr.social_runs || {}).youtube) || {};
+  return yt.url || (yt.video_id ? 'https://youtu.be/' + yt.video_id : '');
+}
+const withLongLink = (text, url) => (url ? String(text || '').replace(LONG_LINK_PH, url) : String(text || ''));
 // Detecta "se acabó la cuota" en el mensaje de error de una llamada a la API de YouTube.
 function isQuotaError(err) {
   return /quotaExceeded|dailyLimitExceeded|rateLimitExceeded|youtube\.quota|exceeded your.{0,15}quota/i.test(String((err && err.message) || err || ''));
@@ -517,4 +529,4 @@ async function youtubePlaylists(supabase) {
     return (j.items || []).map((p) => ({ id: p.id, title: p.snippet.title }));
   });
 }
-module.exports = { refreshYoutube, youtubeAccessToken, youtubeAddToPlaylist, youtubePlaylists, tiktokAuthUrl, tiktokConnect, tiktokSendDraft, tiktokCreatorInfo, tiktokDirectPost, ttDirect, metaAuthUrl, metaConnect, instagramPublishReel, facebookPublishReel, youtubeAuthUrl, youtubeConnect, youtubeUpload, checkState, stateProblem, getAccount, REDIRECT, ytCreds, withYoutubeFallback, isQuotaError };
+module.exports = { LONG_LINK_PH, longVideoUrl, withLongLink, refreshYoutube, youtubeAccessToken, youtubeAddToPlaylist, youtubePlaylists, tiktokAuthUrl, tiktokConnect, tiktokSendDraft, tiktokCreatorInfo, tiktokDirectPost, ttDirect, metaAuthUrl, metaConnect, instagramPublishReel, facebookPublishReel, youtubeAuthUrl, youtubeConnect, youtubeUpload, checkState, stateProblem, getAccount, REDIRECT, ytCreds, withYoutubeFallback, isQuotaError };
