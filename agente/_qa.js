@@ -120,10 +120,11 @@ Para cada toma decide (sé justo: marca false solo si el problema se ve claro):
 - evidence: en una frase, qué parte del SUJETO PRINCIPAL comparaste y cómo estaba en la primera y en la última imagen.
 - haze: aparece humo, neblina o bruma blanca que NO tiene que ver con la narración (true = problema).
 - broken: algo deforme, caras o manos rotas, letras/texto inventado, cosas que aparecen o desaparecen (true = problema).
+- minor: true si TODOS los problemas que viste son MENORES: solo cambia algo del FONDO mientras la cámara se mueve (aparece otra lámpara, un árbol, un muro cambia), o se deforma un detalle CHICO y secundario (una antena, la lámpara de un casco, ramas, un objeto al costado), y el SUJETO PRINCIPAL se mantiene igual y se ve bien, sin saltar a otra escena. Es false si cambia o se deforma el sujeto principal, cambia de lugar entero, cambian las personas, hay caras/manos rotas o se ve feo a simple vista. (Franklin aprueba a mano estas tomas con detalles menores.)
 - MISMO LUGAR (oct-14): compara la PRIMERA y la ÚLTIMA imagen. Si el lugar se convirtió en otro (un pozo que pasa a ser un túnel, una celda que pasa a ser otra celda, las luces de un edificio que desaparecen, la noche que se vuelve atardecer, una pila de objetos que se derrumba sola), eso es broken = true aunque cada imagen se vea bien por separado. Pon en reason "cambia de lugar".
 - reason: una frase corta en español con lo que viste (vacío si todo bien).
 - COHERENCIA (oct-16): si en reason describes un defecto (personas de más o de menos, objeto distinto, cámara que se va, acción que no ocurre, gesto que no se pidió), la casilla que corresponde DEBE ir en false. reason vacío si todo está bien.
-Responde SOLO este JSON: {"tomas":[{"n":1,"image_ok":true,"style_ok":true,"action_ok":true,"haze":false,"broken":false,"evidence":"","reason":""}]}`;
+Responde SOLO este JSON: {"tomas":[{"n":1,"image_ok":true,"style_ok":true,"action_ok":true,"haze":false,"broken":false,"minor":false,"evidence":"","reason":""}]}`;
     try {
       const j = parseJson(await runClaude(prompt, { files, timeoutMin: 8, log }));
       for (const t of (j.tomas || [])) if (t && t.n != null) out[Number(t.n)] = t;
@@ -273,6 +274,9 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
       // mayoría se ve bien en el video (T15, T24, T41…) y rehacerla arriesga empeorarla. Si no hay imagen equivocada ni
       // nada roto/deforme, se acepta con nota (queda como evidencia para el cerebro). VYRALES_QA_ESTRICTO=1 lo desactiva.
       const leve = bad && !forced && process.env.VYRALES_QA_ESTRICTO !== '1' && r.image_ok !== false && r.style_ok !== false && r.broken !== true && (r.action_ok === false) !== (r.haze === true);
+      // oct-16 (revisión de las aprobaciones de Franklin: de 20 que aprobó a mano, el QA decía "mal" en 15): problemas solo de
+      // fondo o de un detalle chico con el sujeto principal bien → se acepta con nota, no se rehace (rehacer arriesga empeorarla).
+      const menor = bad && !forced && process.env.VYRALES_QA_ESTRICTO !== '1' && r.minor === true && r.style_ok !== false;
       // Hasta 3 intentos por toma; en TODOS Claude reescribe cámara/acción/final con lo que vio el QA (repetir el mismo
       // prompt daba el mismo error, ej. T6 Toba). Imagen nueva si no cuadra o desde el 2º intento (solo sin personajes).
       // Después de 3 queda para revisión humana.
@@ -294,9 +298,9 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
       }
       if (contradice) log(`QA visual toma ${it.sh.n}: las casillas dicen "bien" pero la nota describe un problema (${String(r.reason).slice(0, 140)}) → queda para que la revises`);
       // revisar: queda para Franklin y ya NO se re-escanea en cada pasada (antes el QA en vivo miraba las mismas tomas una y otra vez).
-      qaOf[it.sh.n] = { clip_id: it.clip.id, ok: (!bad || leve) && !contradice, revisar: (contradice || (bad && !leve && already)) || undefined, leve: leve || undefined, image_ok: r.image_ok !== false, style_ok: r.style_ok !== false, action_ok: r.action_ok !== false, haze: !!r.haze, broken: !!r.broken, reason: String(r.reason || '').slice(0, 300), at: new Date().toISOString(), redone: tries > 0, tries };
+      qaOf[it.sh.n] = { clip_id: it.clip.id, ok: (!bad || leve || menor) && !contradice, revisar: (contradice || (bad && !leve && !menor && already)) || undefined, leve: (leve || menor) || undefined, image_ok: r.image_ok !== false, style_ok: r.style_ok !== false, action_ok: r.action_ok !== false, haze: !!r.haze, broken: !!r.broken, reason: String(r.reason || '').slice(0, 300), at: new Date().toISOString(), redone: tries > 0, tries };
       ev0.push({ ep: epId, n: it.sh.n, clip: it.clip.id, try: tries, src: 'qa', verdict: r, reason: r.reason, shot: it.sh });
-      if (leve) log(`QA visual toma ${it.sh.n}: detalle leve (${r.reason || ''}) → se acepta sin rehacer`);
+      if (leve || menor) log(`QA visual toma ${it.sh.n}: detalle ${menor ? 'menor' : 'leve'} (${r.reason || ''}) → se acepta sin rehacer`);
       else if (bad && !already) {
         const freeFrame = !(it.sh.characters || []).length; // cuadro nuevo solo por el camino gratis (Flow/FLUX)
         // Franklin (oct-11): si se rehace con el MISMO prompt, sale el mismo error → SIEMPRE se reescribe el prompt
@@ -400,7 +404,7 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
         clipId = clip ? clip.id : clipId;
         const res3 = await visionReview([{ sh: shNow, clip, url: clip && clip.storage_path, dur: clip ? await durationOf(clip.storage_path) : 0 }], log);
         const vr = res3[t.n] || {};
-        const ok = !(vr.image_ok === false || vr.style_ok === false || vr.action_ok === false || vr.haze === true || vr.broken === true);
+        const ok = !(vr.image_ok === false || vr.style_ok === false || vr.action_ok === false || vr.haze === true || vr.broken === true) || (vr.minor === true && vr.style_ok !== false && process.env.VYRALES_QA_ESTRICTO !== '1');
         attempts.push({ try: tries, at: new Date().toISOString(), mode: dec.mode, newFrame: !!dec.newFrame, verdict: pickV(vr), reason: ok ? '' : String(vr.reason || '').slice(0, 300), score: scoreOf(vr), prompt: promptOf(shNow), clip_path: clip && clip.storage_path });
         try { await C.recordVerdict(supabase, { ep: epId, n: t.n, clip: clipId, try: tries, src: 'qa', verdict: vr, reason: vr.reason, shot: shNow, tag: 'att' }); } catch (_) {}
         const prevReason = (shNow.qa && (shNow.qa.reason || shNow.qa.force_reason)) || reason;
