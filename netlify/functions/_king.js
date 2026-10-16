@@ -81,8 +81,24 @@ const STEADY_CAM_RE = /\b(locked(-off)?\s+(close-?up\s+)?camera|static\s+(docume
 const GESTURE_RE = /\b(point(s|ing|ed)?|rais(e|es|ed|ing)\s+(an?|his|her|their|one|both|right|left)?\s*(arm|arms|hand|hands)|arms? raised|reach(es|ing|ed)?\s+(out|for|toward|towards|into|up|down)|grab(s|bing|bed)?|touch(es|ing|ed)?|palms?\s+(flat\s+)?(on|against)|hands?\s+(flat\s+)?(on|against)\s+the\s+(rock|wall)|walk(s|ing|ed)?\s+(away|off|out)|wav(e|es|ing))\b/i;
 const sentencesOf = (t) => String(t || '').replace(/\s+/g, ' ').split(/(?<=[.!?])\s+(?=[A-Z])/).map((x) => x.trim()).filter(Boolean);
 // Limpia acción/final: quita frases-instrucción (meta), listas de prohibiciones y palabras de sincronía. NO toca la acción.
+// RELLENO (Franklin oct-16: "las de suspirar no son necesarias"): respirar, suspirar, parpadear, pecho que sube… como
+// acción de adorno. Se quita la CLÁUSULA (", his chest rising with a slow breath", "the woman breathes naturally") solo si
+// después queda una acción real; si la toma ES sobre respirar (alguien dormido, cansado) se deja.
+const FILLER_RE = /\b(breath\w*|sigh\w*|blink\w*|chest\s+(rises?|rising|lifts?|lifting|swell\w*)|shift(s|ing)? (his|her|their) weight)\b/i;
+function dropFiller(s) {
+  const parts = String(s).split(/(;|,\s*(?:and\s+|then\s+|while\s+|as\s+)?|\s+(?:and|then|while|as)\s+(?=(?:his|her|their)\b))/i);
+  const kept = []; let removed = false;
+  for (let i = 0; i < parts.length; i += 2) { const seg = parts[i]; if (FILLER_RE.test(seg)) { removed = true; continue; } if (seg && seg.trim()) kept.push((kept.length ? (parts[i - 1] || ', ') : '') + seg); }
+  if (!removed) return s;
+  const out = kept.join('').replace(/^[,;\s]+/, '').replace(/\s*[,;]\s*$/, '').replace(/\s+(and|then|while|as)\s*$/i, '').trim();
+  return out.split(/\s+/).length >= 5 ? out.replace(/[.!?]*$/, '.') : s;
+}
+// Frases-instrucción de continuidad que el guionista mete dentro de la acción ("Faces, clothing, objects… exactly as in the first frame").
+const CONT_SENT_RE = /^(faces?|same faces?|clothing|clothes)\b[^.]*\b(exactly as|as in the first frame|same)\b/i;
 function cleanMotion(t) {
-  return sentencesOf(t).filter((s) => !META_SENT_RE.test(s) && !NEG_LIST_RE.test(s) && !/^(the\s+)?camera\b/i.test(s))
+  return sentencesOf(t).filter((s) => !META_SENT_RE.test(s) && !NEG_LIST_RE.test(s) && !/^(the\s+)?camera\b/i.test(s) && !CONT_SENT_RE.test(s.trim()))
+    .map(dropFiller)
+    .map((s) => s.replace(/;\s*same faces?, clothes[^.;]*/i, ''))
     // La cámara la decide SOLO la línea "Camera:" (antes la acción decía "the camera pushes in" y la línea "lateral drift").
     .map((s) => s.replace(/,?\s*\b(while|as|and)\s+the camera\s+[^,.;]*/gi, ''))
     // Cláusulas en negativo dentro de una frase (", without touching the marks", ", no sudden motion"): con cfg = 1 nombrar lo
