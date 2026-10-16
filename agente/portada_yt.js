@@ -40,6 +40,17 @@ const cont=ep.continuity||{};const land=cont.kind==='largo';
 const {data:serie0}=await sb.from('series').select('story_bible').eq('id',ep.series_id).single();const EN=require(F+'/_pulir').ctasOf(serie0&&serie0.story_bible).lang==='en';const W=land?1280:1080,H=land?720:1920;
 const imgs=require(F+'/_assets').latestPerShot((ep.assets||[]).filter((a)=>a.kind==='image'&&a.storage_path&&a.shot_number!=null),['image']).filter((a)=>a.kind==='image').sort((a,b)=>a.shot_number-b.shot_number);
 if(!imgs.length)throw new Error('El episodio no tiene cuadros.');
+// Ya hay portada hecha para ESTE video final (p. ej. al preparar los textos) y solo falta ponerla en YouTube → no se rehace.
+const lastFinal=(ep.assets||[]).filter((a)=>a.kind==='final_render').map((a)=>a.created_at).sort().pop()||'';
+const th0=cont.thumbnail||{};
+if(vid0&&th0.es_url&&th0.at&&new Date(th0.at)>=new Date(lastFinal||0)){
+  console.log('Portada ya hecha para este video ('+th0.at+') → solo la pongo en YouTube.');
+  const buf=Buffer.from(await (await fetch(th0.es_url)).arrayBuffer());
+  const tk=await require(F+'/_social').youtubeAccessToken(sb);
+  const r=await fetch('https://www.googleapis.com/upload/youtube/v3/thumbnails/set?videoId='+vid0+'&uploadType=media',{method:'POST',headers:{Authorization:'Bearer '+tk,'Content-Type':'image/jpeg'},body:buf});
+  console.log(r.ok?'YouTube: portada puesta ✅ https://youtu.be/'+vid0:'YouTube: no pude poner la portada (HTTP '+r.status+': '+(await r.text()).slice(0,200)+')');
+  return;
+}
 const cwd=fs.mkdtempSync(path.join(os.tmpdir(),'vy-portada-'));fs.mkdirSync(path.join(cwd,'fonts'));fs.copyFileSync(findFont(),path.join(cwd,'fonts',FONT_FILE));
 console.log('Bajando',imgs.length,'cuadros...');
 const byShot={};
@@ -86,14 +97,30 @@ Responde SOLO JSON: {"mejor":"${cands[0].out}","por_que":"..."}`;
   try{const k=parseJson(await runClaude(p2,{files:cands.map((c)=>({name:c.out,buffer:fs.readFileSync(path.join(cwd,c.out))})),timeoutMin:6,log:console.log}));win=cands.find((c)=>c.out===k.mejor)||win;console.log('Ganadora:',win.out,'('+win.kind+') ·',k.por_que);}catch(e){console.log('no pude comparar ('+e.message.slice(0,80)+') → uso la primera');}
 }
 await compose(cwd,{img:win.img,text:EN?T1:(j.text_en||j.text_es),hl:EN?H1:j.highlight_en,side:win.side,W,H,out:'portada_en.jpg'});
+// PORTADA PARA TIKTOK / INSTAGRAM / FACEBOOK (vertical 1080x1920, Franklin oct-16: "IA en todos"). En un Short es la
+// misma ganadora. En un largo se hace una versión vertical: si ganó la de IA, Flow la genera en 9:16 con el mismo prompt.
+let socialFile=null;
+if(!land){socialFile=win.out;}
+else{
+  let vimg=win.img;
+  if(win.kind==='ia'&&win.prompt){
+    try{const {flowImages}=require('./flow_imagenes');const r=await flowImages([win.prompt+' Vertical 9:16 composition: the subject fills the lower half, dark empty space at the top for text.'],console.log,null,{aspect:'9:16'});if(r&&r[0]&&r[0].buffer){vimg=path.join(cwd,'ai_v.jpg');fs.writeFileSync(vimg,r[0].buffer);}}
+    catch(e){console.log('Portada vertical con IA: no se pudo ('+String(e.message).slice(0,120)+') → recorto la horizontal');}
+  }
+  await compose(cwd,{img:vimg,text:T1,hl:H1,side:'left',W:1080,H:1920,out:'portada_social.jpg'});socialFile='portada_social.jpg';
+}
 const {uploadFile}=require(F+'/_storage');const {data:se}=await sb.from('series').select('slug').eq('id',ep.series_id).single();
 const base=`${se.slug}/ep${ep.episode_number}/portada-yt-${Date.now()}`;
 // YouTube acepta portadas de hasta 2 MB: si pasa, se baja la calidad del jpg.
-for(const f of [win.out,'portada_en.jpg']){for(let q=4;q<=12&&fs.statSync(path.join(cwd,f)).size>1.9e6;q+=2){await ff(['-i',f,'-q:v',String(q),'r_'+f],cwd);fs.renameSync(path.join(cwd,'r_'+f),path.join(cwd,f));}}
+for(const f of [win.out,'portada_en.jpg'].concat(socialFile&&socialFile!==win.out?[socialFile]:[])){for(let q=4;q<=12&&fs.statSync(path.join(cwd,f)).size>1.9e6;q+=2){await ff(['-i',f,'-q:v',String(q),'r_'+f],cwd);fs.renameSync(path.join(cwd,'r_'+f),path.join(cwd,f));}}
 const esBuf=fs.readFileSync(path.join(cwd,win.out)),enBuf=fs.readFileSync(path.join(cwd,'portada_en.jpg'));
 const thumb={shot:win.shot,kind:win.kind,ai_prompt:win.prompt||null,text_es:j.text_es,text_en:j.text_en,es_url:await uploadFile(sb,{path:base+'-es.jpg',buffer:esBuf,contentType:'image/jpeg'}),en_url:await uploadFile(sb,{path:base+'-en.jpg',buffer:enBuf,contentType:'image/jpeg'}),at:new Date().toISOString()};
-const {data:fr}=await sb.from('episodes').select('continuity').eq('id',epId).single();
-await sb.from('episodes').update({continuity:Object.assign({},fr.continuity||{},{thumbnail:thumb})}).eq('id',epId);
+thumb.social_url=socialFile===win.out?thumb.es_url:await uploadFile(sb,{path:base+'-social.jpg',buffer:fs.readFileSync(path.join(cwd,socialFile)),contentType:'image/jpeg'});
+// La portada de las redes (Instagram la usa por API; TikTok/Facebook se descarga del panel) = la de IA.
+const {data:fr}=await sb.from('episodes').select('continuity, validator_report').eq('id',epId).single();
+const vr=Object.assign({},fr.validator_report||{});vr.publish_package=Object.assign({},vr.publish_package||{},{cover_url:thumb.social_url,cover_kind:win.kind});
+await sb.from('episodes').update({continuity:Object.assign({},fr.continuity||{},{thumbnail:thumb}),validator_report:vr}).eq('id',epId);
+console.log('Portada redes:',thumb.social_url);
 console.log('Portada ES:',thumb.es_url);console.log('Portada EN:',thumb.en_url);
 const vid=vid0||((((ep.validator_report||{}).social_runs||{}).youtube||{}).video_id);
 if(vid){
