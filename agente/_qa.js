@@ -355,8 +355,12 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
       // 🔧 BITÁCORA de la toma: lo que ya se probó y qué pasó (persiste en shots[].qa.attempts entre corridas).
       const promptOf = (x) => ({ camera: x.camera || '', action_en: x.action_en || '', reaction_en: x.reaction_en || '', start_en: x.start_en || '', background_en: x.background_en || '' });
       const pickV = (v) => ({ image_ok: v.image_ok !== false, style_ok: v.style_ok !== false, action_ok: v.action_ok !== false, haze: !!v.haze, broken: !!v.broken });
+      // oct-16: con imagen TUYA, las quejas de la imagen (personas, ropa, época) salen igual en todos los intentos y no
+      // dependen del video → no cuentan para elegir el MEJOR intento (T19: se perdió el intento 0, el único que picaba).
+      const ownImg = !!(t.sh.own_image || (t.sh.qa && t.sh.qa.keep_image));
+      const scoreOf = (v) => E.score(ownImg ? Object.assign({}, v, { image_ok: true, style_ok: true }) : v);
       const attempts = ((t.sh.qa && t.sh.qa.attempts) || []).slice();
-      if (!attempts.some((a) => a.try === tries && a.clip_path === t.clip.storage_path)) attempts.push({ try: tries, at: new Date().toISOString(), verdict: pickV(curV), reason: curV.reason || reason || '', score: E.score(curV), prompt: promptOf(t.sh), clip_path: t.clip.storage_path });
+      if (!attempts.some((a) => a.try === tries && a.clip_path === t.clip.storage_path)) attempts.push({ try: tries, at: new Date().toISOString(), verdict: pickV(curV), reason: curV.reason || reason || '', score: scoreOf(curV), prompt: promptOf(t.sh), clip_path: t.clip.storage_path });
       const saveShot = async (patch, qaPatch) => {
         const { data: frx } = await supabase.from('episodes').select('shots').eq('id', epId).single();
         await supabase.from('episodes').update({ shots: (frx.shots || []).map((x) => x.n === t.n ? Object.assign({}, x, patch || {}, { qa: Object.assign({}, x.qa || {}, qaPatch || {}, { attempts: attempts.slice(-12) }) }) : x) }).eq('id', epId);
@@ -368,7 +372,7 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
         const dec = E.decide({ sh: shNow, verdict: curV, attempts, doc: brain, freeFrame: !(shNow.characters || []).length, keepImage: !!(shNow.own_image || (shNow.qa && shNow.qa.keep_image)) });
         log(`🔧 especialista toma ${t.n}: ${dec.mode.toUpperCase()} — ${dec.why}`);
         await C.addDiary(supabase, { ep: epId, n: t.n, try: tries + 1, mode: dec.mode, why: dec.why, fallas: dec.fallas });
-        if (!dec.regen) { await saveShot(null, { needs_human: dec.mode, especialista: dec.why }); log(`QA toma ${t.n}: queda marcada para que la revises (${dec.mode})`); break; }
+        if (!dec.regen) { await saveShot(null, { needs_human: dec.mode, especialista: dec.why, revisar: true }); log(`QA toma ${t.n}: queda marcada para que la revises (${dec.mode})`); break; }
         // Contexto: lo que se dice ANTES y DESPUÉS, para que la imagen conecte con el relato.
         const ctxA = (ep2.shots || []).find((x) => x.n === t.n - 1);
         const ctxB = (ep2.shots || []).find((x) => x.n === t.n + 1);
@@ -396,7 +400,7 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
         const res3 = await visionReview([{ sh: shNow, clip, url: clip && clip.storage_path, dur: clip ? await durationOf(clip.storage_path) : 0 }], log);
         const vr = res3[t.n] || {};
         const ok = !(vr.image_ok === false || vr.style_ok === false || vr.action_ok === false || vr.haze === true || vr.broken === true);
-        attempts.push({ try: tries, at: new Date().toISOString(), mode: dec.mode, newFrame: !!dec.newFrame, verdict: pickV(vr), reason: ok ? '' : String(vr.reason || '').slice(0, 300), score: E.score(vr), prompt: promptOf(shNow), clip_path: clip && clip.storage_path });
+        attempts.push({ try: tries, at: new Date().toISOString(), mode: dec.mode, newFrame: !!dec.newFrame, verdict: pickV(vr), reason: ok ? '' : String(vr.reason || '').slice(0, 300), score: scoreOf(vr), prompt: promptOf(shNow), clip_path: clip && clip.storage_path });
         try { await C.recordVerdict(supabase, { ep: epId, n: t.n, clip: clipId, try: tries, src: 'qa', verdict: vr, reason: vr.reason, shot: shNow, tag: 'att' }); } catch (_) {}
         const prevReason = (shNow.qa && (shNow.qa.reason || shNow.qa.force_reason)) || reason;
         await saveShot(null, { clip_id: clipId, ok, image_ok: vr.image_ok !== false, style_ok: vr.style_ok !== false, action_ok: vr.action_ok !== false, haze: !!vr.haze, broken: !!vr.broken, reason: ok ? '' : String(vr.reason || reason).slice(0, 300), fixed_from: ok ? prevReason : (shNow.qa && shNow.qa.fixed_from), redone: true, tries, force: false, force_any: false, at: new Date().toISOString() });
@@ -424,7 +428,7 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
         for (const a of alive) if (keep && a.clip_path !== keep.clip_path) { try { await removeByPublicUrl(supabase, a.clip_path, () => {}); } catch (_) {} a.clip_path = null; }
         await saveShot(null, {});
       } catch (e) { log(`QA toma ${t.n}: (no pude comparar intentos: ${String(e.message).slice(0, 120)})`); }
-      if (!done && tries >= 3) log(`QA toma ${t.n}: 3 intentos y sigue con problema → queda para que la revises`);
+      if (!done && tries >= 3) { log(`QA toma ${t.n}: 3 intentos y sigue con problema → queda para que la revises`); try { await saveShot(null, { revisar: true }); } catch (_) {} }
     }
     await setWorking(null);
   }
