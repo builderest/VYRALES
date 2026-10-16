@@ -100,6 +100,15 @@ async function ensureLogin(page, waitMin) {
 }
 
 async function newProject(page) {
+  // Desde DENTRO de un proyecto no existe el botón "Nuevo proyecto" (oct-16, EP39: los lotes 2+ fallaban así): se vuelve
+  // primero a la página de inicio de Flow.
+  if (/\/project\//.test(page.url())) {
+    const home = page.getByRole('link', { name: /^home$|inicio/i }).first();
+    if (await home.count().catch(() => 0)) await home.click({ timeout: 10000 }).catch(() => {});
+    if (/\/project\//.test(page.url())) await page.goto(new URL(page.url()).origin + '/', { waitUntil: 'domcontentloaded' }).catch(() => {});
+    await page.waitForURL((u) => !/\/project\//.test(String(u)), { timeout: 20000 }).catch(() => {});
+    await sleep(2500);
+  }
   if (!(await inApp(page))) await enterApp(page);
   await shot(page, 'inicio');
   const cands = [page.getByRole('button', { name: /nuevo proyecto|new project/i }).first(), page.getByText(/nuevo proyecto|new project/i).first()];
