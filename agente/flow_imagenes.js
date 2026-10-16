@@ -385,26 +385,35 @@ async function flowImages(prompts, log = console.log, onEach = null, opts = {}) 
       res[i] = { buffer: buf, mimeType: jpg ? 'image/jpeg' : 'image/png' };
       if (onEach) { try { await onEach(i, res[i]); } catch (e) { log('  (no se pudo guardar al momento: ' + String(e.message).slice(0, 120) + ')'); } }
     };
+    // Lotes de LOTE escenas. Lo que no salga se vuelve a pedir EN LOTE (hasta 2 vueltas más, cada una en proyecto nuevo);
+    // de a una solo quedan las últimas 1–2 (oct-16, Franklin: "no debería ir una en una": EP39 pasó 28 imágenes de a una).
     if (LOTE > 1 && prompts.length > 1) {
-      for (let s0 = 0; s0 < prompts.length; s0 += LOTE) {
-        const idx = []; for (let k = s0; k < Math.min(prompts.length, s0 + LOTE); k++) idx.push(k);
-        try {
-          const t = Date.now();
-          // oct-16 (EP39 "se quedó pegado"): cada lote en un PROYECTO NUEVO. En la misma conversación el agente de Flow
-          // mezcló pedidos: en el lote 5 rehízo "las 8 escenas del tercer set que se frenaron" en vez de las 14 nuevas → 0/14
-          // y todo el lote pasó al paso de a una (~1 min por imagen).
-          if (s0 > 0) await newProject(page);
-          const imgs = await generateBatch(page, ctx, idx.map((k) => prompts[k]), 'lote' + (s0 / LOTE + 1), log);
-          const map = await matchScenes(idx.map((k) => prompts[k]), imgs, log);
-          let n = 0;
-          for (let m = 0; m < imgs.length; m++) {
-            if (map[m] < 0) continue;
-            const buf = await download(ctx, page, imgs[m].src, true);
-            if (esOriginal(buf)) { await finish(idx[map[m]], buf); n++; log(`Flow escena ${idx[map[m]] + 1}/${prompts.length}: lista (${buf.length} bytes, en lote)`); }
-          }
-          log(`Flow lote ${s0 / LOTE + 1}: ${n}/${idx.length} en ${Math.round((Date.now() - t) / 1000)} s`);
-        } catch (e) { if (/CUOTA_FLOW/.test(e.message)) { log('Flow: ' + e.message + ' → no sigo pidiendo (cada pedido esperaría en vano).'); cuota = true; break; } log('Flow lote: FALLÓ ' + String(e.message).slice(0, 200) + ' → las de este lote van una por una'); }
-        await sleep(2000 + Math.random() * 2000);
+      let first = true;
+      for (let vuelta = 0; vuelta < 3 && !cuota; vuelta++) {
+        const pend = []; for (let k = 0; k < prompts.length; k++) if (!res[k]) pend.push(k);
+        if (pend.length < 2 || (vuelta > 0 && pend.length < 3)) break;
+        if (vuelta > 0) log(`Flow: ${pend.length} escena(s) no salieron → las pido otra vez EN LOTE (vuelta ${vuelta + 1})`);
+        for (let s0 = 0; s0 < pend.length; s0 += LOTE) {
+          const idx = pend.slice(s0, s0 + LOTE);
+          if (idx.length < 2) continue;
+          try {
+            const t = Date.now();
+            // Cada lote en un PROYECTO NUEVO: en la misma conversación el agente de Flow mezclaba pedidos (EP39, lote 5:
+            // rehízo "las 8 escenas del tercer set" en vez de las 14 nuevas → 0/14).
+            if (!first) await newProject(page);
+            first = false;
+            const imgs = await generateBatch(page, ctx, idx.map((k) => prompts[k]), 'lote' + (vuelta ? 'R' + vuelta + '_' : '') + (s0 / LOTE + 1), log);
+            const map = await matchScenes(idx.map((k) => prompts[k]), imgs, log);
+            let n = 0;
+            for (let m = 0; m < imgs.length; m++) {
+              if (map[m] < 0 || res[idx[map[m]]]) continue;
+              const buf = await download(ctx, page, imgs[m].src, true);
+              if (esOriginal(buf)) { await finish(idx[map[m]], buf); n++; log(`Flow escena ${idx[map[m]] + 1}/${prompts.length}: lista (${buf.length} bytes, en lote)`); }
+            }
+            log(`Flow lote ${vuelta ? '(vuelta ' + (vuelta + 1) + ') ' : ''}${s0 / LOTE + 1}: ${n}/${idx.length} en ${Math.round((Date.now() - t) / 1000)} s`);
+          } catch (e) { if (/CUOTA_FLOW/.test(e.message)) { log('Flow: ' + e.message + ' → no sigo pidiendo (cada pedido esperaría en vano).'); cuota = true; break; } log('Flow lote: FALLÓ ' + String(e.message).slice(0, 200)); }
+          await sleep(2000 + Math.random() * 2000);
+        }
       }
     }
     for (let i = 0; i < prompts.length; i++) {
