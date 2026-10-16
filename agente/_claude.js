@@ -30,7 +30,21 @@ async function withMemory(prompt) {
 async function runClaude(prompt, opts = {}) {
   return runClaudeRaw(opts.memory === false ? prompt : await withMemory(prompt), opts);
 }
-function runClaudeRaw(prompt, { timeoutMin = 12, log = () => {}, files = [], web = false } = {}) {
+// oct-16: cuando el plan de Claude llega a su LÍMITE (semanal o de 5 h: "You've hit your weekly limit · resets 1am"),
+// cada llamada seguía abriendo Claude Code y fallando a los segundos — el QA en vivo y claude_aprender lo repetían
+// en bucle durante horas. Ahora el primer aviso se guarda y, durante 60 min, las llamadas fallan AL INSTANTE.
+const LIMIT_FLAG = path.join(__dirname, '.claude_limite');
+const LIMIT_RE = /hit your (weekly|session|usage|5-hour)? ?limit|usage limit reached|limit · resets/i;
+function claudeLimited() { try { const t = Number(fs.readFileSync(LIMIT_FLAG, 'utf8').split('|')[0]); return Date.now() - t < 60 * 60000 ? fs.readFileSync(LIMIT_FLAG, 'utf8').split('|')[1] || 'límite del plan' : null; } catch (_) { return null; } }
+function runClaudeRaw(prompt, opts = {}) {
+  const lim = claudeLimited();
+  if (lim) return Promise.reject(new Error('CLAUDE_LIMITE: ' + lim + ' (se vuelve a probar en menos de 1 h)'));
+  return runClaudeRaw0(prompt, opts).catch((e) => {
+    if (LIMIT_RE.test(String(e.message))) { try { fs.writeFileSync(LIMIT_FLAG, Date.now() + '|' + String(e.message).replace(/^Claude: /, '').slice(0, 120)); } catch (_) {} e.message = 'CLAUDE_LIMITE: ' + e.message; }
+    throw e;
+  });
+}
+function runClaudeRaw0(prompt, { timeoutMin = 12, log = () => {}, files = [], web = false } = {}) {
   const exe = claudePath();
   if (!exe) return Promise.reject(new Error('Claude Code no está instalado en esta PC (usa el botón "Claude: instalar / revisar").'));
   const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'vy-claude-'));

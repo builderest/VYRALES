@@ -89,6 +89,12 @@ async function freeImage({ prompt, references = [], aspectRatio = '9:16', log = 
   let refs = references || [];
   let anon = false;
   let last = null;
+  // oct-16: si la cuota diaria del agente de Flow ya se acabó (visto hace < 3 h, en este u otro proceso), no se abre
+  // Chrome para nada: antes cada toma esperaba el tope 3 veces antes de ir a Gemini.
+  const fs = require('fs'), path = require('path');
+  const flag = path.join(__dirname, '..', '..', '_to_delete', 'flow', 'cuota_agotada.txt');
+  const cuotaReciente = () => { try { return Date.now() - Number(fs.readFileSync(flag, 'utf8')) < 3 * 3600000; } catch (_) { return false; } };
+  if (cuotaReciente()) { log('Flow: la cuota del agente está agotada (aviso de hace menos de 3 h) → salto Flow'); tries = 0; }
   for (let i = 1; i <= tries; i++) {
     try {
       // Tras un rechazo por política: SIN las fotos de cara de esas personas (Flow no hace personas reales desde una
@@ -99,7 +105,7 @@ async function freeImage({ prompt, references = [], aspectRatio = '9:16', log = 
       const p = R.length ? 'Reference images in order: ' + R.map((r, k) => `image ${k + 1} = ${r.label}`).join('; ') + '. ' + pr : pr;
       const f = await F.flowImage({ prompt: p, refs: R, aspect: aspectRatio === '16:9' ? '16:9' : '9:16' });
       return { buffer: f.buffer, mimeType: f.mimeType || 'image/jpeg', costUsd: 0, model: 'flow' };
-    } catch (e) { last = e; if (/POLITICA/.test(e.message) && anonimizar.length && !anon) { anon = true; log('Flow: rechazo por política → reintento sin los nombres de las personas'); } log('Flow falló (intento ' + i + '/' + tries + '): ' + String(e.message).slice(0, 140)); if (i < tries) await new Promise((r) => setTimeout(r, 4000 * i)); }
+    } catch (e) { last = e; if (/CUOTA_FLOW/.test(e.message)) { try { fs.mkdirSync(path.dirname(flag), { recursive: true }); fs.writeFileSync(flag, String(Date.now())); } catch (_) {} log('Flow: ' + e.message + ' → no reintento'); break; } if (/POLITICA/.test(e.message) && anonimizar.length && !anon) { anon = true; log('Flow: rechazo por política → reintento sin los nombres de las personas'); } log('Flow falló (intento ' + i + '/' + tries + '): ' + String(e.message).slice(0, 140)); if (i < tries) await new Promise((r) => setTimeout(r, 4000 * i)); }
   }
   log('Flow falló ' + tries + ' veces → Gemini (de pago, ~$' + IMAGE_PRICE_USD + ')');
   return generateImage({ prompt, references, aspectRatio });

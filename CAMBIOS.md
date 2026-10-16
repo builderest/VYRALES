@@ -19,6 +19,28 @@
 
 ## Registro de cambios
 
+### 2026-10-16 (sesión Claude Cowork) — Flow: dejar de colgarse (cuota, referencias, detector, lote de 10) y cortar el bucle de Claude sin cuota
+
+Franklin: "Flow se queda colgado la mayor parte del tiempo". Análisis con los últimos 60 trabajos (`agent_jobs.output`) y las capturas de `_to_delete/flow`: Flow SÍ genera en ~40–60 s; lo que se colgaba era el robot. 27 intentos fallidos y 9 pagos a Gemini innecesarios, por 3 causas + un bucle:
+
+- **`agente/flow_imagenes.js`**
+  - **Cuota del agente de Flow** ("Has alcanzado tu límite de cuota del agente de Flow… vuelve mañana", captura del 15-oct): el código no lo leía y esperaba el tope en cada intento, reabriendo Chrome 3 veces. Ahora lo detecta al instante (`CUOTA_FLOW`), deja de pedir en ese lote, y guarda `_to_delete/flow/cuota_agotada.txt` para que nadie vuelva a abrir Chrome durante 3 h. Las imágenes son gratis; lo que tiene cuota es el CHAT del agente.
+  - **Fotos de referencia**: se subían pero quedaban SIN seleccionar y "Añadir a petición" no respondía (12 fallos `locator.click: Timeout 15000ms`). Ahora se hace clic en la foto subida antes de añadirla.
+  - **Detector**: filtraba por orientación (vertical/horizontal) → con referencias Flow entregaba en la otra y la imagen ya hecha se ignoraba (16 de 1376×768 perdidas). Ahora vale cualquier imagen del CDN de Flow; lo que ya estaba (incluida la miniatura de la referencia, que carga tarde) se descarta esperando a que la cuadrícula quede quieta y los primeros 10 s tras enviar.
+  - **Descarga**: tomaba la imagen de más píxeles de la página → con referencia del mismo tamaño se guardaba la REFERENCIA. Ahora toma la que se ve más grande en pantalla (el visor). Probado con `flow_prueba_ref`: sale la mujer en la hacienda con la cara de la referencia, 58 s.
+  - **Lote de 10 por mensaje** (antes 6). Probado 2 veces con `flow_prueba_lote` (modo reescrito para esto): 10/10 imágenes en ~106 s (≈10 s cada una, 1 solo mensaje de cuota) contra ~60 s+ cada una de a una.
+- **`netlify/functions/_image.js`** (`freeImage`): con `CUOTA_FLOW` no reintenta (antes 3 esperas) y respeta el aviso de 3 h. OJO: sigue la regla de Franklin — si Flow no puede dar NINGUNA imagen, va a Gemini (~$0.067 c/u); con la cuota agotada en medio de un largo eso puede sumar.
+- **`agente/_claude.js`** + **`agente/_qa.js`**: con el plan de Claude en su límite ("You've hit your weekly limit"), el QA en vivo y `claude_aprender` seguían llamando a Claude en bucle (un `flow_frames` de 1 toma duró 1 h 42 min así). Ahora el primer aviso se guarda en `agente/.claude_limite` (en `.gitignore`) y por 60 min las llamadas fallan al instante con `CLAUDE_LIMITE`; el QA salta el resto de los grupos.
+- Pendiente: las tomas CON personajes/lugar fijo y las que rehace el QA siguen yendo de a una (ahora funcionan, ~60 s c/u, pero reabren Chrome cada vez) → siguiente paso: agruparlas en lotes. También: el agente estaba APAGADO (ni el bucle `agente_bucle.bat` corría); se arrancó con `agente\iniciar_oculto.vbs`.
+
+### 2026-10-16 (sesión Claude) — comando "Detener todo" en la Terminal
+
+Franklin: "que pare la corrección de videos y que cuando inicie NO siga donde quedó". No había forma: la Terminal rechaza órdenes mientras algo corre, no existía un comando para cancelar, y `recoverOrphans` vuelve a encolar al reiniciar lo que quedó en `running` (gen_local/regen_local/qa_tomas…).
+- **`agente/comandos.js`** — nuevo `detener_todo` (visible en la Terminal).
+- **`agente/agente.js`** — `CHILDREN` (pid → comando de cada trabajo que corre) y `stopAll()`. `tick()` atiende `detener_todo` ANTES que cualquier fila (corre aunque king/Flow/Claude/general estén llenos). Hace: (1) fila `pending/running/cancelar` → `expired` con nota (así `recoverOrphans` no retoma nada), (2) `taskkill /F /T` a cada proceso de trabajo (se lleva sus ffmpeg) + ffmpeg sueltos cuyo ejecutable/comando tenga "VYRALE", (3) ComfyUI de king: `/queue {clear:true}` + `/interrupt`, (4) a los 3 s vacía la fila otra vez (por si el QA se re-encoló al morir) y pausa `queueFullRenders` 60 min. La fila general excluye `detener_todo`.
+- **`netlify/functions/agent.js`** — `detener_todo` entra aunque haya una orden corriendo (solo admin; evita duplicado). **Necesita push** para funcionar desde vyrales.app (en local con `netlify dev` funciona ya).
+- OJO: el agente carga el código nuevo cuando se reinicia (solo se reinicia solo si está libre). Si está a mitad de un QA, hay que reiniciarlo a mano una vez.
+
 ### 2026-10-15 (sesión Claude Cowork) — regla de vehículos en LTX-SAFE, bug de JSON en ideas, bug de pantalla vacía en Guiones, MindFuel Rise cósmico (borrador)
 
 Sesión de investigación de por qué fallan tomas en QA (venía del trabajo con king/LTX/Wan de antes) + trabajo nuevo en MindFuel Rise.

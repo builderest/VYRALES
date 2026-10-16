@@ -126,7 +126,7 @@ Responde SOLO este JSON: {"tomas":[{"n":1,"image_ok":true,"style_ok":true,"actio
       const j = parseJson(await runClaude(prompt, { files, timeoutMin: 8, log }));
       for (const t of (j.tomas || [])) if (t && t.n != null) out[Number(t.n)] = t;
       log(`QA visual: revisadas tomas ${group.map((g) => g.sh.n).join(', ')}`);
-    } catch (e) { log('QA visual: falló un grupo (' + String(e.message).slice(0, 160) + ')'); }
+    } catch (e) { log('QA visual: falló un grupo (' + String(e.message).slice(0, 160) + ')'); if (/CLAUDE_LIMITE/.test(e.message)) { log('QA visual: Claude sin cuota → salto el resto de los grupos (oct-16)'); break; } }
   }
   return out;
 }

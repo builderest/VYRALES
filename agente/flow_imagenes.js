@@ -99,7 +99,11 @@ async function newProject(page) {
 const mediaKey = (src) => { const m = /\/image\/([0-9a-f-]{36})/i.exec(src) || /\/asb\/([^=?]+)/.exec(src); return m ? m[1] : String(src).split('?')[0]; };
 async function imgSrcs(page) {
   // Miniaturas de la cuadrícula del proyecto (no las del chat del agente, que repiten las mismas).
-  return page.evaluate((wide) => [...new Set([...document.querySelectorAll('img')].filter((i) => i.naturalWidth >= 120 && (wide ? i.naturalWidth > i.naturalHeight * 1.2 : i.naturalHeight > i.naturalWidth) && !/avatar|profile|googleusercontent\.com\/a\//i.test(i.src)).map((i) => i.currentSrc || i.src))], ASPECT === '16:9');
+  // oct-16: antes se filtraba por orientación (vertical si 9:16, horizontal si 16:9). Con fotos de referencia Flow a
+  // veces entrega en la otra orientación → la imagen YA hecha se ignoraba, se esperaba hasta el tope y se pagaba Gemini
+  // (16 imágenes de 1376x768 perdidas así en los últimos trabajos). Ahora vale cualquier imagen de Flow (su CDN o /asb/)
+  // de buen tamaño; lo que ya estaba antes del pedido (fotos de referencia incluidas) se descarta con mediaKey.
+  return page.evaluate(() => [...new Set([...document.querySelectorAll('img')].filter((i) => i.naturalWidth >= 120 && i.naturalHeight >= 120 && /flow-content\.google|\/asb\/|googleusercontent\.com/i.test(i.currentSrc || i.src) && !/avatar|profile|googleusercontent\.com\/a\/|\/ogw\/|gstatic/i.test(i.currentSrc || i.src)).map((i) => i.currentSrc || i.src))]);
 }
 
 // Sube imágenes de referencia (fotos de cara de los personajes) como "ingredientes" del pedido:
@@ -123,9 +127,14 @@ async function addRefs(page, refs, name) {
       const [fc] = await Promise.all([page.waitForEvent('filechooser', { timeout: 15000 }), up.click({ force: true })]);
       await fc.setFiles(f);
     }
-    // Espera a que termine de subir y queden seleccionada; luego "Añadir a petición".
+    // Espera a que termine de subir; luego "Añadir a petición".
+    // oct-16: la foto subida aparece en la lista pero NO queda seleccionada, y "Añadir a petición" no hace nada hasta
+    // marcarla (12 fallos "locator.click: Timeout 15000ms" → 3 reintentos → Gemini pagado). Se hace clic en ella.
     const add = page.getByRole('button', { name: /Añadir a petición|Add to prompt/i }).first();
-    for (let k = 0; k < 30; k++) { await sleep(1000); if (await add.isEnabled().catch(() => false)) break; }
+    const item = page.getByText(path.basename(f), { exact: true }).first();
+    for (let k = 0; k < 30; k++) { await sleep(1000); if (await item.isVisible().catch(() => false)) break; }
+    await item.click({ timeout: 10000 }).catch((e) => console.log('  (no pude marcar la foto subida: ' + String(e.message).split('\n')[0] + ')'));
+    for (let k = 0; k < 15; k++) { await sleep(1000); if (await add.isEnabled().catch(() => false)) break; }
     await shot(page, `${name}_ref${i + 1}`);
     await add.click({ timeout: 15000 });
     await sleep(1500);
@@ -141,13 +150,18 @@ async function addRefs(page, refs, name) {
 async function generate(page, ctx, prompt, name, refs, waitSec = 90) {
   if (refs && refs.length) { await addRefs(page, refs, name); await sleep(2000); }
   // Lo que ya hay (incluidas las fotos de referencia recién subidas) NO cuenta como resultado.
+  // oct-16: la miniatura de la foto SUBIDA tarda en cargar y a veces aparece después de esta foto de "antes" → se
+  // tomaba la propia referencia como resultado. Se espera a que la cuadrícula quede quieta y, además, todo lo que
+  // aparezca en los primeros 10 s tras enviar (Flow nunca genera tan rápido) también cuenta como "ya estaba".
   const before = new Set((await imgSrcs(page)).map(mediaKey));
+  for (let k = 0; k < 5; k++) { await sleep(1500); const n0 = before.size; (await imgSrcs(page)).forEach((x) => before.add(mediaKey(x))); if (before.size === n0 && k >= 1) break; }
   await page.click('.ProseMirror');
   await page.keyboard.insertText(prompt);
   await sleep(800);
   await shot(page, name + '_1_prompt');
   await page.keyboard.press('Enter');
   const t0 = Date.now();
+  while (Date.now() - t0 < 10000) { await sleep(2000); (await imgSrcs(page)).forEach((x) => before.add(mediaKey(x))); }
   let confirmed = false;
   while (Date.now() - t0 < waitSec * 1000) {
     await sleep(4000);
@@ -164,6 +178,9 @@ async function generate(page, ctx, prompt, name, refs, waitSec = 90) {
       }
     } catch (_) {}
     // oct-14: Flow rechaza por política (p. ej. una persona real y famosa por su nombre) → avisar YA, no esperar 4 min.
+    // oct-16: "Has alcanzado tu límite de cuota del agente de Flow… vuelve mañana" → no va a generar nada hoy.
+    // Antes se esperaba el tope en cada intento (y se reabría Chrome 3 veces). Ahora se avisa al instante.
+    if (await page.getByText(/límite de cuota del agente|quota limit for the Flow agent|reached your .*quota|cuota del agente de Flow/i).first().isVisible().catch(() => false)) { await shot(page, name + '_cuota'); throw new Error('CUOTA_FLOW: se acabó la cuota diaria del agente de Flow (vuelve mañana).'); }
     const pol = await page.getByText(/might violate our policies|infringir nuestras pol[ií]ticas/i).first().isVisible().catch(() => false);
     if (pol) { await shot(page, name + '_politica'); throw new Error('POLITICA: Flow rechazó la imagen por sus políticas (suele ser una persona real nombrada).'); }
     const now = (await imgSrcs(page)).filter((s) => !before.has(mediaKey(s)));
@@ -175,7 +192,10 @@ async function generate(page, ctx, prompt, name, refs, waitSec = 90) {
       try {
         await page.locator(`img[src="${src.replace(/"/g, '\\"')}"]`).first().click({ timeout: 8000 });
         await sleep(4000);
-        const big = await page.evaluate(() => [...document.querySelectorAll('img')].map((i) => ({ s: i.currentSrc || i.src, w: i.naturalWidth, h: i.naturalHeight })).sort((a, b) => b.w * b.h - a.w * a.h)[0]);
+        // oct-16: antes se tomaba la imagen de MÁS PÍXELES de la página; con foto de referencia del mismo tamaño
+        // (768x1376) salía la REFERENCIA en vez de la generada. Ahora: la que se ve MÁS GRANDE en pantalla (el visor),
+        // y solo del CDN de Flow.
+        const big = await page.evaluate(() => [...document.querySelectorAll('img')].filter((i) => /flow-content\.google|\/asb\//.test(i.currentSrc || i.src)).map((i) => { const r = i.getBoundingClientRect(); return { s: i.currentSrc || i.src, w: i.naturalWidth, h: i.naturalHeight, a: r.width * r.height }; }).sort((a, b) => b.a - a.a)[0]);
         console.log('  grande:', big && big.w + 'x' + big.h, big && big.s.slice(0, 200));
         await shot(page, name + '_grande');
         if (big && big.w > 600) src = big.s;
@@ -238,7 +258,7 @@ async function flowImage({ prompt, refs = [], aspect = null, waitSec = 90 }) {
 // genera, los mensajes nuevos se pierden). Flow NO respeta el orden de las escenas al devolverlas, así que cada
 // imagen se empareja con su escena mirándola (Gemini visión, miniaturas, ~$0.002 por lote). Lo que no se pueda
 // emparejar se rehace solo, una por una.
-const LOTE = Math.max(1, Math.min(12, Number(process.env.FLOW_LOTE) || 6));
+let LOTE = Math.max(1, Math.min(12, Number(process.env.FLOW_LOTE) || 10)); // oct-16: 10 por mensaje (probado: 10/10 en 32 s) // let: la prueba de lote (prueba_lote) lo cambia
 async function newImages(page, before) {
   const seen = new Set();
   return (await imgSrcs(page)).filter((s) => { const k = mediaKey(s); if (before.has(k) || seen.has(k)) return false; seen.add(k); return true; });
@@ -264,6 +284,7 @@ async function generateBatch(page, ctx, prompts, name, log) {
     await sleep(4000);
     const c = page.getByRole('button', { name: /^(Generar|Confirmar|Sí|Continuar|Generate|Confirm|Yes|Continue)$/i }).first();
     if (await c.isVisible().catch(() => false)) { await c.click().catch(() => {}); log('  (confirmé la generación)'); }
+    if (await page.getByText(/límite de cuota del agente|quota limit for the Flow agent|cuota del agente de Flow/i).first().isVisible().catch(() => false)) { await shot(page, name + '_cuota'); throw new Error('CUOTA_FLOW: se acabó la cuota diaria del agente de Flow (vuelve mañana).'); }
     cur = await newImages(page, before);
     if (cur.length !== last) { log(`  Flow lote: ${cur.length}/${prompts.length} imágenes (${Math.round((Date.now() - t0) / 1000)} s)`); last = cur.length; quiet = 0; }
     else if (cur.length >= prompts.length) { if (++quiet >= 2) break; }
@@ -297,6 +318,9 @@ async function matchScenes(prompts, imgs, log) {
 // prompts: [string] → [{ buffer, mimeType } | { error }] en el mismo orden.
 async function flowImages(prompts, log = console.log, onEach = null, opts = {}) {
   ASPECT = opts.aspect === '16:9' ? '16:9' : '9:16'; RULE_BASE = ruleBaseFor();
+  // oct-16: cuota del agente agotada hace < 3 h (aviso compartido con _image.js) → no se abre Chrome.
+  const FLAG = path.join(OUT, 'cuota_agotada.txt');
+  try { if (Date.now() - Number(fs.readFileSync(FLAG, 'utf8')) < 3 * 3600000) { log('Flow: cuota del agente agotada (aviso de hace < 3 h) → no pido nada'); return prompts.map(() => ({ error: 'CUOTA_FLOW: cuota del agente agotada' })); } } catch (_) {}
   if (ASPECT === '16:9') log('Flow: imágenes HORIZONTALES 16:9');
   let { ctx, page } = await openFlow(process.env.FLOW_VISIBLE === '1');
   const out = [];
@@ -311,6 +335,7 @@ async function flowImages(prompts, log = console.log, onEach = null, opts = {}) 
     if (!ok) throw new Error('Flow: no hay sesión de Google.');
     await newProject(page);
     const res = new Array(prompts.length).fill(null);
+    let cuota = false; // oct-16: con la cuota del agente agotada no se sigue pidiendo
     const finish = async (i, buf) => {
       const jpg = buf[0] === 0xff && buf[1] === 0xd8;
       res[i] = { buffer: buf, mimeType: jpg ? 'image/jpeg' : 'image/png' };
@@ -330,19 +355,21 @@ async function flowImages(prompts, log = console.log, onEach = null, opts = {}) 
             if (buf && buf.length > 60000) { await finish(idx[map[m]], buf); n++; log(`Flow escena ${idx[map[m]] + 1}/${prompts.length}: lista (${buf.length} bytes, en lote)`); }
           }
           log(`Flow lote ${s0 / LOTE + 1}: ${n}/${idx.length} en ${Math.round((Date.now() - t) / 1000)} s`);
-        } catch (e) { log('Flow lote: FALLÓ ' + String(e.message).slice(0, 200) + ' → las de este lote van una por una'); }
+        } catch (e) { if (/CUOTA_FLOW/.test(e.message)) { log('Flow: ' + e.message + ' → no sigo pidiendo (cada pedido esperaría en vano).'); cuota = true; break; } log('Flow lote: FALLÓ ' + String(e.message).slice(0, 200) + ' → las de este lote van una por una'); }
         await sleep(2000 + Math.random() * 2000);
       }
     }
     for (let i = 0; i < prompts.length; i++) {
       if (res[i]) { out[i] = res[i]; continue; }
+      if (cuota) { out[i] = { error: 'CUOTA_FLOW: se acabó la cuota diaria del agente de Flow (vuelve mañana).' }; continue; }
       try {
         const img = await generate(page, ctx, String(prompts[i]).trim().replace(/\.?$/, '.') + ruleFor(prompts[i]), 'lote' + (i + 1));
         await finish(i, img.buffer); out[i] = res[i];
         log(`Flow ${i + 1}/${prompts.length}: lista una por una (${img.buffer.length} bytes)`);
-      } catch (e) { out[i] = { error: e.message }; log(`Flow ${i + 1}/${prompts.length}: FALLÓ ${String(e.message).slice(0, 200)}`); }
+      } catch (e) { out[i] = { error: e.message }; log(`Flow ${i + 1}/${prompts.length}: FALLÓ ${String(e.message).slice(0, 200)}`); if (/CUOTA_FLOW/.test(e.message)) cuota = true; }
       await sleep(2000 + Math.random() * 2000);
     }
+    if (cuota) { try { fs.writeFileSync(FLAG, String(Date.now())); } catch (_) {} }
     return out;
   } finally {
     await ctx.close().catch(() => {});
@@ -352,6 +379,34 @@ module.exports = { flowImage, flowImages };
 
 if (require.main === module) (async () => {
   const mode = process.argv[2] || 'prueba';
+  // oct-16 (Franklin: "en un solo mensaje generar todas, o de 10 en 10, sin cerrar la ventana"): PRUEBA de lote grande.
+  // Usa el MISMO flowImages del pipeline (una sola ventana de Chrome, un mensaje por lote) con 10 escenas fáciles de
+  // distinguir, y mide cuántas salen en el lote y cuánto tarda. No toca episodios ni la base de datos.
+  if (mode === 'prueba_lote') {
+    LOTE = Math.max(1, Math.min(12, Number(process.argv[3]) || 10));
+    const P = [
+      'A vast dark nebula of deep blue and violet gas clouds with one sharp diagonal beam of white light across it.',
+      'A single rocky planet in black silhouette against deep space, a bright sun peeking from behind its curved edge.',
+      'A thick swirling band of golden-orange clouds on the surface of a gas giant planet, filling the frame.',
+      'A glowing ring of orange and white energy expanding in the center of a dark empty space.',
+      'A single bright white star alone in the center of total black darkness.',
+      'A fossil human molar tooth lying on a plain white laboratory table under soft cool light.',
+      'The dark mouth of a limestone cave on a dry hillside with holm oak trees, at golden hour.',
+      'A rusty old railway track cutting through a deep trench of grey rock walls on a hill.',
+      'A blacksmith forge with glowing orange coals and a thick iron bar lying in the fire.',
+      'An empty bare concrete gym at dawn with one loaded steel barbell on the dark floor.'
+    ];
+    const t0 = Date.now(); const tiempos = [];
+    console.log('PRUEBA LOTE: ' + P.length + ' escenas, ' + LOTE + ' por mensaje');
+    const r = await flowImages(P, console.log, async (i, img) => {
+      tiempos.push(Math.round((Date.now() - t0) / 1000));
+      fs.writeFileSync(path.join(OUT, 'lote10_escena' + (i + 1) + (img.mimeType === 'image/png' ? '.png' : '.jpg')), img.buffer);
+    }, { aspect: '9:16' });
+    const ok = r.filter((x) => x && x.buffer).length;
+    console.log('RESULTADO: ' + ok + '/' + P.length + ' imágenes en ' + Math.round((Date.now() - t0) / 1000) + ' s · cada una lista a los (s): ' + tiempos.join(', '));
+    console.log('Guardadas en _to_delete\\flow\\lote10_escena*.jpg');
+    return;
+  }
   // Se muestra solo si hace falta iniciar sesión, si pediste verla (modo "ver"/login) o con FLOW_VISIBLE=1.
   const wantVisible = mode === 'login' || mode === 'ver' || process.env.FLOW_VISIBLE === '1';
   let { ctx, page } = await openFlow(wantVisible);
