@@ -16,12 +16,15 @@ process.env.VYRALES_LOCAL_RUN = '1';
   const supabase = getSupabaseClient();
   const redone = await require('./_qa').qaShots({ supabase, epId, handler: null, log: (...x) => console.log(...x) });
   // Se une si cambió algo O si todavía no hay video final más nuevo que la última toma (producción cortada antes de unir).
-  const { data: chk } = await supabase.from('episodes').select('assets(kind, created_at)').eq('id', epId).single();
+  const { data: chk } = await supabase.from('episodes').select('continuity, assets(kind, created_at)').eq('id', epId).single();
+  // oct-16: también si la VOZ cambió después del último video final (parche de una frase, p. ej. el cierre de MindFuel):
+  // antes el panel seguía mostrando el final viejo con la voz vieja.
+  const voiceAt = ((chk.continuity || {}).voice || {}).at || '';
   const lastClip = (chk.assets || []).filter((a) => a.kind === 'video_clip').map((a) => a.created_at).sort().pop() || '';
   const lastFinal = (chk.assets || []).filter((a) => a.kind === 'final_render').map((a) => a.created_at).sort().pop() || '';
   const { data: cont } = await supabase.from('agent_jobs').select('id').eq('status', 'pending').eq('command', 'qa_tomas:' + epId).limit(1);
   if (cont && cont.length) { console.log('QA: quedó pendiente (cedió el turno a un trabajo manual o sigue en otra corrida) → NO uno el video todavía, se une cuando termine todo.'); return; }
-  if (redone.length || lastFinal < lastClip) {
+  if (redone.length || lastFinal < lastClip || (voiceAt && new Date(lastFinal || 0) < new Date(voiceAt))) {
     const { mergeEpisodeVideo } = require(path.join(ROOT, 'netlify', 'functions', '_merge'));
     const { data: ep } = await supabase.from('episodes').select('*, assets(*)').eq('id', epId).single();
     const { data: sr } = await supabase.from('series').select('id, slug, title, genre, story_bible').eq('id', ep.series_id).single();
