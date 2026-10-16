@@ -95,6 +95,24 @@ async function newProject(page) {
   console.log('Proyecto:', page.url());
 }
 
+// oct-16: ancho real de la imagen (JPEG/PNG/WEBP) para distinguir la ORIGINAL de la miniatura. Antes se usaba el
+// peso (> 60 KB): una imagen casi negra (una estrella sola en el espacio) pesa menos que eso aunque sea la original
+// → se descartaba siempre, salía del lote y terminaba guardándose la miniatura de 286x512.
+function imgWidth(b) {
+  try {
+    if (b[0] === 0x89 && b[1] === 0x50) return b.readUInt32BE(16);
+    if (b.slice(0, 4).toString() === 'RIFF' && b.slice(8, 12).toString() === 'WEBP') {
+      const t = b.slice(12, 16).toString();
+      if (t === 'VP8 ') return b.readUInt16LE(26) & 0x3fff;
+      if (t === 'VP8L') return 1 + (((b[22] & 0x3f) << 8) | b[21]);
+      if (t === 'VP8X') return 1 + b.readUIntLE(24, 3);
+    }
+    if (b[0] === 0xff && b[1] === 0xd8) { let i = 2; while (i < b.length) { if (b[i] !== 0xff) { i++; continue; } const m = b[i + 1]; if (m >= 0xc0 && m <= 0xcf && m !== 0xc4 && m !== 0xc8 && m !== 0xcc) return b.readUInt16BE(i + 7); i += 2 + b.readUInt16BE(i + 2); } }
+  } catch (_) {}
+  return 0;
+}
+const esOriginal = (b) => !!b && (imgWidth(b) >= 600 || (imgWidth(b) === 0 && b.length > 60000));
+
 // Clave estable de una imagen de Flow: el id del medio (la firma de la URL cambia cada vez que se refresca).
 const mediaKey = (src) => { const m = /\/image\/([0-9a-f-]{36})/i.exec(src) || /\/asb\/([^=?]+)/.exec(src); return m ? m[1] : String(src).split('?')[0]; };
 async function imgSrcs(page) {
@@ -204,7 +222,7 @@ async function generate(page, ctx, prompt, name, refs, waitSec = 90) {
       // Las URLs de Google (…/asb/…) dan la ORIGINAL agregando "=s0" (sin eso llega la miniatura de 286 px).
       if (/googleusercontent\.com|flow\.google\.com\/asb\//.test(src)) {
         const full = src.replace(/=[a-z0-9-]+$/i, '') + '=s0';
-        try { const r = await ctx.request.get(full); if (r.ok()) { const b = Buffer.from(await r.body()); if (b.length > 60000) { buf = b; console.log('  original:', b.length, 'bytes'); } } } catch (_) {}
+        try { const r = await ctx.request.get(full); if (r.ok()) { const b = Buffer.from(await r.body()); if (esOriginal(b)) { buf = b; console.log('  original:', b.length, 'bytes', imgWidth(b) + ' px de ancho'); } } } catch (_) {}
       }
       if (!buf) try { const r = await ctx.request.get(src); if (r.ok()) buf = Buffer.from(await r.body()); } catch (_) {}
       if (!buf) {
@@ -217,6 +235,7 @@ async function generate(page, ctx, prompt, name, refs, waitSec = 90) {
       for (let k = 0; k < 15 && quiet < 3; k++) { await sleep(3000); const c = (await imgSrcs(page)).length; if (c === last) quiet++; else { quiet = 0; last = c; } }
       await shot(page, name + '_2_listo');
       if (!buf) throw new Error('Vi la imagen nueva pero no pude descargarla: ' + src.slice(0, 120));
+      if (!esOriginal(buf)) throw new Error('Solo conseguí la miniatura (' + imgWidth(buf) + ' px), no la original: ' + src.slice(0, 120));
       return { buffer: buf, src };
     }
     if ((Date.now() - t0) % 20000 < 4000) await shot(page, name + '_esperando');
@@ -258,7 +277,7 @@ async function flowImage({ prompt, refs = [], aspect = null, waitSec = 90 }) {
 // genera, los mensajes nuevos se pierden). Flow NO respeta el orden de las escenas al devolverlas, así que cada
 // imagen se empareja con su escena mirándola (Gemini visión, miniaturas, ~$0.002 por lote). Lo que no se pueda
 // emparejar se rehace solo, una por una.
-let LOTE = Math.max(1, Math.min(12, Number(process.env.FLOW_LOTE) || 10)); // oct-16: 10 por mensaje (probado: 10/10 en 32 s) // let: la prueba de lote (prueba_lote) lo cambia
+let LOTE = Math.max(1, Math.min(30, Number(process.env.FLOW_LOTE) || 20)); // oct-16: 20 por mensaje (probado: 20/20 en 74 s, 10/10 en ~106 s) // let: la prueba de lote (prueba_lote) lo cambia
 async function newImages(page, before) {
   const seen = new Set();
   return (await imgSrcs(page)).filter((s) => { const k = mediaKey(s); if (before.has(k) || seen.has(k)) return false; seen.add(k); return true; });
@@ -352,7 +371,7 @@ async function flowImages(prompts, log = console.log, onEach = null, opts = {}) 
           for (let m = 0; m < imgs.length; m++) {
             if (map[m] < 0) continue;
             const buf = await download(ctx, page, imgs[m].src, true);
-            if (buf && buf.length > 60000) { await finish(idx[map[m]], buf); n++; log(`Flow escena ${idx[map[m]] + 1}/${prompts.length}: lista (${buf.length} bytes, en lote)`); }
+            if (esOriginal(buf)) { await finish(idx[map[m]], buf); n++; log(`Flow escena ${idx[map[m]] + 1}/${prompts.length}: lista (${buf.length} bytes, en lote)`); }
           }
           log(`Flow lote ${s0 / LOTE + 1}: ${n}/${idx.length} en ${Math.round((Date.now() - t) / 1000)} s`);
         } catch (e) { if (/CUOTA_FLOW/.test(e.message)) { log('Flow: ' + e.message + ' → no sigo pidiendo (cada pedido esperaría en vano).'); cuota = true; break; } log('Flow lote: FALLÓ ' + String(e.message).slice(0, 200) + ' → las de este lote van una por una'); }
@@ -383,8 +402,10 @@ if (require.main === module) (async () => {
   // Usa el MISMO flowImages del pipeline (una sola ventana de Chrome, un mensaje por lote) con 10 escenas fáciles de
   // distinguir, y mide cuántas salen en el lote y cuánto tarda. No toca episodios ni la base de datos.
   if (mode === 'prueba_lote') {
-    LOTE = Math.max(1, Math.min(12, Number(process.argv[3]) || 10));
-    const P = [
+    // Cuántas escenas probar: argumento, o el número en _to_delete/flow/prueba_lote_n.txt (para probar >10 sin tocar el agente).
+    let N = Number(process.argv[3]) || 0; try { N = N || Number(fs.readFileSync(path.join(OUT, 'prueba_lote_n.txt'), 'utf8')); } catch (_) {}
+    N = Math.max(1, Math.min(30, N || 10)); LOTE = N;
+    const P0 = [
       'A vast dark nebula of deep blue and violet gas clouds with one sharp diagonal beam of white light across it.',
       'A single rocky planet in black silhouette against deep space, a bright sun peeking from behind its curved edge.',
       'A thick swirling band of golden-orange clouds on the surface of a gas giant planet, filling the frame.',
@@ -394,17 +415,28 @@ if (require.main === module) (async () => {
       'The dark mouth of a limestone cave on a dry hillside with holm oak trees, at golden hour.',
       'A rusty old railway track cutting through a deep trench of grey rock walls on a hill.',
       'A blacksmith forge with glowing orange coals and a thick iron bar lying in the fire.',
-      'An empty bare concrete gym at dawn with one loaded steel barbell on the dark floor.'
+      'An empty bare concrete gym at dawn with one loaded steel barbell on the dark floor.',
+      'A red vintage pickup truck parked alone in a golden wheat field at sunset.',
+      'A lighthouse on a rocky cliff at night with its beam crossing a stormy sea.',
+      'A single white sailboat on a calm turquoise lagoon seen from above.',
+      'A snowy pine forest at dawn with one wooden cabin and smoke from its chimney.',
+      'A close view of a green tree frog sitting on a wet leaf in the rain.',
+      'An old stone bridge over a narrow river in a misty green valley.',
+      'A desert with tall orange sand dunes and one camel walking on the ridge.',
+      'A bowl of ramen with an egg and green onions on a dark wooden table.',
+      'A brass antique compass lying open on an old paper-free wooden desk.',
+      'A herd of wild horses running across a wide grassy plain under dark clouds.'
     ];
+    const P = P0.slice(0, N);
     const t0 = Date.now(); const tiempos = [];
     console.log('PRUEBA LOTE: ' + P.length + ' escenas, ' + LOTE + ' por mensaje');
     const r = await flowImages(P, console.log, async (i, img) => {
       tiempos.push(Math.round((Date.now() - t0) / 1000));
-      fs.writeFileSync(path.join(OUT, 'lote10_escena' + (i + 1) + (img.mimeType === 'image/png' ? '.png' : '.jpg')), img.buffer);
+      fs.writeFileSync(path.join(OUT, 'lote' + P.length + '_escena' + (i + 1) + (img.mimeType === 'image/png' ? '.png' : '.jpg')), img.buffer);
     }, { aspect: '9:16' });
     const ok = r.filter((x) => x && x.buffer).length;
     console.log('RESULTADO: ' + ok + '/' + P.length + ' imágenes en ' + Math.round((Date.now() - t0) / 1000) + ' s · cada una lista a los (s): ' + tiempos.join(', '));
-    console.log('Guardadas en _to_delete\\flow\\lote10_escena*.jpg');
+    console.log('Guardadas en _to_delete\\flow\\lote' + P.length + '_escena*.jpg');
     return;
   }
   // Se muestra solo si hace falta iniciar sesión, si pediste verla (modo "ver"/login) o con FLOW_VISIBLE=1.
