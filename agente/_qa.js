@@ -121,6 +121,7 @@ Para cada toma decide (sé justo: marca false solo si el problema se ve claro):
 - broken: algo deforme, caras o manos rotas, letras/texto inventado, cosas que aparecen o desaparecen (true = problema).
 - MISMO LUGAR (oct-14): compara la PRIMERA y la ÚLTIMA imagen. Si el lugar se convirtió en otro (un pozo que pasa a ser un túnel, una celda que pasa a ser otra celda, las luces de un edificio que desaparecen, la noche que se vuelve atardecer, una pila de objetos que se derrumba sola), eso es broken = true aunque cada imagen se vea bien por separado. Pon en reason "cambia de lugar".
 - reason: una frase corta en español con lo que viste (vacío si todo bien).
+- COHERENCIA (oct-16): si en reason describes un defecto (personas de más o de menos, objeto distinto, cámara que se va, acción que no ocurre, gesto que no se pidió), la casilla que corresponde DEBE ir en false. reason vacío si todo está bien.
 Responde SOLO este JSON: {"tomas":[{"n":1,"image_ok":true,"style_ok":true,"action_ok":true,"haze":false,"broken":false,"evidence":"","reason":""}]}`;
     try {
       const j = parseJson(await runClaude(prompt, { files, timeoutMin: 8, log }));
@@ -255,7 +256,7 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
       // Se salta solo si ESTE clip ya pasó. Si falló y no se alcanzó a rehacer (proceso cortado), se vuelve a revisar.
       // Si Franklin APROBÓ esta toma, manda su decisión: no se revisa ni se rehace (salvo que la marque con ✗).
       if (clip && clip.approved && !(sh.qa && sh.qa.force)) continue;
-      if (clip && !(sh.qa && sh.qa.clip_id === clip.id && sh.qa.ok && !sh.qa.force)) items.push({ sh, clip, url: clip.storage_path, dur: await durationOf(clip.storage_path) });
+      if (clip && !(sh.qa && sh.qa.clip_id === clip.id && (sh.qa.ok || sh.qa.revisar) && !sh.qa.force)) items.push({ sh, clip, url: clip.storage_path, dur: await durationOf(clip.storage_path) });
     }
     log(`QA visual: revisando ${items.length} toma(s) con Claude ($0)...`);
     const res = await visionReview(items, log, async (group) => { if (group && group[0]) await setWorking(group[0].n, 'revisar'); });
@@ -276,7 +277,13 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
       // Después de 3 queda para revisión humana.
       const tries = it.sh.qa ? (Number(it.sh.qa.tries) || (it.sh.qa.redone ? 1 : 0)) : 0;
       const already = tries >= 3;
-      qaOf[it.sh.n] = { clip_id: it.clip.id, ok: !bad || leve, leve: leve || undefined, image_ok: r.image_ok !== false, style_ok: r.style_ok !== false, action_ok: r.action_ok !== false, haze: !!r.haze, broken: !!r.broken, reason: String(r.reason || '').slice(0, 300), at: new Date().toISOString(), redone: tries > 0, tries };
+      // oct-16: el juez a veces deja TODAS las casillas en "bien" pero describe un defecto en la nota ("son cuatro y no
+      // tres", "la cámara se aleja", "no se ve que trabajen a pico") y la toma quedaba APROBADA. Ahora queda marcada para
+      // que la revises (sin rehacerla sola: rehacer sin motivo claro arriesgaba empeorarla).
+      const contradice = !bad && /\b(en vez de|en lugar de|no se ve|no ocurre|no hace|no pasa|son \w+ y no|aparece|desaparece|se aleja|se va|cambia de|deform|falta|sobra|de m[aá]s|de menos)\b/i.test(String(r.reason || ''));
+      if (contradice) log(`QA visual toma ${it.sh.n}: las casillas dicen "bien" pero la nota describe un problema (${String(r.reason).slice(0, 140)}) → queda para que la revises`);
+      // revisar: queda para Franklin y ya NO se re-escanea en cada pasada (antes el QA en vivo miraba las mismas tomas una y otra vez).
+      qaOf[it.sh.n] = { clip_id: it.clip.id, ok: (!bad || leve) && !contradice, revisar: (contradice || (bad && !leve && already)) || undefined, leve: leve || undefined, image_ok: r.image_ok !== false, style_ok: r.style_ok !== false, action_ok: r.action_ok !== false, haze: !!r.haze, broken: !!r.broken, reason: String(r.reason || '').slice(0, 300), at: new Date().toISOString(), redone: tries > 0, tries };
       ev0.push({ ep: epId, n: it.sh.n, clip: it.clip.id, try: tries, src: 'qa', verdict: r, reason: r.reason, shot: it.sh });
       if (leve) log(`QA visual toma ${it.sh.n}: detalle leve (${r.reason || ''}) → se acepta sin rehacer`);
       else if (bad && !already) {

@@ -63,39 +63,54 @@ function onlyMotion(t, shot) {
   }
   return keep.join(', ');
 }
+// ─────────────────────────────────────────────────────────────────────────────────────────────────────────────
+// PROMPT PARA LTX-2.5 (destilado, cfg = 1) — REESCRITO oct-16 tras la prueba A/B en king (tomas 19/36/79/89/107 del EP 34,
+// misma imagen y misma semilla; ver CAMBIOS.md). Lo que rompía las tomas con el prompt anterior (HECHO, en los videos):
+//  1) "Scene at the start" describía OTRA imagen cuando Franklin subió la suya (start_en viejo): LTX empuja hacia el texto →
+//     cambia de lugar, aparecen/desaparecen personas (T36 saltó a una cantera; T19 perdió obreros).
+//  2) El "By the end" (reaction_en) pedía gestos que la acción no pedía (T36 "pointing", T19 "palms flat on the rock") → los hacía.
+//  3) Cámara impuesta ("slow lateral drift" automático) + ~100 palabras de relleno → la cámara viajaba de más.
+//  4) Se recortaban frases con palabras de quietud → la acción llegaba incompleta o sin sentido (T89).
+//  5) Listas "No grabbing, no tapping…" dentro de la acción: con cfg = 1 NOMBRAR algo lo provoca (T79 agarró con dedos doblados).
+// Ahora: imagen → UNA acción (completa, tal cual) → final coherente → cámara de la toma → 2–3 líneas cortas de continuidad.
+// Objetivo: 100–200 palabras, todo en afirmativo.
+const META_SENT_RE = /^(no |not |do not|don'?t|never|without |avoid|preserve|keep (the )?(exact|original|same)|locked(-off)? (documentary )?camera|static (documentary )?(shot|camera)|continuous (photorealistic )?shot|photorealistic|realistic breathing|all (movements|motion)|natural documentary realism|quiet archaeological realism|authentic|restrained|the movement is (restrained|careful|subtle)|cinematic|documentary (style|realism|footage)|minimal (realistic )?motion|subtle (dust|natural)|slight dust)/i;
+const NEG_LIST_RE = /\b(no|without)\s+\w+(?:\s+\w+)?\s*,\s*(no|without)\s+\w+/i; // "no grabbing, no tapping"
+const SYNC_RE = /,?\s*\b(together|in unison|in sync|simultaneously|at the same time|all at once|in the same (?:\w+\s+){0,2}(?:arc|rhythm|motion|movement|direction|way))\b/gi;
+const STEADY_CAM_RE = /\b(locked(-off)?\s+(close-?up\s+)?camera|static\s+(documentary\s+)?(camera|shot)|camera\s+(holds|stays|remains)\s+(steady|still|fixed)|fixed\s+camera|tripod|locked-off)\b/i;
+const GESTURE_RE = /\b(point(s|ing|ed)?|rais(e|es|ed|ing)\s+(an?|his|her|their|one|both|right|left)?\s*(arm|arms|hand|hands)|arms? raised|reach(es|ing|ed)?|grab(s|bing|bed)?|touch(es|ing|ed)?|palms?\s+(flat\s+)?(on|against)|hands?\s+(flat\s+)?(on|against)\s+the\s+(rock|wall)|walk(s|ing|ed)?\s+(away|off|out)|wav(e|es|ing))\b/i;
+const sentencesOf = (t) => String(t || '').replace(/\s+/g, ' ').split(/(?<=[.!?])\s+(?=[A-Z])/).map((x) => x.trim()).filter(Boolean);
+// Limpia acción/final: quita frases-instrucción (meta), listas de prohibiciones y palabras de sincronía. NO toca la acción.
+function cleanMotion(t) {
+  return sentencesOf(t).filter((s) => !META_SENT_RE.test(s) && !NEG_LIST_RE.test(s) && !/^(the\s+)?camera\b/i.test(s))
+    // La cámara la decide SOLO la línea "Camera:" (antes la acción decía "the camera pushes in" y la línea "lateral drift").
+    .map((s) => s.replace(/,?\s*\b(while|as|and)\s+the camera\s+[^,.;]*/gi, ''))
+    // Cláusulas en negativo dentro de una frase (", without touching the marks", ", no sudden motion"): con cfg = 1 nombrar lo
+    // que no debe pasar lo provoca → se quita SOLO esa cláusula.
+    .map((s) => s.replace(/,?\s*\b(without|never)\s+[^,.;]*/gi, '').replace(/,\s*no\s+[^,.;]*/gi, '').replace(SYNC_RE, '').replace(/\s+,/g, ',').replace(/\s{2,}/g, ' ').replace(/\s+([.!?])$/, '$1'))
+    .filter((s) => s.split(/\s+/).length >= 3).join(' ').trim();
+}
+// Descripción del cuadro: sin el relleno de estilo fotográfico que el guionista repite en cada start_en.
+function cleanStart(t) {
+  return String(t || '')
+    .replace(/\b(extreme\s+)?(medium|wide|close)[- ]?(wide\s+|up\s+)?shot\s+\d+\s?mm\s*[,:]?\s*/gi, '')
+    .replace(/\bclose-?up\s+\d+\s?mm\s*[:,]?\s*/gi, 'Close-up: ')
+    .replace(/,?\s*photorealistic documentary photograph,?\s*shot on a real camera,?\s*natural imperfect textures,?\s*real lighting\.?/gi, '')
+    .replace(/^\s*photorealistic documentary photograph[^.]*\.\s*/i, '')
+    .replace(/,?\s*\b(horizontal|vertical)\s+(16:9|9:16)\s+(widescreen\s+|landscape\s+|portrait\s+)*(frame|image|composition|format)\b\.?/gi, '')
+    .replace(/\bfrozen\s+(mid-?(fall|air|motion|collapse))/gi, 'in the middle of falling').replace(/\b(frozen|motionless|suspended)\s+(in\s+)?(mid-?air|time)\b/gi, 'falling')
+    .replace(/\s+([.,])/g, '$1').replace(/\s{2,}/g, ' ').replace(/^[\s,.:]+/, '').trim();
+}
 function ltxPromptFor(shot, storyBible) {
   const sb = storyBible || {};
-  const names = {};
   // "NeandertalUno" → "the first neandertal" (nombres internos que LTX no entiende).
   const clean = (t) => String(t || '').replace(/\b([A-Z][a-z]+)(Uno|Dos|Tres|Cuatro)\b/g, (_, a, b) => ({ Uno: 'the first ', Dos: 'the second ', Tres: 'the third ', Cuatro: 'the fourth ' }[b] + a.toLowerCase())).replace(/\s+/g, ' ').trim();
   if (shot.ltx_en) return clean(shot.ltx_en); // si el guion trae un prompt propio para LTX, manda ese
-  const MOVE_RE = /push|pull|dolly|pan|tilt|track|zoom|orbit|crane|handheld|fpv|drone|fly|follow|glide|rise|rush|slide|sink|descend|move|drift|lateral|arc|truck|boom|sweep/i;
-  // Videos narrados de curiosidades (sin personajes): cámara con energía, se mueve de verdad.
-  // En novelas con personas se mantiene lenta (con gente, el movimiento fuerte deforma caras e inventa fondos).
   const dynamic = sb.format === 'narrado_unico';
-  // Narrados: NUNCA cámara fija ("static" dejaba la toma como una foto quieta: EP2 depredadores T7/T11/T16).
-  // Cámaras que Claude escribe con "framing kept unchanged", "held", "no zoom": con cfg = 1 eso frena o PROVOCA el zoom.
-  const cam0 = clean(shot.camera).replace(/,?\s*(?:with\s+)?(?:the\s+)?(?:same\s+)?(?:extreme\s+)?(?:wide\s+)?(?:framing|angle|height)\s+(?:kept|held)(?:\s+unchanged)?/gi, '').replace(/,?\s*\b(?:no zoom|without zoom(?:ing)?|kept unchanged|unchanged|held)\b/gi, '').replace(/,?\s*(?:the\s+)?same\s+(?:\w+\s+){0,2}(?:framing|angle|distance)\b/gi, '').replace(/,\s*(?:high|low|wide)\s*(?=,|$)/gi, '').replace(/\s+,/g, ',').replace(/[,\s]+$/, '');
-  // LTX-SAFE (Franklin oct-14, EP 11 con 60 % de tomas rotas): push-in, grúa, seguimiento, órbita o dron hacen que solo
-  // se mueva la cámara, cortan al sujeto o lo cambian por otro → en narrados se cambian por un desplazamiento lateral
-  // corto. También arregla guiones YA escritos. El relleno automático ya no es "slow push-in" (dejaba todo quieto).
-  const { safeCamera } = require('./_ltx_safe');
-  const camSafe = dynamic ? safeCamera(cam0, shot) : cam0;
-  const cam = dynamic && !MOVE_RE.test(camSafe) ? [camSafe.replace(/\bstatic\b/ig, '').replace(/^[,\s]+|[,\s]+$/g, '').replace(/,\s*,/g, ','), 'slow lateral drift to the ' + ((Number(shot.n) || 0) % 2 ? 'right' : 'left')].filter(Boolean).join(', ') : camSafe;
-  const moving = MOVE_RE.test(cam);
-  // Primeros planos (ojo, dientes, ventosas): movimiento suave. Con "energía" LTX los hacía explotar (EP2 T10/T11).
-  // Solo planos cerrados: "slow push-in" en planos abiertos dejaba casi todo quieto (Toba largo, oct-2026).
-  const gentle = dynamic && /close[- ]?up|macro|\beye\b/i.test(cam + ' ' + (shot.start_en || ''));
-  void names;
-  // LTX no sabe quién es "Valentina": cada nombre se cambia por lo que lleva puesto
-  // ("the person in a mustard-yellow cardigan over a white t-shirt"), así sabe a quién mover y quién habla.
+  // LTX no sabe quién es "Valentina": cada nombre se cambia por lo que lleva puesto.
   const who = whoMap(shot);
   const named = (t) => who.reduce((acc, [re, desc]) => acc.replace(re, desc), clean(t));
   const speaker = speaksOnScreen(shot, sb) ? speakerDesc(shot, who) : '';
-  // Fondo: el del guion (background_en) o, en guiones viejos, la descripción del lugar en la biblia.
-  const locVisual = (() => { const l = sb.locations && shot.location && sb.locations[shot.location]; return l ? (typeof l === 'string' ? l : l.visual) : ''; })();
-  const bg = shot.background_en || locVisual;
-  // Modo voz de LTX: la línea va dicha EN el video (en español, con la voz descrita del personaje).
   const { ltxVoiceMode } = require('./_series');
   const line = (() => { const d = shot.dialogue; return (Array.isArray(d) ? d : d ? [d] : []).find((x) => x && x.line) || null; })();
   const vc = line && sb.voice_cast && sb.voice_cast[line.speaker];
@@ -104,58 +119,55 @@ function ltxPromptFor(shot, storyBible) {
     : '';
   const ambient = (() => { const l = sb.locations && shot.location && sb.locations[shot.location]; return l && typeof l === 'object' ? l.ambient : ''; })();
   const soundLine = ltxVoiceMode(sb) ? 'Sound: ' + (ambient ? clean(ambient) + ', ' : '') + 'soft and quiet' + (sayLine ? ', with the spoken words clear on top.' : '.') : '';
-  // Tomas sin personas (espacio, paisajes, animales: curiosidades): nada de frases de gente/ropa/actuación,
-  // que con cfg = 1 pueden hacer aparecer personas donde no hay.
-  const hasPeople = (shot.characters || []).length > 0 || /\b(person|people|man|men|woman|women|child|children|boy|girl|silhouette|silhouettes|guard|crowd|human|humans|hunter|hunters|survivor|survivors|clan|tribe|band|family|forager|foragers|artisan|figures|soldier|soldiers|officer|members|homo sapiens)\b/i.test([shot.start_en, shot.action_en, shot.prompt_override].join(' '));
-  return [
-    hasPeople ? 'The video starts exactly on the provided image and keeps its composition, people, clothing, lighting and background.' : 'The video starts exactly on the provided image and keeps its composition, lighting and background.',
-    // Si el usuario editó el prompt de la toma en el panel, esa descripción manda.
-    ...(shot.prompt_override && shot.prompt_override.trim()
-      ? ['Scene: ' + named(stripVeoSpeech(shot.prompt_override)).slice(0, 2200).replace(/[^.]*$/, '')]
-      : [
-        // "frozen mid-fall" / "suspended in mid-air" en la descripción del cuadro → LTX lo deja congelado (Toba T16).
-        shot.start_en ? 'Scene at the start: ' + named(dynamic ? String(shot.start_en).replace(/\bfrozen\s+(mid-?(fall|air|motion|collapse))/gi, 'in the middle of falling').replace(/\b(frozen|motionless|suspended|still)\s+(in\s+)?(mid-?air|place|time)\b/gi, 'falling').replace(/\b(frozen|motionless|static)\b/gi, '') : shot.start_en) + '.' : '',
-        shot.action_en ? (dynamic ? 'Then: ' + named(onlyMotion(shot.action_en, shot) || String(shot.action_en).replace(/\b(completely |perfectly )?(still|steady|steadily|motionless|frozen|static|unmoving)\b/gi, '')) : 'Then, slowly and naturally: ' + named(shot.action_en)) + '.' : '',
-        // Final con quietud ("the column rests steady") se omite en narrados: si no, LTX frena el movimiento.
-        // El control de calidad vio que la acción no se notaba → se pide que ocurra completa y se vea.
-        // Toma de SOLO CÁMARA (maqueta de museo, objeto, mapa): el objeto es rígido y no cambia; solo se mueve la cámara.
-        shot.camera_only ? 'The ' + (/model|maqueta/i.test(shot.start_en || '') ? 'museum model' : 'main object') + ' is a solid rigid physical object with exactly the same shape, layers and details from the first frame to the last; only the camera moves around it.' : '',
-        shot.qa_boost && shot.action_en && !shot.camera_only ? 'The main action is the whole point of this clip: it happens fully, clearly and visibly from the first second to the last.' : '',
-        shot.reaction_en && (!dynamic || onlyMotion(shot.reaction_en, shot)) ? 'By the end: ' + named(dynamic ? onlyMotion(shot.reaction_en, shot) : shot.reaction_en) + '.' : ''
-      ]),
-    moving
-      ? (dynamic ? 'Camera: ' + cam + (gentle ? '. The camera moves slowly and smoothly; the subject looks whole and sharp the whole clip.' : '. The camera makes exactly this one smooth move, like a premium cinematic documentary shot, and the main subject of the first frame is in the picture from the first second to the last.') : 'Camera: ' + cam + ', very slow and subtle; the framing stays close to the first frame.')
-      : 'Camera: ' + (cam ? cam + '. ' : '') + 'Locked-off tripod shot with the same fixed framing from the first frame to the last frame.',
-    // Narrados sin personas: todo se mueve todo el tiempo (si no, el fondo queda como foto quieta).
-    dynamic && !hasPeople && !shot.camera_only ? (gentle ? (/\b(animal|creature|dinosaur|whale|shark|octopus|squid|orca|bird|fish|mammal|eye|skin)\b/i.test([shot.start_en, shot.action_en].join(' ')) ? 'Gentle natural life in the scene: the animal skin and body move softly, tiny particles drift slowly in the water.' : (hazeScene(shot) ? 'Gentle ambient life: lights glow softly, fine dust drifts in the air; shapes look solid and real.' : 'Gentle natural life in what is already in the image; the air is clear and clean, shapes look solid and real.')) : (/\b(animal|creature|dinosaur|whale|shark|octopus|squid|orca|bird|fish|mammal|beast|monster)\b/i.test([shot.start_en, shot.action_en].join(' ')) ? 'Everything keeps moving for the whole clip: the animal moves its body continuously, light shifts naturally, water and clouds move if they are in the image; the air is clear.' : (hazeScene(shot) ? 'The scene stays alive for the whole clip with natural ambient motion: lights flicker, dust and haze drift softly; objects look solid and intact.' : ('The scene stays alive for the whole clip with natural motion of what is already in the image; the air is clear and clean' + (/\b(break|breaks|crack|cracks|crash|crashes|collaps\w*|shatter\w*|explod\w*|crumbl\w*|plunge|tumbl\w*|fall|falls|split)\b/i.test(shot.action_en || '') ? '.' : ', objects look solid and intact.'))))) : '',
-    // Ropa de cada personaje (LTX inventaba pies descalzos o cambiaba la ropa al moverse: EP3 T2/T9).
+  const hasPeople = (shot.characters || []).length > 0 || /\b(person|people|man|men|woman|women|child|children|boy|girl|silhouette|silhouettes|guard|crowd|hunter|hunters|survivor|survivors|clan|tribe|band|family|forager|foragers|artisan|figures|soldier|soldiers|officer|members|researchers?|workers?|astronauts?|pilots?|homo sapiens|humans? (?:figure|being)s?)\b/i.test([shot.start_en, shot.action_en, shot.prompt_override].join(' '));
+
+  // 1) LA IMAGEN. Si la imagen la subió Franklin (own_image), el start_en es de OTRA imagen → no se describe: manda la foto.
+  // Con prompt editado a mano en el panel (prompt_override), ese texto manda y describe la escena entera.
+  const override = !!(shot.prompt_override && shot.prompt_override.trim());
+  const startTxt = shot.own_image || override ? '' : cleanStart(named(shot.start_en));
+  const opening = startTxt
+    ? 'The video starts on the provided image: ' + startTxt.replace(/[.\s]*$/, '.')
+    : 'The video starts on the provided image and keeps its place, ' + (hasPeople ? 'people, clothing, ' : '') + 'objects and light.';
+
+  // 2) LA ACCIÓN, completa (sin recortes por palabras de quietud), sin frases-instrucción ni prohibiciones.
+  const actionRaw = override ? stripVeoSpeech(shot.prompt_override) : (shot.action_en || '');
+  const action = cleanMotion(named(actionRaw));
+  // 3) EL FINAL: solo si no pide un gesto que la acción no pidió (T36: el final decía "pointing" y la acción no).
+  let ending = override ? '' : cleanMotion(named(shot.reaction_en || ''));
+  if (ending) { const g = ending.match(GESTURE_RE); if (g && !new RegExp('\\b' + g[1].slice(0, 4), 'i').test(action)) ending = ''; }
+
+  // 4) CÁMARA de la toma (no se impone ninguna). Si la acción pide cámara fija, manda eso. Movimientos que LTX rompe
+  //    (push-in, dolly, órbita, dron…) se cambian por un desplazamiento lateral (regla LTX-SAFE #4).
+  const cam0 = named(shot.camera).replace(/,?\s*\b(?:no zoom|without zoom(?:ing)?|kept unchanged|unchanged|held)\b/gi, '').replace(/[,\s]+$/, '');
+  const { safeCamera } = require('./_ltx_safe');
+  let camera;
+  if (STEADY_CAM_RE.test(actionRaw) || /^(the camera )?(static|locked|fixed|still|holds steady|stays steady)\b/i.test(cam0) || !cam0) camera = 'The camera holds steady.';
+  else camera = 'Camera: ' + (dynamic ? safeCamera(cam0, shot) : cam0 + ', slow and subtle') + '.';
+
+  const parts = [
+    opening,
+    action ? (action.charAt(0).toUpperCase() + action.slice(1)).replace(/([^.!?])$/, '$1.') : '',
+    shot.camera_only ? 'The ' + (/model|maqueta/i.test(shot.start_en || '') ? 'museum model' : 'main object') + ' is a solid rigid object with the same shape and details from the first frame to the last; only the camera moves around it.' : '',
+    shot.qa_boost && action && !shot.camera_only ? 'The main action happens fully and clearly within the clip.' : '',
+    ending ? 'By the end, ' + ending.replace(/^(the shot ends with|by the end,?)\s+/i, '').replace(/^([A-Z])(?=[a-z])/, (m) => m.toLowerCase()).replace(/[.\s]*$/, '.') : '',
+    camera,
+    // Continuidad (evidencia previa, en afirmativo y corto):
     wardrobeLine(shot),
-    // Fondo sin palabras de quietud ("Static strata, unmoving chamber, fixed frozen lake" congelaba T15 Toba).
-    bg ? 'Background: ' + (dynamic ? clean(bg).replace(/\b(static|unmoving|motionless|fixed|frozen|unchanged|still|steady|locked)\s*/gi, '').replace(/\s+,/g, ',') : clean(bg)).replace(/[.\s]*$/, '') + (dynamic ? '.' : '; it stays exactly as in the first frame.') : (dynamic ? '' : 'The background, walls, terrain and sky stay exactly as in the first frame.'),
-    // Estilo de la serie SIN lo de ropa ("period-appropriate hide garments" vestía de pieles a la científica moderna) ni el formato.
-    sb.visual_style ? clean(sb.visual_style).split(/,\s*/).filter((x) => !/garment|cloth|outfit|wear|hide|vertical|9:16|framing|aspect/i.test(x) && (hazeScene(shot) || !/smoke|dust|haze|mist|fog/i.test(x))).join(', ').slice(0, 260).replace(/,[^,]*$/, (m) => (clean(sb.visual_style).length > 260 ? '' : m)).replace(/[,.\s]*$/, '.') : 'Photorealistic cinematic footage.',
-    isAnimated(sb) ? 'The whole clip keeps exactly the same stylized 3D animated look as the first frame.' : '',
-    // IMPORTANTE (HECHO, oct-2026): la plantilla usa el modelo DESTILADO con cfg = 1, así que el prompt
-    // NEGATIVO NO HACE NADA y nombrar algo en el positivo (aunque sea "no subtitles", "nobody is barefoot")
-    // lo PROVOCA: EP1 Dulce salió con subtítulos inventados (hasta en chino) y con pies descalzos.
-    // Todo se pide en AFIRMATIVO: lo que sí debe verse.
-    // Solo con personajes reales de novela: en narrados, nombrar "envelopes, letters, papers" hacía APARECER papeles en las
-    // manos de cazadores y arqueólogos (QA visual Toba T29/T41/T44/T52/T56/T64, oct-2026).
-    hasPeople && (shot.characters || []).length && !dynamic ? 'Objects that the characters hold at the start (trays, envelopes, letters, phones, cups) stay in the same hands for the whole clip. Papers and letters are plain and blank.' : '',
-    // Narrados: gente de espaldas/perfil. Hablar de "expresiones con los ojos" las hacía girarse a cámara (QA Toba T29/T56/T68).
-    hasPeople && dynamic ? 'The people keep the same number, direction and clothing as in the first frame while their bodies move naturally.' : '',
-    hasPeople && !dynamic ? 'Acting is subtle and restrained' + (isAnimated(sb) ? ', like a premium animated feature' : '') + ': small natural expressions with the eyes and brows, lips relaxed.' : '',
-    // Planos SIN personas (oct-14, EP25): 4 de 18 cortaron a otra escena o deformaron el lugar (T8, T18, T21, T28) y 0 de 21
-    // con personas. Cuando solo se mueve la cámara, LTX "inventa" movimiento cambiando el lugar. Se pide en afirmativo.
-    !hasPeople && !shot.camera_only && (() => { try { const f = require('./_cerebro').featuresOf(shot); return f.personas === 'p0' && !f.vehiculo; } catch (_) { return false; } })() ? 'One single continuous take: the place stays exactly the same place for the whole clip, with the same buildings, walls and objects keeping their shape, size and position; only the camera glides gently and the natural elements of the scene (light, grass, water, cloth) move a little.' : '',
-    // Voces fijas para todos: el que habla mueve la boca en 0–6 s (ahí el render pone su voz); si no, bocas cerradas.
-    speaksOnScreen(shot, sb)
-      ? 'Natural subtle body motion, consistent faces. ' + (speaker ? speaker.charAt(0).toUpperCase() + speaker.slice(1) : 'The character who speaks') + ' keeps the head and eyes turned toward whoever or whatever the action says they are talking to, from the first frame to the last frame' + (sayLine ? '. ' + sayLine + ' ' : ', and moves the lips softly and naturally as if talking quietly during the first 6 seconds, then closes the mouth. ') + 'Everyone else keeps the mouth closed. Photos, paintings and screens on the walls are still pictures. ' + soundLine + ' Clean cinematic image.'
-      : (hasPeople ? 'Natural subtle body motion, consistent faces, mouths closed. ' : (dynamic ? (gentle ? 'Slow, smooth, continuous natural motion. ' : (/\b(animal|creature|dinosaur|whale|shark|octopus|squid|orca|bird|fish|mammal|beast|monster|storm|fire|explosion|asteroid|waves|running|fight|missile|missiles|rocket|rockets|launch|jet|plane)\b/i.test([shot.start_en, shot.action_en].join(' ')) ? 'Constant, vivid, powerful motion in every part of the frame from the first second to the last: the scene feels alive and spectacular. ' : 'Smooth, continuous, cinematic motion from the first second to the last. ')) : 'Smooth, continuous, natural motion. ')) + soundLine + ' Clean cinematic image.'
-  ].filter(Boolean).join(' ').replace(/\.\s*\./g, '.')
-    // Guiones con "no readable text, no logos": con cfg = 1 nombrar texto/letras/logos los hace aparecer.
+    hasPeople ? 'The same people stay in the shot with the same faces and clothing' + (speaksOnScreen(shot, sb) ? '.' : ', mouths closed.') : '',
+    !hasPeople && !shot.camera_only ? 'One continuous shot; the place and everything in it keep their shape.' : '',
+    hasPeople && (shot.characters || []).length && !dynamic ? 'Objects the characters hold stay in the same hands; papers and letters are plain and blank.' : '',
+    hasPeople && !dynamic ? 'Acting is subtle and restrained' + (isAnimated(sb) ? ', like a premium animated feature' : '') + '.' : '',
+    speaksOnScreen(shot, sb) && speaker ? (speaker.charAt(0).toUpperCase() + speaker.slice(1)) + ' keeps the head turned toward whoever they are talking to.' + (sayLine ? ' ' + sayLine : '') : '',
+    soundLine,
+    isAnimated(sb) ? 'The whole clip keeps the same stylized 3D animated look as the first frame.' : (sb.visual_style ? String(clean(sb.visual_style).split(/,\s*/)[0]).replace(/[.\s]*$/, '.') : 'Photorealistic footage.')
+  ].filter(Boolean);
+  let out = parts.join(' ').replace(/\.\s*\./g, '.')
+    // Con cfg = 1 nombrar texto/letras/logos los hace aparecer (aunque sea "no text").
     .replace(/,?\s*(?:with\s+|and\s+)?(?:no|without)\s+(?:any\s+)?(?:readable\s+|visible\s+|on-screen\s+)?(?:text|writing|words|letters|logos?|captions|subtitles|watermarks?)\b(?:\s*(?:,|or|and)\s*(?:no\s+)?(?:readable\s+)?(?:text|writing|words|letters|logos?|captions|subtitles|watermarks?)\b)*/gi, '')
-    .replace(/\s+/g, ' ');
+    .replace(/\s+/g, ' ').trim();
+  // Tope de largo: si se pasa de ~220 palabras, la descripción del cuadro se recorta a sus 2 primeras frases.
+  if (out.split(/\s+/).length > 220 && startTxt) out = out.replace(startTxt.replace(/[.\s]*$/, '.'), sentencesOf(startTxt).slice(0, 2).join(' ').replace(/[.\s]*$/, '.'));
+  return out;
 }
 
 // [nombre → "the person in <primera prenda>"] desde shot.wardrobe (nombre completo y nombre de pila).
@@ -260,7 +272,10 @@ async function kingGenerateVideo({ prompt, negative = null, startImage, endImage
   wf[N.width].inputs.value = wide ? 1280 : 704;
   wf[N.height].inputs.value = wide ? 704 : 1280;
   if (wide) log('  LTX en horizontal 16:9');
-  // LTX en king aguanta hasta 16 s por toma (probado por Franklin; tarda más).
+  // oct-16 (Franklin): MÁXIMO 8 s por clip. LTX aguanta más, pero con más segundos inventa movimiento para llenar el tiempo
+  // (prueba A/B T79: la mano llegó y siguió hasta salirse del cuadro). Cualquier segundo entero vale en esta instalación:
+  // la plantilla pide seg × 24 + 1 cuadros, que cumple la regla 8n+1 de LTX. Lo que necesite más, se parte en varias tomas.
+  // El tope de 8 s lo pone kingSecondsFor; aquí solo el límite físico (con una excepción: ver kingSecondsFor).
   wf[N.duration].inputs.value = Math.max(2, Math.min(15, Math.round(Number(durationSeconds) || 8)));
   wf[N.seedA].inputs.noise_seed = crypto.randomInt(1, 2 ** 31);
   wf[N.seedB].inputs.noise_seed = crypto.randomInt(1, 2 ** 31);
@@ -314,17 +329,22 @@ async function stripAudio(buf) {
 
 // Duración de la toma en king según lo que dura la voz: así una frase buena no se acorta ni se acelera.
 // Usa la narración ya generada si existe; si no, estima ~1.9 palabras por segundo (voz de documental).
-// Mínimo 8 s, máximo 16 s. shot.seconds (si el guion lo trae) manda.
+// oct-16 (Franklin): máximo 8 s por clip (antes 15). Si la voz dura más, el render ajusta la velocidad (hasta 0.6×) y el
+// guionista debe partir la línea en dos tomas (regla LTX-SAFE de duración). shot.seconds (si el guion lo trae) manda.
 function kingSecondsFor(shot) {
   if (!shot) return 8;
-  if (Number(shot.seconds) > 0) return Math.max(2, Math.min(15, Math.round(Number(shot.seconds)))); // voz continua: tomas cortas tipo anime (2 s)
+  if (Number(shot.seconds) > 0) return Math.max(2, Math.min(8, Math.round(Number(shot.seconds)))); // voz continua: tomas cortas tipo anime (2 s)
   let voice = Number(shot.narration && shot.narration.seconds) || 0;
   if (!voice) {
     const d = shot.dialogue;
     const words = (Array.isArray(d) ? d : d ? [d] : []).map((x) => (x && x.line) || '').join(' ').split(/\s+/).filter(Boolean).length;
     voice = words / 1.9;
   }
-  return Math.max(8, Math.min(15, Math.ceil(voice + 1.3)));
+  const need = voice + 1.3;
+  // Excepción: el render solo puede ralentizar hasta 0.6× (si no, la voz continua se adelanta y TODO lo que sigue queda
+  // desfasado). Si la línea es tan larga que 8 s no alcanzan ni a 0.6×, se da lo justo para no desfasar (≈1 % de las tomas;
+  // esas deberían partirse en el guion).
+  return Math.max(4, Math.min(8, Math.ceil(need)), Math.ceil(need * 0.6));
 }
 
 module.exports = { kingSecondsFor, kingGenerateVideo, ltxPromptFor, ltxNegativeFor, speaksOnScreen, NEG_BASE };
