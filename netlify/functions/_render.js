@@ -184,7 +184,12 @@ const POWER_WORDS = new Set(('never nobody nothing everything everyone always no
   'save yourself life dream dreams purpose truth real must power change move moving up again focus regret proof promise respect earn earned ' +
   'built build show shows up silence silent dark storm war battle hungry winners legacy die dying alive free freedom').split(' '));
 const EMPH_COLOR = '&H0000C8FF&'; // oro (BGR)
-function kineticEvents(words, { lead = 0, bodyEnd = 1e9, wide = false, emphasis = [] } = {}) {
+// look (por canal, story_bible.frase_style): { size: % del tamaño base, color: '#RRGGBB', emph_color: '#RRGGBB' }.
+const assColor = (hex, def) => { const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || '')); return m ? '&H00' + m[1].slice(4, 6) + m[1].slice(2, 4) + m[1].slice(0, 2) + '&' : def; };
+function kineticEvents(words, { lead = 0, bodyEnd = 1e9, wide = false, emphasis = [], look = {} } = {}) {
+  const BASE_C = assColor(look.color, '&H00FFFFFF&'), EMPH_C = assColor(look.emph_color, EMPH_COLOR);
+  const SZ = Math.max(40, Math.min(150, Number(look.size) || 100)) / 100;
+  const FS = Math.round((wide ? 118 : 120) * SZ);
   const key = (w) => String(w).toLowerCase().replace(/[^\p{L}\p{N}']/gu, '').replace(/'s$/, '');
   const shown = (w) => String(w).replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}%]+$/gu, '').toUpperCase();
   const E = new Set(emphasis.map(key).filter(Boolean));
@@ -212,11 +217,11 @@ function kineticEvents(words, { lead = 0, bodyEnd = 1e9, wide = false, emphasis 
       if (!(en > st + 0.03)) return;
       const txt = c.slice(0, k + 1).map((x, j) => {
         const em = isEmph(x.word);
-        const base = em ? `{\\1c${EMPH_COLOR}\\fscx135\\fscy135}` : '{\\1c&H00FFFFFF&\\fscx100\\fscy100}';
+        const base = em ? `{\\1c${EMPH_C}\\fscx135\\fscy135}` : `{\\1c${BASE_C}\\fscx100\\fscy100}`;
         const pop = j === k ? (em ? '{\\fscx95\\fscy95\\t(0,140,\\fscx135\\fscy135)}' : '{\\fscx75\\fscy75\\t(0,120,\\fscx100\\fscy100)}') : '';
         return base + pop + shown(x.word);
       }).join(' ');
-      evs.push({ start: st, end: en, style: 'Frase', text: txt });
+      evs.push({ start: st, end: en, style: 'Frase', text: `{\\fs${FS}}` + txt });
     });
   });
   return evs;
@@ -686,7 +691,7 @@ async function renderEpisode({ episode, series, log = console.log, fetchFile = d
         const word = String(wd.word).replace(/[^\p{L}\p{N}]/gu, '').toUpperCase();
         return word && en > st + 0.05 ? { start: st, end: en, style: 'Word', text: `{\\1c${WORD_COLORS[k % WORD_COLORS.length]}\\fscx118\\fscy118\\t(0,90,\\fscx100\\fscy100)}` + word } : null;
       }).filter(Boolean) : null;
-      const fraseEvs = sbx.subtitle_style === 'frase' ? kineticEvents(Array.isArray(contVoice.words) && contVoice.words.length ? contVoice.words : VF.wordTimes(segs), { lead: VF.LEAD, bodyEnd, wide: W > H, emphasis: [...big, ...gold] }) : null;
+      const fraseEvs = sbx.subtitle_style === 'frase' ? kineticEvents(Array.isArray(contVoice.words) && contVoice.words.length ? contVoice.words : VF.wordTimes(segs), { lead: VF.LEAD, bodyEnd, wide: W > H, emphasis: [...big, ...gold], look: sbx.frase_style || {} }) : null;
       const evs = fraseEvs ? fraseEvs : wordEvs ? wordEvs.concat(numEvs) : segs.map((x, k) => {
         const st = VF.LEAD + Number(x.start) - 0.05;
         const en = Math.min(bodyEnd - 0.1, k + 1 < segs.length ? VF.LEAD + Number(segs[k + 1].start) - 0.08 : VF.LEAD + Number(x.end) + 1.6);
