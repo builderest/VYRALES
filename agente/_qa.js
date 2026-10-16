@@ -281,6 +281,16 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
       // tres", "la cámara se aleja", "no se ve que trabajen a pico") y la toma quedaba APROBADA. Ahora queda marcada para
       // que la revises (sin rehacerla sola: rehacer sin motivo claro arriesgaba empeorarla).
       const contradice = !bad && /\b(en vez de|en lugar de|no se ve|no ocurre|no hace|no pasa|son \w+ y no|aparece|desaparece|se aleja|se va|cambia de|deform|falta|sobra|de m[aá]s|de menos)\b/i.test(String(r.reason || ''));
+      // oct-16: la imagen la SUBISTE TÚ (own_image / keep_image) y el juez solo se queja de la IMAGEN (personas, ropa, objeto),
+      // no del movimiento: rehacer el video NO puede arreglar eso (la imagen no se cambia) y el reescritor terminaba inventando
+      // acciones nuevas sobre la misma foto (T19: "pala" en vez de picos). Queda para que tú decidas, sin gastar intentos.
+      const soloImagenTuya = bad && !forced && !!(it.sh.own_image || (it.sh.qa && it.sh.qa.keep_image)) && r.action_ok !== false && r.broken !== true && r.haze !== true;
+      if (soloImagenTuya) {
+        log(`QA visual toma ${it.sh.n}: la imagen la subiste tú y el QA dice: ${String(r.reason || '').slice(0, 160)} → no la rehago (rehacer el video no cambia la imagen); queda para que la revises`);
+        qaOf[it.sh.n] = { clip_id: it.clip.id, ok: false, revisar: true, own_image_note: true, image_ok: r.image_ok !== false, style_ok: r.style_ok !== false, action_ok: true, haze: false, broken: false, reason: String(r.reason || '').slice(0, 300), at: new Date().toISOString(), redone: tries > 0, tries };
+        ev0.push({ ep: epId, n: it.sh.n, clip: it.clip.id, try: tries, src: 'qa', verdict: r, reason: r.reason, shot: it.sh });
+        continue;
+      }
       if (contradice) log(`QA visual toma ${it.sh.n}: las casillas dicen "bien" pero la nota describe un problema (${String(r.reason).slice(0, 140)}) → queda para que la revises`);
       // revisar: queda para Franklin y ya NO se re-escanea en cada pasada (antes el QA en vivo miraba las mismas tomas una y otra vez).
       qaOf[it.sh.n] = { clip_id: it.clip.id, ok: (!bad || leve) && !contradice, revisar: (contradice || (bad && !leve && already)) || undefined, leve: leve || undefined, image_ok: r.image_ok !== false, style_ok: r.style_ok !== false, action_ok: r.action_ok !== false, haze: !!r.haze, broken: !!r.broken, reason: String(r.reason || '').slice(0, 300), at: new Date().toISOString(), redone: tries > 0, tries };
@@ -392,6 +402,8 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
         await saveShot(null, { clip_id: clipId, ok, image_ok: vr.image_ok !== false, style_ok: vr.style_ok !== false, action_ok: vr.action_ok !== false, haze: !!vr.haze, broken: !!vr.broken, reason: ok ? '' : String(vr.reason || reason).slice(0, 300), fixed_from: ok ? prevReason : (shNow.qa && shNow.qa.fixed_from), redone: true, tries, force: false, force_any: false, at: new Date().toISOString() });
         if (!redone.includes(t.n)) redone.push(t.n);
         log(`QA toma ${t.n}: ${ok ? 'quedó bien ✓ (' + dec.mode + ')' : 'todavía no (' + (vr.reason || '') + ')'}`);
+        // Imagen tuya y el movimiento ya está bien: lo que queda es de la IMAGEN → no se gastan más intentos (ver soloImagenTuya).
+        if (!ok && (shNow.own_image || (shNow.qa && shNow.qa.keep_image)) && vr.action_ok !== false && vr.broken !== true && vr.haze !== true) { await saveShot(null, { revisar: true, own_image_note: true }); log(`QA toma ${t.n}: el movimiento ya está bien; lo que queda es de tu imagen → queda para que la revises`); done = true; break; }
         if (ok) done = true; else { reason = vr.reason || reason; curV = vr; }
       }
       // 🏆 QUEDARSE CON EL MEJOR: si un intento anterior salió mejor que el último, se restaura ESE clip y SU prompt.

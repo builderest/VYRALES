@@ -78,7 +78,7 @@ const META_SENT_RE = /^(no |not |do not|don'?t|never|without |avoid|preserve|kee
 const NEG_LIST_RE = /\b(no|without)\s+\w+(?:\s+\w+)?\s*,\s*(no|without)\s+\w+/i; // "no grabbing, no tapping"
 const SYNC_RE = /,?\s*\b(together|in unison|in sync|simultaneously|at the same time|all at once|in the same (?:\w+\s+){0,2}(?:arc|rhythm|motion|movement|direction|way))\b/gi;
 const STEADY_CAM_RE = /\b(locked(-off)?\s+(close-?up\s+)?camera|static\s+(documentary\s+)?(camera|shot)|camera\s+(holds|stays|remains)\s+(steady|still|fixed)|fixed\s+camera|tripod|locked-off)\b/i;
-const GESTURE_RE = /\b(point(s|ing|ed)?|rais(e|es|ed|ing)\s+(an?|his|her|their|one|both|right|left)?\s*(arm|arms|hand|hands)|arms? raised|reach(es|ing|ed)?|grab(s|bing|bed)?|touch(es|ing|ed)?|palms?\s+(flat\s+)?(on|against)|hands?\s+(flat\s+)?(on|against)\s+the\s+(rock|wall)|walk(s|ing|ed)?\s+(away|off|out)|wav(e|es|ing))\b/i;
+const GESTURE_RE = /\b(point(s|ing|ed)?|rais(e|es|ed|ing)\s+(an?|his|her|their|one|both|right|left)?\s*(arm|arms|hand|hands)|arms? raised|reach(es|ing|ed)?\s+(out|for|toward|towards|into|up|down)|grab(s|bing|bed)?|touch(es|ing|ed)?|palms?\s+(flat\s+)?(on|against)|hands?\s+(flat\s+)?(on|against)\s+the\s+(rock|wall)|walk(s|ing|ed)?\s+(away|off|out)|wav(e|es|ing))\b/i;
 const sentencesOf = (t) => String(t || '').replace(/\s+/g, ' ').split(/(?<=[.!?])\s+(?=[A-Z])/).map((x) => x.trim()).filter(Boolean);
 // Limpia acción/final: quita frases-instrucción (meta), listas de prohibiciones y palabras de sincronía. NO toca la acción.
 function cleanMotion(t) {
@@ -149,7 +149,7 @@ function ltxPromptFor(shot, storyBible) {
     action ? (action.charAt(0).toUpperCase() + action.slice(1)).replace(/([^.!?])$/, '$1.') : '',
     shot.camera_only ? 'The ' + (/model|maqueta/i.test(shot.start_en || '') ? 'museum model' : 'main object') + ' is a solid rigid object with the same shape and details from the first frame to the last; only the camera moves around it.' : '',
     shot.qa_boost && action && !shot.camera_only ? 'The main action happens fully and clearly within the clip.' : '',
-    ending ? 'By the end, ' + ending.replace(/^(the shot ends with|by the end,?)\s+/i, '').replace(/^([A-Z])(?=[a-z])/, (m) => m.toLowerCase()).replace(/[.\s]*$/, '.') : '',
+    ending ? 'By the end, ' + ending.replace(/^(the shot ends with|by the end,?)\s+/i, '').replace(/^(A|An|The|He|She|It|They|His|Her|Its|Their|Both|Each|One|Two|Three|All|Only|Every|This|That|These|Those|Some|Most|Several|Everyone|Nobody|Smoke|Dust|Flames|Fire)\b/, (m) => m.toLowerCase()).replace(/[.\s]*$/, '.') : '',
     camera,
     // Continuidad (evidencia previa, en afirmativo y corto):
     wardrobeLine(shot),
