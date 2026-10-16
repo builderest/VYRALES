@@ -1,0 +1,134 @@
+{
+  "format_version": 3,
+  "slug": "mindfuel_rise_cosmic",
+  "title": "MindFuel Rise — Rise",
+  "genre": "motivacion",
+  "language": "en",
+  "synopsis": "A single continuous hard-discipline monologue (stoic, no-fluff, NewPerson-style) paired one line at a time with abstract cosmic/space imagery — no people, no faces, no on-screen text.",
+  "story_bible": {
+    "format": "narrado_unico",
+    "tone": "Hard, blunt, commanding stoic-discipline motivation — zero fluff, zero softness, never validates how the viewer feels. The whole episode is ONE continuous flowing monologue (never disconnected standalone quotes), hammering the SAME core idea from several different angles, building toward a final short, forceful closing line. Short punchy lines hit fast; occasional longer lines stay controlled and level, never warm, never sentimental, never apologetic. Modeled on the raw 'NewPerson' style of discipline-over-motivation content, clean language (no profanity), for a serious US/English audience.",
+    "setting": "No fixed location — pure deep space, scale changes every shot (nebula, planet, star field, energy, gas giant, single star).",
+    "visual_style": "Abstract cosmic space imagery: nebulas, backlit planets, star fields, expanding energy, gas giant clouds, a single star — no people, no faces, no hands, no on-screen text, no logos, no recognizable spacecraft or named celestial bodies. Vast scale, deep contrast, cinematic lighting, vertical 9:16 framing, dramatic color palettes (deep blues/violets, golds/oranges, stark blacks and whites). Real photographic look, not illustration or 3D render.",
+    "negative": "text, letters, subtitles, watermark, logo, people, hands, faces, spacecraft, satellites, cartoon, illustration, painting, 3D render, low quality, blurry, flicker",
+    "narration": {
+      "engine": "gemini_tts",
+      "voice": "Orus",
+      "model": "gemini-3.8-flash-tts",
+      "video_audio": "none",
+      "mode": "continuous",
+      "style": "Blunt, commanding American English motivational narrator: firm, deep, authoritative, steady and relentless, hammering each line with weight. No warmth, no soothing tone, no sympathetic pauses. Short lines hit hard and fast; longer lines stay level and controlled. Intensity never drops from the first word to the last — the closing line lands with full force, never trailing off."
+    },
+    "rules": {
+      "keyframes": false,
+      "shot_seconds": 8,
+      "shots_per_episode": 6,
+      "max_dialogue_words_per_shot": 0,
+      "max_characters_per_shot": 0,
+      "max_words_per_episode": 130,
+      "shot_model": "veo_lite",
+      "cliffhanger_model": "veo_lite",
+      "reference_images": false
+    },
+    "locations": {
+      "deep_space": {
+        "visual": "Vast deep space, vertical 9:16 framing, dramatic cinematic lighting, no text, no people, no recognizable spacecraft."
+      }
+    }
+  },
+  "characters": [],
+  "episodes": [
+    {
+      "episode_number": 1,
+      "title": "Rise",
+      "continuity": "",
+      "shots": [
+        {
+          "n": 1,
+          "location": "deep_space",
+          "characters": [],
+          "scene_es": "You keep waiting to feel ready. Stop. That feeling is never coming.",
+          "voice_part": "You keep waiting to feel ready. Stop. That feeling is never coming.",
+          "camera": "slow lateral drift to the left",
+          "start_en": "A vast dark nebula filling the frame, deep blue and violet gas clouds drifting slowly, with a single sharp beam of white light at the left edge of the frame.",
+          "end_en": "The same vast dark nebula, the single sharp beam of white light has slid across to the right edge of the frame.",
+          "action_en": "the beam of white light slides slowly and steadily across the nebula from left to right",
+          "reaction_en": "",
+          "background_en": "",
+          "dialogue": [],
+          "sfx": ""
+        },
+        {
+          "n": 2,
+          "location": "deep_space",
+          "characters": [],
+          "scene_es": "Out there, nothing waits for permission. Stars collapse. Planets ignite. Systems burn down and rebuild without asking anyone first.",
+          "voice_part": "Out there, nothing waits for permission. Stars collapse. Planets ignite. Systems burn down and rebuild without asking anyone first.",
+          "camera": "short slow pan to the right",
+          "end_en": "A single rocky planet in silhouette against deep space, now strongly backlit, bright sunlight glowing fully around its curved edge.",
+          "action_en": "a bright sun emerges slowly from behind the planet's curved edge, the sunlight growing steadily brighter",
+          "reaction_en": "",
+          "background_en": "",
+          "dialogue": [],
+          "sfx": ""
+        },
+        {
+          "n": 3,
+          "location": "deep_space",
+          "characters": [],
+          "scene_es": "You don't need the right conditions. You need the decision. Right now.",
+          "voice_part": "You don't need the right conditions. You need the decision. Right now.",
+          "camera": "gentle slight handheld sway",
+          "end_en": "A single glowing point of light at the exact center of the frame, every smaller point of light has gathered into it.",
+          "action_en": "a dense field of small bright points of light slowly draws inward and compresses toward a single glowing point at the center, everything converging at the same calm, steady pace",
+          "reaction_en": "",
+          "background_en": "",
+          "dialogue": [],
+          "sfx": ""
+        },
+        {
+          "n": 4,
+          "location": "deep_space",
+          "characters": [],
+          "scene_es": "Every time you choose discipline over comfort, something in you ignites — whether you feel it or not.",
+          "voice_part": "Every time you choose discipline over comfort, something in you ignites — whether you feel it or not.",
+          "camera": "slow lateral drift to the right",
+          "end_en": "A glowing ring of orange and white energy has expanded outward to the edges of the frame, large and faint.",
+          "action_en": "a glowing ring of orange and white energy expands outward from the center in slow motion, growing larger and fainter as it spreads",
+          "reaction_en": "",
+          "background_en": "",
+          "dialogue": [],
+          "sfx": ""
+        },
+        {
+          "n": 5,
+          "location": "deep_space",
+          "characters": [],
+          "scene_es": "That fire doesn't need an audience. It doesn't need proof. It only needs you to keep feeding it, every single day.",
+          "voice_part": "That fire doesn't need an audience. It doesn't need proof. It only needs you to keep feeding it, every single day.",
+          "camera": "short slow pan to the left",
+          "end_en": "Thick golden-orange clouds of a gas giant's atmosphere, the single large spiral band has rotated further around.",
+          "action_en": "the spiral band of golden-orange clouds rotates slowly in one continuous direction at a steady pace",
+          "reaction_en": "",
+          "background_en": "",
+          "dialogue": [],
+          "sfx": ""
+        },
+        {
+          "n": 6,
+          "location": "deep_space",
+          "characters": [],
+          "scene_es": "So get up. Rise. Nobody else is going to do it for you.",
+          "voice_part": "So get up. Rise. Nobody else is going to do it for you.",
+          "camera": "slow lateral drift to the left",
+          "end_en": "A single bright star at the center of total darkness, now much larger and more intense, its light filling the frame evenly.",
+          "action_en": "the star slowly grows larger and more intense, its light expanding evenly outward in all directions like it is igniting",
+          "reaction_en": "",
+          "background_en": "",
+          "dialogue": [],
+          "sfx": ""
+        }
+      ]
+    }
+  ]
+}

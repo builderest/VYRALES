@@ -61,10 +61,19 @@ function runClaudeRaw(prompt, { timeoutMin = 12, log = () => {}, files = [], web
       try { fs.rmSync(cwd, { recursive: true, force: true }); } catch (_) {}
       // stream-json: una línea JSON por evento. Las respuestas largas llegan en VARIOS mensajes (Claude sigue
       // cuando llega al máximo de salida) y "result" trae solo el último → se juntan todos los textos en orden.
-      let j = null; const texts = [];
+      // oct-16: con web:true (ideas), Claude escribe comentarios de texto ENTRE búsquedas ("Voy a revisar...")
+      // antes del JSON final. Antes se pegaban TODOS los textos seguidos → el comentario quedaba pegado al JSON
+      // y lo rompía ("Expected ',' or ']' after array element"). Ahora se reinicia `texts` cada vez que se ve
+      // una herramienta (tool_use o su resultado): solo queda el texto de la ÚLTIMA tanda, ya sin más tool calls
+      // de por medio (que sigue pudiendo venir partida en varios mensajes si Claude llega al máximo de salida).
+      let j = null; let texts = [];
       for (const ln of out.split(/\r?\n/)) {
         let ev = null; try { ev = JSON.parse(ln); } catch (_) { continue; }
-        if (ev.type === 'assistant' && ev.message && Array.isArray(ev.message.content)) ev.message.content.forEach((c) => { if (c.type === 'text' && c.text) texts.push(c.text); });
+        if (ev.type === 'assistant' && ev.message && Array.isArray(ev.message.content)) {
+          if (ev.message.content.some((c) => c.type === 'tool_use')) texts = [];
+          ev.message.content.forEach((c) => { if (c.type === 'text' && c.text) texts.push(c.text); });
+        }
+        if (ev.type === 'user' && ev.message && Array.isArray(ev.message.content) && ev.message.content.some((c) => c.type === 'tool_result')) texts = [];
         if (ev.type === 'result') j = ev;
       }
       if (j && j.is_error) return reject(new Error('Claude: ' + String(j.result || j.subtype || 'error').slice(0, 300)));
@@ -86,7 +95,15 @@ function parseJson(text) {
   const t = String(text || '').replace(/^\s*```(?:json)?/i, '').replace(/```\s*$/, '');
   try { return JSON.parse(t); } catch (_) {}
   const a = t.indexOf('{'), b = t.lastIndexOf('}');
-  if (a >= 0 && b > a) return JSON.parse(t.slice(a, b + 1));
+  if (a >= 0 && b > a) {
+    try { return JSON.parse(t.slice(a, b + 1)); } catch (e) {
+      // Diagnóstico (oct-16): muestra el texto ALREDEDOR de la posición donde falló, no solo el arranque.
+      const m = /position (\d+)/.exec(e.message || '');
+      const pos = m ? Number(m[1]) : 0;
+      const ctx = t.slice(a).slice(Math.max(0, pos - 150), pos + 150);
+      throw new Error('Claude no devolvió un JSON válido (' + e.message + '). Alrededor del error: …' + ctx + '…');
+    }
+  }
   throw new Error('Claude no devolvió un JSON válido: ' + t.slice(0, 200));
 }
 

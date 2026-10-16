@@ -263,7 +263,15 @@
       item.style.display = ok ? '' : 'none';
       if (ok) shown++;
     });
-    var em = $('vyArcEmpty'); if (em) em.classList.toggle('hidden', shown > 0 || !list.children.length);
+    // oct-16: antes, con el canal SIN episodios (list.children.length === 0), el mensaje de vacío se
+    // escondía en vez de mostrarse (!list.children.length volvía 'hidden' a true) — la pantalla quedaba
+    // en blanco sin avisar nada. Ahora se muestra siempre que no haya nada visible, con un texto distinto
+    // si de verdad no hay episodios todavía (vs. que el filtro/búsqueda no encontró nada).
+    var em = $('vyArcEmpty');
+    if (em) {
+      em.classList.toggle('hidden', shown > 0);
+      if (shown === 0) em.textContent = list.children.length ? 'Ningún episodio coincide con el filtro.' : 'Todavía no hay guiones en este canal. Dale a "Producir siguiente" para generar el primero.';
+    }
   }
   function setFiltro(k) { arcFiltro = k; pintarChips(); filtrarArco(); }
 
