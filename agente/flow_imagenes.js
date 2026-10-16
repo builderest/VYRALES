@@ -314,7 +314,7 @@ async function generateBatch(page, ctx, prompts, name, log, refs = null) {
   const before = new Set((await imgSrcs(page)).map(mediaKey));
   for (let k = 0; k < 5; k++) { await sleep(1500); const n0 = before.size; (await imgSrcs(page)).forEach((x) => before.add(mediaKey(x))); if (before.size === n0 && k >= 1) break; }
   const refTxt = refs && refs.length ? 'Reference images in order: ' + refs.map((r, k) => `image ${k + 1} = ${r.label || 'reference'}`).join('; ') + '. Use them as the exact identity/look of those people and places in every scene where they appear.\n' : '';
-  const msg = refTxt + `Create ${prompts.length} separate images, one for EACH scene below. Each scene is its own ${ASPECT === '16:9' ? 'horizontal 16:9 widescreen' : 'vertical 9:16'} photorealistic image; do not combine scenes into one picture and do not skip any scene. Generate all ${prompts.length} now without asking.\n` +
+  const msg = refTxt + `Create ${prompts.length} separate images, exactly ONE image for EACH scene below (one version only, not two). Only these scenes: ignore any earlier request in this chat. Each scene is its own ${ASPECT === '16:9' ? 'horizontal 16:9 widescreen' : 'vertical 9:16'} photorealistic image; do not combine scenes into one picture and do not skip any scene. Generate all ${prompts.length} now without asking.\n` +
     prompts.map((p, i) => `Scene ${i + 1}: ${String(p).trim().replace(/\.?$/, '.')}${PEOPLE_RE.test(p) ? '' : ' (no people)'}`).join('\n') + '\nStyle for every image:' + RULE_BASE;
   await page.click('.ProseMirror');
   await page.keyboard.insertText(msg);
@@ -390,6 +390,10 @@ async function flowImages(prompts, log = console.log, onEach = null, opts = {}) 
         const idx = []; for (let k = s0; k < Math.min(prompts.length, s0 + LOTE); k++) idx.push(k);
         try {
           const t = Date.now();
+          // oct-16 (EP39 "se quedó pegado"): cada lote en un PROYECTO NUEVO. En la misma conversación el agente de Flow
+          // mezcló pedidos: en el lote 5 rehízo "las 8 escenas del tercer set que se frenaron" en vez de las 14 nuevas → 0/14
+          // y todo el lote pasó al paso de a una (~1 min por imagen).
+          if (s0 > 0) await newProject(page);
           const imgs = await generateBatch(page, ctx, idx.map((k) => prompts[k]), 'lote' + (s0 / LOTE + 1), log);
           const map = await matchScenes(idx.map((k) => prompts[k]), imgs, log);
           let n = 0;
