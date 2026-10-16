@@ -137,7 +137,7 @@ async function runJob(job) {
           add('\n[VIGILANTE: ' + STALL_MIN + ' min sin avanzar → lo corto' + (again ? ' y lo vuelvo a encolar una vez]\n' : ']\n'));
           await flush(true).catch(() => {});
           p.kill();
-          if (again) { try { await sb.from('agent_jobs').insert({ command: job.command }); } catch (_) {} }
+          if (again) { try { await sb.from('agent_jobs').insert({ command: job.command, workspace_id: job.workspace_id || TEN.ADMIN_WS }); } catch (_) {} }
         }, 60000);
         p.on('close', () => clearInterval(stallPoll));
         p.stdout.on('data', (d) => add(String(d)));
@@ -570,7 +570,7 @@ async function recoverOrphans() {
     for (const j of orf || []) {
       await sb.from('agent_jobs').update({ status: 'error', output: String(j.output || '').slice(-19000) + '\n[agente reiniciado: este trabajo se cortó a la mitad]' }).eq('id', j.id);
       const retry = /^(gen_local|regen_local|render_full|voz_ingles|qa_tomas|flow_frames|short_reusar):/.test(j.command);
-      if (retry && !/agente reiniciado/.test(String(j.output || ''))) { await sb.from('agent_jobs').insert({ command: j.command }); log('↻ retomo trabajo cortado por reinicio:', j.command); }
+      if (retry && !/agente reiniciado/.test(String(j.output || ''))) { await sb.from('agent_jobs').insert({ command: j.command, workspace_id: j.workspace_id || TEN.ADMIN_WS }); log('↻ retomo trabajo cortado por reinicio:', j.command); }
       else log('✖ trabajo cortado por reinicio (no se reintenta):', j.command);
     }
   } catch (e) { log('no pude revisar trabajos cortados:', e.message); }

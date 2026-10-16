@@ -143,14 +143,14 @@ CORRIGE CON PRECISIÓN, NO REINVENTES (Franklin oct-14: reinventar desde cero ha
 
 Narración (FIJA: NO la cambies, no la reescribas, no la resumas): "${lineOf(sh)}"
 ${context ? 'Contexto (lo que se dice ANTES y DESPUÉS, para que la imagen conecte con el relato): ' + context + '\n' : ''}
-La imagen inicial muestra: ${sh.start_en || ''}
+${sh.own_image ? 'La imagen inicial la SUBIÓ Franklin y NO se cambia. Su descripción escrita puede estar VIEJA (de otra imagen): guíate por lo que el control de calidad dice que se ve. No nombres ropa, época, cantidad de personas ni objetos que no estén confirmados; nombra a las personas solo por su posición (the person on the left / in the center / on the right). Descripción vieja (solo referencia): ' + (sh.start_en || '') : 'La imagen inicial muestra: ' + (sh.start_en || '')}
 Cámara actual: ${sh.camera || ''}
 Acción actual: ${sh.action_en || ''}
 Final actual: ${sh.reaction_en || ''}
 Lo que salió mal (control de calidad): ${reason}
 ${extra ? '\n' + extra + '\n' : ''}
 Reglas:
-- La imagen tiene que mostrar EXACTAMENTE lo que dice la narración y ser de la ÉPOCA de la historia: si la historia es de la prehistoria (o de otra época), nada moderno (estadios, ciudades, ropa actual, carros, pantallas) salvo que la NARRACIÓN lo mencione o compare con eso ("cabrían en un estadio"): entonces SÍ se muestra lo moderno (sin inventar acción ajena, nada de gente jugando). Si la narración no lo menciona (solo da la cifra), se muestra con gente de esa época.
+${sh.own_image ? '- La imagen es de Franklin: NO la corrijas ni pidas que muestre otra época u otras personas; solo arregla el MOVIMIENTO sobre lo que ya se ve.' : '- La imagen tiene que mostrar EXACTAMENTE lo que dice la narración y ser de la ÉPOCA de la historia: si la historia es de la prehistoria (o de otra época), nada moderno (estadios, ciudades, ropa actual, carros, pantallas) salvo que la NARRACIÓN lo mencione o compare con eso ("cabrían en un estadio"): entonces SÍ se muestra lo moderno (sin inventar acción ajena, nada de gente jugando). Si la narración no lo menciona (solo da la cifra), se muestra con gente de esa época.'}
 - La cámara hace UN movimiento corto y suave que mantiene TODO lo importante dentro del cuadro hasta el final. En "camera" escribe SOLO el movimiento (ej. "slow lateral drift to the left"); nunca "no zoom", "held", "unchanged", "same framing" (LTX hace lo que lee). Si el problema fue que solo se movía la cámara, que se metió o hizo zoom de más, usa un movimiento mínimo y pon el movimiento en el SUJETO.
 - La acción (25–45 palabras, inglés) describe SOLO lo que se mueve en el sujeto principal, con verbos visibles y una dirección. Tiene que VERSE claramente en 6 segundos: nada de "respira", "parpadea" o gestos mínimos; si el sujeto es una persona pequeña o lejana, que camine, se agache, levante algo o señale. Si una persona se salía del cuadro, que se mueva DENTRO del cuadro (hacia la cámara o de lado corto), nunca hacia fuera. Nunca uses still, steady, stay, remain, fixed, motionless, frozen, static, suspended.
 - Si el sujeto es humo, una columna de erupción, nubes o polvo: usa verbos de turbulencia visibles (billows, churns, rolls, swells and expands outward, grows taller) para que su forma CAMBIE durante la toma.
@@ -231,7 +231,7 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
     await setWorking(sh.n, 'rehacer'); // el panel muestra qué toma está rehaciendo el QA (también en la fase automática)
     if (/quieto|escena|deforma/.test(why) && !sh.clip_stale) {
       try {
-        const fix = await rewriteShot(sh, /deforma/.test(why) ? 'LTX deformó una parte del lugar (' + why + '): el terreno o el edificio se "desliza" mientras el primer plano queda quieto. Usa una cámara que se desplace de lado de verdad (slow lateral drift) con un primer plano con textura que pase por delante, y el movimiento en algo natural (luces, hierba, viento); nada de paneos en planos abiertos.' : /escena/.test(why) ? 'LTX cortó a OTRA escena a mitad del clip (' + why + '): perdió el lugar y los objetos del cuadro inicial. Pide UN movimiento corto y sencillo que se pueda hacer dentro de ese mismo encuadre (en sitios cerrados o clips de 3 s o menos, cámara casi fija y el movimiento en el sujeto o la luz).' : 'El video salió casi congelado: ' + why + '. Necesita un movimiento claro y visible del sujeto principal.', log);
+        const fix = await rewriteShot(sh, /deforma/.test(why) ? 'LTX deformó una parte del lugar (' + why + '): el terreno o el edificio se "desliza" mientras el primer plano queda quieto. Usa una cámara que se desplace de lado de verdad (slow lateral drift) con un primer plano con textura que pase por delante, y el movimiento en algo natural (luces, hierba, viento); nada de paneos en planos abiertos.' : /escena/.test(why) ? 'LTX cortó a OTRA escena a mitad del clip (' + why + '): perdió el lugar y los objetos del cuadro inicial. Pide UN movimiento corto y sencillo que se pueda hacer dentro de ese mismo encuadre (en sitios cerrados o clips de 3 s o menos, cámara casi fija y el movimiento en el sujeto o la luz).' : 'El video salió casi congelado: ' + why + '. Necesita un movimiento claro y visible del sujeto principal.', log, { allowSplit: false });
         if (fix) {
           const { data: fr } = await supabase.from('episodes').select('shots').eq('id', epId).single();
           await supabase.from('episodes').update({ shots: (fr.shots || []).map((x) => x.n === sh.n ? Object.assign({}, x, fix, fix.start_en ? { end_en: '', end_frame_url: null, end_frame_skip: false } : {}, { prompt_override: null, ltx_en: null, keyframe_prompt_override: fix.start_en ? null : x.keyframe_prompt_override, qa_rewrite_from: { camera: x.camera, action_en: x.action_en, reaction_en: x.reaction_en, start_en: x.start_en } }) : x) }).eq('id', epId);
@@ -337,7 +337,7 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
     // el QA NO se traba: termina la toma actual, le CEDE el turno al manual (prioridad) y se re-encola para
     // seguir después justo donde quedó (las tomas ya buenas no se re-escanean).
     const hayTrabajoManual = async () => { try { const { data } = await supabase.from('agent_jobs').select('command').eq('status', 'pending'); return (data || []).some((j) => /^(gen_local|regen_local|toma_local):/.test(j.command)); } catch (_) { return false; } };
-    const reencolarQA = async () => { try { const { data: ex } = await supabase.from('agent_jobs').select('id').eq('status', 'pending').eq('command', 'qa_tomas:' + epId).limit(1); if (ex && ex.length) return; const row = { command: 'qa_tomas:' + epId }; if (process.env.VYRALES_WS) row.workspace_id = process.env.VYRALES_WS; await supabase.from('agent_jobs').insert(row); } catch (_) {} };
+    const reencolarQA = async () => { try { const { data: ex } = await supabase.from('agent_jobs').select('id').eq('status', 'pending').eq('command', 'qa_tomas:' + epId).limit(1); if (ex && ex.length) return; const row = { command: 'qa_tomas:' + epId, workspace_id: process.env.VYRALES_WS || '00000000-0000-0000-0000-000000000001' }; await supabase.from('agent_jobs').insert(row); } catch (_) {} };
     for (const t of todo) {
       if (await hayTrabajoManual()) {
         log('QA: hay un video manual en cola → le doy prioridad. Termino aquí; el QA se re-encola y sigue después donde quedó (sin re-escanear las buenas).');
@@ -375,7 +375,7 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
         const context = [ctxA ? 'antes: "' + lineOf(ctxA) + '"' : '', ctxB ? 'después: "' + lineOf(ctxB) + '"' : ''].filter(Boolean).join(' · ');
         if (dec.rewrite) {
           try {
-            const fix = await rewriteShot(shNow, reason, log, { allowImage: dec.newFrame && !shNow.own_image, allowSplit: true, context, extra: E.instructions(dec, attempts, brain) });
+            const fix = await rewriteShot(shNow, reason, log, { allowImage: dec.newFrame && !shNow.own_image, allowSplit: !(shNow.own_image || (shNow.qa && shNow.qa.keep_image)), context, extra: E.instructions(dec, attempts, brain) });
             if (fix && fix.split) { splits.push({ n: t.n, parts: fix.split }); log(`QA toma ${t.n}: se parte en ${fix.split.length} tomas (misma narración)`); await C.addDiary(supabase, { ep: epId, n: t.n, mode: 'partir', why: 'el especialista partió la toma en ' + fix.split.length }); done = true; break; }
             if (fix) {
               const { data: fr } = await supabase.from('episodes').select('shots').eq('id', epId).single();
@@ -435,13 +435,13 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
     for (const sp of splits.sort((a, b) => b.n - a.n)) {
       try { await splitShotDb(supabase, epId, sp.n, sp.parts, log); } catch (e) { log(`QA toma ${sp.n}: no pude partirla (${String(e.message).slice(0, 140)})`); }
     }
-    await supabase.from('agent_jobs').insert({ command: 'flow_frames:' + epId });
+    await supabase.from('agent_jobs').insert({ command: 'flow_frames:' + epId, workspace_id: process.env.VYRALES_WS || '00000000-0000-0000-0000-000000000001' }); // sin workspace_id la fila de Flow la ignoraba
     log(`QA: partí ${splits.length} toma(s); en cola sus imágenes nuevas (Flow) y videos (king)`);
   }
   try { await require(path.join(ROOT, 'netlify', 'functions', '_cerebro')).think(supabase, { log }); } catch (e) { log('🧠 no pude pensar (' + String(e.message).slice(0, 100) + ')'); }
   try {
     const lessons = await require(path.join(ROOT, 'netlify', 'functions', '_memoria')).readJson(supabase, 'lecciones.json', []);
-    if (lessons.some((l) => !l.consolidated)) { const { data: oa } = await supabase.from('agent_jobs').select('id').eq('status', 'pending').eq('command', 'claude_aprender').limit(1); if (!(oa && oa.length)) await supabase.from('agent_jobs').insert({ command: 'claude_aprender' }); }
+    if (lessons.some((l) => !l.consolidated)) { const { data: oa } = await supabase.from('agent_jobs').select('id').eq('status', 'pending').eq('command', 'claude_aprender').limit(1); if (!(oa && oa.length)) await supabase.from('agent_jobs').insert({ command: 'claude_aprender', workspace_id: process.env.VYRALES_WS || '00000000-0000-0000-0000-000000000001' }); }
   } catch (_) {}
   log(redone.length ? `QA: rehice ${redone.length} toma(s): ${redone.join(', ')}` : 'QA: no rehice ninguna toma en esta pasada (las marcadas con ⚠ necesitan revisión humana)');
   await setWorking(null);

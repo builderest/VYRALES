@@ -25,7 +25,7 @@ exports.handler = async (event) => {
       // 🧠 oct-14: la regla nueva queda "evaluando" (todavía NO se usa) hasta que el cerebro la revise contra la evidencia y las
       // reglas que ya existen (claude_aprender en tu PC, $0). Si no está de acuerdo, te deja una objeción con la mejor solución.
       rules.unshift({ regla, por_que: 'La agregó Franklin', origen: 'franklin', estado: 'evaluando', at: new Date().toISOString() });
-      try { const { data: pend } = await sb.from('agent_jobs').select('id').eq('status', 'pending').eq('command', 'claude_aprender').limit(1); if (!(pend && pend.length)) await sb.from('agent_jobs').insert({ command: 'claude_aprender' }); } catch (_) {}
+      try { const { data: pend } = await sb.from('agent_jobs').select('id').eq('status', 'pending').eq('command', 'claude_aprender').limit(1); if (!(pend && pend.length)) await sb.from('agent_jobs').insert(await require('./_tenant').jobRow(sb, 'claude_aprender')); } catch (_) {}
     } else return json(400, { error: 'Nada que hacer.' });
     await M.writeJson(sb, 'reglas.json', Object.assign({}, mem, { rules, updated_at: new Date().toISOString() }));
     return json(200, { ok: true, rules });
