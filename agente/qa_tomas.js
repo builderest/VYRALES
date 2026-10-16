@@ -11,6 +11,7 @@ for (const line of fs.readFileSync(path.join(ROOT, '.env'), 'utf8').split(/\r?\n
 process.env.VYRALES_LOCAL_RUN = '1';
 (async () => {
   const epId = process.argv[2];
+  const forzarUnir = process.argv[3] === 'unir'; // qa_tomas:<ep>:unir → vuelve a unir el final aunque no cambió nada (p. ej. cambió el estilo de letras)
   if (!/^[0-9a-f-]{36}$/i.test(epId || '')) throw new Error('Uso: node agente/qa_tomas.js <episode_id>');
   const { getSupabaseClient } = require(path.join(ROOT, 'netlify', 'functions', '_supabase'));
   const supabase = getSupabaseClient();
@@ -24,7 +25,7 @@ process.env.VYRALES_LOCAL_RUN = '1';
   const lastFinal = (chk.assets || []).filter((a) => a.kind === 'final_render').map((a) => a.created_at).sort().pop() || '';
   const { data: cont } = await supabase.from('agent_jobs').select('id').eq('status', 'pending').eq('command', 'qa_tomas:' + epId).limit(1);
   if (cont && cont.length) { console.log('QA: quedó pendiente (cedió el turno a un trabajo manual o sigue en otra corrida) → NO uno el video todavía, se une cuando termine todo.'); return; }
-  if (redone.length || lastFinal < lastClip || (voiceAt && new Date(lastFinal || 0) < new Date(voiceAt))) {
+  if (forzarUnir || redone.length || lastFinal < lastClip || (voiceAt && new Date(lastFinal || 0) < new Date(voiceAt))) {
     const { mergeEpisodeVideo } = require(path.join(ROOT, 'netlify', 'functions', '_merge'));
     const { data: ep } = await supabase.from('episodes').select('*, assets(*)').eq('id', epId).single();
     const { data: sr } = await supabase.from('series').select('id, slug, title, genre, story_bible').eq('id', ep.series_id).single();
