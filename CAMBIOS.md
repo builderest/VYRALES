@@ -59,6 +59,7 @@
 
 - **Lugar fijo en cada toma** (pendiente del oct-14, hecho oct-17): `claude_largo.js` → `assignLocations`: tras los prompts, Claude revisa solo las tomas con location "escena" y liga a su lugar fijo las que ocurren claramente en él (EP47 tenía aldea/búnker/laboratorio sin ligar: 31, 84–86, 122–123, 40, 43, 76, 50). No toca narración ni prompts; si duda, la deja. EP47 no se tocó (ya en producción).
 - **PENDIENTE nuevo** (arriba): llamado a suscribirse a mitad del largo = video con animación en una esquina; esperar la animación de Franklin.
+- **Texto de portada con más fuerza** (`agente/portada_yt.js`, Franklin oct-17: "NINGUNO SOLTÓ" queda plano; ejemplos que sí: "¡SOLO UNO SALDRÍA VIVO!", "¡NINGUNO IBA A CEDER!", "¡UNA LUCHA SIN ESCAPE!"): 2–5 palabras con tensión y lo que está en juego, ¡! / ¿? cuando sume, exagerar la emoción y nunca los hechos (solo lo que cuenta la historia), 1–2 palabras en amarillo; inglés con la misma fuerza.
 
 ### 2026-10-16 (sesión Claude Cowork, 4) — MindFuel: letras que se van armando en el centro; cierre propio en inglés
 
