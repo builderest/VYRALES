@@ -826,3 +826,4 @@ experimento (`doc.forzados`: ¿quién tenía razón?).
 - `netlify.toml` → `ignore`: si el push no toca public/, netlify/, netlify.toml ni package*.json, Netlify no construye.
 - Intro del canal (`story_bible.intro`, `_render.js insertIntro`): se mete después del gancho (≥10 s) en una pausa de la voz; `continuity.intro {at,dur}` corre subtítulos CC (`_captions.js`) y capítulos (`_publish.js`). Puesta en las series largas de VYRALES con la versión de 4.4 s.
 - `comandos.js` toma_local aceptaba solo tomas de 1–2 cifras (no la 139) → 1–3 cifras.
+- Intro (Franklin oct-17: "después del logo tiene que entrar algo mejor, que no se sienta tan brusco"): historia→logo con fundido de 0.5 s, logo→historia con fundido de 1 s sobre la primera imagen congelada 0.8 s, y la voz vuelve después (respiro con el eco de la intro). Intro nueva sin fundido a negro pegado (`intro_vyrales_4s_sin_fundido.mp4`). `continuity.intro.dur` = lo que se corren subtítulos y capítulos (intro − 0.7 s).

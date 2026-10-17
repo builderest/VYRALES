@@ -852,19 +852,29 @@ async function insertIntro({ cwd, episode, series, total, parts, words, fetchFil
   const T = at.toFixed(3);
   const V = `fps=${FPS},scale=${W}:${H}:force_original_aspect_ratio=decrease,pad=${W}:${H}:(ow-iw)/2:(oh-ih)/2,setsar=1,format=yuv420p`;
   const A = 'aresample=48000,aformat=channel_layouts=stereo';
+  // Franklin oct-17: "después del logo tiene que entrar algo mejor, que no se sienta tan brusco".
+  // Historia → logo: fundido de XA s. Logo → historia: fundido de XB s sobre la primera imagen congelada HOLD s,
+  // y la voz vuelve recién después (respiro con el eco final de la intro).
+  const XA = 0.5, XB = 1.0, HOLD = 0.8;
+  const offA = Math.max(0.05, at - XA), offB = offA + dur - XB;
   const f = [
-    `[0:v]trim=0:${T},setpts=PTS-STARTPTS,${V}[v0]`,
-    `[1:v]setpts=PTS-STARTPTS,${V}[v1]`,
-    `[0:v]trim=start=${T},setpts=PTS-STARTPTS,${V}[v2]`,
-    `[0:a]atrim=0:${T},asetpts=PTS-STARTPTS,${A},afade=t=out:st=${Math.max(0, at - 0.25).toFixed(3)}:d=0.25[a0]`,
+    `[0:v]trim=0:${T},setpts=PTS-STARTPTS,${V},settb=AVTB[v0]`,
+    `[1:v]setpts=PTS-STARTPTS,${V},settb=AVTB[v1]`,
+    `[0:v]trim=start=${T},setpts=PTS-STARTPTS,${V},tpad=start_duration=${HOLD}:start_mode=clone,settb=AVTB[v2]`,
+    `[v0][v1]xfade=transition=fade:duration=${XA}:offset=${offA.toFixed(3)}[vx]`,
+    `[vx][v2]xfade=transition=fade:duration=${XB}:offset=${offB.toFixed(3)}[v]`,
+    `[0:a]atrim=0:${T},asetpts=PTS-STARTPTS,${A}[a0]`,
     im.hasAudio ? `[1:a]asetpts=PTS-STARTPTS,${A},loudnorm=I=-18:TP=-2:LRA=11,${A}[a1]` : `anullsrc=r=48000:cl=stereo,atrim=0:${dur.toFixed(3)}[a1]`,
-    `[0:a]atrim=start=${T},asetpts=PTS-STARTPTS,${A},afade=t=in:st=0:d=0.3[a2]`,
-    '[v0][a0][v1][a1][v2][a2]concat=n=3:v=1:a=1[v][a]',
+    `[0:a]atrim=start=${T},asetpts=PTS-STARTPTS,${A},adelay=${Math.round(HOLD * 1000)}|${Math.round(HOLD * 1000)},afade=t=in:st=0:d=${(HOLD + 0.2).toFixed(2)}[a2]`,
+    `[a0][a1]acrossfade=d=${XA}:c1=tri:c2=tri[ax]`,
+    `[ax][a2]acrossfade=d=${XB}:c1=tri:c2=tri[a]`,
   ];
-  log(`intro del canal: ${dur.toFixed(1)} s en el segundo ${T} (pausa de la voz)...`);
+  // Lo que venía después del corte ahora empieza en offB + HOLD: eso es lo que se corren subtítulos y capítulos.
+  const shift = offB + HOLD - at;
+  log(`intro del canal: ${dur.toFixed(1)} s en el segundo ${T} (pausa de la voz), con fundidos y respiro antes de la voz...`);
   await run(['-y', '-i', 'final.mp4', '-i', 'intro.src', '-filter_complex', f.join(';'), '-map', '[v]', '-map', '[a]', ...VIDEO_OUT, ...AUDIO_OUT, '-movflags', '+faststart', 'final-intro.mp4'], cwd);
   fs.renameSync(path.join(cwd, 'final-intro.mp4'), path.join(cwd, 'final.mp4'));
-  return { at: Number(T), dur: Number(dur.toFixed(3)), url: ic.url };
+  return { at: Number(T), dur: Number(shift.toFixed(3)), intro_seconds: Number(dur.toFixed(3)), url: ic.url };
 }
 // Los subtítulos CC y los capítulos salen de los tiempos de la voz: se guarda dónde quedó la intro para correrlos.
 async function saveIntroInfo(episode, intro) {
