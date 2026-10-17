@@ -69,11 +69,29 @@ async function job(id) {
     }
     try { const { polishLines } = require(path.join(ROOT, 'netlify', 'functions', '_pulir')); const sh = data.episodes[0].shots; const nl = await polishLines(sh.map((x) => (x.dialogue || []).map((d) => d.line).join(' ')), claudeLlm(() => {}), Object.assign({ title: data.episodes[0].title }, await require(path.join(ROOT, 'netlify', 'functions', '_pulir')).channelCtas(supabase))); sh.forEach((x, i) => { x.dialogue = [{ speaker: 'Narrador', line: nl[i] }]; }); console.log('Narración pulida (sin muletillas ni saltos).'); } catch (e) { console.log('  (pulido: ' + String(e.message).slice(0, 120) + ')'); }
     console.log('Guion escrito en', Math.round((Date.now() - t) / 1000), 's. Revisor IMAGEN = NARRACIÓN (prompts detallados) con Claude...');
-    const { validation } = await finishScript(data, { idea, tipo, llm: claudeLlm(console.log) });
+    let { validation } = await finishScript(data, { idea, tipo, llm: claudeLlm(console.log) });
     const ep = data.episodes[0];
+    // oct-17 (Franklin: "los guiones no se guardan automáticos en Guiones"): el revisor PARTE tomas que nombran varias
+    // cosas, así que el número de tomas sube (19 en vez de 15) y la validación lo marcaba como error → no se podía crear.
+    // Partir es correcto: se ajusta el número esperado al real y se valida otra vez.
+    if (!validation.ok && (validation.errors || []).every((x) => /se esperaban \d+/.test(x))) {
+      const sb0 = data.story_bible = data.story_bible || {}; sb0.rules = Object.assign({}, sb0.rules, { shots_per_episode: ep.shots.length });
+      validation = require(path.join(ROOT, 'netlify', 'functions', '_series')).validateSeries(data);
+    }
     console.log(`Listo: "${ep.title}" · ${ep.shots.length} tomas · validación ${validation.ok ? 'OK' : 'con errores: ' + (validation.errors || []).join(' · ')}`);
     try { const { logSpend } = require(path.join(ROOT, 'netlify', 'functions', '_spend')); await logSpend(supabase, { kind: 'text', model: 'claude_plan', costUsd: 0, note: 'guion desde idea (Claude en la PC): ' + String(idea.titulo || '').slice(0, 60) }); } catch (_) {}
     await save({ ok: true, tipo, model: 'Claude (tu plan)', costUsd: 0, validation, series: data, at: new Date().toISOString() });
+    // Se crea solo en el panel (Producción → Guiones), igual que los videos largos (antes había que abrir Analítica y darle
+    // "Crear el video en el panel" en el mismo navegador donde se pidió).
+    if (validation.ok) {
+      try {
+        const T = require(path.join(ROOT, 'netlify', 'functions', '_tenant'));
+        const r = await T.runInWs(process.env.VYRALES_WS || T.ADMIN_WS, () => require(path.join(ROOT, 'netlify', 'functions', 'import-series')).handler({ httpMethod: 'POST', headers: {}, body: JSON.stringify({ series: data }) }));
+        const o = JSON.parse(r.body || '{}');
+        if (r.statusCode < 300) { console.log(`En el panel → Guiones: "${ep.title}" (serie ${data.slug || (o.series && o.series.slug) || ''})`); await save({ ok: true, tipo, model: 'Claude (tu plan)', costUsd: 0, validation, series: data, imported: { slug: data.slug || (o.series && o.series.slug) || null }, at: new Date().toISOString() }); }
+        else console.log('⚠ No pude crearlo en el panel (' + (o.error || r.statusCode) + (o.errors ? ' — ' + o.errors.join(' · ') : '') + '): créalo desde Analítica.');
+      } catch (e) { console.log('⚠ No pude crearlo en el panel (' + String(e.message).slice(0, 160) + '): créalo desde Analítica.'); }
+    } else console.log('⚠ El guion tiene errores de validación: revísalo en Analítica antes de crearlo.');
   } catch (e) {
     console.log('ERROR:', e.message);
     await save({ ok: false, error: e.message, engine: 'claude', at: new Date().toISOString() }).catch(() => {});

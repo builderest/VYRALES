@@ -18,13 +18,24 @@ async function detail(shots, { aspect, context, title, log }) {
   const rows = shots.map((s, i) => ({ n: i + 1, chapter: s.chapter, chapter_title: s.chapter_title, camera: s.camera || '', start_en: s.visual_es || '', dialogue: [{ speaker: 'Narrador', line: s.line }], characters: Array.isArray(s.characters) ? s.characters : [], location: s.location || '' })); // Franklin oct-14: antes se perdían personaje y lugar aquí
   const { checkVisuals, applyChanges } = F('_visual_check');
   const out = [];
+  const normG = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
   for (let i = 0; i < rows.length; i += 16) {
     const part = rows.slice(i, i + 16);
     let done = null;
-    for (let k = 1; k <= 2 && !done; k++) {
-      try { const vc = await checkVisuals({ series: { title }, shots: part, rewriteStart: 'all', llm: claudeLlm(() => {}), aspect, context, log: () => {} }); done = applyChanges(part, vc.changes); }
-      catch (e) { log(`    (grupo ${i / 16 + 1}, intento ${k}: ${String(e.message).slice(0, 140)})`); }
+    // oct-17 (Castle Bravo: 7 min de trabajo perdidos por el GUARDIÁN al final): cada grupo se verifica AL MOMENTO. Si
+    // Claude cambió la narración al partir tomas, se pide otra vez ese grupo SIN partir; si aun así cambia, queda el grupo
+    // sin detallar (la importación pone valores por defecto) en vez de tirar todo el guion.
+    const narrG = (list) => normG(list.map((x) => (x.dialogue || []).map((d) => d && d.line).filter(Boolean).join(' ')).join(' '));
+    for (let k = 1; k <= 3 && !done; k++) {
+      try {
+        const noSplit = k > 1;
+        const vc = await checkVisuals(Object.assign({ series: { title }, shots: part, rewriteStart: 'all', llm: claudeLlm(() => {}), aspect, context, log: () => {} }, noSplit ? { allowSplit: false } : {}));
+        const cand = applyChanges(part, vc.changes, noSplit ? { splits: false } : undefined);
+        if (narrG(cand) === narrG(part)) done = cand;
+        else log(`    (grupo ${i / 16 + 1}, intento ${k}: cambió la narración al partir tomas → lo pido otra vez sin partir)`);
+      } catch (e) { log(`    (grupo ${i / 16 + 1}, intento ${k}: ${String(e.message).slice(0, 140)})`); }
     }
+    if (!done) log(`    (grupo ${i / 16 + 1}: queda sin detallar para no tocar la narración)`);
     out.push(...(done || part));
     log(`    prompts detallados: ${Math.min(i + 16, rows.length)}/${rows.length}`);
   }
@@ -59,6 +70,7 @@ async function detail(shots, { aspect, context, title, log }) {
   const job = String(process.argv[2] || '').replace(/[^a-z0-9-]/gi, '');
   const supabase = F('_supabase').getSupabaseClient();
   const { uploadFile } = F('_storage');
+  let storyForResume = null;
   const save = (obj) => uploadFile(supabase, { path: `guiones/${job}.json`, buffer: Buffer.from(JSON.stringify(obj)), contentType: 'application/json' });
   try {
     const { data: u } = supabase.storage.from('media').getPublicUrl(`guiones/${job}.req.json`);
@@ -67,14 +79,17 @@ async function detail(shots, { aspect, context, title, log }) {
     const canal = await F('_memoria').memoryBlock(supabase).catch(() => '');
     console.log('Guionista largo (Claude) →', String(req.topic).slice(0, 120), canal ? '· con identidad/memoria del canal (' + (process.env.VYRALES_WS || 'principal') + ')' : '');
     const t0 = Date.now();
-    let story = null;
+    // oct-17: si un intento anterior de ESTE guion ya escribió y pulió la historia (y falló después, en los prompts), se
+    // reusa: no se vuelven a gastar ~7 min de Claude. Basta con volver a pedir el mismo trabajo.
+    let story = null, resumed = false;
+    try { const { data: pu } = supabase.storage.from('media').getPublicUrl(`guiones/${job}.json`); const rr = await fetch(pu.publicUrl + '?t=' + Date.now()); if (rr.ok) { const prev = await rr.json(); if (prev && !prev.ok && prev.story && Array.isArray(prev.story.chapters) && prev.story.chapters.length) { story = prev.story; resumed = true; console.log('  reuso la historia ya escrita y pulida en el intento anterior: "' + story.title + '"'); } } } catch (_) {}
     for (let k = 1; k <= 2 && !story; k++) {
       let raw = '';
       try { raw = (req.raw_file && fs.existsSync(path.join(ROOT, req.raw_file))) ? (console.log('  reuso la historia ya escrita: ' + req.raw_file), fs.readFileSync(path.join(ROOT, req.raw_file), 'utf8')) : await runClaude(F('_guionista').buildLongPrompt(tipo, Object.assign({ topic: req.topic, canal }, await F('_pulir').channelCtas(supabase))), { timeoutMin: 25, log: console.log }); fs.mkdirSync(path.join(ROOT, '_to_delete'), { recursive: true }); fs.writeFileSync(path.join(ROOT, '_to_delete', `claude_raw_${k}.txt`), raw); story = parseJson(raw); }
       catch (e) { console.log(`  intento ${k}: ${String(e.message).slice(0, 200)}`); if (k === 2) throw e; }
     }
     // Pulido de la narración (largo y cada Short): sin "Y" muletilla, sin saltos, sin palabras raras. Claude, $0.
-    try {
+    if (!resumed) try {
       const { polishLines, channelCtas } = F('_pulir');
       const cc = await channelCtas(supabase); // cierre/CTA e idioma del canal (MindFuel: inglés, sin "historias")
       const all = (story.chapters || []).flatMap((c) => c.shots || []);
@@ -87,6 +102,7 @@ async function detail(shots, { aspect, context, title, log }) {
     const words = longShots.map((s) => s.line).join(' ').split(/\s+/).filter(Boolean).length;
     console.log(`Historia escrita en ${Math.round((Date.now() - t0) / 1000)} s: "${story.title}" · ${(story.chapters || []).length} capítulos · ${longShots.length} tomas · ${words} palabras (~${(words / 2.3 / 60).toFixed(1)} min) · ${(story.shorts || []).length} Shorts`);
     await save({ ok: false, partial: true, stage: 'prompts', story, at: new Date().toISOString() });
+    storyForResume = story;
     const context = story.title + '. ' + (story.chapters || []).map((c) => c.title).join(' → ');
     console.log('Prompts detallados del video largo (16:9)...');
     const detailed = await detail(longShots, { aspect: '16:9', context, title: story.title, log: console.log });
@@ -111,7 +127,7 @@ async function detail(shots, { aspect, context, title, log }) {
     console.log(`LISTO en ${Math.round((Date.now() - t0) / 60000)} min → media/guiones/${job}.json`);
   } catch (e) {
     console.log('ERROR:', e.message);
-    await save({ ok: false, error: e.message, at: new Date().toISOString() }).catch(() => {});
+    await save(Object.assign({ ok: false, error: e.message, at: new Date().toISOString() }, typeof storyForResume !== 'undefined' && storyForResume ? { story: storyForResume } : {})).catch(() => {});
     process.exit(1);
   }
 })();
