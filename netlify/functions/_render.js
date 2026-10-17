@@ -619,7 +619,7 @@ async function renderEpisode({ episode, series, log = console.log, fetchFile = d
       const r = await renderClip({ cwd, input: src, out, c: cP, subtitle, speechWindow, hookText, narrStartMin, speakerColor: spk ? SPEAKER_COLORS[speakers.indexOf(spk) % SPEAKER_COLORS.length] : null, sub, fadeIn, fadeOut, narration, muteOriginal, tailReserve });
       const dur = r.dur;
       if (r.narr && r.narr.tempo > 1.001) log(`toma ${c.shot}: narración acelerada ${r.narr.tempo.toFixed(2)}x para que quepa.`);
-      parts.push({ file: out, dur, narr: r.narr, xfade: XFADE[c.transition] && i < chosen.length ? Math.min(tSec(c), dur / 2) : 0, xname: XFADE[c.transition] || 'fade', musicOff: !!(shot && /^(off|none|silence|silencio)$/i.test(String(shot.music || ''))) });
+      parts.push({ file: out, dur, shot: c.shot, narr: r.narr, xfade: XFADE[c.transition] && i < chosen.length ? Math.min(tSec(c), dur / 2) : 0, xname: XFADE[c.transition] || 'fade', musicOff: !!(shot && /^(off|none|silence|silencio)$/i.test(String(shot.music || ''))) });
     }
     if (tailMode) {
       log('cierre sobre la última imagen...');
@@ -783,7 +783,7 @@ async function renderEpisode({ episode, series, log = console.log, fetchFile = d
     // Intro del canal (Franklin oct-16): story_bible.intro = { url, after_seconds } → se mete DESPUÉS del gancho, en una
     // pausa de la voz. Si algo falla, el video sale igual sin intro (nunca rompe el render).
     let intro = null;
-    try { intro = await insertIntro({ cwd, episode, series, total, parts, words: contVoice && Array.isArray(contVoice.words) ? contVoice.words : null, fetchFile, log }); }
+    try { intro = await insertIntro({ cwd, episode, series, total, parts, markShot: ((episode.shots || []).find((x) => x.intro_before && chosen.some((c) => c.shot === x.n)) || (episode.shots || []).slice(0, 40).find((x) => /^\s*(esta es la historia|this is the story)\b/i.test(dialogueOf(x) || x.voice_part || '') && chosen.some((c) => c.shot === x.n)) || {}).n, words: contVoice && Array.isArray(contVoice.words) ? contVoice.words : null, fetchFile, log }); }
     catch (e) { log('AVISO: no pude poner la intro (' + String(e.message).slice(0, 160) + ') → sale sin intro'); }
     if (intro) total += intro.dur;
     try { await saveIntroInfo(episode, intro); } catch (_) {}
@@ -839,12 +839,17 @@ function introCutTime({ parts, words, after, maxAt }) {
   }
   return bounds.find((b) => b >= after && b <= maxAt) || null;
 }
-async function insertIntro({ cwd, episode, series, total, parts, words, fetchFile, log }) {
+async function insertIntro({ cwd, episode, series, total, parts, markShot, words, fetchFile, log }) {
   const ic = ((series && series.story_bible) || {}).intro;
   if (!ic || !ic.url || ic.enabled === false || (episode.continuity || {}).kind !== 'largo') return null;
   const after = Number(ic.after_seconds) || 10, maxAt = after + 12;
   if (total < maxAt + 30) return null;
-  const at = introCutTime({ parts, words, after, maxAt });
+  // Franklin oct-17: la intro va AL TERMINAR EL GANCHO, justo antes de la frase de presentación ("Esta es la historia
+  // de…"), que el guionista marca con intro_before. Así nunca corta una idea a la mitad. Sin marca: pausa ≥ after s.
+  let at = null;
+  if (markShot) { let t0 = 0; for (const p of parts) { if (p.shot === markShot) { at = t0; break; } t0 += p.dur - p.xfade; } }
+  if (at != null && (at < 3 || at > total - 30)) at = null;
+  if (at == null) at = introCutTime({ parts, words, after, maxAt });
   if (!at) { log('intro: no encontré una pausa de la voz entre ' + after + ' y ' + maxAt + ' s → sale sin intro'); return null; }
   await fetchFile(ic.url, path.join(cwd, 'intro.src'));
   const im = await probeMedia('intro.src', cwd);

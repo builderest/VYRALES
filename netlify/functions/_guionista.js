@@ -215,6 +215,7 @@ ${voz}
 - Duración objetivo ~11 minutos: unas 1,500 palabras de narración (el narrador habla ~2.3 palabras por segundo). Mínimo 1,150 palabras, máximo 2,000.
 - ESTRUCTURA:
   1. APERTURA EN FRÍO (30–45 s): el momento más tenso de toda la historia, contado en presente, sin contexto. La primera frase empieza con el tema más llamativo.
+  1b. PRESENTACIÓN (Franklin oct-17): justo DESPUÉS de la APERTURA EN FRÍO (ahí entra la intro del canal), UNA línea propia que empiece EXACTAMENTE con "Esta es la historia de…" (en inglés "This is the story of…") y diga en una frase de qué va el video sin revelar la sorpresa que viene después. Ejemplo: "Esta es la historia del día en que Estados Unidos planeó hacer explotar una bomba atómica en la Luna… y de por qué casi nadie se enteró." Lleva su PROPIA toma con una imagen amplia que presente el tema.
   2. LA PROMESA (10–20 s): qué va a descubrir el espectador si se queda ("y lo que encontraron después lo cambió todo").
   3. 6 a 8 CAPÍTULOS de 60–120 s. Cada capítulo tiene título corto, avanza la historia (causa → efecto) y TERMINA con una pregunta abierta o un giro que obliga a seguir viendo.
   4. EL CLÍMAX al 70–80 % del video.
