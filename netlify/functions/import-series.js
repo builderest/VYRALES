@@ -186,6 +186,11 @@ exports.handler = async (event) => {
         if (!sb.subtitle_style) sb.subtitle_style = prev.subtitle_style || 'palabra';
         if (!sb.image_engine) sb.image_engine = prev.image_engine || 'flow';
       }
+      // oct-17 (Franklin: "la intro no se guardó en el video de los dinosaurios"): un guion nuevo REEMPLAZABA el story_bible
+      // entero y se perdían los ajustes del CANAL (intro, cierre/CTA, idioma, estilo de letras, tarjeta del Short).
+      // Esos ajustes son del canal, no del guion: se conservan siempre.
+      for (const k of ['intro', 'ctas', 'language', 'frase_style', 'short_end_card', 'subtitle_style']) if (prev[k] != null) sb[k] = prev[k];
+      if (prev.end_card && !sb.end_card) sb.end_card = prev.end_card;
       return sb;
     }
     if (body.dry_run) {
