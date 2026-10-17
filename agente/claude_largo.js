@@ -13,6 +13,24 @@ process.env.VYRALES_LOCAL_RUN = '1';
 const { runClaude, parseJson, claudeLlm } = require('./_claude');
 const F = (f) => require(path.join(ROOT, 'netlify', 'functions', f));
 
+// Lugar fijo de cada toma (pendiente de Franklin, oct-14; hecho oct-17): muchas tomas quedaban con location "escena" aunque
+// ocurrían en un lugar fijo (EP47: aldea, búnker y laboratorio sin ligar) → no recibían la foto del lugar como referencia
+// en Flow y el mismo lugar salía distinto. Claude revisa SOLO las tomas "escena" y liga las que ocurren claramente en uno.
+// No toca la narración ni los prompts; si duda, la deja como está.
+async function assignLocations(shots, locations, log) {
+  const keys = Object.keys(locations || {}).filter((k) => k && k !== 'escena');
+  const pend = shots.filter((s) => !s.location || s.location === 'escena');
+  if (!keys.length || !pend.length) return 0;
+  const locTxt = keys.map((k) => `- "${k}": ${String((locations[k] && (locations[k].visual || locations[k].description)) || '').slice(0, 220)}`).join('\n');
+  const rows = pend.map((s) => `${s.n}: ${String(s.start_en || '').replace(/\s+/g, ' ').slice(0, 280)}`).join('\n');
+  const prompt = `Eres el continuista de un documental. Para cada TOMA, decide si su imagen ocurre claramente DENTRO o EN uno de los LUGARES FIJOS (mismo sitio físico). Incluye SOLO las que estés seguro. NO incluyas: espacio, mapas, primeros planos de objetos sin lugar, otro sitio distinto, o si dudas.\nResponde SOLO JSON: {"asignar":[{"n":12,"lugar":"<nombre exacto de la lista>"}]}\n\nLUGARES FIJOS:\n${locTxt}\n\nTOMAS:\n${rows}`;
+  const o = parseJson(await runClaude(prompt, { log: () => {} }));
+  let k = 0;
+  for (const a of (o && o.asignar) || []) { const s = shots.find((x) => x.n === Number(a.n)); if (s && (!s.location || s.location === 'escena') && keys.includes(a.lugar)) { s.location = a.lugar; k++; } }
+  log(`    lugares fijos: ${k} toma(s) ligadas a su lugar (de ${pend.length} genéricas)`);
+  return k;
+}
+
 // Convierte tomas {line, visual_es, camera} en tomas del sistema con prompts detallados (Claude, por grupos).
 async function detail(shots, { aspect, context, title, log }) {
   const rows = shots.map((s, i) => ({ n: i + 1, chapter: s.chapter, chapter_title: s.chapter_title, camera: s.camera || '', start_en: s.visual_es || '', dialogue: [{ speaker: 'Narrador', line: s.line }], characters: Array.isArray(s.characters) ? s.characters : [], location: s.location || '' })); // Franklin oct-14: antes se perdían personaje y lugar aquí
@@ -106,6 +124,7 @@ async function detail(shots, { aspect, context, title, log }) {
     const context = story.title + '. ' + (story.chapters || []).map((c) => c.title).join(' → ');
     console.log('Prompts detallados del video largo (16:9)...');
     const detailed = await detail(longShots, { aspect: '16:9', context, title: story.title, log: console.log });
+    try { await assignLocations(detailed, story.locations, console.log); } catch (e) { console.log('    lugares fijos: no se pudo (' + String(e.message).slice(0, 120) + ') — quedan como estaban'); }
     // Los Shorts del largo usan las TOMAS DEL LARGO (short_reusar.js, Franklin oct-11): no se escriben prompts de
     // imagen/video para ellos (ahorra ~5–10 min por guion). Solo su narración.
     const shorts = (story.shorts || []).map((sh) => Object.assign({}, sh, { reuse_long: true, shots: (sh.shots || []).map((x, i) => ({ n: i + 1, camera: x.camera || '', start_en: x.visual_es || '', scene_es: x.visual_es || x.line, dialogue: [{ speaker: 'Narrador', line: x.line }], characters: Array.isArray(x.characters) ? x.characters : [], location: x.location || 'escena' })) }));

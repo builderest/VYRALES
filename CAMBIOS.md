@@ -26,6 +26,11 @@
 
 ---
 
+## 📌 PENDIENTE (Franklin, oct-17) — llamado a suscribirse a MITAD del video largo
+- Debe ser un VIDEO superpuesto en una esquina con una animación tipo YouTube (botón de suscribirse), no una frase del narrador.
+- NO implementar todavía: Franklin va a hacer la animación primero. Cuando la tenga: overlay en una esquina tras un momento
+  fuerte (nunca al inicio), sin tapar subtítulos/caras, con su sonido bajo la narración.
+
 ## Registro de cambios
 
 ### 2026-10-16/17 (sesión Claude Cowork, 5) — telescopio, cierre de VYRALES, intro del canal, guiones que no llegaban, QA en bucle
@@ -52,6 +57,8 @@
 - **"El sistema está como estancado"** (oct-17): no había nada atascado en la PC (fila vacía); el botón "generar lugares que faltan" pedía los lugares UNO POR UNO desde el navegador y, al bloquearse el celular o cerrar la pestaña, la cadena se cortaba sin aviso (Castle Bravo EP47: hizo Búnker de Enyu y Aldea de Rongelap y paró; faltaban Cubierta del Dragón de la Suerte y Laboratorio de Los Álamos → puestos en fila a mano). Ahora el panel manda todos a la PC de una vez y siguen aunque se cierre el panel.
 - **Caras y lugares fijos automáticos al producir** (Franklin oct-17: "pensé que ya eso estaba solucionado para que lo hagas todo"): `flow_cuadros.js` (lo llama gen_local) ahora hace solo, con Flow, las caras de personajes y las imágenes de lugares fijos que falten para las tomas del episodio, antes de los cuadros. Ya no hace falta pedirlas en el panel.
 
+- **Lugar fijo en cada toma** (pendiente del oct-14, hecho oct-17): `claude_largo.js` → `assignLocations`: tras los prompts, Claude revisa solo las tomas con location "escena" y liga a su lugar fijo las que ocurren claramente en él (EP47 tenía aldea/búnker/laboratorio sin ligar: 31, 84–86, 122–123, 40, 43, 76, 50). No toca narración ni prompts; si duda, la deja. EP47 no se tocó (ya en producción).
+- **PENDIENTE nuevo** (arriba): llamado a suscribirse a mitad del largo = video con animación en una esquina; esperar la animación de Franklin.
 
 ### 2026-10-16 (sesión Claude Cowork, 4) — MindFuel: letras que se van armando en el centro; cierre propio en inglés
 
