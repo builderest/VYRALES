@@ -13,6 +13,46 @@ process.env.VYRALES_LOCAL_RUN = '1';
 const { runClaude, parseJson, claudeLlm } = require('./_claude');
 const F = (f) => require(path.join(ROOT, 'netlify', 'functions', f));
 
+// EDITOR (Franklin oct-17, tras revisar guiones con ChatGPT): antes de detallar, Claude revisa la historia como un editor
+// de documentales: (1) afirmaciones absolutas ("todos", "nadie", "encontraron al culpable") → precisas; lo que es
+// reconstrucción, como hipótesis; (2) contradicciones entre líneas (esqueletos "completos" vs "le faltan extremidades");
+// (3) ritmo: el contexto no puede retrasar lo prometido al inicio; quita repeticiones (máx. 15 % de las líneas);
+// (4) título claro ("el triple de la potencia prevista", no "3 veces más potente"); (5) texto de portada épico y concreto
+// (si hay cifras, la comparación: "ESPERABAN 5 | EXPLOTÓ CON 15"). Nunca inventa datos ni cambia de qué trata una toma.
+async function editorPass(story, log) {
+  const chapters = story.chapters || [];
+  const rows = []; chapters.forEach((c, ci) => (c.shots || []).forEach((sh, si) => rows.push(`${ci + 1}.${si + 1}: ${sh.line}`)));
+  if (rows.length < 10) return;
+  const total = rows.length;
+  const prompt = `Eres el editor jefe de un canal de documentales con millones de vistas. Revisa este guion ANTES de producirlo.
+Título: "${story.title}"
+Gancho: "${story.hook_text || ''}"
+Líneas del narrador (id capítulo.línea: texto):
+${rows.join('\n')}
+
+Corrige SOLO lo necesario:
+1) PRECISIÓN: cambia afirmaciones absolutas o sin respaldo ("todos", "nadie", "los científicos estaban de acuerdo", "encontraron al culpable") por frases precisas ("los cálculos daban por…", "identificaron una de las claves…"). Lo que es reconstrucción o interpretación debe sonar como tal ("la posición de los huesos permite proponer…"). Las cifras con el rango o la base correcta ("casi el triple de los cinco megatones calculados").
+2) CONTRADICCIONES: si una línea contradice otra (ej. "completos" y luego "le faltan extremidades"), corrige la primera.
+3) RITMO: que el contexto no retrase lo que se prometió al inicio; quita líneas repetidas o de relleno (máximo ${Math.floor(total * 0.15)} líneas) y nunca la frase "Esta es la historia de…", la pregunta final ni las dos últimas líneas.
+4) TÍTULO: claro y sin ambigüedad (ej. "el triple de la potencia prevista" en vez de "3 veces más potente"). Si ya está bien, déjalo igual.
+5) PORTADA: 2 a 5 palabras en MAYÚSCULAS, épicas y concretas; si la historia tiene una comparación numérica, úsala (ej. "ESPERABAN 5 | EXPLOTÓ CON 15", el | es el salto de línea).
+REGLAS: no inventes datos nuevos; cada línea cambiada debe seguir hablando de LO MISMO (misma imagen), con largo parecido; mismo idioma; voz natural de narrador.
+Responde SOLO JSON: {"titulo":"...","cambios":[{"id":"2.3","line":"..."}],"quitar":["3.4"],"portada":"...","notas":["por qué, breve"]}`;
+  const o = parseJson(await runClaude(prompt, { log: () => {} }));
+  if (!o) return;
+  let nc = 0, nq = 0;
+  const byId = (id) => { const [a, b] = String(id).split('.').map(Number); const c = chapters[a - 1]; return c && c.shots && c.shots[b - 1] ? { c, i: b - 1 } : null; };
+  for (const ch of o.cambios || []) { const r = byId(ch.id); if (r && ch.line && String(ch.line).trim().length > 3) { r.c.shots[r.i].line = String(ch.line).trim(); nc++; } }
+  const quitar = (o.quitar || []).map(byId).filter(Boolean);
+  if (quitar.length && quitar.length <= Math.floor(total * 0.15)) {
+    const marks = new Set(quitar.map((r) => r.c.shots[r.i]));
+    for (const c of chapters) { const before = (c.shots || []).length; c.shots = (c.shots || []).filter((sh) => !marks.has(sh)); nq += before - c.shots.length; }
+  }
+  if (o.titulo && String(o.titulo).trim().length >= 10 && String(o.titulo).length <= 110) story.title = String(o.titulo).trim();
+  if (o.portada && String(o.portada).trim().length >= 4) story.cover_text = String(o.portada).trim();
+  log(`Editor: ${nc} línea(s) corregidas, ${nq} quitada(s), título "${story.title}", portada "${story.cover_text || ''}"${(o.notas || []).length ? ' · ' + o.notas.slice(0, 4).join(' · ') : ''}`);
+}
+
 // Lugar fijo de cada toma (pendiente de Franklin, oct-14; hecho oct-17): muchas tomas quedaban con location "escena" aunque
 // ocurrían en un lugar fijo (EP47: aldea, búnker y laboratorio sin ligar) → no recibían la foto del lugar como referencia
 // en Flow y el mismo lugar salía distinto. Claude revisa SOLO las tomas "escena" y liga las que ocurren claramente en uno.
@@ -107,6 +147,7 @@ async function detail(shots, { aspect, context, title, log }) {
       catch (e) { console.log(`  intento ${k}: ${String(e.message).slice(0, 200)}`); if (k === 2) throw e; }
     }
     // Pulido de la narración (largo y cada Short): sin "Y" muletilla, sin saltos, sin palabras raras. Claude, $0.
+    if (!resumed) { try { await editorPass(story, console.log); } catch (e) { console.log('Editor: no se pudo (' + String(e.message).slice(0, 140) + ') — sigo con el guion tal cual.'); } }
     if (!resumed) try {
       const { polishLines, channelCtas } = F('_pulir');
       const cc = await channelCtas(supabase); // cierre/CTA e idioma del canal (MindFuel: inglés, sin "historias")
@@ -130,7 +171,7 @@ async function detail(shots, { aspect, context, title, log }) {
     const shorts = (story.shorts || []).map((sh) => Object.assign({}, sh, { reuse_long: true, shots: (sh.shots || []).map((x, i) => ({ n: i + 1, camera: x.camera || '', start_en: x.visual_es || '', scene_es: x.visual_es || x.line, dialogue: [{ speaker: 'Narrador', line: x.line }], characters: Array.isArray(x.characters) ? x.characters : [], location: x.location || 'escena' })) }));
     if (shorts.length) console.log(`${shorts.length} Shorts: usarán las tomas del largo (sin prompts propios).`);
     const result = { ok: true, kind: 'largo', tipo, model: 'Claude (tu plan)', costUsd: 0, words, minutes: +(words / 2.3 / 60).toFixed(1),
-      long: { title: story.title, hook_text: story.hook_text, description: story.description, sources: story.sources || [], characters: story.characters || [], locations: story.locations || {}, chapters: (story.chapters || []).map((c) => c.title), shots: detailed },
+      long: { title: story.title, cover_text: story.cover_text || '', hook_text: story.hook_text, description: story.description, sources: story.sources || [], characters: story.characters || [], locations: story.locations || {}, chapters: (story.chapters || []).map((c) => c.title), shots: detailed },
       shorts, at: new Date().toISOString() };
     await save(result);
     // oct-14 (Franklin: "hice un guion y no se pone en Guiones; ha pasado más de una vez"): antes había que abrir

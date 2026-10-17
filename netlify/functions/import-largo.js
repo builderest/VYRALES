@@ -59,7 +59,7 @@ exports.handler = async (event) => {
     const doImport = async (data) => { const res = await imp({ httpMethod: 'POST', headers: { 'x-vyrales-key': process.env.DASHBOARD_KEY || '' }, /* llamada interna = "sistema" (multiusuario) */ queryStringParameters: {}, body: JSON.stringify({ series: data }) }); const o = JSON.parse(res.body || '{}'); if (res.statusCode >= 400) throw new Error((o.error || res.statusCode) + (o.errors ? ': ' + o.errors.slice(0, 4).join(' · ') : '')); return o; };
     const L = g.long;
     const longSlug = p.slug + '_completa';
-    const longEp = { title: L.title, continuity: { summary: L.description || '', hook_text: L.hook_text || '', sources: L.sources || [], chapters: L.chapters || [], youtube_description: L.description || '', visual_checked: new Date().toISOString(), from_job: job, kind: 'largo' }, shots: L.shots };
+    const longEp = { title: L.title, continuity: { summary: L.description || '', hook_text: L.hook_text || '', cover_text_es: L.cover_text || undefined, sources: L.sources || [], chapters: L.chapters || [], youtube_description: L.description || '', visual_checked: new Date().toISOString(), from_job: job, kind: 'largo' }, shots: L.shots };
     const r1 = await doImport(seriesJson({ slug: longSlug, title: p.title + ' · Historias completas', synopsis: 'Historias completas (8–15 min) para YouTube: ' + p.nombre + '.', tipo, narration, ep: longEp, aspect: '16:9', characters: L.characters, locations: L.locations,
       sbExtra: { max_seconds: 1100, end_card: { enabled: true, mode: 'tail', text: 'SUSCRÍBETE', subtext: 'Una historia completa cada semana', voice: '', seconds: 3 } } }));
     // En un canal, import-series le pone a la serie el slug del canal (oct-14) → se usa el slug REAL.

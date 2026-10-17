@@ -13,9 +13,10 @@ const clean=(t)=>String(t||'').replace(/[{}\\]/g,'').trim();
 
 async function compose(cwd,{img,text,hl,side,W,H,out}){
   // Texto: 1–2 líneas gigantes, palabra destacada en amarillo, borde negro grueso, lado sin sujeto oscurecido.
-  const words=clean(text).toUpperCase().split(/\s+/).filter(Boolean);
+  const words=clean(String(text).replace(/\|/g,' ')).toUpperCase().split(/\s+/).filter(Boolean);
   const mid=Math.ceil(words.length/2); // 2 palabras = 1 por línea (más grandes)
-  const lines=[words.slice(0,mid),words.slice(mid)].filter((l)=>l.length);
+  // "ESPERABAN 5 | EXPLOTÓ CON 15": el | marca dónde va el salto de línea (texto elegido a mano).
+  const lines=String(text).includes('|')?String(text).split('|').map((p)=>clean(p).toUpperCase().split(/\s+/).filter(Boolean)).filter((l)=>l.length):[words.slice(0,mid),words.slice(mid)].filter((l)=>l.length);
   const hlSet=new Set((hl||[]).map((w)=>clean(w).toUpperCase()));
   const longest=Math.max(...lines.map((l)=>l.join(' ').length));
   const land=W>H;
@@ -69,10 +70,12 @@ Elige las 2 tomas MÁS ÉPICAS para la portada: un solo sujeto claro y grande, d
 Escribe el TEXTO de la portada: 2 a 5 palabras en MAYÚSCULAS, con FUERZA y TENSIÓN, épico, que haga que la gente NO pueda pasar de largo (Franklin, oct-17: "NINGUNO SOLTÓ" es plano y descriptivo; así sí: "¡SOLO UNO SALDRÍA VIVO!", "¡NINGUNO IBA A CEDER!", "¡UNA LUCHA SIN ESCAPE!", "CASI NOS BORRA", "¿EL FIN HUMANO?"). Usa lo que está EN JUEGO (vida o muerte, el fin, lo imposible, el peligro, el secreto), con ¡! o ¿? cuando sume. EXAGERA al máximo la emoción y el drama (es lo que hace que la gente entre), NUNCA los hechos: solo lo que la historia cuenta de verdad. Entre varias opciones, elige SIEMPRE la más épica y exagerada. NO repitas el título palabra por palabra ni describas la imagen. Marca 1–2 palabras para destacar en amarillo (la más fuerte). Y la versión en inglés natural con la misma fuerza (2–5 palabras); solo se usa en canales en inglés (MindFuel): en VYRALES la portada va SOLO en español.
 Para cada toma di en qué lado está el sujeto ("left","right","center") para poner el texto en el lado contrario.
 ADEMÁS (Franklin, oct-16: "una portada que llame MUCHO la atención, hecha con IA, que exagere, que haga que la gente entre"): escribe 2 prompts en inglés para generar con IA una imagen NUEVA de portada, NO un cuadro del video. Estilo miniatura viral de YouTube: UN sujeto enorme y dramático que se entiende en miniatura, emoción extrema o escala exagerada (algo gigantesco, a punto de pasar, en el momento más intenso), contraste fuerte, luz de contraluz/rim light, colores saturados (naranja/azul, rojo/negro), fondo simple y oscuro, profundidad de campo corta, y un lado del cuadro LIBRE (oscuro y vacío) para poner el texto. Exagera lo visual, pero que sea el tema REAL del video (nada que el video no cuente, ni personas reales identificables, ni sangre). Sin letras, logos ni texto dentro de la imagen. ${land?'Formato horizontal 16:9.':'Formato vertical 9:16, sujeto en la mitad de abajo y el espacio libre ARRIBA.'}
-Responde SOLO JSON: {"tomas":[{"n":12,"subject_side":"right","why":"..."},{"n":40,"subject_side":"left","why":"..."}],"text_es":"...","highlight_es":["..."],"text_en":"...","highlight_en":["..."],"ai":[{"prompt":"...","subject_side":"right"},{"prompt":"...","subject_side":"left"}]}`;
+${cont.cover_text_es?'EL TEXTO DE LA PORTADA YA ESTÁ DECIDIDO: "'+String(cont.cover_text_es).replace(/\|/g,' / ')+'". Elige tomas y prompts de IA que lo muestren (por ejemplo, la explosión si habla de la bomba).\n':''}Responde SOLO JSON: {"tomas":[{"n":12,"subject_side":"right","why":"..."},{"n":40,"subject_side":"left","why":"..."}],"text_es":"...","highlight_es":["..."],"text_en":"...","highlight_en":["..."],"ai":[{"prompt":"...","subject_side":"right"},{"prompt":"...","subject_side":"left"}]}`;
 const j=parseJson(await runClaude(p1,{files:sheets.map((x)=>({name:x,buffer:fs.readFileSync(path.join(cwd,x))})),timeoutMin:10,log:console.log}));
 const picks=(j.tomas||[]).filter((t)=>byShot[t.n]).slice(0,2);
 if(!picks.length)throw new Error('Claude no eligió tomas válidas: '+JSON.stringify(j).slice(0,200));
+// Texto de portada elegido a mano para este video (continuity.cover_text_es, Franklin oct-17): manda sobre el de Claude.
+if(cont.cover_text_es){j.text_es=cont.cover_text_es;const lw=String(cont.cover_text_es).split(/[\s|]+/).filter(Boolean);j.highlight_es=[lw[lw.length-1]];}
 console.log('Elegidas:',picks.map((t)=>t.n+' ('+t.why+')').join(' | '),'· texto:',j.text_es,'/',j.text_en);
 const sideFor=(t)=>t.subject_side==='left'?'right':'left';
 // Texto principal: el idioma del canal (MindFuel = inglés).
