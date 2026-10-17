@@ -38,7 +38,10 @@ function decide({ sh, verdict, attempts = [], doc = null, freeFrame = true, keep
   const dudosas = fallas.filter((f) => { const j = judge[JUDGE_KEY[f]]; return j && j.usable && j.fiabilidad != null && j.fiabilidad < 0.5; });
   const out = { fallas, activas: activas.map((p) => p.key), sospechosos: sospechosos.map((p) => p.key), duros: duros.map((p) => p.key) };
 
-  if (fallas.length && dudosas.length === fallas.length) return Object.assign(out, { mode: 'no_fiable', rewrite: false, regen: false, newFrame: false, why: 'el QA marcó ' + fallas.join(', ') + ' y en eso el juez no es fiable según tus aprobaciones' });
+  // oct-16: la "fiabilidad" se calculó con el juez VIEJO, que marcaba detalles menores (fondo, gestos) que Franklin aprobaba.
+  // Ahora el juez separa lo menor (minor: true → se acepta solo). Si dice explícitamente minor: false, es un problema real
+  // (cambia de lugar, se deforma el sujeto, se va a negro) y SÍ se rehace.
+  if (fallas.length && dudosas.length === fallas.length && !(verdict && verdict.minor === false)) return Object.assign(out, { mode: 'no_fiable', rewrite: false, regen: false, newFrame: false, why: 'el QA marcó ' + fallas.join(', ') + ' y en eso el juez no es fiable según tus aprobaciones' });
   // Ya se intentó una reparación de estructura/patrón y siguió con lo mismo, y la evidencia dice que reintentar no sirve.
   const last = attempts.filter((a) => a.mode).slice(-1)[0];
   if (duros.length && last && (last.mode === 'estructura' || last.mode === 'seguro') && score(verdict) > 0) return Object.assign(out, { mode: 'humano', rewrite: false, regen: false, newFrame: false, why: 'reintentar "' + duros.map((p) => p.label).join(', ') + '" casi nunca funciona (' + duros.map((p) => Math.round(p.reintento.util * 100) + ' %').join(', ') + ' de éxito) y ya se probó un cambio de estructura' });
