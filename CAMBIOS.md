@@ -806,3 +806,9 @@ experimento (`doc.forzados`: ¿quién tenía razón?).
   sistema por su cuenta. Si Franklin pide explícitamente un tema de ese tipo para un video puntual, se
   escribe igual de bien — él decide publicarlo solo en Instagram/TikTok/Facebook (cada plataforma ya se
   publica por separado, así que no hace falta subirlo también a YouTube).
+
+## 2026-10-16 — Pose ya tomada + prompts más largos
+- `_ltx_safe.js` regla 17: la acción empieza desde la pose del cuadro; si ya está en posición (ojo en el ocular) nunca "leans toward / settles into"; cámara suave en vez de "holds steady" (evita clip congelado).
+- `_ltx_safe.js` regla 10: action_en de 40–75 palabras (antes 25–45), con detalle visual (luz, textura, partículas, qué queda quieto). Evidencia: explosión en la Luna de Franklin.
+- `_king.js`: tope del prompt 220→300 palabras; `cleanMotion` quita frases enteras de relleno ("Only a subtle breathing movement…") y órdenes de cámara sueltas ("Stable camera…") — manda la línea Camera:.
+- EP39 #43 reescrita (sigue mirando y ajusta el foco) y en cola regen_local. Backup: /tmp/ep39_shots_backup_oct16c.json.

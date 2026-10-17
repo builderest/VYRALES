@@ -95,8 +95,14 @@ function dropFiller(s) {
 }
 // Frases-instrucción de continuidad que el guionista mete dentro de la acción ("Faces, clothing, objects… exactly as in the first frame").
 const CONT_SENT_RE = /^(faces?|same faces?|clothing|clothes)\b[^.]*\b(exactly as|as in the first frame|same)\b/i;
+// Frases que dan una orden de cámara aunque no empiecen con "camera" ("Stable camera, continuous footage…"): manda la línea Camera:.
+const CAM_SENT_RE = /\b(stable|static|steady|locked|fixed|still|handheld)\s+camera\b|\bcamera\s+(remains|stays|is)\b/i;
 function cleanMotion(t) {
-  return sentencesOf(t).filter((s) => !META_SENT_RE.test(s) && !NEG_LIST_RE.test(s) && !/^(the\s+)?camera\b/i.test(s) && !CONT_SENT_RE.test(s.trim()))
+  const all = sentencesOf(t);
+  // Frase ENTERA de relleno ("Only a very subtle breathing movement is visible…"): se quita si queda otra frase con acción.
+  const nonFiller = all.filter((s) => !FILLER_RE.test(s) && !META_SENT_RE.test(s));
+  return all.filter((s) => !(FILLER_RE.test(s) && nonFiller.length && dropFiller(s) === s))
+    .filter((s) => !META_SENT_RE.test(s) && !NEG_LIST_RE.test(s) && !/^(the\s+)?camera\b/i.test(s) && !CONT_SENT_RE.test(s.trim()) && !CAM_SENT_RE.test(s))
     .map(dropFiller)
     .map((s) => s.replace(/;\s*same faces?, clothes[^.;]*/i, ''))
     // La cámara la decide SOLO la línea "Camera:" (antes la acción decía "the camera pushes in" y la línea "lateral drift").
@@ -182,7 +188,7 @@ function ltxPromptFor(shot, storyBible) {
     .replace(/,?\s*(?:with\s+|and\s+)?(?:no|without)\s+(?:any\s+)?(?:readable\s+|visible\s+|on-screen\s+)?(?:text|writing|words|letters|logos?|captions|subtitles|watermarks?)\b(?:\s*(?:,|or|and)\s*(?:no\s+)?(?:readable\s+)?(?:text|writing|words|letters|logos?|captions|subtitles|watermarks?)\b)*/gi, '')
     .replace(/\s+/g, ' ').trim();
   // Tope de largo: si se pasa de ~220 palabras, la descripción del cuadro se recorta a sus 2 primeras frases.
-  if (out.split(/\s+/).length > 220 && startTxt) out = out.replace(startTxt.replace(/[.\s]*$/, '.'), sentencesOf(startTxt).slice(0, 2).join(' ').replace(/[.\s]*$/, '.'));
+  if (out.split(/\s+/).length > 300 && startTxt) out = out.replace(startTxt.replace(/[.\s]*$/, '.'), sentencesOf(startTxt).slice(0, 2).join(' ').replace(/[.\s]*$/, '.'));
   return out;
 }
 
