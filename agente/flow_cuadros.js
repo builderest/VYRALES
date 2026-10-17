@@ -36,6 +36,27 @@ for (const line of fs.readFileSync(path.join(ROOT, '.env'), 'utf8').split(/\r?\n
   // Lugares fijos (Franklin oct-14): Flow acepta varias fotos de referencia → toda toma cuyo lugar tenga foto fija
   // (TOMAS FIJAS = series.visual_memory.locations[lugar].url) va por el camino CON referencias, aunque no tenga personajes,
   // para que la celda, el túnel o el penal se vean IGUALES en todo el documental. Antes solo las tomas con personaje.
+  // oct-17 (Franklin: "pensé que eso ya estaba solucionado para que lo hagas todo"): antes las caras y las imágenes de
+  // lugares fijos había que pedirlas a mano en el panel (y la cadena del navegador se cortaba). Ahora, al producir, se
+  // hacen SOLAS las que faltan para las tomas de este episodio, con Flow ($0), antes de los cuadros.
+  try {
+    const { spawnSync } = require('child_process');
+    const { data: vm0 } = await supabase.from('series').select('visual_memory, story_bible').eq('id', ep.series_id).single();
+    const defs = (vm0 && vm0.story_bible && vm0.story_bible.locations) || {};
+    const have = (vm0 && vm0.visual_memory && vm0.visual_memory.locations) || {};
+    const faltanL = [...new Set(all.map((s) => s.location).filter((l) => l && l !== 'escena' && defs[l] && !(have[l] && have[l].url)))];
+    const { data: chars0 } = await supabase.from('characters').select('name, reference_image_url').eq('series_id', ep.series_id);
+    const usados = new Set(all.flatMap((s) => s.characters || []));
+    const sinCara = (chars0 || []).filter((c) => !c.reference_image_url && usados.has(c.name));
+    if (sinCara.length) {
+      console.log(`Caras que faltan (${sinCara.map((c) => c.name).join(', ')}): las hago con Flow antes de los cuadros...`);
+      spawnSync(process.execPath, [path.join(__dirname, 'flow_cara.js'), series.slug], { stdio: 'inherit', timeout: 15 * 60000 });
+    }
+    for (const l of faltanL) {
+      console.log(`Lugar fijo sin imagen: "${l}" → lo hago con Flow antes de los cuadros...`);
+      spawnSync(process.execPath, [path.join(__dirname, 'flow_lugar.js'), series.slug, l], { stdio: 'inherit', timeout: 8 * 60000 });
+    }
+  } catch (e) { console.log('Caras/lugares automáticos: no se pudo (' + String(e.message).slice(0, 160) + ') — sigo igual.'); }
   const { data: vmRow } = await supabase.from('series').select('visual_memory').eq('id', ep.series_id).single();
   const vmLocs = (vmRow && vmRow.visual_memory && vmRow.visual_memory.locations) || {};
   const lugarFijo = (s) => !!(s.location && vmLocs[s.location] && vmLocs[s.location].url);
