@@ -104,6 +104,11 @@ exports.handler = async (event) => {
     // Órdenes de la PC en curso (para que los botones sigan "trabajando" aunque recargues el panel).
     let agentJobs = [];
     try { const { data: aj } = await byWs(supabase.from('agent_jobs').select('command, status, created_at').in('status', ['pending', 'running'])).order('created_at').limit(20); agentJobs = aj || []; } catch (_) {}
+    // oct-16: órdenes de Flow que FALLARON hace poco (p. ej. cuota del agente agotada) → el panel deja de esperar 10 min
+    // en silencio y muestra la razón real (última línea útil de la salida).
+    let agentErrors = [];
+    try { const { data: ae } = await byWs(supabase.from('agent_jobs').select('command, finished_at, output').eq('status', 'error').like('command', 'flow_%').gte('finished_at', new Date(Date.now() - 20 * 60000).toISOString())).order('finished_at', { ascending: false }).limit(10);
+      agentErrors = (ae || []).map((j) => ({ command: j.command, finished_at: j.finished_at, reason: (String(j.output || '').split(/\r?\n/).filter((l) => /cuota|FALL|error|inicia sesión|login/i.test(l)).pop() || String(j.output || '').trim().split(/\r?\n/).pop() || '').slice(0, 240) })); } catch (_) {}
     // oct-14: con 28 episodios largos la respuesta pasó de 6 MB → Netlify devolvía 502 (Function.ResponseSizeTooLarge).
     // Se recortan SOLO en esta respuesta (la base no se toca) campos pesados que la lista del panel no usa:
     // prompt_preview (prompt de Veo; en narrados LTX arma el suyo), palabras/segmentos/texto de la voz (el editor los saca de
@@ -126,6 +131,7 @@ exports.handler = async (event) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         agent_jobs: agentJobs,
+        agent_errors: agentErrors,
         series,
         all_series: allSeries || [],
         episodes,

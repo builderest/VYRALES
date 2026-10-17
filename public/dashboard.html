@@ -2897,8 +2897,10 @@
         if (sbK.image_engine === 'flow' && sbK.flow_characters !== false) {
           if (btn) btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>Flow en la PC...';
           try { await agentOrder('flow_frames:' + episodeId + ':' + n); } catch (err) { alert('No se pudo mandar a la PC: ' + err.message); return loadDashboard(); }
-          const okF = await pollUntil(d => { const cur = (d.episodes || []).find(x => x.id === episodeId); const f = cur && frameFor(cur, n); return f && f.updated_at !== prevUpdated; }, 10 * 60 * 1000);
+          let flowErr = null;
+          const okF = await pollUntil(d => { const cmd = 'flow_frames:' + episodeId + ':' + n; const er = (d.agent_errors || []).find(j => j.command === cmd && new Date(j.finished_at).getTime() > startedAt); if (er) { flowErr = er; return true; } const cur = (d.episodes || []).find(x => x.id === episodeId); const f = cur && frameFor(cur, n); return f && f.updated_at !== prevUpdated; }, 10 * 60 * 1000);
           await loadDashboard();
+          if (flowErr) { alert(/cuota/i.test(flowErr.reason) ? 'Flow no hizo el cuadro: se acabó la cuota del agente de Flow por ahora. El sistema vuelve a intentarlo solo cuando pasen ~3 h desde el aviso; no es un fallo del programa.' : 'Flow no hizo el cuadro: ' + flowErr.reason); return; }
           if (!okF) alert('El cuadro de Flow no apareció en 10 minutos. Revisa la Terminal (puede estar esperando otra tarea o que inicies sesión en Flow).');
           return;
         }

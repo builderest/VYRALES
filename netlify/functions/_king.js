@@ -101,7 +101,9 @@ function cleanMotion(t) {
   const all = sentencesOf(t);
   // Frase ENTERA de relleno ("Only a very subtle breathing movement is visible…"): se quita si queda otra frase con acción.
   const nonFiller = all.filter((s) => !FILLER_RE.test(s) && !META_SENT_RE.test(s));
-  return all.filter((s) => !(FILLER_RE.test(s) && nonFiller.length && dropFiller(s) === s))
+  // Toma de CONTINUACIÓN (mantiene la pose): la respiración sutil es su único movimiento del sujeto, se deja.
+  const keepPose = /\b(maintains?|keeps?|retains?|holds?)\b[^.]*\b(same|exact(ly)?|original)\b/i.test(t);
+  return all.filter((s) => keepPose || !(FILLER_RE.test(s) && nonFiller.length && dropFiller(s) === s))
     .filter((s) => !META_SENT_RE.test(s) && !NEG_LIST_RE.test(s) && !/^(the\s+)?camera\b/i.test(s) && !CONT_SENT_RE.test(s.trim()) && !CAM_SENT_RE.test(s))
     .map(dropFiller)
     .map((s) => s.replace(/;\s*same faces?, clothes[^.;]*/i, ''))
