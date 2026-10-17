@@ -812,3 +812,5 @@ experimento (`doc.forzados`: ¿quién tenía razón?).
 - `_ltx_safe.js` regla 10: action_en de 40–75 palabras (antes 25–45), con detalle visual (luz, textura, partículas, qué queda quieto). Evidencia: explosión en la Luna de Franklin.
 - `_king.js`: tope del prompt 220→300 palabras; `cleanMotion` quita frases enteras de relleno ("Only a subtle breathing movement…") y órdenes de cámara sueltas ("Stable camera…") — manda la línea Camera:.
 - EP39 #43 reescrita (sigue mirando y ajusta el foco) y en cola regen_local. Backup: /tmp/ep39_shots_backup_oct16c.json.
+- `_ltx_safe.js` regla 17, CIERRE NATURAL: la última toma de una acción puede salir de la pose con UN solo movimiento lento desde la mitad del clip; el "By the end" describe la pose final (nada de "rests/breathing calmly").
+- EP39 #135: mira por el ocular los primeros segundos, luego se endereza y mira la media Luna arriba a la izquierda. En cola regen_local. Backup: /tmp/ep39_shots_backup_oct16e.json.
