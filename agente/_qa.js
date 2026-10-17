@@ -213,7 +213,10 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
     await setWorking(sh.n, 'revisar');
     const d = await durationOf(clip.storage_path);
     let why = '';
-    if (exact[sh.n] && d && d < exact[sh.n] * 0.8) why = `dura ${d.toFixed(1)} s y su voz ${exact[sh.n].toFixed(1)} s`;
+    // oct-17: un clip que ya está en el máximo de king (8 s) y alcanza estirándolo hasta 0.6× (lo que el render permite)
+    // NO se rehace: king no lo puede hacer más largo, y rehacerlo era gastar 3 intentos para el mismo resultado (EP39 toma 7).
+    const maxed = d && d >= 7.5 && exact[sh.n] && d >= exact[sh.n] * 0.6;
+    if (exact[sh.n] && d && d < exact[sh.n] * 0.8 && !maxed) why = `dura ${d.toFixed(1)} s y su voz ${exact[sh.n].toFixed(1)} s`;
     else {
       const fz = await frozenSeconds(clip.storage_path);
       if (d && fz > d * 0.4) why = `está quieto ${fz.toFixed(1)} de ${d.toFixed(1)} s`;
