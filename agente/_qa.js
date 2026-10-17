@@ -232,6 +232,16 @@ async function qaShots({ supabase, epId, handler, log = console.log }) {
     }
     // 🧠 Evidencia OBJETIVA para el cerebro: los defectos medidos (corte, deformación) son hechos, no opinión del juez.
     if (/escena|deforma/.test(why)) { try { await require(path.join(ROOT, 'netlify', 'functions', '_cerebro')).recordMany(supabase, [{ ep: epId, n: sh.n, clip: clip.id, try: (sh.qa && Number(sh.qa.tries)) || 0, src: 'medido', ok: false, fl: { b: true }, reason: 'medido: ' + why, shot: sh, tag: 'medido' }]); } catch (_) {} }
+    // oct-17: el arreglo MECÁNICO no tenía tope de intentos (EP39 toma 139 se rehizo 13 veces seguidas: el regen borra
+    // el veredicto y la pasada siguiente volvía a medir lo mismo). Ahora cuenta en qa.tries (el regen lo conserva) y a
+    // los 3 intentos queda para que Franklin la vea.
+    const triesM = Number(sh.qa && sh.qa.tries) || 0;
+    if (triesM >= 3) {
+      log(`QA toma ${sh.n}: ${why}, pero ya lleva ${triesM} intentos → queda marcada para que la veas (no la rehago otra vez)`);
+      try { const { data: fr } = await supabase.from('episodes').select('shots').eq('id', epId).single(); await supabase.from('episodes').update({ shots: (fr.shots || []).map((x) => x.n === sh.n ? Object.assign({}, x, { qa: Object.assign({}, x.qa || {}, { revisar: true, ok: false, reason: why, mech_ok: true, mech_clip_id: clip.id }) }) : x) }).eq('id', epId); } catch (_) {}
+      continue;
+    }
+    try { const { data: fr } = await supabase.from('episodes').select('shots').eq('id', epId).single(); await supabase.from('episodes').update({ shots: (fr.shots || []).map((x) => x.n === sh.n ? Object.assign({}, x, { qa: Object.assign({}, x.qa || {}, { tries: triesM + 1 }) }) : x) }).eq('id', epId); } catch (_) {}
     log(`QA toma ${sh.n}: ${why} → la rehago con prompt nuevo`);
     await setWorking(sh.n, 'rehacer'); // el panel muestra qué toma está rehaciendo el QA (también en la fase automática)
     if (/quieto|escena|deforma/.test(why) && !sh.clip_stale) {
