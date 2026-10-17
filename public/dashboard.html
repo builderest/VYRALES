@@ -1669,7 +1669,11 @@
         const _qw = (_ep0 && _ep0.validator_report && _ep0.validator_report.qa_working) || null;
         const editingNow = !!(_qw && _qw.n === shotNo && _qw.at && (Date.now() - new Date(_qw.at).getTime() < 25 * 60000) && !asset.approved);
         const editRevisar = editingNow && _qw.what === 'revisar';
-        const est = asset.approved ? { t: 'APROBADO', c: 'text-cyber-emerald' }
+        // oct-16 (Franklin: "le doy a rehacer con LTX y su estado no cambia"): si hay un trabajo EN COLA o CORRIENDO para rehacer
+        // ESTA toma, se muestra eso (antes seguía diciendo APROBADO hasta que terminaba, y el aviso se perdía al refrescar).
+        const _regen = _ep0 && ((lastLoadedData && lastLoadedData.agent_jobs) || []).find(j => /^(pending|running)$/.test(j.status) && new RegExp('^(regen_local|toma_local):' + _ep0.id + ':(.*,)?' + shotNo + '(,|$)').test(String(j.command || '')));
+        const est = _regen ? { t: _regen.status === 'running' ? 'REHACIÉNDOSE AHORA' : 'EN COLA PARA REHACER', c: 'text-cyber-pink' }
+          : asset.approved ? { t: 'APROBADO', c: 'text-cyber-emerald' }
           : editingNow ? { t: editRevisar ? 'REVISÁNDOSE AHORA' : 'EDITÁNDOSE AHORA', c: 'text-cyber-pink' }
           : qaReviewed ? { t: 'REVISADA · falta tu OK', c: 'text-cyber-cyan' }
           : { t: 'PENDIENTE', c: 'text-cyber-gold' };
@@ -1693,7 +1697,7 @@
               '</div>' +
               '<div class="p-3 text-[11px] font-mono space-y-1.5 border-t border-cyber-border">' +
                 '<div class="flex justify-between text-slate-400">' +
-                  '<span>Estado: <strong class="' + est.c + '">' + (editingNow ? '<i class=\'fa-solid fa-spinner fa-spin mr-1\'></i>' : '') + est.t + '</strong></span>' +
+                  '<span>Estado: <strong class="' + est.c + '">' + (editingNow || _regen ? '<i class=\'fa-solid fa-spinner fa-spin mr-1\'></i>' : '') + est.t + '</strong></span>' +
                 '</div>' +
                 (function() { const ep0 = ((lastLoadedData && lastLoadedData.episodes) || []).find(e => (e.assets || []).some(x => x.id === asset.id)); const sh0 = ep0 && (ep0.shots || []).find(x => x.n === shotNo); if (!sh0) return '';
                   const ln = (sh0.voice_part || (sh0.dialogue || []).map(d => d.line).join(' ') || '').trim();
