@@ -37,14 +37,25 @@ exports.handler = async (event) => {
       };
     }
 
+    // oct-16 ("No pude confirmar el estado del episodio (HTTP 500)"): con 42 episodios esta respuesta tardaba ~20 s en Netlify
+    // (al borde del límite) porque traía el PROMPT completo de cada asset (2.100 assets, +2 MB) que la lista no usa.
+    // Ahora: assets sin prompt + una consulta mínima que solo dice qué clips son "voz en off" (lo único que el panel mira del prompt).
     const { data: episodes, error: episodesError } = await supabase
       .from('episodes')
-      .select('*, assets(*)')
+      .select('*, assets(id, episode_id, kind, shot_number, storage_path, approved, approved_at, created_at, updated_at, model, cost_usd, quality_score)')
       .eq('series_id', series.id)
       .order('episode_number', { ascending: false })
       .limit(50);
 
     if (episodesError) throw episodesError;
+    try {
+      const ids = (episodes || []).map((e) => e.id);
+      if (ids.length) {
+        const { data: vo } = await supabase.from('assets').select('id').in('episode_id', ids).ilike('prompt', '%Voice-over narration%');
+        const voSet = new Set((vo || []).map((x) => x.id));
+        for (const e of episodes) for (const a of e.assets || []) a.prompt = voSet.has(a.id) ? 'Voice-over narration' : '';
+      }
+    } catch (_) {}
     const { latestPerShot } = require('./_assets');
     (episodes || []).forEach((e) => { e.assets = latestPerShot(e.assets); });
 
