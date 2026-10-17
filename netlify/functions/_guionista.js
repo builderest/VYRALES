@@ -198,7 +198,7 @@ function buildNarratedPrompt(tipo = 'curiosidades', { topic = '', canal = '' } =
 // los prompts detallados en inglés para Flow/LTX los escribe después el revisor (_visual_check), por capítulos.
 function buildLongPrompt(tipo = 'historia', { topic = '', canal = '', cierre = null, cta = null } = {}) {
   // Cierre del largo y del Short POR CANAL (ctasOf en _pulir.js). null = el de VYRALES (español).
-  const CIERRE = cierre === null ? 'Si quieres más historias como esta, contadas completas, suscríbete al canal.' : cierre;
+  const CIERRE = cierre === null ? 'Suscríbete a VYRALES, porque la próxima historia podría cambiar todo lo que creías saber.' : cierre;
   const CTA = cta === null ? 'Si quieres ver la historia completa, entra al enlace que te dejo aquí abajo.' : cta;
   const p = TIPOS[tipo] || TIPOS.historia;
   const voz = (buildNarratedPromptRaw(tipo, p).match(/=== VOZ HUMANA[\s\S]*?(?=\n=== REGLAS TÉCNICAS)/) || [''])[0];
@@ -219,7 +219,7 @@ ${voz}
   3. 6 a 8 CAPÍTULOS de 60–120 s. Cada capítulo tiene título corto, avanza la historia (causa → efecto) y TERMINA con una pregunta abierta o un giro que obliga a seguir viendo.
   4. EL CLÍMAX al 70–80 % del video.
   5. RESOLUCIÓN Y LEGADO: qué pasó después y por qué te importa hoy.
-  6. CIERRE: vuelve a la imagen de la apertura, una pregunta al espectador para que comente${CIERRE ? ' y, como ÚLTIMA frase, EXACTAMENTE: "' + CIERRE + '" (solo esa, en ese idioma; nunca la repitas en otro idioma)' : ''}.
+  6. CIERRE: vuelve a la imagen de la apertura, una pregunta al espectador para que comente${CIERRE ? ' y, como ÚLTIMA frase, EXACTAMENTE: "' + CIERRE + '" (solo esa, en ese idioma; nunca la repitas en otro idioma)' : ''}${/Suscríbete a VYRALES/.test(CIERRE) ? ' Justo ANTES de esa frase final, una línea de cierre propia con misterio, adaptada al tema de ESTE video (no la copies igual en todos). Ejemplo para historia: "La historia nunca termina… solo espera a que alguien descubra sus secretos. Y todavía nos quedan muchos por revelar." Para espacio, ciencia, guerra o tecnología, cambia las palabras pero mantén la idea (lo que falta por descubrir). La frase final de suscripción va en su PROPIA toma' : ''}.
 - RETENCIÓN: un re-enganche cada 30–60 s (un dato que sorprende, un giro, una pregunta). Nunca resumas lo que ya se dijo. Nada de relleno ni de listas de datos.
 - CERO DATOS FALSOS: cada dato con su fuente en "sources". Si hay un rango, usa palabras prudentes ("cerca de", "unos"). Si no se puede verificar, no entra.
 

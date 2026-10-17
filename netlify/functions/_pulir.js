@@ -1,7 +1,8 @@
 // PULIDO DE LA NARRACIÓN (Franklin, oct-11: "nada que suene a IA; sin 'Y' sueltas al empezar; la historia debe
 // seguir completa sin saltos bruscos ni palabras locas"). Claude en la PC revisa TODAS las líneas juntas y las
 // corrige lo mínimo: misma cantidad de líneas (cada una sigue en su toma), mismos datos, mismo largo aprox.
-const CIERRE_LARGO = 'Si quieres más historias como esta, contadas completas, suscríbete al canal.';
+// Firma de VYRALES (Franklin, oct-16): la última frase es siempre esta; la frase de antes la adapta el guionista al tema.
+const CIERRE_LARGO = 'Suscríbete a VYRALES, porque la próxima historia podría cambiar todo lo que creías saber.';
 const CTA_SHORT = 'Si quieres ver la historia completa, entra al enlace que te dejo aquí abajo.';
 
 // Cierre / llamada a la acción POR CANAL (Franklin oct-16): MindFuel es un canal de motivación en inglés; ahí no se puede
