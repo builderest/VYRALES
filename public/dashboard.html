@@ -3064,7 +3064,18 @@
         const faltan = Object.keys(locs).filter(k => k !== 'escena' && !((vmL[k] || {}).url) && (!window.__fijosScope || window.__fijosScope.locs.has(k)));
         if (!faltan.length) return alert('Todas las tomas fijas ya tienen imagen.');
         if (!await askConfirm('Generar ' + faltan.length + ' imagen(es) de lugar con Google Flow ($0)?\n\n' + faltan.map(k => '\u2022 ' + k).join('\n') + '\n\nSe hacen una por una en tu PC.')) return;
-        for (const k of faltan) { await generateLocationImage(k); }
+        // oct-17 (Franklin: "el sistema está como estancado"): antes se pedían UNA POR UNA desde el navegador; si el
+        // celular se bloqueaba o se cerraba la pestaña, la cadena se cortaba en silencio (Castle Bravo: hizo 2 de 4 y paró).
+        // Ahora se mandan TODAS a la PC de una vez (el agente las hace en fila aunque cierres el panel).
+        const sbL = d.series.story_bible || {};
+        if (sbL.image_engine !== 'flow') { for (const k of faltan) { await generateLocationImage(k); } return; }
+        const prev = {}; faltan.forEach(k => { prev[k] = (vmL[k] || {}).url || null; });
+        try { for (const k of faltan) await agentOrder('flow_lugar:' + DEFAULT_SERIES + ':' + k); }
+        catch (err) { return alert('No se pudo mandar a la PC: ' + err.message); }
+        const sub = document.getElementById('locationsSubtitle');
+        if (sub) sub.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>Google Flow en tu PC: ' + faltan.length + ' lugar(es) en fila ($0). Puedes cerrar el panel: siguen solos.';
+        await pollUntil(dd => { const m = (dd.series && dd.series.visual_memory && dd.series.visual_memory.locations) || {}; return faltan.every(k => m[k] && m[k].url && m[k].url !== prev[k]); }, faltan.length * 8 * 60 * 1000);
+        return loadDashboard();
       };
       window.pickLocationImage = function(btn) {
         pendingLocationKey = btn.dataset.loc;
