@@ -780,6 +780,13 @@ async function renderEpisode({ episode, series, log = console.log, fetchFile = d
     args.push('-filter_complex', filters.join(';'), '-map', '0:v', '-map', '[aout]', '-c:v', 'copy', ...AUDIO_OUT, '-t', total.toFixed(3), '-movflags', '+faststart', 'final.mp4');
     log('audio final (música / volumen parejo)...');
     await run(args, cwd);
+    // Intro del canal (Franklin oct-16): story_bible.intro = { url, after_seconds } → se mete DESPUÉS del gancho, en una
+    // pausa de la voz. Si algo falla, el video sale igual sin intro (nunca rompe el render).
+    let intro = null;
+    try { intro = await insertIntro({ cwd, episode, series, total, parts, words: contVoice && Array.isArray(contVoice.words) ? contVoice.words : null, fetchFile, log }); }
+    catch (e) { log('AVISO: no pude poner la intro (' + String(e.message).slice(0, 160) + ') → sale sin intro'); }
+    if (intro) total += intro.dur;
+    try { await saveIntroInfo(episode, intro); } catch (_) {}
     tagAiMetadata(path.join(cwd, 'final.mp4'), log);
     // Supabase rechaza archivos de más de 50 MB (probado: 45 MB OK, 55 MB → 413). Un episodio de
     // 2:40 salía en ~87 MB y la subida fallaba sin video final. Si pasa de MAX_UPLOAD_MB se
@@ -798,13 +805,80 @@ async function renderEpisode({ episode, series, log = console.log, fetchFile = d
       finalName = 'final-small.mp4';
       log(`recomprimido: ${(fs.statSync(path.join(cwd, finalName)).size / 1048576).toFixed(1)} MB`);
     }
-    return { file: path.join(cwd, finalName), seconds: total, pieces: parts.length, cleanup, plan };
+    return { file: path.join(cwd, finalName), seconds: total, pieces: parts.length, cleanup, plan, intro };
   } catch (err) {
     cleanup();
     throw err;
   }
 }
 
+
+// ¿Dónde va la intro? En una pausa de la voz (≥ 0.25 s) entre after_seconds y +12 s, lo más cerca posible de un cambio
+// de toma (si el cambio cae dentro de la pausa, se corta justo ahí). Sin tiempos de voz: el primer cambio de toma.
+function introCutTime({ parts, words, after, maxAt }) {
+  const bounds = []; let s0 = 0;
+  parts.forEach((p, k) => { const next = s0 + p.dur - p.xfade; if (k < parts.length - 1) bounds.push(next + p.xfade / 2); s0 = next; });
+  const nearB = (t) => bounds.reduce((b, x) => (Math.abs(x - t) < Math.abs(b - t) ? x : b), Infinity);
+  if (words && words.length) {
+    const LEAD = require('./_voice_full').LEAD;
+    const gaps = [];
+    for (let i = 0; i + 1 < words.length; i++) {
+      const g0 = LEAD + Number(words[i].end), g1 = LEAD + Number(words[i + 1].start);
+      if (g1 - g0 >= 0.25 && (g0 + g1) / 2 >= after && (g0 + g1) / 2 <= maxAt) gaps.push([g0, g1]);
+    }
+    let best = null;
+    for (const [g0, g1] of gaps) {
+      const b = nearB((g0 + g1) / 2);
+      const inside = b > g0 + 0.05 && b < g1 - 0.05;
+      const cut = inside ? b : (g0 + g1) / 2;
+      const score = inside ? 0 : Math.abs(b - cut) + 0.5 / (g1 - g0);
+      if (!best || score < best.score) best = { cut, score };
+    }
+    if (best) return best.cut;
+    return null; // sin pausa en la ventana → mejor sin intro que cortar una palabra
+  }
+  return bounds.find((b) => b >= after && b <= maxAt) || null;
+}
+async function insertIntro({ cwd, episode, series, total, parts, words, fetchFile, log }) {
+  const ic = ((series && series.story_bible) || {}).intro;
+  if (!ic || !ic.url || ic.enabled === false || (episode.continuity || {}).kind !== 'largo') return null;
+  const after = Number(ic.after_seconds) || 10, maxAt = after + 12;
+  if (total < maxAt + 30) return null;
+  const at = introCutTime({ parts, words, after, maxAt });
+  if (!at) { log('intro: no encontré una pausa de la voz entre ' + after + ' y ' + maxAt + ' s → sale sin intro'); return null; }
+  await fetchFile(ic.url, path.join(cwd, 'intro.src'));
+  const im = await probeMedia('intro.src', cwd);
+  const dur = im.duration;
+  const T = at.toFixed(3);
+  const V = `fps=${FPS},scale=${W}:${H}:force_original_aspect_ratio=decrease,pad=${W}:${H}:(ow-iw)/2:(oh-ih)/2,setsar=1,format=yuv420p`;
+  const A = 'aresample=48000,aformat=channel_layouts=stereo';
+  const f = [
+    `[0:v]trim=0:${T},setpts=PTS-STARTPTS,${V}[v0]`,
+    `[1:v]setpts=PTS-STARTPTS,${V}[v1]`,
+    `[0:v]trim=start=${T},setpts=PTS-STARTPTS,${V}[v2]`,
+    `[0:a]atrim=0:${T},asetpts=PTS-STARTPTS,${A},afade=t=out:st=${Math.max(0, at - 0.25).toFixed(3)}:d=0.25[a0]`,
+    im.hasAudio ? `[1:a]asetpts=PTS-STARTPTS,${A},loudnorm=I=-15:TP=-1.5:LRA=11,${A}[a1]` : `anullsrc=r=48000:cl=stereo,atrim=0:${dur.toFixed(3)}[a1]`,
+    `[0:a]atrim=start=${T},asetpts=PTS-STARTPTS,${A},afade=t=in:st=0:d=0.3[a2]`,
+    '[v0][a0][v1][a1][v2][a2]concat=n=3:v=1:a=1[v][a]',
+  ];
+  log(`intro del canal: ${dur.toFixed(1)} s en el segundo ${T} (pausa de la voz)...`);
+  await run(['-y', '-i', 'final.mp4', '-i', 'intro.src', '-filter_complex', f.join(';'), '-map', '[v]', '-map', '[a]', ...VIDEO_OUT, ...AUDIO_OUT, '-movflags', '+faststart', 'final-intro.mp4'], cwd);
+  fs.renameSync(path.join(cwd, 'final-intro.mp4'), path.join(cwd, 'final.mp4'));
+  return { at: Number(T), dur: Number(dur.toFixed(3)), url: ic.url };
+}
+// Los subtítulos CC y los capítulos salen de los tiempos de la voz: se guarda dónde quedó la intro para correrlos.
+async function saveIntroInfo(episode, intro) {
+  if (!episode || !episode.id || !/^[0-9a-f-]{36}$/.test(String(episode.id))) return;
+  const old = (episode.continuity || {}).intro;
+  if (!intro && !old) return;
+  const sb = require('./_supabase').getSupabaseClient();
+  const { data: fr } = await sb.from('episodes').select('continuity').eq('id', episode.id).single();
+  const c = Object.assign({}, (fr && fr.continuity) || {});
+  if (intro) c.intro = intro; else delete c.intro;
+  await sb.from('episodes').update({ continuity: c }).eq('id', episode.id);
+}
+// Tiempo de la voz → tiempo en el video con intro (lo de después del corte se corre lo que dura la intro).
+function introShift(intro) { return (t) => (intro && t >= intro.at ? t + intro.dur : t); }
 
 // Marca el MP4 como "hecho con IA" con el estándar IPTC (XMP DigitalSourceType = trainedAlgorithmicMedia),
 // el mismo que leen Meta / TikTok / Google para poner su etiqueta de IA cuando la detectan.
@@ -826,4 +900,4 @@ function tagAiMetadata(file, log = console.log) {
   } catch (err) { log('AVISO: no pude agregar los metadatos de IA:', err.message); }
 }
 
-module.exports = { kineticEvents, run, download, detectSpeech, renderEpisode, resolvePlan, defaultPlan, autoTransition, autoEndCard, withTotalEpisodes, dialogueOf, findFont, FONT_FILE, FONT_NAME };
+module.exports = { introShift, introCutTime, kineticEvents, run, download, detectSpeech, renderEpisode, resolvePlan, defaultPlan, autoTransition, autoEndCard, withTotalEpisodes, dialogueOf, findFont, FONT_FILE, FONT_NAME };

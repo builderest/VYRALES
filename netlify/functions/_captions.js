@@ -134,8 +134,11 @@ async function ensureSubtitles(supabase, episode, log = console.log) {
   // Idioma de la voz = idioma de la serie (VYRALES 'es', MindFuel 'en').
   const { data: serL } = await supabase.from('series').select('language').eq('id', episode.series_id).single();
   const main = (serL && serL.language) === 'en' ? 'en' : 'es', other = main === 'es' ? 'en' : 'es';
-  const out = { [main]: buildSrt(voice.words) };
-  const ytt = { [main]: buildYtt(voice.words) }; // oct-14: lo que se sube a YouTube va con colores y letra grande
+  // Intro del canal metida después del gancho (continuity.intro = { at, dur }): lo que viene después se corre.
+  const IN = cont.intro;
+  const sh = (ws) => (IN && IN.dur ? ws.map((w) => (LEAD + Number(w.start) >= IN.at ? Object.assign({}, w, { start: Number(w.start) + IN.dur, end: Number(w.end) + IN.dur }) : w)) : ws);
+  const out = { [main]: buildSrt(sh(voice.words)) };
+  const ytt = { [main]: buildYtt(sh(voice.words)) }; // oct-14: lo que se sube a YouTube va con colores y letra grande
   if (main === 'es' && en && en.voice_url && Array.isArray(en.lines)) {
     let words = Array.isArray(en.words) && en.words.length ? en.words : null;
     if (!words) {
@@ -148,7 +151,7 @@ async function ensureSubtitles(supabase, episode, log = console.log) {
         await supabase.from('episodes').update({ continuity: Object.assign({}, c2, { english: Object.assign({}, c2.english, { words }) }) }).eq('id', episode.id);
       }
     }
-    if (words) { out.en = buildSrt(words); ytt.en = buildYtt(words); }
+    if (words) { out.en = buildSrt(sh(words)); ytt.en = buildYtt(sh(words)); }
   }
   if (!out[other]) { try { const tr = await translateSrt(out[main], main, other, log); if (tr) { out[other] = tr; ytt[other] = yttFromSrt(tr); } } catch (e) { log('subtítulos: no pude traducir (' + String(e.message).slice(0, 120) + ')'); } }
   const { uploadFile } = require('./_storage');

@@ -63,7 +63,7 @@ module.exports = {
   // "flow_cuadros:<episode_id>[:<tomas>]" — cuadros con Google Flow en una sesión + videos en king.
   flow_cuadros: { label: 'Flow: cuadros del episodio', help: 'Genera los cuadros iniciales en Google Flow (una sesión) y rehace los videos en king', special: 'flow_cuadros', arg: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(:\d{1,3}(,\d{1,3})*)?$/i, hidden: true },
   // "toma_local:<episode_id>:<n>" — una sola toma (cuadro + video) en king; lo pide el panel.
-  toma_local: { label: 'Una toma en king', help: 'Genera una sola toma (cuadro + video) en la PC king', special: 'toma_local', arg: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}:\d{1,2}$/i, hidden: true },
+  toma_local: { label: 'Una toma en king', help: 'Genera una sola toma (cuadro + video) en la PC king', special: 'toma_local', arg: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}:\d{1,3}$/i, hidden: true },
   diag_python: { label: 'Diagnóstico Python', help: 'Revisa si hay Python en la PC', special: 'diag_python' },
   claude_diag: { label: 'Claude: instalar / revisar', help: 'Revisa si Claude Code está instalado en la PC (si no, lo instala) y prueba tu plan', special: 'claude_diag' },
   claude_login: { label: 'Claude: iniciar sesión', help: 'Abre una ventana de Claude Code en la PC para iniciar sesión una vez con tu plan', special: 'claude_login' },

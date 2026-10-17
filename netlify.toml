@@ -1,6 +1,10 @@
 [build]
   publish = "public"
   functions = "netlify/functions"
+  # REGLA (Franklin oct-16: "no se puede hacer tantos deploy"): cada deploy de producción cuesta 15 créditos.
+  # Si el push solo toca cosas de la PC (agente/, CAMBIOS.md, notas, json sueltos) Netlify NO construye.
+  # Exit 0 = saltar el build; exit 1 = construir.
+  ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- public/ netlify/ netlify.toml package.json package-lock.json"
 
 [functions]
   node_bundler = "esbuild"

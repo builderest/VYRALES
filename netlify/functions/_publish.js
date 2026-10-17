@@ -44,7 +44,8 @@ function shotStartTimes(episode, ordered) {
   const cuts = VF.shotCutsExact(voice, ordered);
   if (!cuts) return null;
   const out = {}; let t = 0;
-  for (const s of ordered) { out[s.n] = t; t += Number(cuts[s.n]) || 0; }
+  const IN = (episode.continuity || {}).intro; const LEAD = VF.LEAD || 0.6;
+  for (const s of ordered) { out[s.n] = IN && IN.dur && t + LEAD >= IN.at ? t + IN.dur : t; t += Number(cuts[s.n]) || 0; }
   return out;
 }
 // Capítulos "0:00 Título" (cada uno en su línea; YouTube exige empezar en 0:00, 3+ capítulos de 10+ s).

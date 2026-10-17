@@ -818,3 +818,11 @@ experimento (`doc.forzados`: ¿quién tenía razón?).
 - Panel: al pedir un cuadro de Flow, si el trabajo falla (p. ej. cuota del agente de Flow agotada) se muestra la razón real en vez de esperar 10 min y decir "no apareció". `get-episodes` devuelve `agent_errors` (fallos de flow_* de los últimos 20 min).
 - **Firma de cierre de VYRALES** (Franklin, oct-16): la última frase de los largos en español es siempre "Suscríbete a VYRALES, porque la próxima historia podría cambiar todo lo que creías saber." (`CIERRE_LARGO` en `_pulir.js` y default de `buildLongPrompt`). Justo antes, el guionista escribe una línea de cierre con misterio adaptada al tema (ejemplo: "La historia nunca termina… solo espera a que alguien descubra sus secretos. Y todavía nos quedan muchos por revelar."), y la suscripción va en su propia toma. MindFuel no cambia (tiene sus ctas).
 - **EP39**: toma 138 = "La historia nunca termina…" (misma imagen de la Luna, video a rehacer); toma 139 nueva = "Suscríbete a VYRALES…" con la imagen de la apertura (copia de la toma 1, sin gastar Flow). En cola `regen_local:…:138,139` (rehace y une el final). Respaldo: /tmp/ep39_backup_cierre.json.
+
+## REGLA — pocos deploys (Franklin, oct-16: "no se puede hacer tantos deploy, eso es una regla"; "los cambios tenemos que hacerlos locales")
+- Cada deploy de producción en Netlify cuesta 15 créditos (291 deploys = 4,365 de 4,810 créditos del período).
+- Los cambios se hacen y se prueban LOCAL (el agente de la PC lee los archivos de la carpeta: no necesita push).
+- Commit local sí; `push` solo cuando un cambio TIENE que estar en la web (panel / funciones de Netlify), juntando todo en UN push, como máximo una vez al día, o cuando Franklin lo pida.
+- `netlify.toml` → `ignore`: si el push no toca public/, netlify/, netlify.toml ni package*.json, Netlify no construye.
+- Intro del canal (`story_bible.intro`, `_render.js insertIntro`): se mete después del gancho (≥10 s) en una pausa de la voz; `continuity.intro {at,dur}` corre subtítulos CC (`_captions.js`) y capítulos (`_publish.js`). Puesta en las series largas de VYRALES con la versión de 4.4 s.
+- `comandos.js` toma_local aceptaba solo tomas de 1–2 cifras (no la 139) → 1–3 cifras.
