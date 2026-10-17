@@ -857,7 +857,7 @@ async function insertIntro({ cwd, episode, series, total, parts, words, fetchFil
     `[1:v]setpts=PTS-STARTPTS,${V}[v1]`,
     `[0:v]trim=start=${T},setpts=PTS-STARTPTS,${V}[v2]`,
     `[0:a]atrim=0:${T},asetpts=PTS-STARTPTS,${A},afade=t=out:st=${Math.max(0, at - 0.25).toFixed(3)}:d=0.25[a0]`,
-    im.hasAudio ? `[1:a]asetpts=PTS-STARTPTS,${A},loudnorm=I=-15:TP=-1.5:LRA=11,${A}[a1]` : `anullsrc=r=48000:cl=stereo,atrim=0:${dur.toFixed(3)}[a1]`,
+    im.hasAudio ? `[1:a]asetpts=PTS-STARTPTS,${A},loudnorm=I=-18:TP=-2:LRA=11,${A}[a1]` : `anullsrc=r=48000:cl=stereo,atrim=0:${dur.toFixed(3)}[a1]`,
     `[0:a]atrim=start=${T},asetpts=PTS-STARTPTS,${A},afade=t=in:st=0:d=0.3[a2]`,
     '[v0][a0][v1][a1][v2][a2]concat=n=3:v=1:a=1[v][a]',
   ];
